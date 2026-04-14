@@ -191,17 +191,9 @@ const CSS = `
   }
   .ag-topbar-title p { font-size:11px; color:var(--text-2); margin-top:2px; }
 
-  /* Variante com título centralizado (usada pelos módulos) */
-  .ag-topbar-centered {
-    position: relative;
-  }
-  .ag-topbar-centered .ag-topbar-title {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
+  /* Centraliza o texto do título sem tirar do fluxo flex */
+  .ag-topbar .ag-topbar-title {
     text-align: center;
-    flex: unset;
-    pointer-events: none;
   }
 
   .ag-search {
