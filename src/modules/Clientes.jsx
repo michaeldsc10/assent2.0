@@ -880,26 +880,13 @@ export default function Clientes() {
       <style>{CSS}</style>
 
       {/* ── Topbar ── */}
-      <header className="cl-topbar">
-        <div className="cl-topbar-title">
-          <h1>Clientes</h1>
-          <p>Gerencie e acompanhe sua base de clientes</p>
-        </div>
-
-        <div className="cl-search">
-          <Search size={13} color="var(--text-3)" />
-          <input
-            placeholder="Buscar por nome, CPF ou telefone..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-
-        <button className="btn-novo-cl" onClick={() => setModalNovo(true)}>
-          <UserPlus size={14} />
-          Novo Cliente
-        </button>
-      </header>
+     <header className="ag-topbar ag-topbar-centered">
+  <div className="ag-topbar-title">
+    <h1>Clientes</h1>
+    <p>Gerencie e acompanhe sua base de clientes</p>
+  </div>
+  {/* search + botão — ficam à direita normalmente */}
+</header>
 
       {/* ── Conteúdo ── */}
       <div className="ag-content">
