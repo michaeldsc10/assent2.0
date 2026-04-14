@@ -63,9 +63,11 @@ const NAV = [
 
 /* ─── CSS base (sempre ativo) ──────────────────────── */
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Sora:wght@300;400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body, #root { height: 100%; width: 100%; margin: 0; padding: 0; }
 
   :root {
     --bg:         #09090c;
@@ -77,6 +79,7 @@ const CSS = `
     --gold:       #c8a55e;
     --gold-l:     #dfc07c;
     --gold-d:     rgba(200,165,94,0.12);
+    --gold-brand: #D4AF37;
     --text:       #edeae3;
     --text-2:     #787480;
     --text-3:     #3a3842;
@@ -91,6 +94,7 @@ const CSS = `
     --amber:      #f59e0b;
     --amber-d:    rgba(245,158,11,0.1);
     font-family: 'DM Sans', sans-serif;
+    --font-display: 'Playfair Display', serif;
     color-scheme: dark;
   }
 
@@ -180,10 +184,25 @@ const CSS = `
   }
   .ag-topbar-title { flex:1; }
   .ag-topbar-title h1 {
-    font-family:'Sora',sans-serif; font-size:17px; font-weight:600;
-    color:var(--text); line-height:1.2;
+    font-family: var(--font-display); font-size:20px; font-weight:600;
+    color: var(--gold-brand);
+    line-height:1.2;
+    letter-spacing: 0.01em;
   }
   .ag-topbar-title p { font-size:11px; color:var(--text-2); margin-top:2px; }
+
+  /* Variante com título centralizado (usada pelos módulos) */
+  .ag-topbar-centered {
+    position: relative;
+  }
+  .ag-topbar-centered .ag-topbar-title {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    flex: unset;
+    pointer-events: none;
+  }
 
   .ag-search {
     display:flex; align-items:center; gap:8px;
