@@ -1,9 +1,14 @@
+/* ═══════════════════════════════════════════════════
+   ASSENT v2.0 — Auth.jsx (Tela de Login + Cadastro)
+   Versão corrigida e limpa
+   ═══════════════════════════════════════════════════ */
+
 import { useState } from "react";
-import { login, register, auth } from "../lib/firebase";
+import { login, register } from "../lib/firebase";   // Removemos o 'auth' daqui
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
-export default function Auth({ onLoginSuccess }) {
+export default function Auth({ onAuthSuccess }) {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,18 +28,32 @@ export default function Auth({ onLoginSuccess }) {
         const userCredential = await register(email, password);
         const uid = userCredential.user.uid;
 
-        // Cria o documento do usuário na nova estrutura
         await setDoc(doc(db, "users", uid), {
-          name: nome || email.split("@")[0],
+          name: nome.trim() || email.split("@")[0],
           email: email,
           plan: "pro",
           createdAt: new Date(),
           clienteIdCnt: 0,
         });
       }
-      onLoginSuccess?.();
+
+      // Sucesso → avisa o App.jsx
+      onAuthSuccess?.();
     } catch (err) {
-      setError(err.message);
+      console.error("Erro de autenticação:", err.code, err.message);
+
+      // Mensagens amigáveis
+      if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password") {
+        setError("E-mail ou senha incorretos.");
+      } else if (err.code === "auth/email-already-in-use") {
+        setError("Este e-mail já está cadastrado.");
+      } else if (err.code === "auth/invalid-email") {
+        setError("E-mail inválido.");
+      } else if (err.code === "auth/weak-password") {
+        setError("A senha deve ter pelo menos 6 caracteres.");
+      } else {
+        setError("Ocorreu um erro. Tente novamente.");
+      }
     } finally {
       setLoading(false);
     }
@@ -52,7 +71,7 @@ export default function Auth({ onLoginSuccess }) {
     }}>
       <div style={{
         background: "#0f0f13",
-        padding: "40px 32px",
+        padding: "40px 36px",
         borderRadius: "16px",
         width: "100%",
         maxWidth: "420px",
@@ -60,15 +79,15 @@ export default function Auth({ onLoginSuccess }) {
       }}>
         <div style={{ textAlign: "center", marginBottom: "32px" }}>
           <div style={{
-            width: 64, height: 64, borderRadius: 12,
-            background: "linear-gradient(135deg, #b8952e, #e0c060)",
+            width: 68, height: 68, borderRadius: 14,
+            background: "linear-gradient(135deg, #c8a55e, #e0c060)",
             margin: "0 auto 16px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 28,
-            color: "#0a0808",
+            fontSize: 32,
             fontWeight: 700,
+            color: "#0a0808",
           }}>AG</div>
           <h1 style={{ fontFamily: "'Sora', sans-serif", fontSize: 28 }}>Assent Gestão</h1>
           <p style={{ color: "#787480", marginTop: 8 }}>
@@ -86,13 +105,13 @@ export default function Auth({ onLoginSuccess }) {
                 type="text"
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
+                placeholder="Seu nome completo"
                 style={{
                   width: "100%", padding: "12px 14px", background: "#141419",
                   border: "1px solid #222", borderRadius: 8, color: "#edeae3",
                   fontSize: 15,
                 }}
-                placeholder="Seu nome"
-                required
+                required={!isLogin}
               />
             </div>
           )}
@@ -105,12 +124,12 @@ export default function Auth({ onLoginSuccess }) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="seu@email.com"
               style={{
                 width: "100%", padding: "12px 14px", background: "#141419",
                 border: "1px solid #222", borderRadius: 8, color: "#edeae3",
                 fontSize: 15,
               }}
-              placeholder="seu@email.com"
               required
             />
           </div>
@@ -123,17 +142,17 @@ export default function Auth({ onLoginSuccess }) {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
               style={{
                 width: "100%", padding: "12px 14px", background: "#141419",
                 border: "1px solid #222", borderRadius: 8, color: "#edeae3",
                 fontSize: 15,
               }}
-              placeholder="••••••••"
               required
             />
           </div>
 
-          {error && <p style={{ color: "#e05252", fontSize: 13, marginBottom: 16 }}>{error}</p>}
+          {error && <p style={{ color: "#e05252", fontSize: 13, marginBottom: 16, textAlign: "center" }}>{error}</p>}
 
           <button
             type="submit"
@@ -147,34 +166,19 @@ export default function Auth({ onLoginSuccess }) {
               fontSize: 15,
               border: "none",
               borderRadius: 9,
-              cursor: "pointer",
+              cursor: loading ? "not-allowed" : "pointer",
+              opacity: loading ? 0.8 : 1,
             }}
           >
-            {loading ? "Carregando..." : isLogin ? "Entrar" : "Criar conta"}
+            {loading ? "Processando..." : isLogin ? "Entrar" : "Criar conta"}
           </button>
         </form>
 
         <div style={{ textAlign: "center", marginTop: 24, fontSize: 13 }}>
           {isLogin ? (
-            <>
-              Não tem conta?{" "}
-              <span
-                onClick={() => setIsLogin(false)}
-                style={{ color: "#c8a55e", cursor: "pointer", fontWeight: 500 }}
-              >
-                Cadastre-se
-              </span>
-            </>
+            <>Não tem conta? <span onClick={() => { setIsLogin(false); setError(""); }} style={{ color: "#c8a55e", cursor: "pointer" }}>Cadastre-se</span></>
           ) : (
-            <>
-              Já tem conta?{" "}
-              <span
-                onClick={() => setIsLogin(true)}
-                style={{ color: "#c8a55e", cursor: "pointer", fontWeight: 500 }}
-              >
-                Entrar
-              </span>
-            </>
+            <>Já tem conta? <span onClick={() => { setIsLogin(true); setError(""); }} style={{ color: "#c8a55e", cursor: "pointer" }}>Entrar</span></>
           )}
         </div>
       </div>
