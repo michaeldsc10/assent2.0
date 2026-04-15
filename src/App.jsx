@@ -14,8 +14,7 @@ function App() {
   return user ? <Dashboard /> : <Auth onLoginSuccess={() => {}} />;
 }
 
-export default App;
-import Dashboard from "./Dashboard";
+
 
 export default function App() {
   return <Dashboard />;
