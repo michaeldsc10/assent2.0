@@ -231,23 +231,399 @@ const gerarIdCliente = (cnt) => `C${String(cnt + 1).padStart(4, "0")}`;
 /* ======================= MODAIS (Cole aqui os 4 modais completos do arquivo antigo) ======================= */
 
 function ModalNovoCliente({ cliente, clientes, onSave, onClose }) {
-  // Cole aqui TODO o conteúdo da função ModalNovoCliente que você tinha no arquivo antigo
-  // (desde "const isEdit = !!cliente;" até o final do return)
-  // Se quiser, posso te ajudar a colar ele corretamente. Por enquanto deixei placeholder.
-  return <div>Modal Novo/Editar Cliente - ainda não colado</div>;
+  const isEdit = !!cliente;
+
+  const [form, setForm] = useState({
+    nome:      cliente?.nome      || "",
+    telefone:  cliente?.telefone  || "",
+    cpf:       cliente?.cpf       || "",
+    instagram: cliente?.instagram || "",
+    endereco:  cliente?.endereco  || "",
+  });
+  const [erros, setErros] = useState({});
+  const [salvando, setSalvando] = useState(false);
+
+  const set = (campo, valor) => {
+    setForm(f => ({ ...f, [campo]: valor }));
+    if (erros[campo]) setErros(e => ({ ...e, [campo]: "" }));
+  };
+
+  const validar = () => {
+    const e = {};
+    const nomeLimpo = form.nome.trim();
+
+    if (!nomeLimpo)          e.nome = "Nome é obrigatório.";
+    if (!form.telefone.trim()) e.telefone = "Telefone é obrigatório.";
+    if (!form.cpf.trim())    e.cpf = "CPF/CNPJ é obrigatório.";
+
+    /* Proibido cadastrar 2 clientes com nome completamente idêntico */
+    if (nomeLimpo) {
+      const duplicado = clientes.some(c =>
+        c.nome.trim().toLowerCase() === nomeLimpo.toLowerCase() &&
+        c.id !== cliente?.id
+      );
+      if (duplicado) e.nome = "Já existe um cliente com este nome exato.";
+    }
+
+    setErros(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSalvar = async () => {
+    if (!validar()) return;
+    setSalvando(true);
+    await onSave({
+      nome:      form.nome.trim(),
+      telefone:  form.telefone.trim(),
+      cpf:       form.cpf.trim(),
+      instagram: form.instagram.trim().replace(/^@/, ""),
+      endereco:  form.endereco.trim(),
+    });
+    setSalvando(false);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box">
+
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">{isEdit ? "Editar Cliente" : "Novo Cliente"}</div>
+            <div className="modal-sub">
+              {isEdit ? `Editando ${cliente.id} — ${cliente.nome}` : "Preencha os dados do novo cliente"}
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose}>
+            <X size={14} color="var(--text-2)" />
+          </button>
+        </div>
+
+        <div className="modal-body">
+
+          {/* Nome */}
+          <div className="form-group">
+            <label className="form-label">
+              Nome <span className="form-label-req">*</span>
+            </label>
+            <input
+              className={`form-input ${erros.nome ? "err" : ""}`}
+              value={form.nome}
+              onChange={e => set("nome", e.target.value)}
+              placeholder="Nome completo"
+              autoFocus
+            />
+            {erros.nome && <div className="form-error">{erros.nome}</div>}
+          </div>
+
+          {/* Telefone + CPF */}
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">
+                Telefone <span className="form-label-req">*</span>
+              </label>
+              <input
+                className={`form-input ${erros.telefone ? "err" : ""}`}
+                value={form.telefone}
+                onChange={e => set("telefone", e.target.value)}
+                placeholder="(62) 99999-9999"
+              />
+              {erros.telefone && <div className="form-error">{erros.telefone}</div>}
+            </div>
+            <div className="form-group">
+              <label className="form-label">
+                CPF / CNPJ <span className="form-label-req">*</span>
+              </label>
+              <input
+                className={`form-input ${erros.cpf ? "err" : ""}`}
+                value={form.cpf}
+                onChange={e => set("cpf", e.target.value)}
+                placeholder="000.000.000-00"
+              />
+              {erros.cpf && <div className="form-error">{erros.cpf}</div>}
+            </div>
+          </div>
+
+          {/* Instagram + Endereço */}
+          <div className="form-row">
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Instagram</label>
+              <input
+                className="form-input"
+                value={form.instagram}
+                onChange={e => set("instagram", e.target.value)}
+                placeholder="@usuario"
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Endereço</label>
+              <input
+                className="form-input"
+                value={form.endereco}
+                onChange={e => set("endereco", e.target.value)}
+                placeholder="Rua, número, bairro"
+              />
+            </div>
+          </div>
+
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
+            {salvando ? "Salvando..." : isEdit ? "Salvar Alterações" : "Cadastrar Cliente"}
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
 }
 
+
+/* ══════════════════════════════════════════════════════
+   MODAL: Detalhe de Venda
+   ══════════════════════════════════════════════════════ */
 function ModalDetalheVenda({ venda, onClose }) {
-  return <div>Modal Detalhe Venda - ainda não colado</div>;
+  if (!venda) return null;
+
+  const itens = venda.itens || [];
+
+  /* Cálculos do rodapé */
+  const subtotal   = itens.reduce((s, i) => s + (i.preco || 0) * (i.qtd || 1), 0);
+  const descontos  = itens.reduce((s, i) => s + (i.desconto || 0), 0);
+  const custoTotal = itens.reduce((s, i) => s + (i.custo || 0) * (i.qtd || 1), 0);
+  const total      = typeof venda.total === "number" ? venda.total : subtotal - descontos;
+  const lucro      = total - custoTotal;
+
+  return (
+    <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box modal-box-lg">
+
+        <div className="modal-header">
+          <div>
+            <div className="modal-title" style={{ color: "var(--gold)" }}>{venda.id}</div>
+            <div className="modal-sub">Detalhes da venda</div>
+          </div>
+          <button className="modal-close" onClick={onClose}>
+            <X size={14} color="var(--text-2)" />
+          </button>
+        </div>
+
+        <div className="modal-body">
+
+          {/* Metadados */}
+          <div className="vd-meta">
+            <div className="vd-meta-row">Cliente: <strong>{venda.cliente || "—"}</strong></div>
+            <div className="vd-meta-row">Data: <strong>{fmtData(venda.data)}</strong></div>
+            <div className="vd-meta-row">Pagamento: <strong>{venda.formaPagamento || "—"}</strong></div>
+          </div>
+
+          <button className="btn-imprimir" onClick={() => window.print()}>
+            <Printer size={13} /> Imprimir
+          </button>
+
+          {/* Tabela de itens */}
+          <div className="vd-table">
+            <div className="vd-thead">
+              <span>PRODUTO</span>
+              <span style={{ textAlign: "center" }}>QTD</span>
+              <span style={{ textAlign: "right" }}>PREÇO UNIT.</span>
+              <span style={{ textAlign: "right" }}>CUSTO UNIT.</span>
+              <span style={{ textAlign: "right" }}>DESCONTO</span>
+              <span style={{ textAlign: "right" }}>TOTAL ITEM</span>
+            </div>
+
+            {itens.length === 0 ? (
+              <div style={{ padding: "18px", textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>
+                Nenhum item registrado nesta venda.
+              </div>
+            ) : itens.map((item, i) => {
+              const totalItem = (item.preco || 0) * (item.qtd || 1) - (item.desconto || 0);
+              return (
+                <div key={i} className="vd-trow">
+                  <span className="vd-nome">{item.nome || item.produto || "—"}</span>
+                  <span style={{ textAlign: "center" }}>{item.qtd || 1}</span>
+                  <span style={{ textAlign: "right" }}>{fmtR$(item.preco)}</span>
+                  <span style={{ textAlign: "right", color: "var(--red)" }}>{fmtR$(item.custo)}</span>
+                  <span style={{ textAlign: "right" }}>
+                    {item.desconto ? fmtR$(item.desconto) : "—"}
+                  </span>
+                  <span style={{ textAlign: "right", color: "var(--green)", fontFamily: "Sora, sans-serif", fontWeight: 500 }}>
+                    {fmtR$(totalItem)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Totais */}
+          <div className="vd-totals">
+            <div className="vd-total-cell">
+              <div className="vd-total-label">Subtotal</div>
+              <div className="vd-total-val" style={{ color: "var(--text)" }}>{fmtR$(subtotal)}</div>
+            </div>
+            <div className="vd-total-cell">
+              <div className="vd-total-label">Descontos</div>
+              <div className="vd-total-val" style={{ color: "var(--red)" }}>{fmtR$(descontos)}</div>
+            </div>
+            <div className="vd-total-cell">
+              <div className="vd-total-label">Custo Total</div>
+              <div className="vd-total-val" style={{ color: "var(--red)" }}>{fmtR$(custoTotal)}</div>
+            </div>
+            <div className="vd-total-cell">
+              <div className="vd-total-label">Total</div>
+              <div className="vd-total-val" style={{ color: "var(--green)" }}>{fmtR$(total)}</div>
+            </div>
+            <div className="vd-total-cell">
+              <div className="vd-total-label">Lucro Est.</div>
+              <div className="vd-total-val" style={{ color: "var(--gold)" }}>{fmtR$(lucro)}</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
 }
 
+/* ══════════════════════════════════════════════════════
+   MODAL: Histórico de Compras do Cliente
+   ══════════════════════════════════════════════════════ */
 function ModalHistorico({ cliente, vendas, onClose, onVerVenda }) {
-  return <div>Modal Histórico - ainda não colado</div>;
+  const [period, setPeriod] = useState("Tudo");
+
+  /* Filtra as vendas deste cliente */
+  const vendasCliente = useMemo(() =>
+    vendas.filter(v =>
+      v.cliente?.trim().toLowerCase() === cliente.nome.trim().toLowerCase()
+    ),
+    [vendas, cliente.nome]
+  );
+
+  const vendasFiltradas = useMemo(() =>
+    filtrarPorPeriodo(vendasCliente, period),
+    [vendasCliente, period]
+  );
+
+  /* KPIs */
+  const totalGasto = vendasFiltradas.reduce((s, v) => s + (v.total || 0), 0);
+  const totalItens = vendasFiltradas.reduce((s, v) => s + (v.itens?.length || 0), 0);
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box modal-box-lg" style={{ maxWidth: 580 }}>
+
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">{cliente.nome}</div>
+            <div className="modal-sub">
+              {[cliente.telefone, cliente.cpf].filter(Boolean).join(" · ")}
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose}>
+            <X size={14} color="var(--text-2)" />
+          </button>
+        </div>
+
+        <div className="modal-body">
+
+          {/* KPI cards */}
+          <div className="hist-kpis">
+            <div className="hist-kpi">
+              <div className="hist-kpi-label">Compras</div>
+              <div className="hist-kpi-val" style={{ color: "var(--text)" }}>
+                {vendasFiltradas.length}
+              </div>
+            </div>
+            <div className="hist-kpi">
+              <div className="hist-kpi-label">Total Gasto</div>
+              <div className="hist-kpi-val" style={{ color: "var(--green)" }}>
+                {fmtR$(totalGasto)}
+              </div>
+            </div>
+            <div className="hist-kpi">
+              <div className="hist-kpi-label">Itens Comprados</div>
+              <div className="hist-kpi-val" style={{ color: "var(--gold)" }}>
+                {totalItens}
+              </div>
+            </div>
+          </div>
+
+          {/* Filtro de período */}
+          <div className="hist-periods">
+            {PERIODS_HIST.map(p => (
+              <button
+                key={p}
+                className={`hist-period-btn ${period === p ? "active" : ""}`}
+                onClick={() => setPeriod(p)}
+              >{p}</button>
+            ))}
+          </div>
+
+          {/* Label */}
+          <div className="hist-section-label">Histórico de Compras</div>
+
+          {/* Lista de vendas */}
+          {vendasFiltradas.length === 0 ? (
+            <div className="hist-empty">Nenhuma venda encontrada neste período.</div>
+          ) : vendasFiltradas.map((v, i) => (
+            <div key={i} className="hist-row" onClick={() => onVerVenda(v)}>
+              <span className="hist-venda-id">{v.id}</span>
+              <span className="hist-venda-data">{fmtData(v.data)}</span>
+              {v.formaPagamento && <span className="hist-fp">{v.formaPagamento}</span>}
+              <span className="hist-total">{fmtR$(v.total)}</span>
+              <ChevronRight size={14} color="var(--text-3)" />
+            </div>
+          ))}
+
+        </div>
+      </div>
+    </div>
+  );
 }
 
+
+/* ══════════════════════════════════════════════════════
+   MODAL: Confirmar Exclusão
+   ══════════════════════════════════════════════════════ */
 function ModalConfirmDelete({ cliente, onConfirm, onClose }) {
-  return <div>Modal Confirm Delete - ainda não colado</div>;
+  const [excluindo, setExcluindo] = useState(false);
+
+  const handleConfirm = async () => {
+    setExcluindo(true);
+    await onConfirm();
+    setExcluindo(false);
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box modal-box-md">
+        <div className="modal-header">
+          <div className="modal-title">Excluir Cliente</div>
+          <button className="modal-close" onClick={onClose}>
+            <X size={14} color="var(--text-2)" />
+          </button>
+        </div>
+        <div className="confirm-body">
+          <div className="confirm-icon">🗑️</div>
+          <p>
+            Tem certeza que deseja excluir{" "}
+            <strong>{cliente.nome}</strong>?<br />
+            Esta ação não pode ser desfeita.
+          </p>
+        </div>
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn-danger" onClick={handleConfirm} disabled={excluindo}>
+            {excluindo ? "Excluindo..." : "Confirmar Exclusão"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
+
+
 
 /* ======================= COMPONENTE PRINCIPAL ======================= */
 export default function Clientes() {
