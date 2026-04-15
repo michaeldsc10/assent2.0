@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 
 /* ── Módulos ── */
-import Clientes from "./modules/Clientes";
+import Clientes from "./modules/Clientes.jsx";
 
 /* ─── Mock Data ─────────────────────────────────────── */
 const faturamentoData = [
