@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════
-   ASSENT v2.0 — Clientes.jsx (AGORA FUNCIONANDO)
+   ASSENT v2.0 — Clientes.jsx
    Estrutura: users/{uid}/clientes/{id}
    ═══════════════════════════════════════════════════ */
 
@@ -7,7 +7,8 @@ import { useState, useEffect, useMemo } from "react";
 import {
   Search, UserPlus, Edit2, Trash2, X, ChevronRight, Printer,
 } from "lucide-react";
-import { db, auth, onAuthStateChanged } from "../lib/firebase";   // ← importe daqui
+
+import { db, auth, onAuthStateChanged } from "../lib/firebase";
 import {
   collection,
   doc,
@@ -16,22 +17,38 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 
-/* (CSS permanece exatamente igual — mantive o mesmo que você tinha) */
-const CSS = `...` // ← cole aqui o CSS que você já tinha (é muito longo, mantive idêntico)
+/* ── Cole aqui TODO o CSS que você tinha no arquivo original ── */
+const CSS = `
+  /* TODO: Cole todo o CSS longo aqui (modal-overlay, form-group, cl-topbar, cl-row, etc.) */
+  /* Se não colar o CSS, os estilos não vão aparecer, mas pelo menos o conteúdo deve carregar */
+`;
 
-/* Helpers (mesmos que você já tinha) */
-const fmtR$ = (v) => `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
-const fmtData = (d) => { /* mesmo código */ };
+/* ── Helpers ── */
+const fmtR$ = (v) =>
+  `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+
+const fmtData = (d) => {
+  if (!d) return "—";
+  try {
+    const dt = d?.toDate ? d.toDate() : new Date(d);
+    return dt.toLocaleDateString("pt-BR");
+  } catch {
+    return String(d);
+  }
+};
+
 const gerarIdCliente = (cnt) => `C${String(cnt + 1).padStart(4, "0")}`;
-const filtrarPorPeriodo = (vendas, periodo) => { /* mesmo código */ };
+
 const PERIODS_HIST = ["Tudo", "Hoje", "7 dias", "30 dias", "Este mês"];
 
-/* Modais (ModalNovoCliente, ModalDetalheVenda, ModalHistorico, ModalConfirmDelete)
-   → Não mudei nada deles, só colei aqui (para ficar completo) */
-function ModalNovoCliente({ /* ... */ }) { /* mesmo código que você tinha */ }
-function ModalDetalheVenda({ /* ... */ }) { /* mesmo */ }
-function ModalHistorico({ /* ... */ }) { /* mesmo */ }
-function ModalConfirmDelete({ /* ... */ }) { /* mesmo */ }
+/* ── Cole aqui os 4 modais completos (ModalNovoCliente, ModalDetalheVenda, ModalHistorico, ModalConfirmDelete) ── */
+// Eles devem ficar exatamente como estavam no seu arquivo original antes das mudanças.
+// Se precisar, posso te ajudar a ajustar eles também.
+
+function ModalNovoCliente({ cliente, clientes, onSave, onClose }) { /* seu código original */ }
+function ModalDetalheVenda({ venda, onClose }) { /* seu código original */ }
+function ModalHistorico({ cliente, vendas, onClose, onVerVenda }) { /* seu código original */ }
+function ModalConfirmDelete({ cliente, onConfirm, onClose }) { /* seu código original */ }
 
 /* ======================= COMPONENTE PRINCIPAL ======================= */
 export default function Clientes() {
@@ -48,29 +65,27 @@ export default function Clientes() {
   const [historico, setHistorico] = useState(null);
   const [vendaDetalhe, setVendaDetalhe] = useState(null);
 
-  /* ==================== AUTH LISTENER ==================== */
+  // Auth
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      setUid(user ? user.uid : null);
-    });
+    const unsub = onAuthStateChanged(auth, (user) => setUid(user?.uid || null));
     return unsub;
   }, []);
 
-  /* ==================== FIRESTORE REALTIME ==================== */
+  // Firestore Realtime
   useEffect(() => {
-    if (!uid) return;
+    if (!uid) {
+      setLoading(false);
+      return;
+    }
 
     const userRef = doc(db, "users", uid);
     const clientesCol = collection(db, "users", uid, "clientes");
     const vendasCol = collection(db, "users", uid, "vendas");
 
-    // User doc (contador + dados básicos)
     const unsubUser = onSnapshot(userRef, (snap) => {
       if (snap.exists()) {
-        const data = snap.data();
-        setClienteIdCnt(data.clienteIdCnt || 0);
+        setClienteIdCnt(snap.data().clienteIdCnt || 0);
       } else {
-        // Primeiro acesso → cria documento do usuário
         setDoc(userRef, {
           name: "Usuário",
           email: auth.currentUser?.email || "",
@@ -81,18 +96,17 @@ export default function Clientes() {
       }
     });
 
-    // Clientes em tempo real
     const unsubClientes = onSnapshot(clientesCol, (snap) => {
-      const lista = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setClientes(lista);
+      setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    }, (err) => {
+      console.error("Erro clientes:", err);
       setLoading(false);
     });
 
-    // Vendas em tempo real (necessário pro histórico)
     const unsubVendas = onSnapshot(vendasCol, (snap) => {
-      const lista = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setVendas(lista);
-    });
+      setVendas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => console.error("Erro vendas:", err));
 
     return () => {
       unsubUser();
@@ -101,14 +115,13 @@ export default function Clientes() {
     };
   }, [uid]);
 
-  /* ==================== CRUD ==================== */
   const handleAdd = async (form) => {
     if (!uid) return;
     const newId = gerarIdCliente(clienteIdCnt);
-    const novo = { ...form, criadoEm: new Date().toISOString() };
-
-    await setDoc(doc(db, "users", uid, "clientes", newId), novo);
-    // Incrementa contador
+    await setDoc(doc(db, "users", uid, "clientes", newId), {
+      ...form,
+      criadoEm: new Date().toISOString(),
+    });
     await setDoc(doc(db, "users", uid), { clienteIdCnt: clienteIdCnt + 1 }, { merge: true });
     setModalNovo(false);
   };
@@ -128,7 +141,7 @@ export default function Clientes() {
   const clientesFiltrados = useMemo(() => {
     if (!search.trim()) return clientes;
     const q = search.toLowerCase();
-    return clientes.filter((c) =>
+    return clientes.filter(c =>
       c.nome?.toLowerCase().includes(q) ||
       c.cpf?.toLowerCase().includes(q) ||
       c.telefone?.toLowerCase().includes(q)
@@ -140,9 +153,60 @@ export default function Clientes() {
   return (
     <>
       <style>{CSS}</style>
-      {/* Todo o resto do JSX permanece IGUAL ao que você tinha (topbar, tabela, modais) */}
-      {/* ... (o resto do return que você já tinha) ... */}
-      {/* Só troquei as chamadas de onSave/onConfirm para as novas funções handleAdd, handleEdit, handleDelete */}
-    </>
-  );
-}
+
+      <header className="cl-topbar">
+        <div className="cl-topbar-title">
+          <h1>Clientes</h1>
+          <p>Gerencie e acompanhe sua base de clientes</p>
+        </div>
+
+        <div className="cl-search">
+          <Search size={13} color="var(--text-3)" />
+          <input
+            placeholder="Buscar por nome, CPF ou telefone..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        <button className="btn-novo-cl" onClick={() => setModalNovo(true)}>
+          <UserPlus size={14} /> Novo Cliente
+        </button>
+      </header>
+
+      <div className="ag-content">
+        <div className="cl-table-wrap">
+          <div className="cl-table-header">
+            <span className="cl-table-title">Clientes cadastrados</span>
+            <span className="cl-count-badge">{clientes.length}</span>
+          </div>
+
+          <div className="cl-row cl-row-head">
+            <span>ID</span>
+            <span>Nome</span>
+            <span>Telefone</span>
+            <span>CPF / CNPJ</span>
+            <span>Instagram</span>
+            <span>Endereço</span>
+            <span style={{ textAlign: "right" }}>Ações</span>
+          </div>
+
+          {loading ? (
+            <div className="cl-loading">Carregando clientes...</div>
+          ) : clientesFiltrados.length === 0 ? (
+            <div className="cl-empty">
+              <p>{search ? `Nenhum resultado para "${search}".` : "Nenhum cliente cadastrado ainda."}</p>
+            </div>
+          ) : (
+            clientesFiltrados.map((c) => (
+              <div key={c.id} className="cl-row">
+                <span className="cl-id">{c.id}</span>
+                <span className="cl-nome" onClick={() => setHistorico(c)}>{c.nome}</span>
+                <span>{c.telefone || "—"}</span>
+                <span>{c.cpf || "—"}</span>
+                <span className="cl-insta">{c.instagram ? `@${c.instagram}` : "—"}</span>
+                <span className="cl-overflow">{c.endereco || "—"}</span>
+                <div className="cl-actions">
+                  <button className="btn-icon btn-icon-edit" onClick={() => setEditando(c)}>
+                    <Edit2 size={13} />
+                 
