@@ -12,6 +12,8 @@ import {
 
 /* ── Módulos ── */
 import Clientes from "./modules/Clientes.jsx";
+import Produtos from "./pages/Produtos";
+
 
 /* ─── Mock Data ─────────────────────────────────────── */
 const faturamentoData = [
@@ -408,7 +410,7 @@ export default function Dashboard() {
     switch (module) {
       case "Clientes":         return <Clientes />;
       // Módulos futuros serão adicionados aqui:
-      // case "Produtos":      return <Produtos />;
+     case "Produtos":      return <Produtos />;
       // case "Vendas":        return <Vendas />;
       default:                 return renderDashboard();
     }
