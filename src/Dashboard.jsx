@@ -13,7 +13,7 @@ import {
 /* ── Módulos ── */
 import Clientes from "./modules/Clientes.jsx";
 import Produtos from "./modules/Produtos.jsx";
-
+import Servicos from "./modules/Servicos.jsx";
 
 /* ─── Mock Data ─────────────────────────────────────── */
 const faturamentoData = [
