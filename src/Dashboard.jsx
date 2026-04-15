@@ -411,7 +411,7 @@ export default function Dashboard() {
       case "Clientes":         return <Clientes />;
       // Módulos futuros serão adicionados aqui:
      case "Produtos":      return <Produtos />;
-    case "Servicos":        return <Servicos />;
+    case "Serviços":        return <Servicos />;
       default:                 return renderDashboard();
     }
   };
