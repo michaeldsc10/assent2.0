@@ -1,15 +1,20 @@
 /* ═══════════════════════════════════════════════════
    ASSENT v2.0 — firebase.js
+   Configuração correta do Firebase (Auth + Firestore)
    ═══════════════════════════════════════════════════ */
 
 import { initializeApp } from "firebase/app";
+
+// Auth
 import {
   getAuth,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
-  onAuthStateChanged,
+  onAuthStateChanged,        // ← aqui está o correto
 } from "firebase/auth";
+
+// Firestore
 import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
@@ -36,4 +41,5 @@ export const register = (email, password) =>
 
 export const logout = () => signOut(auth);
 
+// Exporta o listener também
 export { onAuthStateChanged };
