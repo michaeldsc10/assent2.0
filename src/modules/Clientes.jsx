@@ -9,9 +9,11 @@ import {
   Search, UserPlus, Edit2, Trash2, X,
   ChevronRight, Printer,
 } from "lucide-react";
-import { db } from "../lib/firebase";
-import { doc, onSnapshot, setDoc } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { db, auth } from "../lib/firebase";
+import {
+  collection, doc, onSnapshot, setDoc, deleteDoc,
+  getDocs, query, orderBy,
+} from "firebase/firestore";
 
 /* ─── CSS do módulo ──────────────────────────────────
    Injeta apenas estilos novos. As variáveis CSS
@@ -201,7 +203,7 @@ const CSS = `
     color: var(--text-2); padding: 2px 10px; border-radius: 20px;
   }
 
-  /* Grid colunas: ID | Nome | Telefone | CPF/CNPJ | Instagram | Endereço | Ações */
+  /* Grid colunas: ID | Nome | Telefone | CPF/CNPJ | Insta | Endereço | Ações */
   .cl-row {
     display: grid;
     grid-template-columns: 72px 1fr 130px 145px 120px 1fr 78px;
@@ -356,7 +358,7 @@ const fmtR$ = (v) =>
 /** Formata data para pt-BR */
 const fmtData = (d) => {
   if (!d) return "—";
-  if (typeof d === "string" && d.includes("/")) return d; // já formatado
+  if (typeof d === "string" && d.includes("/")) return d;
   try {
     const dt = d?.toDate ? d.toDate() : new Date(d);
     return dt.toLocaleDateString("pt-BR");
@@ -365,9 +367,57 @@ const fmtData = (d) => {
   }
 };
 
-/** Gera ID de cliente no formato C0001 */
-const gerarIdCliente = (cnt) =>
-  `C${String(cnt + 1).padStart(4, "0")}`;
+/** Valida CPF (dígitos verificadores) */
+function validarCPF(cpf) {
+  const c = cpf.replace(/\D/g, "");
+  if (c.length !== 11 || /^(\d)\1{10}$/.test(c)) return false;
+  let soma = 0;
+  for (let i = 0; i < 9; i++) soma += +c[i] * (10 - i);
+  let r = (soma * 10) % 11;
+  if (r === 10 || r === 11) r = 0;
+  if (r !== +c[9]) return false;
+  soma = 0;
+  for (let i = 0; i < 10; i++) soma += +c[i] * (11 - i);
+  r = (soma * 10) % 11;
+  if (r === 10 || r === 11) r = 0;
+  return r === +c[10];
+}
+
+/** Valida CNPJ (dígitos verificadores) */
+function validarCNPJ(cnpj) {
+  const c = cnpj.replace(/\D/g, "");
+  if (c.length !== 14 || /^(\d)\1{13}$/.test(c)) return false;
+  const calc = (str, n) => {
+    let soma = 0, pos = n - 7;
+    for (let i = n; i >= 1; i--) {
+      soma += +str[n - i] * pos--;
+      if (pos < 2) pos = 9;
+    }
+    const r = soma % 11;
+    return r < 2 ? 0 : 11 - r;
+  };
+  return calc(c, 12) === +c[12] && calc(c, 13) === +c[13];
+}
+
+/** Valida CPF ou CNPJ (apenas números, 11 ou 14 dígitos) */
+function validarCpfCnpj(valor) {
+  const nums = valor.replace(/\D/g, "");
+  if (nums.length === 11) return validarCPF(nums);
+  if (nums.length === 14) return validarCNPJ(nums);
+  return false;
+}
+
+/** Gera o próximo ID interno no formato C0001 buscando o maior existente */
+async function gerarProximoId(uid) {
+  const snap = await getDocs(collection(db, `users/${uid}/clientes`));
+  if (snap.empty) return "C0001";
+  const nums = snap.docs
+    .map(d => d.data().idInterno || "")
+    .filter(id => /^C\d+$/.test(id))
+    .map(id => parseInt(id.slice(1), 10));
+  if (!nums.length) return "C0001";
+  return `C${String(Math.max(...nums) + 1).padStart(4, "0")}`;
+}
 
 /** Filtra vendas por período */
 const filtrarPorPeriodo = (vendas, periodo) => {
@@ -395,9 +445,23 @@ const PERIODS_HIST = ["Tudo", "Hoje", "7 dias", "30 dias", "Este mês"];
 function ModalNovoCliente({ cliente, clientes, onSave, onClose }) {
   const isEdit = !!cliente;
 
+  /* Telefone armazenado como "DDD|NUMERO" internamente */
+  const parseTel = (raw) => {
+    if (!raw) return { ddd: "", numero: "" };
+    const partes = raw.split("|");
+    if (partes.length === 2) return { ddd: partes[0], numero: partes[1] };
+    /* Compatibilidade com formato antigo (11 dígitos sem separador) */
+    const nums = raw.replace(/\D/g, "");
+    if (nums.length >= 10) return { ddd: nums.slice(0, 2), numero: nums.slice(2) };
+    return { ddd: "", numero: nums };
+  };
+
+  const tel = parseTel(cliente?.telefone);
+
   const [form, setForm] = useState({
     nome:      cliente?.nome      || "",
-    telefone:  cliente?.telefone  || "",
+    ddd:       tel.ddd,
+    numero:    tel.numero,
     cpf:       cliente?.cpf       || "",
     instagram: cliente?.instagram || "",
     endereco:  cliente?.endereco  || "",
@@ -410,21 +474,52 @@ function ModalNovoCliente({ cliente, clientes, onSave, onClose }) {
     if (erros[campo]) setErros(e => ({ ...e, [campo]: "" }));
   };
 
+  /* Só aceita dígitos, com limite de tamanho */
+  const setDigits = (campo, valor, max) => {
+    const nums = valor.replace(/\D/g, "").slice(0, max);
+    set(campo, nums);
+  };
+
   const validar = () => {
     const e = {};
     const nomeLimpo = form.nome.trim();
 
-    if (!nomeLimpo)          e.nome = "Nome é obrigatório.";
-    if (!form.telefone.trim()) e.telefone = "Telefone é obrigatório.";
-    if (!form.cpf.trim())    e.cpf = "CPF/CNPJ é obrigatório.";
+    if (!nomeLimpo)
+      e.nome = "Nome é obrigatório.";
 
-    /* Proibido cadastrar 2 clientes com nome completamente idêntico */
-    if (nomeLimpo) {
-      const duplicado = clientes.some(c =>
-        c.nome.trim().toLowerCase() === nomeLimpo.toLowerCase() &&
+    /* DDD */
+    if (!form.ddd || form.ddd.length !== 2)
+      e.ddd = "DDD obrigatório (2 dígitos).";
+
+    /* Número */
+    if (!form.numero || form.numero.length !== 9)
+      e.numero = "Número obrigatório (9 dígitos).";
+
+    /* CPF/CNPJ */
+    const cpfNums = form.cpf.replace(/\D/g, "");
+    if (!cpfNums) {
+      e.cpf = "CPF/CNPJ é obrigatório.";
+    } else if (cpfNums.length !== 11 && cpfNums.length !== 14) {
+      e.cpf = "Informe 11 dígitos (CPF) ou 14 dígitos (CNPJ).";
+    } else if (!validarCpfCnpj(cpfNums)) {
+      e.cpf = cpfNums.length === 11 ? "CPF inválido." : "CNPJ inválido.";
+    } else {
+      /* Duplicata de CPF/CNPJ */
+      const dupCpf = clientes.some(c =>
+        c.cpf?.replace(/\D/g, "") === cpfNums &&
         c.id !== cliente?.id
       );
-      if (duplicado) e.nome = "Já existe um cliente com este nome exato.";
+      if (dupCpf)
+        e.cpf = "Já existe um cliente com este CPF/CNPJ.";
+    }
+
+    /* Nome duplicado (case-insensitive) */
+    if (nomeLimpo && !e.nome) {
+      const dupNome = clientes.some(c =>
+        c.nome?.trim().toLowerCase() === nomeLimpo.toLowerCase() &&
+        c.id !== cliente?.id
+      );
+      if (dupNome) e.nome = "Já existe um cliente com este nome exato.";
     }
 
     setErros(e);
@@ -436,8 +531,10 @@ function ModalNovoCliente({ cliente, clientes, onSave, onClose }) {
     setSalvando(true);
     await onSave({
       nome:      form.nome.trim(),
-      telefone:  form.telefone.trim(),
-      cpf:       form.cpf.trim(),
+      telefone:  `${form.ddd}|${form.numero}`,   // formato canônico
+      ddd:       form.ddd,
+      numero:    form.numero,
+      cpf:       form.cpf.replace(/\D/g, ""),    // salva só números
       instagram: form.instagram.trim().replace(/^@/, ""),
       endereco:  form.endereco.trim(),
     });
@@ -477,32 +574,53 @@ function ModalNovoCliente({ cliente, clientes, onSave, onClose }) {
             {erros.nome && <div className="form-error">{erros.nome}</div>}
           </div>
 
-          {/* Telefone + CPF */}
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">
-                Telefone <span className="form-label-req">*</span>
-              </label>
-              <input
-                className={`form-input ${erros.telefone ? "err" : ""}`}
-                value={form.telefone}
-                onChange={e => set("telefone", e.target.value)}
-                placeholder="(62) 99999-9999"
-              />
-              {erros.telefone && <div className="form-error">{erros.telefone}</div>}
+          {/* Telefone: DDD + Número */}
+          <div className="form-group">
+            <label className="form-label">
+              Telefone <span className="form-label-req">*</span>
+            </label>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: "0 0 80px" }}>
+                <input
+                  className={`form-input ${erros.ddd ? "err" : ""}`}
+                  value={form.ddd}
+                  onChange={e => setDigits("ddd", e.target.value, 2)}
+                  placeholder="DDD"
+                  maxLength={2}
+                  inputMode="numeric"
+                  style={{ textAlign: "center", letterSpacing: "0.1em" }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <input
+                  className={`form-input ${erros.numero ? "err" : ""}`}
+                  value={form.numero}
+                  onChange={e => setDigits("numero", e.target.value, 9)}
+                  placeholder="999999999"
+                  maxLength={9}
+                  inputMode="numeric"
+                />
+              </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">
-                CPF / CNPJ <span className="form-label-req">*</span>
-              </label>
-              <input
-                className={`form-input ${erros.cpf ? "err" : ""}`}
-                value={form.cpf}
-                onChange={e => set("cpf", e.target.value)}
-                placeholder="000.000.000-00"
-              />
-              {erros.cpf && <div className="form-error">{erros.cpf}</div>}
-            </div>
+            {(erros.ddd || erros.numero) && (
+              <div className="form-error">{erros.ddd || erros.numero}</div>
+            )}
+          </div>
+
+          {/* CPF / CNPJ */}
+          <div className="form-group">
+            <label className="form-label">
+              CPF / CNPJ <span className="form-label-req">*</span>
+            </label>
+            <input
+              className={`form-input ${erros.cpf ? "err" : ""}`}
+              value={form.cpf}
+              onChange={e => setDigits("cpf", e.target.value, 14)}
+              placeholder="Somente números (11 = CPF, 14 = CNPJ)"
+              inputMode="numeric"
+              maxLength={14}
+            />
+            {erros.cpf && <div className="form-error">{erros.cpf}</div>}
           </div>
 
           {/* Instagram + Endereço */}
@@ -793,72 +911,83 @@ function ModalConfirmDelete({ cliente, onConfirm, onClose }) {
 export default function Clientes() {
   const [clientes,       setClientes]       = useState([]);
   const [vendas,         setVendas]         = useState([]);
-  const [clienteIdCnt,   setClienteIdCnt]   = useState(0);
   const [search,         setSearch]         = useState("");
   const [loading,        setLoading]        = useState(true);
 
   /* Estados dos modais */
   const [modalNovo,      setModalNovo]      = useState(false);
-  const [editando,       setEditando]       = useState(null);  // cliente em edição
-  const [deletando,      setDeletando]      = useState(null);  // cliente a excluir
-  const [historico,      setHistorico]      = useState(null);  // cliente com histórico aberto
-  const [vendaDetalhe,   setVendaDetalhe]   = useState(null);  // venda aberta em detalhe
+  const [editando,       setEditando]       = useState(null);
+  const [deletando,      setDeletando]      = useState(null);
+  const [historico,      setHistorico]      = useState(null);
+  const [vendaDetalhe,   setVendaDetalhe]   = useState(null);
 
-  const uid = getAuth().currentUser?.uid;
+  const uid = auth.currentUser?.uid;
 
-  /* ── Listener Firestore em tempo real ── */
+  /* ── Listener Firestore — subcoleção users/{uid}/clientes ── */
   useEffect(() => {
     if (!uid) { setLoading(false); return; }
-    const ref = doc(db, "dados", uid);
-    const unsub = onSnapshot(ref, (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setClientes(data.clientes    || []);
-        setVendas(data.vendas        || []);
-        setClienteIdCnt(data.clienteIdCnt || 0);
-      }
-      setLoading(false);
-    }, (err) => {
-      console.error("Clientes — erro Firestore:", err);
-      setLoading(false);
+
+    const clientesRef = collection(db, `users/${uid}/clientes`);
+    const unsubCl = onSnapshot(
+      query(clientesRef, orderBy("criadoEm", "asc")),
+      (snap) => {
+        setClientes(snap.docs.map(d => ({ ...d.data(), _docId: d.id })));
+        setLoading(false);
+      },
+      (err) => { console.error("Clientes — erro:", err); setLoading(false); }
+    );
+
+    const vendasRef = collection(db, `users/${uid}/vendas`);
+    const unsubVd = onSnapshot(vendasRef, (snap) => {
+      setVendas(snap.docs.map(d => ({ ...d.data(), _docId: d.id })));
     });
-    return () => unsub();
+
+    return () => { unsubCl(); unsubVd(); };
   }, [uid]);
 
-  /* ── Salvar no Firestore (merge parcial) ── */
-  const salvar = async (novosClientes, novoCnt) => {
-    if (!uid) return;
-    await setDoc(
-      doc(db, "dados", uid),
-      {
-        clientes:  novosClientes,
-        updatedAt: new Date(),
-        ...(novoCnt !== undefined && { clienteIdCnt: novoCnt }),
-      },
-      { merge: true }
-    );
+  /* ── Formata telefone para exibição (DDD) + número ── */
+  const fmtTelefone = (c) => {
+    if (c.ddd && c.numero) return `(${c.ddd}) ${c.numero}`;
+    if (c.telefone) {
+      const nums = c.telefone.replace(/\D/g, "");
+      if (nums.length >= 10) return `(${nums.slice(0,2)}) ${nums.slice(2)}`;
+      return c.telefone;
+    }
+    return "—";
   };
 
-  /* ── CRUD ── */
+  /* ── ADD: gera idInterno, salva doc novo na subcoleção ── */
   const handleAdd = async (form) => {
-    const id          = gerarIdCliente(clienteIdCnt);
-    const novo        = { ...form, id, criadoEm: new Date().toISOString() };
-    const lista       = [...clientes, novo];
-    await salvar(lista, clienteIdCnt + 1);
+    if (!uid) return;
+    const idInterno = await gerarProximoId(uid);
+    const novoDoc = {
+      ...form,
+      id:        idInterno,   // campo legível ex: "C0001"
+      idInterno,
+      criadoEm:  new Date().toISOString(),
+    };
+    /* usa idInterno como docId para evitar colisões */
+    await setDoc(doc(db, `users/${uid}/clientes`, idInterno), novoDoc);
     setModalNovo(false);
   };
 
+  /* ── EDIT: atualiza doc existente ── */
   const handleEdit = async (form) => {
-    const lista = clientes.map(c =>
-      c.id === editando.id ? { ...c, ...form } : c
+    if (!uid || !editando) return;
+    const docId = editando._docId || editando.id;
+    await setDoc(
+      doc(db, `users/${uid}/clientes`, docId),
+      { ...form, updatedAt: new Date().toISOString() },
+      { merge: true }
     );
-    await salvar(lista);
     setEditando(null);
   };
 
+  /* ── DELETE: remove doc da subcoleção ── */
   const handleDelete = async () => {
-    const lista = clientes.filter(c => c.id !== deletando.id);
-    await salvar(lista);
+    if (!uid || !deletando) return;
+    const docId = deletando._docId || deletando.id;
+    await deleteDoc(doc(db, `users/${uid}/clientes`, docId));
     setDeletando(null);
   };
 
@@ -868,8 +997,9 @@ export default function Clientes() {
     const q = search.toLowerCase();
     return clientes.filter(c =>
       c.nome?.toLowerCase().includes(q) ||
-      c.cpf?.toLowerCase().includes(q)  ||
-      c.telefone?.toLowerCase().includes(q)
+      c.cpf?.includes(q)                ||
+      c.ddd?.includes(q)                ||
+      c.numero?.includes(q)
     );
   }, [clientes, search]);
 
@@ -937,7 +1067,7 @@ export default function Clientes() {
             <div key={c.id} className="cl-row">
               <span className="cl-id">{c.id}</span>
               <span className="cl-nome" onClick={() => setHistorico(c)}>{c.nome}</span>
-              <span>{c.telefone || "—"}</span>
+              <span>{fmtTelefone(c)}</span>
               <span>{c.cpf || "—"}</span>
               <span className="cl-insta">{c.instagram ? `@${c.instagram}` : "—"}</span>
               <span className="cl-overflow">{c.endereco || "—"}</span>
