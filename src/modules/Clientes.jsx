@@ -7,10 +7,13 @@ import { useState, useEffect, useMemo } from "react";
 import {
   Search, UserPlus, Edit2, Trash2, X, ChevronRight, Printer,
 } from "lucide-react";
-import { db, auth } from "../lib/firebase";
+import { db, auth, onAuthStateChanged } from "../lib/firebase";   // ← importe daqui
 import {
-  collection, doc, setDoc, deleteDoc, onSnapshot,
-  onAuthStateChanged,
+  collection,
+  doc,
+  setDoc,
+  deleteDoc,
+  onSnapshot,
 } from "firebase/firestore";
 
 /* (CSS permanece exatamente igual — mantive o mesmo que você tinha) */
