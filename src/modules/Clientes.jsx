@@ -17,10 +17,10 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 
-/* ── Cole aqui TODO o CSS que você tinha no arquivo original ── */
+/* ── CSS ── (Cole aqui todo o CSS original do módulo Clientes) */
 const CSS = `
-  /* TODO: Cole todo o CSS longo aqui (modal-overlay, form-group, cl-topbar, cl-row, etc.) */
-  /* Se não colar o CSS, os estilos não vão aparecer, mas pelo menos o conteúdo deve carregar */
+  /* ← Cole todo o CSS que estava no seu arquivo original aqui 
+     (tudo que começa com .modal-overlay até o final do CSS) */
 `;
 
 /* ── Helpers ── */
@@ -41,14 +41,26 @@ const gerarIdCliente = (cnt) => `C${String(cnt + 1).padStart(4, "0")}`;
 
 const PERIODS_HIST = ["Tudo", "Hoje", "7 dias", "30 dias", "Este mês"];
 
-/* ── Cole aqui os 4 modais completos (ModalNovoCliente, ModalDetalheVenda, ModalHistorico, ModalConfirmDelete) ── */
-// Eles devem ficar exatamente como estavam no seu arquivo original antes das mudanças.
-// Se precisar, posso te ajudar a ajustar eles também.
+/* ── MODAIS (Cole aqui os 4 modais completos do seu arquivo original) ── */
+function ModalNovoCliente({ cliente, clientes, onSave, onClose }) {
+  /* Cole aqui todo o código da função ModalNovoCliente que você tinha */
+  return <div>Modal Novo Cliente (ainda não colado)</div>;
+}
 
-function ModalNovoCliente({ cliente, clientes, onSave, onClose }) { /* seu código original */ }
-function ModalDetalheVenda({ venda, onClose }) { /* seu código original */ }
-function ModalHistorico({ cliente, vendas, onClose, onVerVenda }) { /* seu código original */ }
-function ModalConfirmDelete({ cliente, onConfirm, onClose }) { /* seu código original */ }
+function ModalDetalheVenda({ venda, onClose }) {
+  /* Cole aqui o ModalDetalheVenda */
+  return <div>Modal Detalhe Venda</div>;
+}
+
+function ModalHistorico({ cliente, vendas, onClose, onVerVenda }) {
+  /* Cole aqui o ModalHistorico */
+  return <div>Modal Histórico</div>;
+}
+
+function ModalConfirmDelete({ cliente, onConfirm, onClose }) {
+  /* Cole aqui o ModalConfirmDelete */
+  return <div>Modal Confirm Delete</div>;
+}
 
 /* ======================= COMPONENTE PRINCIPAL ======================= */
 export default function Clientes() {
@@ -65,7 +77,7 @@ export default function Clientes() {
   const [historico, setHistorico] = useState(null);
   const [vendaDetalhe, setVendaDetalhe] = useState(null);
 
-  // Auth
+  // Auth Listener
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => setUid(user?.uid || null));
     return unsub;
@@ -97,16 +109,16 @@ export default function Clientes() {
     });
 
     const unsubClientes = onSnapshot(clientesCol, (snap) => {
-      setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setClientes(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setLoading(false);
     }, (err) => {
-      console.error("Erro clientes:", err);
+      console.error("Erro ao carregar clientes:", err);
       setLoading(false);
     });
 
     const unsubVendas = onSnapshot(vendasCol, (snap) => {
-      setVendas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, (err) => console.error("Erro vendas:", err));
+      setVendas(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }, (err) => console.error("Erro ao carregar vendas:", err));
 
     return () => {
       unsubUser();
@@ -141,7 +153,7 @@ export default function Clientes() {
   const clientesFiltrados = useMemo(() => {
     if (!search.trim()) return clientes;
     const q = search.toLowerCase();
-    return clientes.filter(c =>
+    return clientes.filter((c) =>
       c.nome?.toLowerCase().includes(q) ||
       c.cpf?.toLowerCase().includes(q) ||
       c.telefone?.toLowerCase().includes(q)
@@ -195,7 +207,9 @@ export default function Clientes() {
             <div className="cl-loading">Carregando clientes...</div>
           ) : clientesFiltrados.length === 0 ? (
             <div className="cl-empty">
-              <p>{search ? `Nenhum resultado para "${search}".` : "Nenhum cliente cadastrado ainda."}</p>
+              <p>
+                {search ? `Nenhum resultado para "${search}".` : "Nenhum cliente cadastrado ainda."}
+              </p>
             </div>
           ) : (
             clientesFiltrados.map((c) => (
@@ -207,6 +221,64 @@ export default function Clientes() {
                 <span className="cl-insta">{c.instagram ? `@${c.instagram}` : "—"}</span>
                 <span className="cl-overflow">{c.endereco || "—"}</span>
                 <div className="cl-actions">
-                  <button className="btn-icon btn-icon-edit" onClick={() => setEditando(c)}>
+                  <button
+                    className="btn-icon btn-icon-edit"
+                    onClick={() => setEditando(c)}
+                    title="Editar cliente"
+                  >
                     <Edit2 size={13} />
-                 
+                  </button>
+                  <button
+                    className="btn-icon btn-icon-del"
+                    onClick={() => setDeletando(c)}
+                    title="Excluir cliente"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Modais */}
+      {modalNovo && (
+        <ModalNovoCliente
+          clientes={clientes}
+          onSave={handleAdd}
+          onClose={() => setModalNovo(false)}
+        />
+      )}
+      {editando && (
+        <ModalNovoCliente
+          cliente={editando}
+          clientes={clientes}
+          onSave={handleEdit}
+          onClose={() => setEditando(null)}
+        />
+      )}
+      {deletando && (
+        <ModalConfirmDelete
+          cliente={deletando}
+          onConfirm={handleDelete}
+          onClose={() => setDeletando(null)}
+        />
+      )}
+      {historico && (
+        <ModalHistorico
+          cliente={historico}
+          vendas={vendas}
+          onClose={() => setHistorico(null)}
+          onVerVenda={setVendaDetalhe}
+        />
+      )}
+      {vendaDetalhe && (
+        <ModalDetalheVenda
+          venda={vendaDetalhe}
+          onClose={() => setVendaDetalhe(null)}
+        />
+      )}
+    </>
+  );
+}
