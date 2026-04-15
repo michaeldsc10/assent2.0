@@ -15,6 +15,7 @@ import Clientes from "./modules/Clientes.jsx";
 import Produtos from "./modules/Produtos.jsx";
 import Servicos from "./modules/Servicos.jsx";
 import Vendedores from "./modules/Vendedores.jsx";
+import Vendas    from "./modules/Vendas.jsx";
 
 /* ─── Mock Data ─────────────────────────────────────── */
 const faturamentoData = [
@@ -414,6 +415,7 @@ export default function Dashboard() {
      case "Produtos":      return <Produtos />;
     case "Serviços":        return <Servicos />;
       case "Vendedores":        return <Vendedores />;
+      case "Vendas":          return <Vendas />;
     
       default:                 return renderDashboard();
     }
