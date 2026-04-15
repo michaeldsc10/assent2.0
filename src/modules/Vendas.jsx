@@ -1,0 +1,1443 @@
+/* ═══════════════════════════════════════════════════
+   ASSENT v2.0 — Vendas.jsx
+   Estrutura Firestore:
+     users/{uid}/vendas/{id}        → cada venda
+     users/{uid}/produtos/{id}      → estoque (qtd atualizado)
+     users/{uid}/servicos/{id}      → serviços
+     users/{uid}                    → vendaIdCnt (contador)
+   ═══════════════════════════════════════════════════ */
+
+import { useState, useEffect, useMemo, useRef } from "react";
+import {
+  Search, Plus, Edit2, Trash2, X, Printer,
+  ShoppingCart, Package, ChevronDown, FileText,
+  Download, Copy, Filter, Calendar,
+} from "lucide-react";
+
+import { db, auth } from "../lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import {
+  collection, doc, setDoc, deleteDoc,
+  onSnapshot, runTransaction, increment, getDoc,
+} from "firebase/firestore";
+
+/* ── CSS ── */
+const CSS = `
+  /* ── Modal base (igual ao Clientes) ── */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,0.78);
+    backdrop-filter: blur(5px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; animation: fadeIn .15s ease;
+  }
+  .modal-overlay-top { z-index: 1100; }
+  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(14px) }
+    to   { opacity: 1; transform: translateY(0) }
+  }
+
+  .modal-box {
+    background: var(--s1); border: 1px solid var(--border-h);
+    border-radius: 16px; width: 100%; max-width: 520px;
+    max-height: 92vh; overflow-y: auto;
+    box-shadow: 0 28px 72px rgba(0,0,0,0.65);
+    animation: slideUp .18s ease;
+  }
+  .modal-box-xl  { max-width: 820px; }
+  .modal-box-lg  { max-width: 680px; }
+  .modal-box-md  { max-width: 420px; }
+  .modal-box::-webkit-scrollbar { width: 3px; }
+  .modal-box::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
+
+  .modal-header {
+    padding: 20px 22px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start;
+    justify-content: space-between; gap: 12px;
+    position: sticky; top: 0;
+    background: var(--s1); z-index: 2;
+  }
+  .modal-title {
+    font-family: 'Sora', sans-serif;
+    font-size: 16px; font-weight: 600; color: var(--text);
+  }
+  .modal-sub { font-size: 12px; color: var(--text-2); margin-top: 3px; }
+  .modal-close {
+    width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+    background: var(--s3); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; margin-top: 2px; transition: background .13s;
+  }
+  .modal-close:hover { background: var(--s2); border-color: var(--border-h); }
+  .modal-body   { padding: 20px 22px; }
+  .modal-footer {
+    padding: 14px 22px; border-top: 1px solid var(--border);
+    display: flex; justify-content: flex-end; gap: 10px;
+    position: sticky; bottom: 0; background: var(--s1); z-index: 2;
+  }
+
+  /* ── Buttons ── */
+  .btn-primary {
+    padding: 9px 20px; border-radius: 9px;
+    background: var(--gold); color: #0a0808;
+    border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 600;
+    transition: opacity .13s, transform .1s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-primary:hover  { opacity: .88; }
+  .btn-primary:active { transform: scale(.97); }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+
+  .btn-secondary {
+    padding: 9px 20px; border-radius: 9px;
+    background: var(--s3); color: var(--text-2);
+    border: 1px solid var(--border); cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 13px;
+    transition: background .13s, color .13s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-secondary:hover { background: var(--s2); color: var(--text); }
+
+  .btn-danger {
+    padding: 9px 20px; border-radius: 9px;
+    background: var(--red-d); color: var(--red);
+    border: 1px solid rgba(224,82,82,.25); cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 13px;
+    transition: background .13s;
+  }
+  .btn-danger:hover { background: rgba(224,82,82,.18); }
+
+  .btn-icon {
+    width: 30px; height: 30px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border: 1px solid transparent;
+    background: transparent; transition: all .13s;
+  }
+  .btn-icon-edit { color: var(--blue); }
+  .btn-icon-edit:hover { background: var(--blue-d); border-color: rgba(91,142,240,.2); }
+  .btn-icon-del  { color: var(--red); }
+  .btn-icon-del:hover  { background: var(--red-d); border-color: rgba(224,82,82,.2); }
+  .btn-icon-view { color: var(--text-2); }
+  .btn-icon-view:hover { background: var(--s3); border-color: var(--border-h); }
+
+  .btn-green {
+    padding: 9px 20px; border-radius: 9px;
+    background: rgba(74,222,128,.12); color: var(--green);
+    border: 1px solid rgba(74,222,128,.2); cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    transition: background .13s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-green:hover { background: rgba(74,222,128,.2); }
+
+  /* ── Forms ── */
+  .form-group { margin-bottom: 16px; }
+  .form-label {
+    display: block; font-size: 10px; font-weight: 600;
+    letter-spacing: .07em; text-transform: uppercase;
+    color: var(--text-2); margin-bottom: 7px;
+  }
+  .form-label-req { color: var(--gold); margin-left: 2px; }
+  .form-input {
+    width: 100%; background: var(--s2);
+    border: 1px solid var(--border); border-radius: 9px;
+    padding: 10px 13px; color: var(--text); font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    outline: none; transition: border-color .15s, box-shadow .15s;
+    box-sizing: border-box;
+  }
+  .form-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(200,165,94,0.1); }
+  .form-input.err   { border-color: var(--red); }
+  .form-error { font-size: 11px; color: var(--red); margin-top: 5px; }
+  .form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+  /* ── Topbar ── */
+  .vd-topbar {
+    padding: 14px 22px;
+    background: var(--s1); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 14px; flex-shrink: 0; flex-wrap: wrap;
+  }
+  .vd-topbar-title h1 {
+    font-family: 'Sora', sans-serif; font-size: 17px; font-weight: 600;
+    color: var(--text);
+  }
+  .vd-topbar-title p { font-size: 11px; color: var(--text-2); margin-top: 2px; }
+  .vd-search {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 12px; width: 270px; flex: 1; min-width: 180px;
+  }
+  .vd-search input {
+    background: transparent; border: none; outline: none;
+    color: var(--text); font-size: 12px; width: 100%;
+  }
+  .vd-topbar-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+  /* ── Filtros de período ── */
+  .vd-periods {
+    display: flex; align-items: center; gap: 6px;
+    padding: 12px 22px; border-bottom: 1px solid var(--border);
+    background: var(--s1); flex-wrap: wrap;
+  }
+  .vd-period-btn {
+    padding: 5px 13px; border-radius: 20px; font-size: 12px;
+    font-family: 'DM Sans', sans-serif; cursor: pointer;
+    border: 1px solid var(--border); background: var(--s2); color: var(--text-2);
+    transition: all .13s;
+  }
+  .vd-period-btn:hover { border-color: var(--border-h); color: var(--text); }
+  .vd-period-btn.active {
+    background: var(--gold); color: #0a0808;
+    border-color: var(--gold); font-weight: 600;
+  }
+  .vd-period-sep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; }
+
+  /* ── Tabela ── */
+  .vd-table-wrap {
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+  }
+  .vd-table-header {
+    padding: 13px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .vd-table-title {
+    font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; color: var(--text);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .vd-count-badge {
+    font-family: 'Sora', sans-serif; font-size: 11px; font-weight: 600;
+    background: var(--s3); border: 1px solid var(--border-h);
+    color: var(--text-2); padding: 2px 9px; border-radius: 20px;
+  }
+  .vd-table-actions { display: flex; gap: 6px; }
+
+  .vd-export-btn {
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 11px; border-radius: 7px; font-size: 11px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border);
+    background: var(--s2); color: var(--text-2);
+    font-family: 'DM Sans', sans-serif; transition: all .13s;
+  }
+  .vd-export-btn:hover { background: var(--s3); color: var(--text); }
+
+  .vd-row {
+    display: grid;
+    grid-template-columns: 72px 1fr 110px 180px 90px 80px 100px 80px;
+    padding: 11px 18px; gap: 8px;
+    border-bottom: 1px solid var(--border);
+    align-items: center; font-size: 12px; color: var(--text-2);
+    cursor: pointer; transition: background .1s;
+  }
+  .vd-row:last-child { border-bottom: none; }
+  .vd-row:hover { background: rgba(255,255,255,0.025); }
+  .vd-row-head { background: var(--s2); cursor: default; }
+  .vd-row-head:hover { background: var(--s2); }
+  .vd-row-head span {
+    font-size: 10px; font-weight: 500; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-3);
+  }
+
+  .vd-vid { font-family: 'Sora', sans-serif; font-size: 11px; color: var(--gold); font-weight: 500; }
+  .vd-cliente { color: var(--text); font-size: 13px; font-weight: 500; }
+  .vd-fp-badge {
+    display: inline-flex; align-items: center;
+    padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600;
+    background: var(--s3); border: 1px solid var(--border-h); color: var(--text-2);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;
+  }
+  .vd-actions { display: flex; align-items: center; gap: 5px; justify-content: flex-end; }
+  .vd-total { font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 600; color: var(--green); }
+  .vd-empty, .vd-loading { padding: 56px 20px; text-align: center; color: var(--text-3); font-size: 13px; }
+
+  /* ── Modal Nova Venda ── */
+  .nv-tabs {
+    display: flex; gap: 6px; margin-bottom: 18px;
+  }
+  .nv-tab {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 16px; border-radius: 9px; font-size: 12px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border);
+    background: var(--s2); color: var(--text-2);
+    font-family: 'DM Sans', sans-serif; transition: all .13s;
+  }
+  .nv-tab.active {
+    background: var(--gold); color: #0a0808; border-color: var(--gold);
+  }
+  .nv-tab:not(.active):hover { background: var(--s3); color: var(--text); }
+
+  /* autocomplete */
+  .nv-autocomplete { position: relative; }
+  .nv-ac-list {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 9999;
+    background: var(--s1); border: 1px solid var(--border-h);
+    border-radius: 9px; max-height: 200px; overflow-y: auto;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5); margin-top: 3px;
+  }
+  .nv-ac-item {
+    padding: 9px 13px; cursor: pointer; font-size: 13px; color: var(--text);
+    transition: background .1s; display: flex; align-items: center; justify-content: space-between;
+  }
+  .nv-ac-item:hover { background: var(--s2); }
+  .nv-ac-item-sub { font-size: 11px; color: var(--text-3); }
+  .nv-ac-empty { padding: 10px 13px; font-size: 12px; color: var(--text-3); text-align: center; }
+
+  /* itens da venda */
+  .nv-items-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .nv-items-label {
+    font-size: 10px; font-weight: 600; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--text-2);
+  }
+  .nv-add-item-btn {
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    cursor: pointer; border: 1px solid rgba(200,165,94,.3);
+    background: rgba(200,165,94,.08); color: var(--gold);
+    font-family: 'DM Sans', sans-serif; transition: all .13s;
+  }
+  .nv-add-item-btn:hover { background: rgba(200,165,94,.14); }
+
+  .nv-item-row {
+    display: grid; grid-template-columns: 1fr 70px 110px 110px 90px 32px;
+    gap: 8px; align-items: start; margin-bottom: 8px;
+    padding: 10px; background: var(--s2); border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .nv-item-field-label {
+    font-size: 9px; font-weight: 600; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-3); margin-bottom: 5px;
+  }
+  .nv-item-remove {
+    width: 28px; height: 28px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border: 1px solid transparent;
+    background: transparent; color: var(--red); margin-top: 14px;
+    transition: all .13s;
+  }
+  .nv-item-remove:hover { background: var(--red-d); border-color: rgba(224,82,82,.2); }
+
+  .nv-totals-bar {
+    display: flex; gap: 16px; padding: 12px 14px;
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 10px; margin-top: 14px; flex-wrap: wrap;
+  }
+  .nv-total-cell { display: flex; flex-direction: column; gap: 2px; }
+  .nv-total-label { font-size: 9px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .nv-total-val { font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; }
+
+  .nv-section-sep {
+    height: 1px; background: var(--border); margin: 18px 0;
+  }
+
+  /* ── Modal Detalhe Venda ── */
+  .dv-meta {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px; margin-bottom: 18px;
+  }
+  .dv-meta-card {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 13px;
+  }
+  .dv-meta-label { font-size: 9px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
+  .dv-meta-val { font-size: 13px; color: var(--text); font-weight: 500; }
+  .dv-meta-obs {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 13px; margin-bottom: 18px;
+  }
+  .dv-table {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; margin-bottom: 14px;
+  }
+  .dv-thead {
+    display: grid; grid-template-columns: 1fr 60px 110px 110px 100px 110px;
+    padding: 8px 12px; background: var(--s3);
+    border-bottom: 1px solid var(--border); gap: 8px;
+  }
+  .dv-thead span {
+    font-size: 9px; font-weight: 600; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-3);
+  }
+  .dv-trow {
+    display: grid; grid-template-columns: 1fr 60px 110px 110px 100px 110px;
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+    gap: 8px; font-size: 12px; color: var(--text-2);
+    align-items: center;
+  }
+  .dv-trow:last-child { border-bottom: none; }
+  .dv-nome { color: var(--text); font-weight: 500; display: flex; align-items: center; gap: 6px; }
+  .dv-totals {
+    display: flex; gap: 12px; padding: 12px 14px;
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 10px; flex-wrap: wrap;
+  }
+  .dv-total-cell { display: flex; flex-direction: column; gap: 2px; }
+  .dv-total-label { font-size: 9px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .dv-total-val { font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; }
+
+  .dv-imprimir {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border);
+    background: var(--s3); color: var(--text-2);
+    font-family: 'DM Sans', sans-serif; transition: all .13s;
+    margin-bottom: 16px;
+  }
+  .dv-imprimir:hover { background: var(--s2); color: var(--text); }
+
+  /* ── Confirm ── */
+  .confirm-body {
+    padding: 24px 22px; text-align: center;
+    font-size: 13px; color: var(--text-2); line-height: 1.6;
+  }
+  .confirm-icon { font-size: 28px; margin-bottom: 12px; }
+
+  /* ── Recibo Print ── */
+  @media print {
+    body > *:not(#recibo-print-root) { display: none !important; }
+    #recibo-print-root { display: block !important; }
+    .recibo-print {
+      font-family: 'Courier New', monospace;
+      width: 80mm; margin: 0 auto; padding: 8mm;
+      font-size: 12px; color: #000;
+    }
+    .recibo-print * { color: #000 !important; }
+  }
+  #recibo-print-root { display: none; }
+
+  /* ── Livre (venda sem produto) ── */
+  .nv-livre-info {
+    background: rgba(200,165,94,.07); border: 1px solid rgba(200,165,94,.2);
+    border-radius: 10px; padding: 11px 14px; margin-bottom: 14px;
+    font-size: 12px; color: var(--text-2);
+  }
+  .nv-livre-info strong { color: var(--gold); }
+`;
+
+/* ── Helpers ── */
+const fmtR$ = (v) =>
+  `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+
+const fmtData = (d) => {
+  if (!d) return "—";
+  try {
+    const dt = d?.toDate ? d.toDate() : new Date(d);
+    return dt.toLocaleDateString("pt-BR");
+  } catch { return String(d); }
+};
+
+const gerarIdVenda = (cnt) => `V${String(cnt + 1).padStart(4, "0")}`;
+
+const PERIODS = ["Tudo", "Hoje", "7 dias", "30 dias", "Este mês"];
+const FORMAS_PAGAMENTO = [
+  "Pix", "Dinheiro", "Cartão de Crédito", "Cartão de Débito",
+  "Boleto", "Transferência", "Sinal", "Parcelado", "Outro",
+];
+
+function filtrarPorPeriodo(vendas, period) {
+  if (period === "Tudo") return vendas;
+  const now = new Date();
+  const start = new Date();
+  if (period === "Hoje") { start.setHours(0, 0, 0, 0); }
+  else if (period === "7 dias") { start.setDate(now.getDate() - 7); }
+  else if (period === "30 dias") { start.setDate(now.getDate() - 30); }
+  else if (period === "Este mês") { start.setDate(1); start.setHours(0, 0, 0, 0); }
+  return vendas.filter(v => {
+    try {
+      const dt = v.data?.toDate ? v.data.toDate() : new Date(v.data);
+      return dt >= start;
+    } catch { return false; }
+  });
+}
+
+/* ── Recibo de impressão ── */
+function imprimirRecibo(venda) {
+  const el = document.getElementById("recibo-print-root");
+  if (!el) return;
+  const itens = venda.itens || [];
+  const subtotal  = itens.reduce((s, i) => s + (i.preco || 0) * (i.qtd || 1), 0);
+  const descontos = itens.reduce((s, i) => s + (i.desconto || 0), 0);
+  el.innerHTML = `
+    <div class="recibo-print">
+      <div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:8px;">ASSENT</div>
+      <div style="text-align:center;font-size:11px;margin-bottom:12px;">Recibo de Venda</div>
+      <div>ID: ${venda.id}</div>
+      <div>Data: ${fmtData(venda.data)}</div>
+      <div>Cliente: ${venda.cliente || "—"}</div>
+      <div>Pgto: ${venda.formaPagamento || "—"}</div>
+      <div style="border-top:1px dashed #000;margin:8px 0;"></div>
+      ${itens.map(i => `
+        <div>${i.nome || i.produto || "Item livre"}</div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;">
+          <span>${i.qtd}x ${fmtR$(i.preco)}</span>
+          <span>${fmtR$((i.preco || 0) * (i.qtd || 1) - (i.desconto || 0))}</span>
+        </div>
+      `).join("")}
+      <div style="border-top:1px dashed #000;margin:8px 0;"></div>
+      ${descontos > 0 ? `<div style="display:flex;justify-content:space-between;"><span>Descontos</span><span>-${fmtR$(descontos)}</span></div>` : ""}
+      <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:14px;">
+        <span>TOTAL</span><span>${fmtR$(venda.total)}</span>
+      </div>
+      ${venda.observacao ? `<div style="margin-top:10px;font-size:11px;">Obs: ${venda.observacao}</div>` : ""}
+      <div style="text-align:center;font-size:10px;margin-top:12px;">Obrigado!</div>
+    </div>
+  `;
+  window.print();
+}
+
+/* ── Exportar CSV ── */
+function exportarCSV(vendas) {
+  const header = "ID,Cliente,Data,Pagamento,Vendedor,Itens,Total\n";
+  const rows = vendas.map(v =>
+    `${v.id},"${v.cliente || ""}","${fmtData(v.data)}","${v.formaPagamento || ""}","${v.vendedor || ""}",${v.itens?.length || 0},${v.total || 0}`
+  ).join("\n");
+  const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "vendas.csv"; a.click();
+  URL.revokeObjectURL(url);
+}
+
+
+/* ══════════════════════════════════════════════════
+   MODAL: Nova / Editar Venda
+   ══════════════════════════════════════════════════ */
+function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, onSave, onClose }) {
+  const isEdit = !!venda;
+
+  // tipo de venda: "produto" | "servico" | "livre"
+  const [tipo, setTipo] = useState(venda?.tipo || "produto");
+
+  // Cabeçalho
+  const [clienteSearch, setClienteSearch] = useState(venda?.cliente || "");
+  const [clienteAC, setClienteAC] = useState(false);
+  const [dataVenda, setDataVenda] = useState(
+    venda?.data ? (venda.data?.toDate ? venda.data.toDate().toISOString().split("T")[0] : new Date(venda.data).toISOString().split("T")[0]) : new Date().toISOString().split("T")[0]
+  );
+  const [vendedor, setVendedor] = useState(venda?.vendedor || "");
+  const [formaPgto, setFormaPgto] = useState(venda?.formaPagamento || "");
+  const [observacao, setObservacao] = useState(venda?.observacao || "");
+
+  // Itens
+  const [itens, setItens] = useState(
+    venda?.itens?.length ? venda.itens : [itemVazio()]
+  );
+
+  // Venda livre
+  const [livreNome, setLivreNome] = useState(venda?.livreNome || "");
+  const [livreValor, setLivreValor] = useState(venda?.livreValor || "");
+  const [livreDesc, setLivreDesc] = useState(venda?.livreDesc || 0);
+
+  const [salvando, setSalvando] = useState(false);
+  const [erros, setErros] = useState({});
+
+  function itemVazio() {
+    return { produtoId: "", nome: "", qtd: 1, preco: 0, custo: 0, desconto: 0, tipo: "produto" };
+  }
+
+  /* Autocomplete de produtos/serviços */
+  const [itemSearches, setItemSearches] = useState(
+    venda?.itens?.length ? venda.itens.map(i => i.nome || "") : [""]
+  );
+  const [itemAC, setItemAC] = useState(null); // índice do item com AC aberto
+
+  const catalogoFiltrado = (search, idx) => {
+    const lista = tipo === "servico" ? servicos : produtos;
+    if (!search.trim()) return lista.slice(0, 8);
+    const q = search.toLowerCase();
+    return lista.filter(p =>
+      p.nome?.toLowerCase().includes(q) || p.id?.toLowerCase().includes(q)
+    ).slice(0, 8);
+  };
+
+  const selecionarProduto = (idx, prod) => {
+    const novo = [...itens];
+    novo[idx] = {
+      ...novo[idx],
+      produtoId: prod.id,
+      nome: prod.nome,
+      preco: prod.preco || 0,
+      custo: prod.custo || prod.precoCusto || 0,
+      tipo: tipo,
+    };
+    setItens(novo);
+    const ns = [...itemSearches];
+    ns[idx] = prod.nome;
+    setItemSearches(ns);
+    setItemAC(null);
+  };
+
+  const atualizarItem = (idx, campo, valor) => {
+    const novo = [...itens];
+    novo[idx] = { ...novo[idx], [campo]: valor };
+    setItens(novo);
+  };
+
+  const adicionarItem = () => {
+    setItens([...itens, itemVazio()]);
+    setItemSearches([...itemSearches, ""]);
+  };
+
+  const removerItem = (idx) => {
+    if (itens.length === 1) return;
+    setItens(itens.filter((_, i) => i !== idx));
+    setItemSearches(itemSearches.filter((_, i) => i !== idx));
+  };
+
+  /* Cálculos */
+  const calculos = useMemo(() => {
+    if (tipo === "livre") {
+      const val = parseFloat(livreValor) || 0;
+      const desc = parseFloat(livreDesc) || 0;
+      return { subtotal: val, descontos: desc, custo: 0, total: val - desc, lucro: val - desc };
+    }
+    const subtotal  = itens.reduce((s, i) => s + (parseFloat(i.preco) || 0) * (parseInt(i.qtd) || 1), 0);
+    const descontos = itens.reduce((s, i) => s + (parseFloat(i.desconto) || 0), 0);
+    const custo     = itens.reduce((s, i) => s + (parseFloat(i.custo) || 0) * (parseInt(i.qtd) || 1), 0);
+    const total     = subtotal - descontos;
+    return { subtotal, descontos, custo, total, lucro: total - custo };
+  }, [itens, tipo, livreValor, livreDesc]);
+
+  const validar = () => {
+    const e = {};
+    if (!clienteSearch.trim()) e.cliente = "Informe o cliente.";
+    if (!formaPgto) e.formaPgto = "Selecione a forma de pagamento.";
+    if (tipo === "livre") {
+      if (!livreNome.trim()) e.livreNome = "Informe uma descrição.";
+      if (!livreValor || parseFloat(livreValor) <= 0) e.livreValor = "Informe o valor.";
+    }
+    setErros(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSalvar = async () => {
+    if (!validar()) return;
+    setSalvando(true);
+
+    const payload = {
+      cliente: clienteSearch.trim(),
+      data: new Date(dataVenda + "T12:00:00"),
+      vendedor: vendedor.trim(),
+      formaPagamento: formaPgto,
+      observacao: observacao.trim(),
+      tipo,
+      total: calculos.total,
+      subtotal: calculos.subtotal,
+      descontos: calculos.descontos,
+      custoTotal: calculos.custo,
+      lucroEstimado: calculos.lucro,
+    };
+
+    if (tipo === "livre") {
+      payload.itens = [{
+        nome: livreNome.trim(),
+        qtd: 1,
+        preco: parseFloat(livreValor) || 0,
+        custo: 0,
+        desconto: parseFloat(livreDesc) || 0,
+        produtoId: null,
+        tipo: "livre",
+      }];
+      payload.livreNome = livreNome.trim();
+      payload.livreValor = parseFloat(livreValor) || 0;
+      payload.livreDesc = parseFloat(livreDesc) || 0;
+    } else {
+      payload.itens = itens.map(i => ({
+        produtoId: i.produtoId || null,
+        nome: i.nome,
+        qtd: parseInt(i.qtd) || 1,
+        preco: parseFloat(i.preco) || 0,
+        custo: parseFloat(i.custo) || 0,
+        desconto: parseFloat(i.desconto) || 0,
+        tipo,
+      }));
+    }
+
+    await onSave(payload, isEdit ? venda : null);
+    setSalvando(false);
+  };
+
+  /* Autocomplete clientes */
+  const clientesFiltrados = useMemo(() => {
+    if (!clienteSearch.trim()) return clientes.slice(0, 6);
+    const q = clienteSearch.toLowerCase();
+    return clientes.filter(c =>
+      c.nome?.toLowerCase().includes(q) || c.cpf?.toLowerCase().includes(q)
+    ).slice(0, 6);
+  }, [clientes, clienteSearch]);
+
+  const refClienteAC = useRef(null);
+  const refItemACs = useRef([]);
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box modal-box-xl">
+
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">{isEdit ? `Editando ${venda.id}` : "Nova Venda"}</div>
+            <div className="modal-sub">{isEdit ? "Altere os dados e salve" : "Registre uma nova venda"}</div>
+          </div>
+          <button className="modal-close" onClick={onClose}>
+            <X size={14} color="var(--text-2)" />
+          </button>
+        </div>
+
+        <div className="modal-body">
+
+          {/* Tabs tipo */}
+          <div className="nv-tabs">
+            <button className={`nv-tab ${tipo === "produto" ? "active" : ""}`} onClick={() => setTipo("produto")}>
+              <Package size={13} /> Produto
+            </button>
+            <button className={`nv-tab ${tipo === "servico" ? "active" : ""}`} onClick={() => setTipo("servico")}>
+              🎯 Serviço
+            </button>
+            <button className={`nv-tab ${tipo === "livre" ? "active" : ""}`} onClick={() => setTipo("livre")}>
+              <FileText size={13} /> Valor Livre
+            </button>
+          </div>
+
+          {/* Cabeçalho */}
+          <div className="form-row">
+            {/* Cliente */}
+            <div className="form-group nv-autocomplete" ref={refClienteAC}>
+              <label className="form-label">Cliente <span className="form-label-req">*</span></label>
+              <input
+                className={`form-input ${erros.cliente ? "err" : ""}`}
+                placeholder="Buscar por nome ou CPF..."
+                value={clienteSearch}
+                onChange={e => { setClienteSearch(e.target.value); setClienteAC(true); }}
+                onFocus={() => setClienteAC(true)}
+                onBlur={() => setTimeout(() => setClienteAC(false), 180)}
+                autoComplete="off"
+              />
+              {erros.cliente && <div className="form-error">{erros.cliente}</div>}
+              {clienteAC && (
+                <div className="nv-ac-list">
+                  {clientesFiltrados.length === 0
+                    ? <div className="nv-ac-empty">Nenhum cliente encontrado</div>
+                    : clientesFiltrados.map(c => (
+                      <div key={c.id} className="nv-ac-item" onMouseDown={() => { setClienteSearch(c.nome); setClienteAC(false); }}>
+                        <span>{c.nome}</span>
+                        <span className="nv-ac-item-sub">{c.cpf || c.telefone || ""}</span>
+                      </div>
+                    ))
+                  }
+                </div>
+              )}
+            </div>
+
+            {/* Data */}
+            <div className="form-group">
+              <label className="form-label">Data da Venda</label>
+              <input
+                type="date"
+                className="form-input"
+                value={dataVenda}
+                onChange={e => setDataVenda(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            {/* Vendedor */}
+            <div className="form-group">
+              <label className="form-label">Vendedor</label>
+              {vendedores?.length > 0 ? (
+                <select className="form-input" value={vendedor} onChange={e => setVendedor(e.target.value)}>
+                  <option value="">— Nenhum / Não informado —</option>
+                  {vendedores.map(v => <option key={v.id || v} value={v.nome || v}>{v.nome || v}</option>)}
+                </select>
+              ) : (
+                <input className="form-input" placeholder="Nome do vendedor..." value={vendedor} onChange={e => setVendedor(e.target.value)} />
+              )}
+            </div>
+
+            {/* Forma de pagamento */}
+            <div className="form-group">
+              <label className="form-label">Forma de Pagamento <span className="form-label-req">*</span></label>
+              <select className={`form-input ${erros.formaPgto ? "err" : ""}`} value={formaPgto} onChange={e => setFormaPgto(e.target.value)}>
+                <option value="">— Selecionar —</option>
+                {FORMAS_PAGAMENTO.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
+              {erros.formaPgto && <div className="form-error">{erros.formaPgto}</div>}
+            </div>
+          </div>
+
+          <div className="nv-section-sep" />
+
+          {/* Itens */}
+          {tipo === "livre" ? (
+            <>
+              <div className="nv-livre-info">
+                <strong>Venda de Valor Livre</strong> — sem produto ou serviço cadastrado.
+                Informe a descrição e o valor abaixo.
+              </div>
+              <div className="form-row-3">
+                <div className="form-group" style={{ gridColumn: "1/3" }}>
+                  <label className="form-label">Descrição <span className="form-label-req">*</span></label>
+                  <input
+                    className={`form-input ${erros.livreNome ? "err" : ""}`}
+                    placeholder="Ex: Serviço personalizado, Consultoria..."
+                    value={livreNome}
+                    onChange={e => setLivreNome(e.target.value)}
+                  />
+                  {erros.livreNome && <div className="form-error">{erros.livreNome}</div>}
+                </div>
+                <div className="form-group" style={{ gridColumn: "3/4" }}>
+                  <label className="form-label">Valor (R$) <span className="form-label-req">*</span></label>
+                  <input
+                    type="number" min="0" step="0.01"
+                    className={`form-input ${erros.livreValor ? "err" : ""}`}
+                    placeholder="0,00"
+                    value={livreValor}
+                    onChange={e => setLivreValor(e.target.value)}
+                  />
+                  {erros.livreValor && <div className="form-error">{erros.livreValor}</div>}
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Desconto (R$)</label>
+                  <input
+                    type="number" min="0" step="0.01"
+                    className="form-input"
+                    placeholder="0"
+                    value={livreDesc}
+                    onChange={e => setLivreDesc(e.target.value)}
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="nv-items-header">
+                <span className="nv-items-label">Itens da Venda</span>
+                <button className="nv-add-item-btn" onClick={adicionarItem}>
+                  <Plus size={12} /> Adicionar item
+                </button>
+              </div>
+
+              {itens.map((item, idx) => (
+                <div key={idx} className="nv-item-row">
+                  {/* Produto/Serviço */}
+                  <div style={{ position: "relative" }}>
+                    <div className="nv-item-field-label">{tipo === "servico" ? "Serviço" : "Produto"}</div>
+                    <input
+                      className="form-input"
+                      placeholder={`Buscar ${tipo === "servico" ? "serviço" : "produto"}...`}
+                      value={itemSearches[idx] || ""}
+                      onChange={e => {
+                        const ns = [...itemSearches];
+                        ns[idx] = e.target.value;
+                        setItemSearches(ns);
+                        atualizarItem(idx, "nome", e.target.value);
+                        setItemAC(idx);
+                      }}
+                      onFocus={() => setItemAC(idx)}
+                      onBlur={() => setTimeout(() => setItemAC(null), 180)}
+                      autoComplete="off"
+                    />
+                    {itemAC === idx && (
+                      <div className="nv-ac-list">
+                        {catalogoFiltrado(itemSearches[idx] || "", idx).length === 0
+                          ? <div className="nv-ac-empty">Nenhum item encontrado</div>
+                          : catalogoFiltrado(itemSearches[idx] || "", idx).map(p => (
+                            <div key={p.id} className="nv-ac-item" onMouseDown={() => selecionarProduto(idx, p)}>
+                              <span>{p.nome}</span>
+                              <span className="nv-ac-item-sub">{fmtR$(p.preco || 0)}</span>
+                            </div>
+                          ))
+                        }
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Qtd */}
+                  <div>
+                    <div className="nv-item-field-label">Qtd</div>
+                    <input
+                      type="number" min="1"
+                      className="form-input"
+                      value={item.qtd}
+                      onChange={e => atualizarItem(idx, "qtd", e.target.value)}
+                    />
+                  </div>
+
+                  {/* Preço */}
+                  <div>
+                    <div className="nv-item-field-label">Preço Unit. (R$)</div>
+                    <input
+                      type="number" min="0" step="0.01"
+                      className="form-input"
+                      value={item.preco}
+                      onChange={e => atualizarItem(idx, "preco", e.target.value)}
+                    />
+                  </div>
+
+                  {/* Custo */}
+                  <div>
+                    <div className="nv-item-field-label">Custo Unit. (R$)</div>
+                    <input
+                      type="number" min="0" step="0.01"
+                      className="form-input"
+                      value={item.custo}
+                      onChange={e => atualizarItem(idx, "custo", e.target.value)}
+                    />
+                  </div>
+
+                  {/* Desconto */}
+                  <div>
+                    <div className="nv-item-field-label">Desconto (R$)</div>
+                    <input
+                      type="number" min="0" step="0.01"
+                      className="form-input"
+                      value={item.desconto}
+                      onChange={e => atualizarItem(idx, "desconto", e.target.value)}
+                    />
+                  </div>
+
+                  {/* Remover */}
+                  <button className="nv-item-remove" onClick={() => removerItem(idx)} disabled={itens.length === 1}>
+                    <X size={13} />
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
+
+          {/* Totais */}
+          <div className="nv-totals-bar">
+            <div className="nv-total-cell">
+              <div className="nv-total-label">Subtotal</div>
+              <div className="nv-total-val" style={{ color: "var(--text)" }}>{fmtR$(calculos.subtotal)}</div>
+            </div>
+            <div className="nv-total-cell">
+              <div className="nv-total-label">Descontos</div>
+              <div className="nv-total-val" style={{ color: "var(--red)" }}>{fmtR$(calculos.descontos)}</div>
+            </div>
+            {tipo !== "livre" && (
+              <div className="nv-total-cell">
+                <div className="nv-total-label">Custo Total</div>
+                <div className="nv-total-val" style={{ color: "var(--red)" }}>{fmtR$(calculos.custo)}</div>
+              </div>
+            )}
+            <div className="nv-total-cell">
+              <div className="nv-total-label">Total</div>
+              <div className="nv-total-val" style={{ color: "var(--green)" }}>{fmtR$(calculos.total)}</div>
+            </div>
+            <div className="nv-total-cell">
+              <div className="nv-total-label">Lucro Est.</div>
+              <div className="nv-total-val" style={{ color: "var(--gold)" }}>{fmtR$(calculos.lucro)}</div>
+            </div>
+          </div>
+
+          <div className="nv-section-sep" />
+
+          {/* Observação */}
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Observação da Venda</label>
+            <textarea
+              className="form-input"
+              style={{ resize: "vertical", minHeight: 70 }}
+              placeholder="Ex: Cliente pediu entrega, moldura especial, sem embalagem..."
+              value={observacao}
+              onChange={e => setObservacao(e.target.value)}
+            />
+          </div>
+
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
+            {salvando ? "Salvando..." : isEdit ? "Salvar Alterações" : "✓ Finalizar Venda"}
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════
+   MODAL: Detalhe de Venda (clique na linha)
+   ══════════════════════════════════════════════════ */
+function ModalDetalheVenda({ venda, onClose, onEditar, onExcluir }) {
+  if (!venda) return null;
+  const itens = venda.itens || [];
+
+  const subtotal   = itens.reduce((s, i) => s + (i.preco || 0) * (i.qtd || 1), 0);
+  const descontos  = itens.reduce((s, i) => s + (i.desconto || 0), 0);
+  const custoTotal = itens.reduce((s, i) => s + (i.custo || 0) * (i.qtd || 1), 0);
+  const total      = typeof venda.total === "number" ? venda.total : subtotal - descontos;
+  const lucro      = total - custoTotal;
+
+  return (
+    <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box modal-box-lg">
+
+        <div className="modal-header">
+          <div>
+            <div className="modal-title" style={{ color: "var(--gold)" }}>{venda.id}</div>
+            <div className="modal-sub">Detalhes da venda</div>
+          </div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {onEditar && (
+              <button className="btn-icon btn-icon-edit" onClick={() => onEditar(venda)} title="Editar">
+                <Edit2 size={13} />
+              </button>
+            )}
+            {onExcluir && (
+              <button className="btn-icon btn-icon-del" onClick={() => onExcluir(venda)} title="Excluir">
+                <Trash2 size={13} />
+              </button>
+            )}
+            <button className="modal-close" onClick={onClose}>
+              <X size={14} color="var(--text-2)" />
+            </button>
+          </div>
+        </div>
+
+        <div className="modal-body">
+
+          {/* Meta cards */}
+          <div className="dv-meta">
+            <div className="dv-meta-card">
+              <div className="dv-meta-label">Cliente</div>
+              <div className="dv-meta-val">{venda.cliente || "—"}</div>
+            </div>
+            <div className="dv-meta-card">
+              <div className="dv-meta-label">Data</div>
+              <div className="dv-meta-val">{fmtData(venda.data)}</div>
+            </div>
+            <div className="dv-meta-card">
+              <div className="dv-meta-label">Pagamento</div>
+              <div className="dv-meta-val">{venda.formaPagamento || "—"}</div>
+            </div>
+          </div>
+
+          {venda.vendedor && (
+            <div className="dv-meta" style={{ gridTemplateColumns: "1fr", marginTop: -6 }}>
+              <div className="dv-meta-card">
+                <div className="dv-meta-label">Vendedor</div>
+                <div className="dv-meta-val">{venda.vendedor}</div>
+              </div>
+            </div>
+          )}
+
+          {venda.observacao && (
+            <div className="dv-meta-obs" style={{ marginTop: 6 }}>
+              <div className="dv-meta-label" style={{ marginBottom: 4 }}>Observação</div>
+              <div style={{ fontSize: 13, color: "var(--text-2)" }}>{venda.observacao}</div>
+            </div>
+          )}
+
+          {/* Botão imprimir */}
+          <button className="dv-imprimir" onClick={() => imprimirRecibo(venda)}>
+            <Printer size={13} /> Reimprimir Recibo
+          </button>
+
+          {/* Tabela de itens */}
+          <div className="dv-table">
+            <div className="dv-thead">
+              <span>PRODUTO / SERVIÇO</span>
+              <span style={{ textAlign: "center" }}>QTD</span>
+              <span style={{ textAlign: "right" }}>PREÇO UNIT.</span>
+              <span style={{ textAlign: "right" }}>CUSTO UNIT.</span>
+              <span style={{ textAlign: "right" }}>DESCONTO</span>
+              <span style={{ textAlign: "right" }}>TOTAL ITEM</span>
+            </div>
+            {itens.length === 0 ? (
+              <div style={{ padding: 18, textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>
+                Nenhum item nesta venda.
+              </div>
+            ) : itens.map((item, i) => {
+              const totalItem = (item.preco || 0) * (item.qtd || 1) - (item.desconto || 0);
+              return (
+                <div key={i} className="dv-trow">
+                  <span className="dv-nome">
+                    {item.tipo === "servico" ? "🎯" : item.tipo === "livre" ? "📝" : <Package size={11} color="var(--text-3)" />}
+                    {item.nome || item.produto || "—"}
+                  </span>
+                  <span style={{ textAlign: "center" }}>{item.qtd || 1}</span>
+                  <span style={{ textAlign: "right" }}>{fmtR$(item.preco)}</span>
+                  <span style={{ textAlign: "right", color: "var(--red)" }}>{fmtR$(item.custo)}</span>
+                  <span style={{ textAlign: "right" }}>{item.desconto ? fmtR$(item.desconto) : "—"}</span>
+                  <span style={{ textAlign: "right", color: "var(--green)", fontFamily: "Sora, sans-serif", fontWeight: 500 }}>
+                    {fmtR$(totalItem)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Totais */}
+          <div className="dv-totals">
+            <div className="dv-total-cell">
+              <div className="dv-total-label">Subtotal</div>
+              <div className="dv-total-val" style={{ color: "var(--text)" }}>{fmtR$(subtotal)}</div>
+            </div>
+            <div className="dv-total-cell">
+              <div className="dv-total-label">Descontos</div>
+              <div className="dv-total-val" style={{ color: "var(--red)" }}>{fmtR$(descontos)}</div>
+            </div>
+            <div className="dv-total-cell">
+              <div className="dv-total-label">Custo Total</div>
+              <div className="dv-total-val" style={{ color: "var(--red)" }}>{fmtR$(custoTotal)}</div>
+            </div>
+            <div className="dv-total-cell">
+              <div className="dv-total-label">Total</div>
+              <div className="dv-total-val" style={{ color: "var(--green)" }}>{fmtR$(total)}</div>
+            </div>
+            <div className="dv-total-cell">
+              <div className="dv-total-label">Lucro Est.</div>
+              <div className="dv-total-val" style={{ color: "var(--gold)" }}>{fmtR$(lucro)}</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════
+   MODAL: Confirmar Exclusão de Venda
+   ══════════════════════════════════════════════════ */
+function ModalConfirmDeleteVenda({ venda, onConfirm, onClose }) {
+  const [excluindo, setExcluindo] = useState(false);
+
+  const handleConfirm = async () => {
+    setExcluindo(true);
+    await onConfirm();
+    setExcluindo(false);
+  };
+
+  return (
+    <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box modal-box-md">
+        <div className="modal-header">
+          <div className="modal-title">Cancelar Venda</div>
+          <button className="modal-close" onClick={onClose}>
+            <X size={14} color="var(--text-2)" />
+          </button>
+        </div>
+        <div className="confirm-body">
+          <div className="confirm-icon">🗑️</div>
+          <p>
+            Tem certeza que deseja excluir a venda <strong>{venda?.id}</strong>?<br />
+            <span style={{ color: "var(--gold)", fontSize: 12 }}>
+              Os produtos vendidos terão o estoque restaurado automaticamente.
+            </span><br /><br />
+            Esta ação não pode ser desfeita.
+          </p>
+        </div>
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn-danger" onClick={handleConfirm} disabled={excluindo}>
+            {excluindo ? "Excluindo..." : "Confirmar Exclusão"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+/* ═══════════════════════════════════════
+   COMPONENTE PRINCIPAL
+   ═══════════════════════════════════════ */
+export default function Vendas() {
+  const [uid, setUid]       = useState(null);
+  const [vendas, setVendas] = useState([]);
+  const [clientes, setClientes]   = useState([]);
+  const [produtos, setProdutos]   = useState([]);
+  const [servicos, setServicos]   = useState([]);
+  const [vendedores, setVendedores] = useState([]);
+  const [vendaIdCnt, setVendaIdCnt] = useState(0);
+
+  const [search, setSearch]   = useState("");
+  const [period, setPeriod]   = useState("Tudo");
+  const [loading, setLoading] = useState(true);
+
+  const [modalNova, setModalNova]       = useState(false);
+  const [editando, setEditando]         = useState(null);
+  const [detalhe, setDetalhe]           = useState(null);
+  const [deletando, setDeletando]       = useState(null);
+  const [confirmarDepoisDetalhe, setConfirmarDepoisDetalhe] = useState(false);
+
+  /* Auth */
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => setUid(user?.uid || null));
+    return unsub;
+  }, []);
+
+  /* Firestore listeners */
+  useEffect(() => {
+    if (!uid) { setLoading(false); return; }
+
+    const userRef     = doc(db, "users", uid);
+    const vendasCol   = collection(db, "users", uid, "vendas");
+    const clientesCol = collection(db, "users", uid, "clientes");
+    const produtosCol = collection(db, "users", uid, "produtos");
+    const servicosCol = collection(db, "users", uid, "servicos");
+    const vendsCol    = collection(db, "users", uid, "vendedores");
+
+    const u1 = onSnapshot(userRef, snap => {
+      if (snap.exists()) setVendaIdCnt(snap.data().vendaIdCnt || 0);
+    });
+    const u2 = onSnapshot(vendasCol, snap => {
+      const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      arr.sort((a, b) => {
+        const da = a.data?.toDate ? a.data.toDate() : new Date(a.data || 0);
+        const db_ = b.data?.toDate ? b.data.toDate() : new Date(b.data || 0);
+        return db_ - da;
+      });
+      setVendas(arr);
+      setLoading(false);
+    });
+    const u3 = onSnapshot(clientesCol, snap => setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u4 = onSnapshot(produtosCol, snap => setProdutos(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u5 = onSnapshot(servicosCol, snap => setServicos(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const u6 = onSnapshot(vendsCol,    snap => setVendedores(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); };
+  }, [uid]);
+
+  /* ── Criar venda ── */
+  const handleSave = async (payload, vendaExistente) => {
+    if (!uid) return;
+
+    if (vendaExistente) {
+      /* EDITAR: se produto mudou, restaura estoque antigo e desconta novo */
+      await runTransaction(db, async (tx) => {
+        /* Restaurar estoque dos itens antigos */
+        for (const oldItem of (vendaExistente.itens || [])) {
+          if (oldItem.produtoId && oldItem.tipo === "produto") {
+            const ref = doc(db, "users", uid, "produtos", oldItem.produtoId);
+            tx.update(ref, { estoque: increment(oldItem.qtd || 1) });
+          }
+        }
+        /* Descontar estoque dos itens novos */
+        for (const newItem of (payload.itens || [])) {
+          if (newItem.produtoId && newItem.tipo === "produto") {
+            const ref = doc(db, "users", uid, "produtos", newItem.produtoId);
+            tx.update(ref, { estoque: increment(-(newItem.qtd || 1)) });
+          }
+        }
+        /* Salvar venda */
+        tx.set(doc(db, "users", uid, "vendas", vendaExistente.id), payload, { merge: true });
+      });
+      setEditando(null);
+      setDetalhe(null);
+      return;
+    }
+
+    /* NOVA VENDA */
+    const novoId = gerarIdVenda(vendaIdCnt);
+    await runTransaction(db, async (tx) => {
+      /* Descontar estoque */
+      for (const item of (payload.itens || [])) {
+        if (item.produtoId && item.tipo === "produto") {
+          const ref = doc(db, "users", uid, "produtos", item.produtoId);
+          tx.update(ref, { estoque: increment(-(item.qtd || 1)) });
+        }
+      }
+      /* Criar venda */
+      tx.set(doc(db, "users", uid, "vendas", novoId), { ...payload, criadoEm: new Date().toISOString() });
+      /* Incrementar contador */
+      tx.set(doc(db, "users", uid), { vendaIdCnt: vendaIdCnt + 1 }, { merge: true });
+    });
+
+    /* Imprimir recibo após criar */
+    imprimirRecibo({ ...payload, id: novoId });
+    setModalNova(false);
+  };
+
+  /* ── Excluir venda — restaura estoque ── */
+  const handleDelete = async () => {
+    if (!uid || !deletando) return;
+    await runTransaction(db, async (tx) => {
+      /* Restaurar estoque */
+      for (const item of (deletando.itens || [])) {
+        if (item.produtoId && item.tipo === "produto") {
+          const ref = doc(db, "users", uid, "produtos", item.produtoId);
+          tx.update(ref, { estoque: increment(item.qtd || 1) });
+        }
+      }
+      tx.delete(doc(db, "users", uid, "vendas", deletando.id));
+    });
+    setDeletando(null);
+    setDetalhe(null);
+  };
+
+  /* Filtros */
+  const vendasFiltradas = useMemo(() => {
+    let lista = filtrarPorPeriodo(vendas, period);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      lista = lista.filter(v =>
+        v.id?.toLowerCase().includes(q) ||
+        v.cliente?.toLowerCase().includes(q) ||
+        v.vendedor?.toLowerCase().includes(q)
+      );
+    }
+    return lista;
+  }, [vendas, period, search]);
+
+  if (!uid) return <div className="vd-loading">Carregando autenticação...</div>;
+
+  return (
+    <>
+      <style>{CSS}</style>
+      <div id="recibo-print-root" />
+
+      {/* Topbar */}
+      <header className="vd-topbar">
+        <div className="vd-topbar-title">
+          <h1>Vendas</h1>
+          <p>Gerencie e acompanhe todas as vendas</p>
+        </div>
+
+        <div className="vd-search">
+          <Search size={13} color="var(--text-3)" />
+          <input
+            placeholder="Buscar por ID ou cliente..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+
+        <div className="vd-topbar-right">
+          <button className="btn-novo-cl" onClick={() => setModalNova(true)}
+            style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: 9, background: "var(--gold)", color: "#0a0808", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", transition: "opacity .13s" }}
+          >
+            <Plus size={14} /> Nova Venda
+          </button>
+        </div>
+      </header>
+
+      {/* Filtros de período */}
+      <div className="vd-periods">
+        {PERIODS.map(p => (
+          <button
+            key={p}
+            className={`vd-period-btn ${period === p ? "active" : ""}`}
+            onClick={() => setPeriod(p)}
+          >{p}</button>
+        ))}
+      </div>
+
+      {/* Tabela */}
+      <div className="ag-content">
+        <div className="vd-table-wrap">
+          <div className="vd-table-header">
+            <div className="vd-table-title">
+              Todas as vendas
+              <span className="vd-count-badge">{vendasFiltradas.length}</span>
+            </div>
+            <div className="vd-table-actions">
+              <button className="vd-export-btn" onClick={() => exportarCSV(vendasFiltradas)}>
+                <Download size={11} /> CSV
+              </button>
+            </div>
+          </div>
+
+          {/* Cabeçalho */}
+          <div className="vd-row vd-row-head">
+            <span>ID</span>
+            <span>CLIENTE</span>
+            <span>DATA</span>
+            <span>PAGAMENTO</span>
+            <span>VENDEDOR</span>
+            <span>ITENS</span>
+            <span>TOTAL</span>
+            <span style={{ textAlign: "right" }}>AÇÕES</span>
+          </div>
+
+          {loading ? (
+            <div className="vd-loading">Carregando vendas...</div>
+          ) : vendasFiltradas.length === 0 ? (
+            <div className="vd-empty">
+              <ShoppingCart size={28} color="var(--text-3)" style={{ marginBottom: 8 }} />
+              <p>Nenhuma venda encontrada.</p>
+            </div>
+          ) : vendasFiltradas.map(v => (
+            <div key={v.id} className="vd-row" onClick={() => setDetalhe(v)}>
+              <span className="vd-vid">{v.id}</span>
+              <span className="vd-cliente">{v.cliente || "—"}</span>
+              <span>{fmtData(v.data)}</span>
+              <span><span className="vd-fp-badge">{v.formaPagamento || "—"}</span></span>
+              <span>{v.vendedor || "—"}</span>
+              <span>{v.itens?.length || 0} item(s)</span>
+              <span className="vd-total">{fmtR$(v.total)}</span>
+              <div className="vd-actions" onClick={e => e.stopPropagation()}>
+                <button className="btn-icon btn-icon-edit" onClick={() => setEditando(v)} title="Editar">
+                  <Edit2 size={13} />
+                </button>
+                <button className="btn-icon btn-icon-del" onClick={() => setDeletando(v)} title="Excluir">
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Modais */}
+      {modalNova && (
+        <ModalNovaVenda
+          uid={uid}
+          clientes={clientes}
+          produtos={produtos}
+          servicos={servicos}
+          vendedores={vendedores}
+          onSave={handleSave}
+          onClose={() => setModalNova(false)}
+        />
+      )}
+
+      {editando && (
+        <ModalNovaVenda
+          venda={editando}
+          uid={uid}
+          clientes={clientes}
+          produtos={produtos}
+          servicos={servicos}
+          vendedores={vendedores}
+          onSave={handleSave}
+          onClose={() => setEditando(null)}
+        />
+      )}
+
+      {detalhe && (
+        <ModalDetalheVenda
+          venda={detalhe}
+          onClose={() => setDetalhe(null)}
+          onEditar={(v) => { setDetalhe(null); setEditando(v); }}
+          onExcluir={(v) => { setDetalhe(null); setDeletando(v); }}
+        />
+      )}
+
+      {deletando && (
+        <ModalConfirmDeleteVenda
+          venda={deletando}
+          onConfirm={handleDelete}
+          onClose={() => setDeletando(null)}
+        />
+      )}
+    </>
+  );
+}
