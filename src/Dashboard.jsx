@@ -148,7 +148,7 @@ const CSS = `
   .ag-nav-item.active  { background:var(--gold-d); color:var(--gold); border-left-color:var(--gold); }
   .ag-nav-item.active svg { color:var(--gold); }
 
-  .ag-user {
+  . {
     padding:12px 14px;
     border-top:1px solid var(--border);
     display:flex; align-items:center; gap:10px;
@@ -161,8 +161,8 @@ const CSS = `
     font-size:12px; font-weight:600; color:var(--gold);
     font-family:'Sora',sans-serif;
   }
-  .ag-user-info { flex:1; min-width:0; }
-  .ag-user-name { font-size:12px; font-weight:500; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .-info { flex:1; min-width:0; }
+  .-name { font-size:12px; font-weight:500; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .ag-plan-badge {
     display:inline-block; margin-top:3px;
     font-size:9px; font-weight:600; letter-spacing:.06em;
@@ -664,12 +664,33 @@ export default function Dashboard() {
           </nav>
 
           <div className="ag-user">
-            <div className="ag-avatar">U</div>
-            <div className="ag-user-info">
-              <div className="ag-user-name">Usuário</div>
-              <div className="ag-plan-badge">PRO</div>
-            </div>
-          </div>
+  <div className="ag-avatar">U</div>
+  <div className="ag-user-info">
+    <div className="ag-user-name">Usuário</div>
+    <div className="ag-plan-badge">PRO</div>
+  </div>
+
+  {/* Botão de Sair */}
+  <button
+    onClick={async () => {
+      const { logout } = await import("./lib/firebase");
+      await logout();
+      window.location.reload(); // força recarregar e voltar pra tela de login
+    }}
+    style={{
+      marginLeft: "auto",
+      background: "transparent",
+      border: "1px solid rgba(255,255,255,0.1)",
+      color: "#e05252",
+      padding: "6px 10px",
+      borderRadius: "6px",
+      fontSize: "12px",
+      cursor: "pointer",
+    }}
+  >
+    Sair
+  </button>
+</div>
 
         </aside>
 
