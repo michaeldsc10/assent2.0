@@ -12,7 +12,7 @@ import {
 
 /* ── Módulos ── */
 import Clientes from "./modules/Clientes.jsx";
-import Produtos from "./pages/Produtos";
+import Produtos from "./modules/Produtos.jsx";
 
 
 /* ─── Mock Data ─────────────────────────────────────── */
