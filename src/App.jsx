@@ -5,15 +5,36 @@ import Dashboard from "./Dashboard";
 
 function App() {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);   // ← Adicionado
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
-    return unsub;
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);        // ← Importante
+    });
+
+    // Cleanup
+    return () => unsubscribe();
   }, []);
 
-  return user ? <Dashboard /> : <Auth onLoginSuccess={() => {}} />;
+  // Enquanto verifica o login, mostra carregando
+  if (loading) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        background: "#09090c",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#787480",
+        fontSize: "15px"
+      }}>
+        Carregando...
+      </div>
+    );
+  }
+
+  return user ? <Dashboard /> : <Auth onAuthSuccess={() => setUser(auth.currentUser)} />;
 }
 
 export default App;
-
-
