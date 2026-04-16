@@ -623,28 +623,32 @@ export default function Despesas() {
     if (!uid) { setLoading(false); return; }
 
     const despesasCol = collection(db, "users", uid, "despesas");
-    const q = query(despesasCol, orderBy("vencimento", "asc"));
+    const q = query(despesasCol,);
 
     const unsub = onSnapshot(q, (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      const batch = writeBatch(db);
-      let mudou = false;
-      docs.forEach(d => {
-        const novoStatus = calcularStatus(d.vencimento, d.status);
-        if (novoStatus !== d.status) {
-          batch.update(doc(db, "users", uid, "despesas", d.id), { status: novoStatus });
-          mudou = true;
-        }
-      });
-      if (mudou) batch.commit();
+     const updatedDocs = docs.map(d => ({
+      ...d,
+      status: calcularStatus(d.vencimento, d.status || "pendente")
+    }));
 
-      setDespesas(docs.map(d => ({ ...d, status: calcularStatus(d.vencimento, d.status) })));
-      setLoading(false);
+    // Ordenamos no cliente (mais estável)
+    updatedDocs.sort((a, b) => {
+      const dateA = parseDate(a.vencimento);
+      const dateB = parseDate(b.vencimento);
+      return (dateA || 0) - (dateB || 0);
     });
 
-    return unsub;
-  }, [uid]);
+    setDespesas(updatedDocs);
+    setLoading(false);
+  }, (error) => {
+    console.error("Erro no onSnapshot:", error);
+    setLoading(false);
+  });
+
+  return () => unsub();
+}, [uid]);
 
   /* ── SALVAR NOVA DESPESA (ID AUTOMÁTICO) ── */
   const handleAdd = async (form) => {
