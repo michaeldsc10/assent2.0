@@ -160,40 +160,34 @@ function ModalEntrada({ uid, produtos, fornecedores, movimento = null, onSalvo, 
       const produtoRef = doc(db, "users", uid, "produtos", form.produtoId);
 
       await runTransaction(db, async (tx) => {
-        const prodSnap = await tx.get(produtoRef);
-        if (!prodSnap.exists()) throw new Error("Produto não encontrado.");
+  const prodSnap = await tx.get(produtoRef);
+  if (!prodSnap.exists()) throw new Error("Produto não encontrado.");
 
-        // Atualiza estoque
-        tx.set(produtoRef, { estoque: novoEstoque }, { merge: true });
+  const estoqueReal = prodSnap.data().estoque ?? 0;
+  const novoEst = Math.max(0, estoqueReal + delta);   // delta = qtdForm - oldQuantidade
 
-        if (form.custo !== "" && !isNaN(Number(form.custo))) {
-          tx.set(produtoRef, { custo: Number(form.custo) }, { merge: true });
-        }
+  // Atualiza o produto
+  tx.set(produtoRef, { estoque: novoEst }, { merge: true });
 
-        const movRef = doc(db, "users", uid, "movimentacoes_estoque", isEditing ? movimento.id : doc(collection(db, "users", uid, "movimentacoes_estoque")).id);
+  if (form.custo !== "" && !isNaN(Number(form.custo))) {
+    tx.set(produtoRef, { custo: Number(form.custo) }, { merge: true });
+  }
 
-        const movData = {
-          produtoId: sanitize(form.produtoId),
-          produtoNome: sanitize(prodSnap.data().nome || ""),
-          quantidade: Number(form.quantidade),
-          tipo: "entrada",
-          motivo: sanitize(form.motivo),
-          fornecedor: sanitize(form.fornecedor) || null,
-          observacao: sanitize(form.observacao) || null,
-          data: sanitize(form.data),
-          custo: form.custo !== "" ? Number(form.custo) : null,
-          estoqueAnterior: estoqueAtual,
-          estoqueNovo: novoEstoque,
-        };
+  const movRef = doc(db, "users", uid, "movimentacoes_estoque", movimento.id);
 
-        if (isEditing) {
-          movData.dataAtualizacao = serverTimestamp();
-          tx.set(movRef, movData, { merge: true });   // ← CORREÇÃO PRINCIPAL
-        } else {
-          movData.dataCriacao = serverTimestamp();
-          tx.set(movRef, movData);
-        }
-      });
+  // Usa SET com MERGE ao invés de UPDATE (resolve "No document to update")
+  tx.set(movRef, {
+    quantidade: Number(form.quantidade),
+    motivo: sanitize(form.motivo),
+    fornecedor: sanitize(form.fornecedor) || null,
+    observacao: sanitize(form.observacao) || null,
+    data: sanitize(form.data),
+    custo: form.custo !== "" ? Number(form.custo) : null,
+    estoqueAnterior: estoqueReal,
+    estoqueNovo: novoEst,
+    dataAtualizacao: serverTimestamp(),
+  }, { merge: true });
+});
 
       onSalvo(isEditing ? "Entrada atualizada com sucesso!" : "Entrada registrada com sucesso!");
       onClose();
@@ -241,37 +235,31 @@ export default function EntradaEstoque() {
   };
 
   /* EXCLUIR - abre modal bonito */
-  const handleExcluir = (mov) => {
-    setMovimentoParaExcluir(mov);
-  };
+  const handleExcluir = async (mov) => {
+  if (!window.confirm(`Excluir entrada de ${mov.produtoNome || mov.produtoId}?`)) return;
 
-  const confirmarExclusao = async () => {
-    if (!movimentoParaExcluir || !uid) return;
+  try {
+    const movRef = doc(db, "users", uid, "movimentacoes_estoque", mov.id);
+    const produtoRef = doc(db, "users", uid, "produtos", mov.produtoId);
 
-    try {
-      const movRef = doc(db, "users", uid, "movimentacoes_estoque", movimentoParaExcluir.id);
-      const produtoRef = doc(db, "users", uid, "produtos", movimentoParaExcluir.produtoId);
+    await runTransaction(db, async (tx) => {
+      const prodSnap = await tx.get(produtoRef);
+      if (!prodSnap.exists()) throw new Error("Produto não encontrado.");
 
-      await runTransaction(db, async (tx) => {
-        const prodSnap = await tx.get(produtoRef);
-        if (!prodSnap.exists()) throw new Error("Produto não encontrado.");
+      const estoqueReal = prodSnap.data().estoque ?? 0;
+      const qtd = Number(mov.quantidade) || 0;
+      const novoEstoque = Math.max(0, estoqueReal - qtd);
 
-        const estoqueReal = prodSnap.data().estoque ?? 0;
-        const qtd = Number(movimentoParaExcluir.quantidade) || 0;
-        const novoEstoque = Math.max(0, estoqueReal - qtd);
+      tx.set(produtoRef, { estoque: novoEstoque }, { merge: true });
+      tx.delete(movRef);
+    });
 
-        tx.set(produtoRef, { estoque: novoEstoque }, { merge: true });
-        tx.delete(movRef);
-      });
-
-      showToast("Entrada excluída e estoque ajustado com sucesso!", "sucesso");
-      setMovimentoParaExcluir(null);
-    } catch (err) {
-      console.error(err);
-      showToast("Erro ao excluir: " + (err.message || "Tente novamente"), "erro");
-    }
-  };
-
+    showToast("Entrada excluída e estoque ajustado!", "sucesso");
+  } catch (err) {
+    console.error(err);
+    showToast("Erro ao excluir: " + err.message, "erro");
+  }
+};
   // ... resto do componente (tabela, botões de ação, etc.)
 
   return (
