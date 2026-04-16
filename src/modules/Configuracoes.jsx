@@ -19,7 +19,7 @@ import {
   EmailAuthProvider,
   updatePassword,
 } from "firebase/auth";
-import "./modules/Configuracoes.css";
+import "./Configuracoes.css";
 
 /* ── Validadores CPF / CNPJ ── */
 const validarCPF = (cpf) => {
