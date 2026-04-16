@@ -594,4 +594,38 @@ export default function Configuracoes() {
       case "estoque":    return <SecaoEstoque    config={config} onSave={handleSave} />;
       default:           return null;
     }
+
+       return (
+    <div className="cfg-container">
+      {/* Menu lateral */}
+      <div className="cfg-sidebar">
+        {NAV.map(item => (
+          <div
+            key={item.key}
+            className={`cfg-nav-item ${secao === item.key ? "active" : ""}`}
+            onClick={() => setSecao(item.key)}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+            <ChevronRight size={14} />
+          </div>
+        ))}
+      </div>
+
+      {/* Conteúdo */}
+      <div className="cfg-content">
+        {renderSecao()}
+      </div>
+
+      {/* Toast */}
+      {toast && (
+        <Toast
+          msg={toast.msg}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
+    </div>
+  );
+}
   };
