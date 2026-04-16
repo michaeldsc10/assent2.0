@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════
    ASSENT v2.0 — firebase.js
-   Configuração + Funções de Auth + Helpers de Licença
+   Configuração Firebase + Auth + Verificação de Licença
    ═══════════════════════════════════════════════════ */
 
 import { initializeApp } from "firebase/app";
@@ -8,7 +8,8 @@ import {
   getAuth, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signOut 
+  signOut,
+  onAuthStateChanged   // ← Adicionado aqui!
 } from "firebase/auth";
 
 import { 
@@ -41,6 +42,9 @@ export const register = (email, password) =>
   createUserWithEmailAndPassword(auth, email, password);
 
 export const logout = () => signOut(auth);
+
+/* ── Listener de Estado de Autenticação (usado no App.jsx / Dashboard) ── */
+export { onAuthStateChanged };
 
 /* ── Nova função: Verificar Licença PRO ── */
 export const verificarLicencaPro = async (uid) => {
