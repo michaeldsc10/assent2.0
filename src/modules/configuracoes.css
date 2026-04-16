@@ -1,5 +1,7 @@
 /* Configuracoes.css - Versão Corrigida e Completa */
-
+.cfg-root {
+  background: red !important;
+}
 :root {
   --s1: #0a0808;
   --s2: #12100f;
