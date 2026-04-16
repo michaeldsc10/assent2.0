@@ -19,7 +19,7 @@ import {
   EmailAuthProvider,
   updatePassword,
 } from "firebase/auth";
-import "./configuracoes.css";
+import "./Configuracoes.css";
 
 /* ── Validadores CPF / CNPJ ── */
 const validarCPF = (cpf) => {
@@ -241,5 +241,57 @@ export function useConfiguracoes(uid) {
 
 /* Componente principal (Configuracoes) permanece igual */
 export default function Configuracoes() {
-  /* ... código original mantido ... */
-}
+ const [uid, setUid]           = useState(null);
+  const [config, setConfig]     = useState(null);
+  const [loading, setLoading]   = useState(true);
+  const [secao, setSecao]       = useState("empresa");
+  const [toast, setToast]       = useState(null);  // { msg, type }
+
+  /* Auth */
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, user => setUid(user?.uid || null));
+    return unsub;
+  }, []);
+
+  /* Carregar config */
+  useEffect(() => {
+    if (!uid) { setLoading(false); return; }
+    const ref = doc(db, "users", uid, "config", "geral");
+    getDoc(ref).then(snap => {
+      setConfig(snap.exists() ? snap.data() : {});
+      setLoading(false);
+    }).catch(() => {
+      setConfig({});
+      setLoading(false);
+    });
+  }, [uid]);
+
+  /* Salvar partial config */
+  const handleSave = async (partial) => {
+    if (!uid) return;
+    try {
+      const ref = doc(db, "users", uid, "config", "geral");
+      await setDoc(ref, partial, { merge: true });
+      setConfig(prev => ({ ...prev, ...partial }));
+      showToast("Configurações salvas com sucesso!", "success");
+    } catch (err) {
+      console.error(err);
+      showToast("Erro ao salvar. Tente novamente.", "error");
+    }
+  };
+
+  const showToast = (msg, type) => {
+    setToast({ msg, type });
+  };
+
+  const renderSecao = () => {
+    if (loading) return <div className="cfg-loading">Carregando configurações...</div>;
+    switch (secao) {
+      case "empresa":    return <SecaoEmpresa    config={config} onSave={handleSave} />;
+      case "seguranca":  return <SecaoSeguranca />;
+      case "financeiro": return <SecaoFinanceiro config={config} onSave={handleSave} />;
+      case "menu":       return <SecaoMenu       config={config} onSave={handleSave} />;
+      case "estoque":    return <SecaoEstoque    config={config} onSave={handleSave} />;
+      default:           return null;
+    }
+  };
