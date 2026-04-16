@@ -519,7 +519,11 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
   const [clienteSearch, setClienteSearch] = useState(venda?.cliente || "");
   const [clienteAC, setClienteAC] = useState(false);
   const [dataVenda, setDataVenda] = useState(
-    venda?.data ? (venda.data?.toDate ? venda.data.toDate().toISOString().split("T")[0] : new Date(venda.data).toISOString().split("T")[0]) : new Date().toISOString().split("T")[0]
+    venda?.data 
+      ? (venda.data?.toDate 
+          ? venda.data.toDate().toISOString().split("T")[0] 
+          : new Date(venda.data).toISOString().split("T")[0]) 
+      : new Date().toISOString().split("T")[0]
   );
   const [vendedor, setVendedor] = useState(venda?.vendedor || "");
   const [formaPgto, setFormaPgto] = useState(venda?.formaPagamento || "");
@@ -527,17 +531,25 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
 
   // Itens + Venda livre
   const [itens, setItens] = useState(
-    venda?.itens?.length ? venda.itens : [itemVazio(tipo)]
+    venda?.itens?.length ? venda.itens : [itemVazio(venda?.tipo || "produto")]
   );
+
   const [livreNome, setLivreNome] = useState(venda?.livreNome || "");
   const [livreValor, setLivreValor] = useState(venda?.livreValor || "");
   const [livreDesc, setLivreDesc] = useState(venda?.livreDesc || 0);
 
+  // ←←← ESTADOS NECESSÁRIOS PARA AUTOCOMPLETE
+  const [itemSearches, setItemSearches] = useState(
+    venda?.itens?.length 
+      ? venda.itens.map(i => i.nome || "") 
+      : [""]
+  );
+  const [itemAC, setItemAC] = useState(null); // índice do item com autocomplete aberto
+
   const [salvando, setSalvando] = useState(false);
   const [erros, setErros] = useState({});
 
-  // ←←← CORREÇÃO 1: itemVazio agora recebe o tipo atual
-  function itemVazio(tipoAtual) {
+  function itemVazio(tipoAtual = "produto") {
     return {
       produtoId: "",
       nome: "",
@@ -545,27 +557,58 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
       preco: 0,
       custo: 0,
       desconto: 0,
-      tipo: tipoAtual,           // ← agora usa o tipo correto
+      tipo: tipoAtual,
     };
   }
 
-  /* CORREÇÃO 2: sempre que o tipo da venda mudar, atualizamos o tipo de TODOS os itens */
+  /* Atualiza o tipo de todos os itens quando o tipo da venda muda */
   useEffect(() => {
-    setItens((prevItens) =>
-      prevItens.map((item) => ({
+    setItens(prevItens =>
+      prevItens.map(item => ({
         ...item,
-        tipo,                    // força o tipo atual em todos os itens
+        tipo,
       }))
     );
   }, [tipo]);
 
-
-
-  const adicionarItem = () => {
-    setItens([...itens, itemVazio(tipo)]);   // ← usa o tipo atual
-    setItemSearches([...itemSearches, ""]);
+  /* Autocomplete de produtos/serviços */
+  const catalogoFiltrado = (search, idx) => {
+    const lista = tipo === "servico" ? servicos : produtos;
+    if (!search.trim()) return lista.slice(0, 8);
+    const q = search.toLowerCase();
+    return lista.filter(p =>
+      p.nome?.toLowerCase().includes(q) || p.id?.toLowerCase().includes(q)
+    ).slice(0, 8);
   };
 
+  const selecionarProduto = (idx, prod) => {
+    const novo = [...itens];
+    novo[idx] = {
+      ...novo[idx],
+      produtoId: prod.id,
+      nome: prod.nome,
+      preco: prod.preco || 0,
+      custo: prod.custo || prod.precoCusto || 0,
+      tipo: tipo,
+    };
+    setItens(novo);
+
+    const ns = [...itemSearches];
+    ns[idx] = prod.nome;
+    setItemSearches(ns);
+    setItemAC(null);
+  };
+
+  const atualizarItem = (idx, campo, valor) => {
+    const novo = [...itens];
+    novo[idx] = { ...novo[idx], [campo]: valor };
+    setItens(novo);
+  };
+
+  const adicionarItem = () => {
+    setItens([...itens, itemVazio(tipo)]);
+    setItemSearches([...itemSearches, ""]);
+  };
 
   const removerItem = (idx) => {
     if (itens.length === 1) return;
@@ -655,9 +698,6 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
     ).slice(0, 6);
   }, [clientes, clienteSearch]);
 
-  const refClienteAC = useRef(null);
-  const refItemACs = useRef([]);
-
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-box modal-box-xl">
@@ -689,8 +729,7 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
 
           {/* Cabeçalho */}
           <div className="form-row">
-            {/* Cliente */}
-            <div className="form-group nv-autocomplete" ref={refClienteAC}>
+            <div className="form-group nv-autocomplete">
               <label className="form-label">Cliente <span className="form-label-req">*</span></label>
               <input
                 className={`form-input ${erros.cliente ? "err" : ""}`}
@@ -707,17 +746,17 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
                   {clientesFiltrados.length === 0
                     ? <div className="nv-ac-empty">Nenhum cliente encontrado</div>
                     : clientesFiltrados.map(c => (
-                      <div key={c.id} className="nv-ac-item" onMouseDown={() => { setClienteSearch(c.nome); setClienteAC(false); }}>
-                        <span>{c.nome}</span>
-                        <span className="nv-ac-item-sub">{c.cpf || c.telefone || ""}</span>
-                      </div>
-                    ))
+                        <div key={c.id} className="nv-ac-item" 
+                             onMouseDown={() => { setClienteSearch(c.nome); setClienteAC(false); }}>
+                          <span>{c.nome}</span>
+                          <span className="nv-ac-item-sub">{c.cpf || c.telefone || ""}</span>
+                        </div>
+                      ))
                   }
                 </div>
               )}
             </div>
 
-            {/* Data */}
             <div className="form-group">
               <label className="form-label">Data da Venda</label>
               <input
@@ -730,23 +769,32 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
           </div>
 
           <div className="form-row">
-            {/* Vendedor */}
             <div className="form-group">
               <label className="form-label">Vendedor</label>
               {vendedores?.length > 0 ? (
                 <select className="form-input" value={vendedor} onChange={e => setVendedor(e.target.value)}>
                   <option value="">— Nenhum / Não informado —</option>
-                  {vendedores.map(v => <option key={v.id || v} value={v.nome || v}>{v.nome || v}</option>)}
+                  {vendedores.map(v => (
+                    <option key={v.id || v} value={v.nome || v}>{v.nome || v}</option>
+                  ))}
                 </select>
               ) : (
-                <input className="form-input" placeholder="Nome do vendedor..." value={vendedor} onChange={e => setVendedor(e.target.value)} />
+                <input 
+                  className="form-input" 
+                  placeholder="Nome do vendedor..." 
+                  value={vendedor} 
+                  onChange={e => setVendedor(e.target.value)} 
+                />
               )}
             </div>
 
-            {/* Forma de pagamento */}
             <div className="form-group">
               <label className="form-label">Forma de Pagamento <span className="form-label-req">*</span></label>
-              <select className={`form-input ${erros.formaPgto ? "err" : ""}`} value={formaPgto} onChange={e => setFormaPgto(e.target.value)}>
+              <select 
+                className={`form-input ${erros.formaPgto ? "err" : ""}`} 
+                value={formaPgto} 
+                onChange={e => setFormaPgto(e.target.value)}
+              >
                 <option value="">— Selecionar —</option>
                 {FORMAS_PAGAMENTO.map(f => <option key={f} value={f}>{f}</option>)}
               </select>
@@ -756,8 +804,9 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
 
           <div className="nv-section-sep" />
 
-          {/* Itens */}
+          {/* Itens da venda */}
           {tipo === "livre" ? (
+            /* ... (parte de venda livre - mantida igual) ... */
             <>
               <div className="nv-livre-info">
                 <strong>Venda de Valor Livre</strong> — sem produto ou serviço cadastrado.
@@ -768,7 +817,7 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
                   <label className="form-label">Descrição <span className="form-label-req">*</span></label>
                   <input
                     className={`form-input ${erros.livreNome ? "err" : ""}`}
-                    placeholder="Ex: Serviço personalizado, Consultoria..."
+                    placeholder="Ex: Serviço personalizado..."
                     value={livreNome}
                     onChange={e => setLivreNome(e.target.value)}
                   />
@@ -810,9 +859,10 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
 
               {itens.map((item, idx) => (
                 <div key={idx} className="nv-item-row">
-                  {/* Produto/Serviço */}
                   <div style={{ position: "relative" }}>
-                    <div className="nv-item-field-label">{tipo === "servico" ? "Serviço" : "Produto"}</div>
+                    <div className="nv-item-field-label">
+                      {tipo === "servico" ? "Serviço" : "Produto"}
+                    </div>
                     <input
                       className="form-input"
                       placeholder={`Buscar ${tipo === "servico" ? "serviço" : "produto"}...`}
@@ -833,17 +883,20 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
                         {catalogoFiltrado(itemSearches[idx] || "", idx).length === 0
                           ? <div className="nv-ac-empty">Nenhum item encontrado</div>
                           : catalogoFiltrado(itemSearches[idx] || "", idx).map(p => (
-                            <div key={p.id} className="nv-ac-item" onMouseDown={() => selecionarProduto(idx, p)}>
-                              <span>{p.nome}</span>
-                              <span className="nv-ac-item-sub">{fmtR$(p.preco || 0)}</span>
-                            </div>
-                          ))
+                              <div 
+                                key={p.id} 
+                                className="nv-ac-item" 
+                                onMouseDown={() => selecionarProduto(idx, p)}
+                              >
+                                <span>{p.nome}</span>
+                                <span className="nv-ac-item-sub">{fmtR$(p.preco || 0)}</span>
+                              </div>
+                            ))
                         }
                       </div>
                     )}
                   </div>
 
-                  {/* Qtd */}
                   <div>
                     <div className="nv-item-field-label">Qtd</div>
                     <input
@@ -854,7 +907,6 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
                     />
                   </div>
 
-                  {/* Preço */}
                   <div>
                     <div className="nv-item-field-label">Preço Unit. (R$)</div>
                     <input
@@ -865,7 +917,6 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
                     />
                   </div>
 
-                  {/* Custo */}
                   <div>
                     <div className="nv-item-field-label">Custo Unit. (R$)</div>
                     <input
@@ -876,7 +927,6 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
                     />
                   </div>
 
-                  {/* Desconto */}
                   <div>
                     <div className="nv-item-field-label">Desconto (R$)</div>
                     <input
@@ -887,8 +937,11 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
                     />
                   </div>
 
-                  {/* Remover */}
-                  <button className="nv-item-remove" onClick={() => removerItem(idx)} disabled={itens.length === 1}>
+                  <button 
+                    className="nv-item-remove" 
+                    onClick={() => removerItem(idx)} 
+                    disabled={itens.length === 1}
+                  >
                     <X size={13} />
                   </button>
                 </div>
@@ -930,7 +983,7 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
             <textarea
               className="form-input"
               style={{ resize: "vertical", minHeight: 70 }}
-              placeholder="Ex: Cliente pediu entrega, moldura especial, sem embalagem..."
+              placeholder="Ex: Cliente pediu entrega..."
               value={observacao}
               onChange={e => setObservacao(e.target.value)}
             />
@@ -949,7 +1002,6 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
     </div>
   );
 }
-
 
 /* ══════════════════════════════════════════════════
    MODAL: Detalhe de Venda (clique na linha)
