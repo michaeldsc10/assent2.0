@@ -16,7 +16,7 @@ import Produtos from "./modules/Produtos.jsx";
 import Servicos from "./modules/Servicos.jsx";
 import Vendedores from "./modules/Vendedores.jsx";
 import Vendas    from "./modules/Vendas.jsx";
-import Configuracoes from "./modules/Configucacoes.jsx";
+import Configuracoes from "./modules/Configuracoes.jsx";
 
 /* ─── Mock Data ─────────────────────────────────────── */
 const faturamentoData = [
