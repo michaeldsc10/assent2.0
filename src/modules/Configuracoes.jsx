@@ -514,6 +514,19 @@ function PassInput({ value, onChange, placeholder, className }) {
    SEÇÃO: Empresa
    ══════════════════════════════════════════════════════ */
 function SecaoEmpresa({ config, onSave }) {
+
+   useEffect(() => {
+  if (!config) return;
+
+  setForm({
+    nomeEmpresa: config?.nomeEmpresa || "",
+    cnpj:        config?.cnpj        || "",
+    telefone:    config?.telefone    || "",
+    endereco:    config?.endereco    || "",
+    logo:        config?.logo        || "",
+  });
+}, [config]);
+   
   const [form, setForm] = useState({
     nomeEmpresa: config?.empresa?.nomeEmpresa || config?.nomeEmpresa || "",
     cnpj:        config?.empresa?.cnpj        || config?.cnpj        || "",
