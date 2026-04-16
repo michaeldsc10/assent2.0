@@ -209,10 +209,14 @@ const CSS = `
   }
 
   .desp-table-wrap {
-    margin: 0 22px 22px;
-    background: var(--s1); border: 1px solid var(--border);
-    border-radius: 12px; overflow: hidden;
-  }
+  margin: 0 22px 22px;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+
+  max-height: 60vh;   /* ou 70vh dependendo do layout */
+  overflow-y: auto;
+}
   .desp-table-header {
     padding: 13px 18px; border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
