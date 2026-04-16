@@ -202,7 +202,307 @@ function SecaoEmpresa({ config, onSave }) {
   );
 }
 
-/* As outras seções (Segurança, Financeiro, Menu, Estoque) permanecem iguais */
+/* ══════════════════════════════════════════════════════
+   SEÇÃO: Segurança
+   ══════════════════════════════════════════════════════ */
+function SecaoSeguranca() {
+  const [form, setForm] = useState({ senhaAtual: "", novaSenha: "", confirmar: "" });
+  const [erros, setErros] = useState({});
+  const [salvando, setSalvando]  = useState(false);
+  const [sucesso, setSucesso]    = useState(false);
+
+  const set = (k, v) => {
+    setForm(f => ({ ...f, [k]: v }));
+    if (erros[k]) setErros(e => ({ ...e, [k]: "" }));
+  };
+
+  const validar = () => {
+    const e = {};
+    if (!form.senhaAtual)       e.senhaAtual = "Informe a senha atual.";
+    if (form.novaSenha.length < 6) e.novaSenha = "Mínimo 6 caracteres.";
+    if (form.novaSenha !== form.confirmar) e.confirmar = "As senhas não conferem.";
+    setErros(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSalvar = async () => {
+    if (!validar()) return;
+    setSalvando(true);
+    setSucesso(false);
+    try {
+      const user = auth.currentUser;
+      const credential = EmailAuthProvider.credential(user.email, form.senhaAtual);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, form.novaSenha);
+      setForm({ senhaAtual: "", novaSenha: "", confirmar: "" });
+      setSucesso(true);
+      setTimeout(() => setSucesso(false), 4000);
+    } catch (err) {
+      if (err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
+        setErros({ senhaAtual: "Senha atual incorreta." });
+      } else {
+        setErros({ senhaAtual: `Erro: ${err.message}` });
+      }
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="cfg-card">
+      <div className="cfg-card-header">
+        <div className="cfg-card-header-icon"><Lock size={15} /></div>
+        <div>
+          <div className="cfg-card-title">Trocar Senha</div>
+          <div className="cfg-card-sub">Autenticação via Firebase — confirme a senha atual</div>
+        </div>
+      </div>
+
+      <div className="cfg-card-body">
+
+        {sucesso && (
+          <div className="cfg-alert info" style={{ background: "rgba(72,187,120,0.08)", borderColor: "rgba(72,187,120,0.3)", color: "#48bb78" }}>
+            <Check size={14} style={{ flexShrink: 0 }} />
+            Senha alterada com sucesso!
+          </div>
+        )}
+
+        <div className="form-group">
+          <label className="form-label">Senha Atual <span className="form-label-req">*</span></label>
+          <PassInput
+            value={form.senhaAtual}
+            onChange={e => set("senhaAtual", e.target.value)}
+            placeholder="Digite sua senha atual"
+            className={erros.senhaAtual ? "err" : ""}
+          />
+          {erros.senhaAtual && <div className="form-error">{erros.senhaAtual}</div>}
+        </div>
+
+        <div className="form-row">
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Nova Senha <span className="form-label-req">*</span></label>
+            <PassInput
+              value={form.novaSenha}
+              onChange={e => set("novaSenha", e.target.value)}
+              placeholder="Mínimo 6 caracteres"
+              className={erros.novaSenha ? "err" : ""}
+            />
+            {erros.novaSenha && <div className="form-error">{erros.novaSenha}</div>}
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Confirmar Nova Senha <span className="form-label-req">*</span></label>
+            <PassInput
+              value={form.confirmar}
+              onChange={e => set("confirmar", e.target.value)}
+              placeholder="Repita a nova senha"
+              className={erros.confirmar ? "err" : ""}
+            />
+            {erros.confirmar && <div className="form-error">{erros.confirmar}</div>}
+          </div>
+        </div>
+
+      </div>
+
+      <div className="cfg-card-footer">
+        <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
+          {salvando ? <><span className="cfg-spinner" />Alterando...</> : <><Lock size={13} />Alterar Senha</>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   SEÇÃO: Financeiro — Taxa de Cartão
+   ══════════════════════════════════════════════════════ */
+function SecaoFinanceiro({ config, onSave }) {
+  const [taxas, setTaxas] = useState({ ...TAXAS_DEFAULT, ...(config?.taxas || {}) });
+  const [salvando, setSalvando] = useState(false);
+
+  const setTaxa = (k, v) => {
+    const numeric = v.replace(/[^0-9.,]/g, "").replace(",", ".");
+    setTaxas(t => ({ ...t, [k]: numeric }));
+  };
+
+  const handleSalvar = async () => {
+    setSalvando(true);
+    await onSave({ taxas });
+    setSalvando(false);
+  };
+
+  return (
+    <div className="cfg-card">
+      <div className="cfg-card-header">
+        <div className="cfg-card-header-icon"><CreditCard size={15} /></div>
+        <div>
+          <div className="cfg-card-title">Taxa de Máquina de Cartão</div>
+          <div className="cfg-card-sub">Usada para calcular lucro líquido nas vendas</div>
+        </div>
+      </div>
+
+      <div className="cfg-card-body" style={{ padding: 0 }}>
+        <table className="taxa-table">
+          <thead>
+            <tr>
+              <th>Modalidade</th>
+              <th>Tipo</th>
+              <th style={{ textAlign: "right" }}>Taxa (%)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {TAXAS_LABELS.map(({ key, label, tipo }) => (
+              <tr key={key}>
+                <td><span className="taxa-bandeira">{label}</span></td>
+                <td><span className="taxa-tipo-badge">{tipo}</span></td>
+                <td style={{ textAlign: "right" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center" }}>
+                    <input
+                      className="taxa-input"
+                      value={taxas[key]}
+                      onChange={e => setTaxa(key, e.target.value)}
+                      inputMode="decimal"
+                    />
+                    <span className="taxa-pct">%</span>
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="cfg-card-footer">
+        <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
+          {salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Taxas</>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   SEÇÃO: Visibilidade do Menu
+   ══════════════════════════════════════════════════════ */
+function SecaoMenu({ config, onSave }) {
+  const initVisible = () => {
+    const base = {};
+    MENU_SECTIONS.forEach(s => {
+      base[s.key] = config?.menuVisivel?.[s.key] !== undefined
+        ? config.menuVisivel[s.key]
+        : true;
+    });
+    return base;
+  };
+
+  const [visivel, setVisivel]   = useState(initVisible);
+  const [salvando, setSalvando] = useState(false);
+
+  const toggle = (key, val) => setVisivel(v => ({ ...v, [key]: val }));
+
+  const handleSalvar = async () => {
+    setSalvando(true);
+    await onSave({ menuVisivel: visivel });
+    setSalvando(false);
+  };
+
+  return (
+    <div className="cfg-card">
+      <div className="cfg-card-header">
+        <div className="cfg-card-header-icon"><LayoutDashboard size={15} /></div>
+        <div>
+          <div className="cfg-card-title">Visibilidade do Menu</div>
+          <div className="cfg-card-sub">Oculte seções que não utiliza para manter o foco</div>
+        </div>
+      </div>
+
+      <div className="cfg-card-body">
+        <div className="menu-toggle-list">
+          {MENU_SECTIONS.map(s => (
+            <div key={s.key} className="menu-toggle-item">
+              <div className="menu-toggle-icon">{s.icon}</div>
+              <div style={{ flex: 1 }}>
+                <div className="menu-toggle-label">{s.label}</div>
+                <div className="menu-toggle-sub">{s.sub}</div>
+              </div>
+              {s.locked ? (
+                <span className="menu-toggle-locked">Sempre visível</span>
+              ) : (
+                <Toggle
+                  checked={!!visivel[s.key]}
+                  onChange={val => toggle(s.key, val)}
+                />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="cfg-card-footer">
+        <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
+          {salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Menu</>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   SEÇÃO: Estoque Mínimo
+   ══════════════════════════════════════════════════════ */
+function SecaoEstoque({ config, onSave }) {
+  const [minimo, setMinimo]     = useState(config?.estoqueMinimo ?? 5);
+  const [salvando, setSalvando] = useState(false);
+
+  const handleSalvar = async () => {
+    setSalvando(true);
+    await onSave({ estoqueMinimo: Number(minimo) });
+    setSalvando(false);
+  };
+
+  return (
+    <div className="cfg-card">
+      <div className="cfg-card-header">
+        <div className="cfg-card-header-icon"><Package size={15} /></div>
+        <div>
+          <div className="cfg-card-title">Estoque Mínimo Padrão</div>
+          <div className="cfg-card-sub">Alertas quando o produto atingir este limite</div>
+        </div>
+      </div>
+
+      <div className="cfg-card-body">
+        <div className="form-group" style={{ marginBottom: 0 }}>
+          <label className="form-label">
+            Quantidade mínima padrão
+          </label>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <input
+              type="number" min="0" max="9999"
+              className="form-input"
+              style={{ maxWidth: 160 }}
+              value={minimo}
+              onChange={e => setMinimo(e.target.value)}
+            />
+            <span style={{ fontSize: 12, color: "var(--text-3)" }}>unidades</span>
+          </div>
+        </div>
+
+        <div className="estoque-hint">
+          <strong>Como funciona:</strong> Quando um produto atingir ou ficar abaixo de{" "}
+          <strong>{minimo || 0} unidade{Number(minimo) !== 1 ? "s" : ""}</strong>, ele será
+          marcado como crítico no módulo de Estoque. Você pode sobrescrever esse valor
+          individualmente em cada produto.
+        </div>
+      </div>
+
+      <div className="cfg-card-footer">
+        <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
+          {salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Estoque</>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 
 /* ══════════════════════════════════════════════════════
    HOOK useConfiguracoes (atualizado para compatibilidade)
