@@ -508,12 +508,11 @@ function exportarCSV(vendas) {
 
 
 /* ══════════════════════════════════════════════════
-   MODAL: Nova / Editar Venda
+   MODAL: Nova / Editar Venda  ← VERSÃO CORRIGIDA
    ══════════════════════════════════════════════════ */
 function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, onSave, onClose }) {
   const isEdit = !!venda;
 
-  // tipo de venda: "produto" | "servico" | "livre"
   const [tipo, setTipo] = useState(venda?.tipo || "produto");
 
   // Cabeçalho
@@ -526,12 +525,10 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
   const [formaPgto, setFormaPgto] = useState(venda?.formaPagamento || "");
   const [observacao, setObservacao] = useState(venda?.observacao || "");
 
-  // Itens
+  // Itens + Venda livre
   const [itens, setItens] = useState(
-    venda?.itens?.length ? venda.itens : [itemVazio()]
+    venda?.itens?.length ? venda.itens : [itemVazio(tipo)]
   );
-
-  // Venda livre
   const [livreNome, setLivreNome] = useState(venda?.livreNome || "");
   const [livreValor, setLivreValor] = useState(venda?.livreValor || "");
   const [livreDesc, setLivreDesc] = useState(venda?.livreDesc || 0);
@@ -539,52 +536,36 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
   const [salvando, setSalvando] = useState(false);
   const [erros, setErros] = useState({});
 
-  function itemVazio() {
-    return { produtoId: "", nome: "", qtd: 1, preco: 0, custo: 0, desconto: 0, tipo: "produto" };
+  // ←←← CORREÇÃO 1: itemVazio agora recebe o tipo atual
+  function itemVazio(tipoAtual) {
+    return {
+      produtoId: "",
+      nome: "",
+      qtd: 1,
+      preco: 0,
+      custo: 0,
+      desconto: 0,
+      tipo: tipoAtual,           // ← agora usa o tipo correto
+    };
   }
 
-  /* Autocomplete de produtos/serviços */
-  const [itemSearches, setItemSearches] = useState(
-    venda?.itens?.length ? venda.itens.map(i => i.nome || "") : [""]
-  );
-  const [itemAC, setItemAC] = useState(null); // índice do item com AC aberto
+  /* CORREÇÃO 2: sempre que o tipo da venda mudar, atualizamos o tipo de TODOS os itens */
+  useEffect(() => {
+    setItens((prevItens) =>
+      prevItens.map((item) => ({
+        ...item,
+        tipo,                    // força o tipo atual em todos os itens
+      }))
+    );
+  }, [tipo]);
 
-  const catalogoFiltrado = (search, idx) => {
-    const lista = tipo === "servico" ? servicos : produtos;
-    if (!search.trim()) return lista.slice(0, 8);
-    const q = search.toLowerCase();
-    return lista.filter(p =>
-      p.nome?.toLowerCase().includes(q) || p.id?.toLowerCase().includes(q)
-    ).slice(0, 8);
-  };
 
-  const selecionarProduto = (idx, prod) => {
-    const novo = [...itens];
-    novo[idx] = {
-      ...novo[idx],
-      produtoId: prod.id,
-      nome: prod.nome,
-      preco: prod.preco || 0,
-      custo: prod.custo || prod.precoCusto || 0,
-      tipo: tipo,
-    };
-    setItens(novo);
-    const ns = [...itemSearches];
-    ns[idx] = prod.nome;
-    setItemSearches(ns);
-    setItemAC(null);
-  };
-
-  const atualizarItem = (idx, campo, valor) => {
-    const novo = [...itens];
-    novo[idx] = { ...novo[idx], [campo]: valor };
-    setItens(novo);
-  };
 
   const adicionarItem = () => {
-    setItens([...itens, itemVazio()]);
+    setItens([...itens, itemVazio(tipo)]);   // ← usa o tipo atual
     setItemSearches([...itemSearches, ""]);
   };
+
 
   const removerItem = (idx) => {
     if (itens.length === 1) return;
