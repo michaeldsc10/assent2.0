@@ -15,6 +15,7 @@ import { db, auth, onAuthStateChanged } from "../lib/firebase";
 import {
   collection, doc, setDoc, deleteDoc, onSnapshot,
   query, orderBy, writeBatch, addDoc,
+  runTransaction
 } from "firebase/firestore";
 
 /* ── CSS ── */
@@ -598,9 +599,31 @@ function StatusBadge({ status }) {
   );
 }
 
+
+const gerarCodigoDespesa = async (uid) => {
+  const ref = doc(db, "users", uid, "meta", "counters");
+
+  return await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(ref);
+
+    let numero = 1;
+
+    if (snap.exists()) {
+      numero = (snap.data().despesa || 0) + 1;
+    }
+
+    transaction.set(ref, { despesa: numero }, { merge: true });
+
+    return `D${String(numero).padStart(4, "0")}`;
+  });
+};
+
+
 /* ════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ════════════════════════════════════════ */
+
+
 export default function Despesas() {
   const [uid, setUid] = useState(null);
   const [despesas, setDespesas] = useState([]);
@@ -658,16 +681,26 @@ export default function Despesas() {
    
   /* ── SALVAR NOVA DESPESA (ID AUTOMÁTICO) ── */
   const handleAdd = async (form) => {
+const codigo = await gerarCodigoDespesa(uid);
+     
+     const gerarCodigo = () => {
+  const now = Date.now().toString().slice(-4);
+  const rand = Math.floor(100 + Math.random() * 900);
+  return `DESP-${now}${rand}`;
+};
+     
     if (!uid) return;
 
     try {
       const baseData = {
-        ...form,
-        status: calcularStatus(form.vencimento, "pendente"),
-        dataCriacao: new Date().toISOString(),
-      };
+  ...form,
+  codigo,
+  status: calcularStatus(form.vencimento, "pendente"),
+  dataCriacao: new Date().toISOString(),
+};
 
       if (form.parcelado && form.totalParcelas > 1) {
+      const codigoBase = codigo;
         const grupoId = `G${Date.now()}`;
         const batch = writeBatch(db);
 
@@ -678,6 +711,7 @@ export default function Despesas() {
 
           batch.set(doc(collection(db, "users", uid, "despesas")), {
             ...baseData,
+            codigo: `${codigoBase}-${i + 1}`,
             parcelado: true,
             grupoId,
             parcelaAtual: i + 1,
@@ -915,7 +949,7 @@ export default function Despesas() {
           <div className="desp-empty">Nenhuma despesa encontrada.</div>
         ) : despesasFiltradas.map(d => (
           <div key={d.id} className="desp-row">
-            <span className="desp-id">{d.id}</span>
+            <span className="desp-id">{d.codigo || d.id}</span>
 
             <div>
               <div className="desp-desc">
