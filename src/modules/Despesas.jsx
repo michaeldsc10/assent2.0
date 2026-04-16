@@ -621,6 +621,8 @@ export default function Despesas() {
   /* Firestore */
  useEffect(() => {
   console.log("UID atual:", uid);
+    console.log("Antes filtro:", despesas.length);
+console.log("Depois filtro:", despesasFiltradas.length);
 
   if (!uid) {
     console.log("Sem UID ainda");
