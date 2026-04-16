@@ -1,10 +1,10 @@
 /* ═══════════════════════════════════════════════════
-   ASSENT v2.0 — Auth.jsx (Tela de Login + Cadastro)
-   Versão corrigida e limpa
+   ASSENT v2.0 — Auth.jsx
+   Login + Cadastro com criação de licença PRO
    ═══════════════════════════════════════════════════ */
 
 import { useState } from "react";
-import { login, register } from "../lib/firebase";   // Removemos o 'auth' daqui
+import { login, register, verificarLicencaPro } from "../lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
@@ -22,27 +22,48 @@ export default function Auth({ onAuthSuccess }) {
     setError("");
 
     try {
+      let uid;
+
       if (isLogin) {
-        await login(email, password);
+        const userCredential = await login(email, password);
+        uid = userCredential.user.uid;
       } else {
         const userCredential = await register(email, password);
-        const uid = userCredential.user.uid;
+        uid = userCredential.user.uid;
 
+        // Cria documento do usuário
         await setDoc(doc(db, "users", uid), {
           name: nome.trim() || email.split("@")[0],
-          email: email,
-          plan: "pro",
+          email: email.toLowerCase(),
           createdAt: new Date(),
           clienteIdCnt: 0,
+          vendedorIdCnt: 0,
+          vendaIdCnt: 0,
+          // Removemos o campo "plan" daqui
+        });
+
+        // Cria documento de licença (nova estrutura)
+        await setDoc(doc(db, "licencas", uid), {
+          clienteAG: true,
+          pro: true,
+          plano: "pro",
+          dataInicio: new Date(),
+          // Você pode adicionar dataExpiracao no futuro
         });
       }
 
-      // Sucesso → avisa o App.jsx
+      // Verifica licença (mesmo no login)
+      const temLicencaPro = await verificarLicencaPro(uid);
+
+      if (!temLicencaPro) {
+        setError("Sua licença não está ativa. Contate o suporte.");
+        return;
+      }
+
       onAuthSuccess?.();
     } catch (err) {
       console.error("Erro de autenticação:", err.code, err.message);
 
-      // Mensagens amigáveis
       if (err.code === "auth/user-not-found" || err.code === "auth/wrong-password") {
         setError("E-mail ou senha incorretos.");
       } else if (err.code === "auth/email-already-in-use") {
