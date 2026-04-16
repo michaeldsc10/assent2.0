@@ -562,7 +562,7 @@ function SecaoEmpresa({ config, onSave }) {
     if (!validarEmpresa()) return;
 
     setSalvando(true);
-    await onSave(form);           // ← AGORA SALVA FLAT (correto)
+    await onSave({ empresa: form });          
     setSalvando(false);
   };
 
