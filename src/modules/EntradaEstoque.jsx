@@ -17,7 +17,7 @@ import {
   serverTimestamp,
   runTransaction,
 } from "firebase/firestore";
-import { v4 as uuid } from "uuid";
+import { v4 as uid } from "uid";
 
 /* ── CSS ── */
 const CSS = `
