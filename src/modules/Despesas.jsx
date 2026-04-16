@@ -620,34 +620,36 @@ export default function Despesas() {
 
   /* Firestore */
  useEffect(() => {
-  console.log("UID atual:", uid);
-    console.log("Antes filtro:", despesas.length);
-console.log("Depois filtro:", despesasFiltradas.length);
+    if (!uid) { setLoading(false); return; }
 
-  if (!uid) {
-    console.log("Sem UID ainda");
-    return;
-  }
+    const despesasCol = collection(db, "users", uid, "despesas");
+    const q = query(despesasCol,);
 
-  const despesasCol = collection(db, "users", uid, "despesas");
-  console.log("Lendo de:", `users/${uid}/despesas`);
+    const unsub = onSnapshot(q, (snap) => {
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-  const unsub = onSnapshot(despesasCol, (snap) => {
-    console.log("Docs recebidos:", snap.docs.length);
-
-    const docs = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data()
+     const updatedDocs = docs.map(d => ({
+      ...d,
+      status: calcularStatus(d.vencimento, d.status || "pendente")
     }));
 
-    console.log("Dados:", docs);
+    // Ordenamos no cliente (mais estável)
+    updatedDocs.sort((a, b) => {
+      const dateA = parseDate(a.vencimento);
+      const dateB = parseDate(b.vencimento);
+      return (dateA || 0) - (dateB || 0);
+    });
 
-    setDespesas(docs);
+    setDespesas(updatedDocs);
+    setLoading(false);
+  }, (error) => {
+    console.error("Erro no onSnapshot:", error);
     setLoading(false);
   });
 
   return () => unsub();
 }, [uid]);
+
 
    
   /* ── SALVAR NOVA DESPESA (ID AUTOMÁTICO) ── */
