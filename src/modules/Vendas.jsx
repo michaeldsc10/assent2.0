@@ -1211,43 +1211,81 @@ export default function Vendas() {
   const [deletando, setDeletando]       = useState(null);
   const [confirmarDepoisDetalhe, setConfirmarDepoisDetalhe] = useState(false);
 
-  /* Auth */
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => setUid(user?.uid || null));
-    return unsub;
-  }, []);
+ /* ====================== AUTH + FIRESTORE LISTENERS ====================== */
+useEffect(() => {
+  // 1. Listener de autenticação
+  const unsubAuth = onAuthStateChanged(auth, (user) => {
+    const currentUid = user?.uid || null;
+    setUid(currentUid);
 
-  /* Firestore listeners */
-  useEffect(() => {
-    if (!uid) { setLoading(false); return; }
-
-    const userRef     = doc(db, "users", uid);
-    const vendasCol   = collection(db, "users", uid, "vendas");
-    const clientesCol = collection(db, "users", uid, "clientes");
-    const produtosCol = collection(db, "users", uid, "produtos");
-    const servicosCol = collection(db, "users", uid, "servicos");
-    const vendsCol    = collection(db, "users", uid, "vendedores");
-
-    const u1 = onSnapshot(userRef, snap => {
-      if (snap.exists()) setVendaIdCnt(snap.data().vendaIdCnt || 0);
-    });
-    const u2 = onSnapshot(vendasCol, snap => {
-      const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      arr.sort((a, b) => {
-        const da = a.data?.toDate ? a.data.toDate() : new Date(a.data || 0);
-        const db_ = b.data?.toDate ? b.data.toDate() : new Date(b.data || 0);
-        return db_ - da;
-      });
-      setVendas(arr);
+    if (!currentUid) {
+      // Limpa tudo quando não tem usuário
+      setVendas([]);
+      setClientes([]);
+      setProdutos([]);
+      setServicos([]);
+      setVendedores([]);
+      setVendaIdCnt(0);
       setLoading(false);
-    });
-    const u3 = onSnapshot(clientesCol, snap => setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const u4 = onSnapshot(produtosCol, snap => setProdutos(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const u5 = onSnapshot(servicosCol, snap => setServicos(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const u6 = onSnapshot(vendsCol,    snap => setVendedores(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    }
+  });
 
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); };
-  }, [uid]);
+  return () => unsubAuth();
+}, []);
+
+// 2. Listener dos dados do Firestore (só roda quando uid existir)
+useEffect(() => {
+  if (!uid) {
+    setLoading(false);
+    return;
+  }
+
+  setLoading(true);
+
+  const userRef     = doc(db, "users", uid);
+  const vendasCol   = collection(db, "users", uid, "vendas");
+  const clientesCol = collection(db, "users", uid, "clientes");
+  const produtosCol = collection(db, "users", uid, "produtos");
+  const servicosCol = collection(db, "users", uid, "servicos");
+  const vendsCol    = collection(db, "users", uid, "vendedores");
+
+  const unsub1 = onSnapshot(userRef, (snap) => {
+    if (snap.exists()) setVendaIdCnt(snap.data().vendaIdCnt || 0);
+  });
+
+  const unsub2 = onSnapshot(vendasCol, (snap) => {
+    const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    arr.sort((a, b) => {
+      const da = a.data?.toDate ? a.data.toDate() : new Date(a.data || 0);
+      const db_ = b.data?.toDate ? b.data.toDate() : new Date(b.data || 0);
+      return db_ - da;
+    });
+    setVendas(arr);
+    setLoading(false);
+  });
+
+  const unsub3 = onSnapshot(clientesCol, (snap) => 
+    setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  );
+  const unsub4 = onSnapshot(produtosCol, (snap) => 
+    setProdutos(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  );
+  const unsub5 = onSnapshot(servicosCol, (snap) => 
+    setServicos(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  );
+  const unsub6 = onSnapshot(vendsCol, (snap) => 
+    setVendedores(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+  );
+
+  return () => {
+    unsub1();
+    unsub2();
+    unsub3();
+    unsub4();
+    unsub5();
+    unsub6();
+  };
+}, [uid]);
 
   /* ── Criar venda ── */
   const handleSave = async (payload, vendaExistente) => {
