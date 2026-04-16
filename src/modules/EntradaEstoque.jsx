@@ -413,7 +413,7 @@ function ModalEntrada({ uid, produtos, fornecedores, movimento = null, onSalvo, 
     </div>
   );
 }
-};
+
 
 /* Componente Principal */
 export default function EntradaEstoque() {
@@ -479,28 +479,7 @@ const confirmarExclusao = async () => {
   setMovimentoParaExcluir(mov);
 };
 
-  try {
-    const movRef = doc(db, "users", uid, "movimentacoes_estoque", mov.id);
-    const produtoRef = doc(db, "users", uid, "produtos", mov.produtoId);
-
-    await runTransaction(db, async (tx) => {
-      const prodSnap = await tx.get(produtoRef);
-      if (!prodSnap.exists()) throw new Error("Produto não encontrado.");
-
-      const estoqueReal = prodSnap.data().estoque ?? 0;
-      const qtd = Number(mov.quantidade) || 0;
-      const novoEstoque = Math.max(0, estoqueReal - qtd);
-
-      tx.set(produtoRef, { estoque: novoEstoque }, { merge: true });
-      tx.delete(movRef);
-    });
-
-    showToast("Entrada excluída e estoque ajustado!", "sucesso");
-  } catch (err) {
-    console.error(err);
-    showToast("Erro ao excluir: " + err.message, "erro");
-  }
-};
+ 
   // ... resto do componente (tabela, botões de ação, etc.)
 
   return (
