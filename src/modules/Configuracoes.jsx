@@ -513,7 +513,7 @@ function PassInput({ value, onChange, placeholder, className }) {
 /* ══════════════════════════════════════════════════════
    SEÇÃO: Empresa
    ══════════════════════════════════════════════════════ */
-unction SecaoEmpresa({ config, onSave }) {
+function SecaoEmpresa({ config, onSave }) {
   const [form, setForm] = useState({
     nomeEmpresa: config?.empresa?.nomeEmpresa || config?.nomeEmpresa || "",
     cnpj:        config?.empresa?.cnpj        || config?.cnpj        || "",
