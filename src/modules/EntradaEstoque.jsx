@@ -199,11 +199,220 @@ function ModalEntrada({ uid, produtos, fornecedores, movimento = null, onSalvo, 
     }
   };
 
-  // ... (o resto do JSX do ModalEntrada permanece igual ao da versão anterior que enviei)
-  // Para não deixar o código gigante, assumo que você colará o corpo do modal da versão anterior aqui.
-  // Se precisar, avise que envio completo novamente.
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box">
 
-  // (coloque aqui o return completo do modal que estava na versão anterior)
+        {/* Header */}
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">
+              {isEditing ? "Editar Entrada de Estoque" : "Registrar Entrada de Estoque"}
+            </div>
+            <div className="modal-sub">
+              {isEditing 
+                ? "Corrija os dados (o estoque será ajustado automaticamente pelo delta)" 
+                : "Informe os dados da movimentação de entrada"}
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose}>
+            <X size={14} color="var(--text-2)" />
+          </button>
+        </div>
+
+        <div className="modal-body">
+
+          {/* Produto */}
+          <div className="form-group">
+            <label className="form-label">
+              Produto <span className="form-label-req">*</span>
+            </label>
+
+            {isEditing ? (
+              /* Em edição o produto é BLOQUEADO (segurança) */
+              <>
+                <div className="form-input readonly">
+                  {produtoSelecionado 
+                    ? `${produtoSelecionado.nome} ${produtoSelecionado.sku ? `(${produtoSelecionado.sku})` : ""}` 
+                    : "Produto removido"}
+                </div>
+                <div className="form-note">Produto não pode ser alterado em edições.</div>
+              </>
+            ) : (
+              <select
+                className={`form-input ${erros.produtoId ? "err" : ""}`}
+                value={form.produtoId}
+                onChange={(e) => set("produtoId", e.target.value)}
+              >
+                <option value="">Selecione um produto...</option>
+                {produtos.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nome} {p.sku ? `(${p.sku})` : ""}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {erros.produtoId && <div className="form-error">{erros.produtoId}</div>}
+          </div>
+
+          {/* Preview de estoque em tempo real (adaptado para edição) */}
+          {produtoSelecionado && (
+            <div className="ee-preview">
+              <div className="ee-preview-card">
+                <div className="ee-preview-label">Estoque Atual</div>
+                <div className="ee-preview-val atual">{estoqueAtual}</div>
+              </div>
+              <div className="ee-preview-card">
+                <div className="ee-preview-label">
+                  {isEditing ? "Ajuste (Delta)" : "Adicionando"}
+                </div>
+                <div className={`ee-preview-val ${delta >= 0 ? "add" : "reduce"}`}>
+                  {delta >= 0 ? `+${delta}` : delta}
+                </div>
+              </div>
+              <div className="ee-preview-card">
+                <div className="ee-preview-label">Novo Estoque</div>
+                <div className="ee-preview-val novo">{novoEstoque}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Quantidade + Data */}
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">
+                Quantidade <span className="form-label-req">*</span>
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                className={`form-input ${erros.quantidade ? "err" : ""}`}
+                value={form.quantidade}
+                onChange={(e) => set("quantidade", e.target.value)}
+                placeholder="0"
+              />
+              {erros.quantidade && <div className="form-error">{erros.quantidade}</div>}
+            </div>
+            <div className="form-group">
+              <label className="form-label">
+                Data <span className="form-label-req">*</span>
+              </label>
+              <input
+                type="date"
+                className={`form-input ${erros.data ? "err" : ""}`}
+                value={form.data}
+                onChange={(e) => set("data", e.target.value)}
+              />
+              {erros.data && <div className="form-error">{erros.data}</div>}
+            </div>
+          </div>
+
+          {/* Motivo */}
+          <div className="form-group">
+            <label className="form-label">
+              Motivo <span className="form-label-req">*</span>
+            </label>
+            <select
+              className={`form-input ${erros.motivo ? "err" : ""}`}
+              value={form.motivo}
+              onChange={(e) => set("motivo", e.target.value)}
+            >
+              <option value="">Selecione o motivo...</option>
+              {MOTIVOS.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            {erros.motivo && <div className="form-error">{erros.motivo}</div>}
+          </div>
+
+          {/* Fornecedor + Custo */}
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Fornecedor</label>
+              <select
+                className="form-input"
+                value={form.fornecedor}
+                onChange={(e) => set("fornecedor", e.target.value)}
+              >
+                <option value="">Nenhum</option>
+                {fornecedores.map((f) => (
+                  <option key={f.id} value={f.nome || f.id}>
+                    {f.nome}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Custo unitário (R$)</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className={`form-input ${erros.custo ? "err" : ""}`}
+                value={form.custo}
+                onChange={(e) => set("custo", e.target.value)}
+                placeholder="0,00"
+              />
+              {erros.custo && <div className="form-error">{erros.custo}</div>}
+            </div>
+          </div>
+
+          {/* Observação */}
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">Observação</label>
+            <textarea
+              className="form-input"
+              rows={2}
+              style={{ resize: "vertical", minHeight: 60 }}
+              value={form.observacao}
+              onChange={(e) => set("observacao", e.target.value)}
+              placeholder="Informações adicionais (opcional)..."
+            />
+          </div>
+
+          {/* Erro global */}
+          {errGlobal && (
+            <div
+              style={{
+                marginTop: 14, display: "flex", alignItems: "center", gap: 7,
+                background: "var(--red-d, rgba(224,82,82,0.1))",
+                border: "1px solid rgba(224,82,82,0.25)",
+                borderRadius: 8, padding: "9px 13px",
+                color: "var(--red)", fontSize: 12,
+              }}
+            >
+              <AlertCircle size={14} />
+              {errGlobal}
+            </div>
+          )}
+
+        </div>
+
+        {/* Footer */}
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose} disabled={salvando}>
+            Cancelar
+          </button>
+          <button className="btn-primary" onClick={handleSubmit} disabled={salvando}>
+            {salvando ? (
+              <>
+                <div className="spinner" /> Salvando...
+              </>
+            ) : (
+              <>
+                <PackagePlus size={14} />
+                {isEditing ? "Salvar Alterações" : "Registrar Entrada"}
+              </>
+            )}
+          </button>
+        </div>
+
+      </div>
+    </div>
+  );
+}
 };
 
 /* Componente Principal */
@@ -235,8 +444,40 @@ export default function EntradaEstoque() {
   };
 
   /* EXCLUIR - abre modal bonito */
-  const handleExcluir = async (mov) => {
-  if (!window.confirm(`Excluir entrada de ${mov.produtoNome || mov.produtoId}?`)) return;
+
+const confirmarExclusao = async () => {
+  if (!movimentoParaExcluir) return;
+
+  try {
+    const mov = movimentoParaExcluir;
+
+    const movRef = doc(db, "users", uid, "movimentacoes_estoque", mov.id);
+    const produtoRef = doc(db, "users", uid, "produtos", mov.produtoId);
+
+    await runTransaction(db, async (tx) => {
+      const prodSnap = await tx.get(produtoRef);
+      if (!prodSnap.exists()) throw new Error("Produto não encontrado.");
+
+      const estoqueReal = prodSnap.data().estoque ?? 0;
+      const qtd = Number(mov.quantidade) || 0;
+      const novoEstoque = Math.max(0, estoqueReal - qtd);
+
+      tx.set(produtoRef, { estoque: novoEstoque }, { merge: true });
+      tx.delete(movRef);
+    });
+
+    showToast("Entrada excluída com sucesso!", "sucesso");
+    setMovimentoParaExcluir(null);
+
+  } catch (err) {
+    console.error(err);
+    showToast("Erro ao excluir: " + err.message, "erro");
+  }
+};
+   
+  const handleExcluir = (mov) => {
+  setMovimentoParaExcluir(mov);
+};
 
   try {
     const movRef = doc(db, "users", uid, "movimentacoes_estoque", mov.id);
