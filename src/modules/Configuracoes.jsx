@@ -515,15 +515,15 @@ function PassInput({ value, onChange, placeholder, className }) {
    ══════════════════════════════════════════════════════ */
 function SecaoEmpresa({ config, onSave }) {
 
-   useEffect(() => {
+  useEffect(() => {
   if (!config) return;
 
   setForm({
-    nomeEmpresa: config?.nomeEmpresa || "",
-    cnpj:        config?.cnpj        || "",
-    telefone:    config?.telefone    || "",
-    endereco:    config?.endereco    || "",
-    logo:        config?.logo        || "",
+    nomeEmpresa: config?.empresa?.nomeEmpresa || "",
+    cnpj:        config?.empresa?.cnpj        || "",
+    telefone:    config?.empresa?.telefone    || "",
+    endereco:    config?.empresa?.endereco    || "",
+    logo:        config?.empresa?.logo        || "",
   });
 }, [config]);
    
