@@ -1041,14 +1041,22 @@ export default function Despesas() {
       await batch.commit();
     } else {
       // Despesa única
-      const newId = gerarIdDespesa(cnt);
-      const status = calcularStatus(form.vencimento, "pendente");
+      } else {
+  // Despesa única
+  const sequencialId = gerarIdDespesa(cnt); // Gera D0001
+  const status = calcularStatus(form.vencimento, "pendente");
 
-      await setDoc(doc(db, "users", uid, "despesas", newId), {
-        ...form, status, dataCriacao: new Date().toISOString(),
-      });
-      await setDoc(doc(db, "users", uid), { despesaIdCnt: cnt + 1 }, { merge: true });
-    }
+  // O quinto argumento de doc() passa a ser o sequencialId em vez de deixar o Firebase gerar
+  await setDoc(doc(db, "users", uid, "despesas", sequencialId), {
+    ...form, 
+    id: sequencialId, // Salva o ID legível dentro do documento para facilitar o map
+    status, 
+    dataCriacao: new Date().toISOString(),
+  });
+
+  // Atualiza o contador no documento do usuário
+  await setDoc(doc(db, "users", uid), { despesaIdCnt: cnt + 1 }, { merge: true });
+}
 
     setModalNovo(false);
   };
@@ -1336,10 +1344,14 @@ export default function Despesas() {
         ) : despesasFiltradas.length === 0 ? (
           <div className="desp-empty">Nenhuma despesa encontrada.</div>
         ) : despesasFiltradas.map(d => (
-          <div key={d.id} className="desp-row">
-            {/* ID */}
-            <span className="desp-id">
-              {d.id}
+          <div key={d.id} className="desp-row"> 
+    {/* O d.id agora virá do nome do documento (D0001) */}
+    <span className="desp-id">
+      {d.id} 
+      {d.recorrente && (
+        <RefreshCw size={9} className="recorr-icon" style={{ marginLeft: 5, verticalAlign: "middle" }} />
+      )}
+    </span>
               {d.recorrente && (
                 <RefreshCw size={9} className="recorr-icon" style={{ marginLeft: 5, verticalAlign: "middle" }} />
               )}
