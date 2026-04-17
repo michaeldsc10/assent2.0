@@ -13,7 +13,7 @@ function App() {
       setUser(currentUser);
       setLoading(false);        // ← Importante
     });
-
+{currentPage === "agenda" && <Agenda />}
     // Cleanup
     return () => unsubscribe();
   }, []);
