@@ -861,7 +861,7 @@ const handleExcluir = (mov) => {
       </div>
     </div>
   </div>
-       </>
+       
 )}
   );
 }
