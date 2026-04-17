@@ -633,7 +633,6 @@ export default function Despesas() {
   const [filtroStatus, setFiltroStatus] = useState("todas");
   const [filtroCategoria, setFiltroCategoria] = useState("todas");
   const [filtroPeriodo, setFiltroPeriodo] = useState("mes");
-  const [periodoCustom, setPeriodoCustom] = useState({ inicio: "", fim: "" });
 
   const [modalNovo, setModalNovo] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -807,7 +806,6 @@ const codigo = await gerarCodigoDespesa(uid);
   const despesasFiltradas = useMemo(() => {
     let lista = [...despesas];
 
-    // Período
     if (filtroPeriodo === "mes") {
       lista = lista.filter(d => {
         const dt = parseDate(d.vencimento);
@@ -815,30 +813,16 @@ const codigo = await gerarCodigoDespesa(uid);
       });
     } else if (filtroPeriodo === "semana") {
       const inicio = new Date(); inicio.setDate(inicio.getDate() - inicio.getDay());
-      const fim    = new Date(inicio); fim.setDate(inicio.getDate() + 6);
+      const fim = new Date(inicio); fim.setDate(inicio.getDate() + 6);
       lista = lista.filter(d => {
         const dt = parseDate(d.vencimento);
         return dt && dt >= inicio && dt <= fim;
       });
-    } else if (filtroPeriodo === "custom") {
-      const inicio = periodoCustom.inicio ? parseDate(periodoCustom.inicio) : null;
-      const fim    = periodoCustom.fim    ? parseDate(periodoCustom.fim)    : null;
-      lista = lista.filter(d => {
-        const dt = parseDate(d.vencimento);
-        if (!dt) return false;
-        if (inicio && dt < inicio) return false;
-        if (fim    && dt > fim)    return false;
-        return true;
-      });
     }
 
-    // Status
     if (filtroStatus !== "todas") lista = lista.filter(d => d.status === filtroStatus);
-
-    // Categoria
     if (filtroCategoria !== "todas") lista = lista.filter(d => d.categoria === filtroCategoria);
 
-    // Busca
     if (search.trim()) {
       const q = search.toLowerCase();
       lista = lista.filter(d =>
@@ -847,31 +831,28 @@ const codigo = await gerarCodigoDespesa(uid);
         d.categoria?.toLowerCase().includes(q)
       );
     }
-
     return lista;
-  }, [despesas, filtroStatus, filtroCategoria, filtroPeriodo, periodoCustom, search, mesAtual, anoAtual]);
+  }, [despesas, filtroStatus, filtroCategoria, filtroPeriodo, search, mesAtual, anoAtual]);
 
   const metricas = useMemo(() => {
     const base = filtroPeriodo === "todas" ? despesas : despesasFiltradas;
-    const vencidas  = base.filter(d => d.status === "vencido").length;
-    const em3dias   = base.filter(d => {
+    const vencidas = base.filter(d => d.status === "vencido").length;
+    const em3dias = base.filter(d => {
       if (d.status !== "pendente") return false;
       const dt = parseDate(d.vencimento);
-      if (!dt) return false;
       const diff = (dt - hoje()) / (1000 * 60 * 60 * 24);
       return diff >= 0 && diff <= 3;
     }).length;
+
     const totalPendente = base.filter(d => d.status === "pendente" || d.status === "vencido")
       .reduce((s, d) => s + (d.valor || 0), 0);
     const totalPago = base.filter(d => d.status === "pago")
       .reduce((s, d) => s + (d.valor || 0), 0);
+
     return { vencidas, em3dias, totalPendente, totalPago };
   }, [despesas, despesasFiltradas, filtroPeriodo]);
 
-  const categoriasFiltro = useMemo(() =>
-    categorias.map(c => c.nome),
-    [categorias]
-  );
+  const categorias = useMemo(() => [...new Set(despesas.map(d => d.categoria).filter(Boolean))], [despesas]);
 
   if (!uid) return <div className="desp-loading">Carregando autenticação...</div>;
 
