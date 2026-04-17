@@ -864,4 +864,4 @@ const handleExcluir = (mov) => {
        
 )}
   );
-}
+
