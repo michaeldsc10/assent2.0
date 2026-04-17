@@ -471,7 +471,7 @@ const gerarIdVenda = (cnt) => `V${String(cnt + 1).padStart(4, "0")}`;
 const PERIODS = ["Tudo", "Hoje", "7 dias", "30 dias", "Este mês"];
 const FORMAS_PAGAMENTO = [
   "Pix", "Dinheiro", "Cartão de Crédito", "Cartão de Débito",
-  "Boleto", "Transferência", "Sinal", "Parcelado", "Outro",
+  "Boleto", "Transferência", "Sinal", "Outro",
 ];
 
 /* Taxas padrão — usadas como fallback enquanto o Firestore carrega */
