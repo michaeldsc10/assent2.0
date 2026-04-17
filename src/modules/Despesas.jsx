@@ -1,20 +1,21 @@
 /* ═══════════════════════════════════════════════════
    ASSENT v2.0 — Despesas.jsx
-   Estrutura: users/{uid}/despesas/{id}
-              users/{uid}/recorrencias/{id}
+   Versão com IDs automáticos do Firebase (addDoc)
+   Baseado no seu código original - Mais segura
    ═══════════════════════════════════════════════════ */
 
 import { useState, useEffect, useMemo } from "react";
 import {
   Search, Plus, Edit2, Trash2, X, CheckCircle, RefreshCw,
   AlertCircle, Clock, AlertTriangle, RotateCcw, TrendingUp,
-  CreditCard, Wallet, Smartphone, ChevronDown, ChevronUp,
+  CreditCard, Wallet, Smartphone,
 } from "lucide-react";
 
 import { db, auth, onAuthStateChanged } from "../lib/firebase";
 import {
   collection, doc, setDoc, deleteDoc, onSnapshot,
   query, orderBy, writeBatch, addDoc,
+  runTransaction
 } from "firebase/firestore";
 
 /* ── CSS ── */
@@ -86,11 +87,6 @@ const CSS = `
     border: none; border-top: 1px solid var(--border);
     margin: 18px 0 16px;
   }
-  .form-section-title {
-    font-size: 10px; font-weight: 600; letter-spacing: .07em;
-    text-transform: uppercase; color: var(--text-3);
-    margin-bottom: 14px;
-  }
 
   /* Toggle chips */
   .chip-group { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -107,23 +103,21 @@ const CSS = `
   .chip:hover:not(.active) { border-color: var(--border-h); color: var(--text); }
 
   /* Buttons */
-  .btn-primary {
+  .btn-primary, .btn-nova-desp {
     padding: 9px 20px; border-radius: 9px;
     background: var(--gold); color: #0a0808;
     border: none; cursor: pointer;
     font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
-    transition: opacity .13s, transform .1s;
+    transition: opacity .13s;
   }
-  .btn-primary:hover  { opacity: .88; }
-  .btn-primary:active { transform: scale(.97); }
-  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-primary:hover, .btn-nova-desp:hover { opacity: .88; }
 
   .btn-secondary {
     padding: 9px 20px; border-radius: 9px;
     background: var(--s3); color: var(--text-2);
     border: 1px solid var(--border); cursor: pointer;
     font-family: 'DM Sans', sans-serif; font-size: 13px;
-    transition: background .13s, color .13s;
+    transition: background .13s;
   }
   .btn-secondary:hover { background: var(--s2); color: var(--text); }
 
@@ -160,25 +154,12 @@ const CSS = `
   .btn-icon-undo  { color: var(--text-3); }
   .btn-icon-undo:hover  { background: var(--s2); border-color: var(--border-h); color: var(--text-2); }
 
-  .btn-nova-desp {
-    display: flex; align-items: center; gap: 7px;
-    padding: 8px 16px; border-radius: 9px;
-    background: var(--gold); color: #0a0808;
-    border: none; cursor: pointer;
-    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
-    white-space: nowrap; transition: opacity .13s;
-  }
-  .btn-nova-desp:hover { opacity: .88; }
-
-  /* Topbar */
   .desp-topbar {
     padding: 14px 22px; background: var(--s1);
     border-bottom: 1px solid var(--border);
     display: flex; align-items: center; gap: 14px; flex-shrink: 0; flex-wrap: wrap;
   }
-  .desp-topbar-title h1 {
-    font-family: 'Sora', sans-serif; font-size: 17px; font-weight: 600; color: var(--text);
-  }
+  .desp-topbar-title h1 { font-family: 'Sora', sans-serif; font-size: 17px; font-weight: 600; color: var(--text); }
   .desp-topbar-title p { font-size: 11px; color: var(--text-2); margin-top: 2px; }
 
   .desp-search {
@@ -191,15 +172,11 @@ const CSS = `
     color: var(--text); font-size: 12px; width: 100%;
   }
 
-  /* Métricas cards */
   .desp-metrics {
     display: grid; grid-template-columns: repeat(4, 1fr);
     gap: 12px; padding: 18px 22px;
   }
-  .metric-card {
-    border-radius: 12px; padding: 14px 16px;
-    border: 1px solid transparent; position: relative; overflow: hidden;
-  }
+  .metric-card { border-radius: 12px; padding: 14px 16px; border: 1px solid transparent; }
   .metric-card-red    { background: rgba(224,82,82,.08);    border-color: rgba(224,82,82,.18); }
   .metric-card-amber  { background: rgba(200,165,94,.08);   border-color: rgba(200,165,94,.18); }
   .metric-card-purple { background: rgba(139,92,246,.08);   border-color: rgba(139,92,246,.18); }
@@ -209,11 +186,6 @@ const CSS = `
     width: 28px; height: 28px; border-radius: 7px;
     display: flex; align-items: center; justify-content: center; margin-bottom: 10px;
   }
-  .metric-icon-red    { background: rgba(224,82,82,.15); }
-  .metric-icon-amber  { background: rgba(200,165,94,.15); }
-  .metric-icon-purple { background: rgba(139,92,246,.15); }
-  .metric-icon-green  { background: rgba(74,186,130,.15); }
-
   .metric-label { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
   .metric-val   { font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 600; }
   .metric-val-red    { color: var(--red); }
@@ -222,112 +194,40 @@ const CSS = `
   .metric-val-green  { color: var(--green); }
   .metric-sub { font-size: 11px; color: var(--text-3); margin-top: 3px; }
 
-  /* Filtros */
   .desp-filters {
     padding: 0 22px 14px;
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   }
-  .filter-label { font-size: 11px; color: var(--text-3); margin-right: 2px; }
   .filter-chip {
     padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 500;
     border: 1px solid var(--border); background: var(--s2); color: var(--text-2);
-    cursor: pointer; transition: all .13s;
+    cursor: pointer;
   }
-  .filter-chip:hover { border-color: var(--border-h); color: var(--text); }
   .filter-chip.active { background: var(--s3); border-color: var(--border-h); color: var(--text); }
-
   .filter-select {
     padding: 5px 10px; border-radius: 8px; font-size: 12px;
     border: 1px solid var(--border); background: var(--s2); color: var(--text-2);
-    cursor: pointer; outline: none; font-family: 'DM Sans', sans-serif;
-    transition: border-color .13s;
   }
-  .filter-select:focus { border-color: var(--border-h); }
 
-  /* Período personalizado */
-  .periodo-custom {
-    display: flex; align-items: center; gap: 6px;
-  }
-  .periodo-custom input[type="date"] {
-    padding: 4px 8px; border-radius: 8px; font-size: 12px;
-    border: 1px solid var(--border); background: var(--s2); color: var(--text-2);
-    outline: none; font-family: 'DM Sans', sans-serif;
-    transition: border-color .13s;
-  }
-  .periodo-custom input[type="date"]:focus { border-color: var(--border-h); }
-  .periodo-custom span { font-size: 11px; color: var(--text-3); }
-
-  /* Gerenciar categorias */
-  .cat-manager {
-    background: var(--s2); border: 1px solid var(--border);
-    border-radius: 10px; padding: 12px 14px; margin-top: 10px;
-  }
-  .cat-manager-title {
-    font-size: 10px; font-weight: 600; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--text-3); margin-bottom: 10px;
-  }
-  .cat-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-  .cat-item {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 3px 10px; border-radius: 20px; font-size: 12px;
-    background: var(--s3); border: 1px solid var(--border); color: var(--text-2);
-  }
-  .cat-item-del {
-    display: flex; align-items: center; cursor: pointer;
-    color: var(--text-3); transition: color .1s; background: none; border: none; padding: 0;
-  }
-  .cat-item-del:hover { color: var(--red); }
-  .cat-add-row { display: flex; gap: 6px; }
-  .cat-add-row input {
-    flex: 1; padding: 7px 10px; border-radius: 8px; font-size: 12px;
-    border: 1px solid var(--border); background: var(--s1); color: var(--text);
-    outline: none; font-family: 'DM Sans', sans-serif;
-    transition: border-color .13s;
-  }
-  .cat-add-row input:focus { border-color: var(--gold); }
-  .cat-add-btn {
-    padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
-    background: var(--gold); color: #0a0808; border: none; cursor: pointer;
-    font-family: 'DM Sans', sans-serif; white-space: nowrap;
-    transition: opacity .13s;
-  }
-  .cat-add-btn:hover { opacity: .88; }
-  .cat-add-btn:disabled { opacity: .5; cursor: not-allowed; }
-  .cat-select-row {
-    display: flex; align-items: center; gap: 6px;
-  }
-  .cat-toggle-btn {
-    padding: 4px 8px; border-radius: 7px; font-size: 11px;
-    border: 1px solid var(--border); background: var(--s2); color: var(--text-3);
-    cursor: pointer; display: flex; align-items: center; gap: 4px;
-    transition: all .13s; white-space: nowrap;
-  }
-  .cat-toggle-btn:hover { border-color: var(--border-h); color: var(--text-2); }
-
-  /* Tabela */
   .desp-table-wrap {
-    margin: 0 22px 22px;
-    background: var(--s1); border: 1px solid var(--border);
-    border-radius: 12px; overflow: hidden;
-  }
+  margin: 0 22px 22px;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+
+  max-height: 60vh;   /* ou 70vh dependendo do layout */
+  overflow-y: auto;
+}
   .desp-table-header {
     padding: 13px 18px; border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
   }
-  .desp-table-title { font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; color: var(--text); }
-  .count-badge {
-    font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 600;
-    background: var(--s3); border: 1px solid var(--border-h);
-    color: var(--text-2); padding: 2px 10px; border-radius: 20px;
-  }
-
   .desp-row {
     display: grid;
-    grid-template-columns: 80px 1fr 100px 110px 110px 90px 100px 110px 90px;
+    grid-template-columns: 220px 1fr 100px 110px 110px 90px 100px 110px 90px;
     padding: 11px 18px; gap: 8px;
     border-bottom: 1px solid var(--border);
     align-items: center; font-size: 12px; color: var(--text-2);
-    transition: background .1s;
   }
   .desp-row:last-child { border-bottom: none; }
   .desp-row:hover { background: rgba(255,255,255,0.02); }
@@ -337,13 +237,12 @@ const CSS = `
     text-transform: uppercase; color: var(--text-3);
   }
 
-  .desp-id    { font-family: 'Sora', sans-serif; font-size: 11px; color: var(--gold); font-weight: 500; }
+  .desp-id    { font-family: 'Sora', sans-serif; font-size: 11px; color: var(--gold); font-weight: 500; word-break: break-all; }
   .desp-desc  { color: var(--text); font-size: 13px; font-weight: 500; }
   .desp-desc-obs { font-size: 11px; color: var(--text-3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
   .desp-valor { font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; color: var(--text); }
   .desp-actions { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
 
-  /* Status badges */
   .status-badge {
     display: inline-flex; align-items: center; gap: 5px;
     padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 500;
@@ -353,17 +252,13 @@ const CSS = `
   .status-vencido { background: rgba(224,82,82,.1);    color: var(--red);   border: 1px solid rgba(224,82,82,.2); }
   .status-cancelado{ background: var(--s3);            color: var(--text-3);border: 1px solid var(--border); }
 
-  /* Categoria badge */
   .cat-badge {
     display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px;
     background: var(--s3); border: 1px solid var(--border); color: var(--text-2);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px;
   }
 
-  /* Recorrente icon */
   .recorr-icon { color: var(--blue); opacity: .8; }
-
-  /* Parcel badge */
   .parcel-badge {
     font-size: 10px; color: var(--text-3); background: var(--s3);
     border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px;
@@ -371,28 +266,10 @@ const CSS = `
   }
 
   .desp-empty, .desp-loading { padding: 56px 20px; text-align: center; color: var(--text-3); font-size: 13px; }
-
-  /* Confirm */
-  .confirm-body { padding: 24px 22px; text-align: center; }
-  .confirm-body p { font-size: 13px; color: var(--text-2); line-height: 1.6; }
-  .confirm-body strong { color: var(--text); }
-  .confirm-icon-wrap {
-    width: 44px; height: 44px; border-radius: 50%; margin: 0 auto 14px;
-    display: flex; align-items: center; justify-content: center;
-  }
-  .confirm-icon-del   { background: var(--red-d); }
-  .confirm-icon-pay   { background: rgba(74,186,130,.12); }
-
-  /* Modal pagar */
-  .pay-info { background: var(--s2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
-  .pay-info-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-2); margin-bottom: 6px; }
-  .pay-info-row:last-child { margin-bottom: 0; }
-  .pay-info-val { font-weight: 600; color: var(--text); }
 `;
 
 /* ── Helpers ── */
-const fmtR$ = (v) =>
-  `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+const fmtR$ = (v) => `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
 const fmtData = (d) => {
   if (!d) return "—";
@@ -424,8 +301,6 @@ const calcularStatus = (vencimento, statusAtual) => {
   return venc < hoje() ? "vencido" : "pendente";
 };
 
-const gerarIdDespesa = (cnt) => `D${String(cnt + 1).padStart(4, "0")}`;
-
 const proximaData = (dataBase, tipo, intervalo = 1) => {
   const d = parseDate(dataBase);
   if (!d) return null;
@@ -436,110 +311,22 @@ const proximaData = (dataBase, tipo, intervalo = 1) => {
   return nova.toISOString().split("T")[0];
 };
 
+const CATEGORIAS_DEFAULT = ["Fixo", "Variável", "Pessoal", "Marketing", "Operacional", "Tecnologia", "Impostos", "Outros"];
 const FORMAS_PAG = [
   { value: "dinheiro", label: "Dinheiro", Icon: Wallet },
   { value: "pix",      label: "Pix",      Icon: Smartphone },
   { value: "cartão",   label: "Cartão",   Icon: CreditCard },
 ];
 
-/* ════════════════════════════════════════
-   HOOK: Categorias dinâmicas
-   Estrutura: categorias_despesas/{categoriaId}
-   ════════════════════════════════════════ */
-function useCategorias(uid) {
-  const [categorias, setCategorias] = useState([]);
-
-  useEffect(() => {
-    if (!uid) return;
-    const col = collection(db, "categorias_despesas");
-    const q = query(col, orderBy("nome", "asc"));
-    const unsub = onSnapshot(q, (snap) => {
-      setCategorias(
-        snap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .filter(c => c.ativa !== false)
-      );
-    });
-    return unsub;
-  }, [uid]);
-
-  const criarCategoria = async (nome) => {
-    const nomeTrimmed = nome.trim();
-    if (!nomeTrimmed) return;
-    await addDoc(collection(db, "categorias_despesas"), {
-      nome: nomeTrimmed,
-      ativa: true,
-      criadoEm: new Date().toISOString(),
-    });
-  };
-
-  const desativarCategoria = async (id) => {
-    await setDoc(doc(db, "categorias_despesas", id), { ativa: false }, { merge: true });
-  };
-
-  return { categorias, criarCategoria, desativarCategoria };
-}
-
-/* ════════════════════════════════════════
-   COMPONENTE: Gerenciar Categorias (inline no modal)
-   ════════════════════════════════════════ */
-function CategoriasManager({ categorias, onCriar, onDesativar }) {
-  const [novaCategoria, setNovaCategoria] = useState("");
-  const [salvando, setSalvando] = useState(false);
-
-  const handleCriar = async () => {
-    if (!novaCategoria.trim()) return;
-    setSalvando(true);
-    await onCriar(novaCategoria);
-    setNovaCategoria("");
-    setSalvando(false);
-  };
-
-  return (
-    <div className="cat-manager">
-      <div className="cat-manager-title">Gerenciar categorias</div>
-      <div className="cat-list">
-        {categorias.length === 0 && (
-          <span style={{ fontSize: 12, color: "var(--text-3)" }}>Nenhuma categoria cadastrada.</span>
-        )}
-        {categorias.map(c => (
-          <span key={c.id} className="cat-item">
-            {c.nome}
-            <button className="cat-item-del" onClick={() => onDesativar(c.id)} title="Remover">
-              <X size={10} />
-            </button>
-          </span>
-        ))}
-      </div>
-      <div className="cat-add-row">
-        <input
-          value={novaCategoria}
-          onChange={e => setNovaCategoria(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && handleCriar()}
-          placeholder="Nova categoria..."
-        />
-        <button className="cat-add-btn" onClick={handleCriar} disabled={salvando || !novaCategoria.trim()}>
-          {salvando ? "..." : "+ Adicionar"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════
-   MODAL: Nova / Editar Despesa
-   ════════════════════════════════════════ */
-function ModalNovaDespesa({ despesa, despesas, categorias, onCriarCategoria, onDesativarCategoria, onSave, onClose }) {
+/* ── Modal Nova / Editar Despesa ── */
+function ModalNovaDespesa({ despesa, onSave, onClose }) {
   const isEdit = !!despesa;
-  const [showCatManager, setShowCatManager] = useState(false);
-
-  const primeiraCategoria = categorias[0]?.nome || "";
 
   const [form, setForm] = useState({
     descricao:      despesa?.descricao      || "",
     valor:          despesa?.valor          || "",
     vencimento:     despesa?.vencimento     || "",
-    categoria:      despesa?.categoria      || primeiraCategoria,
+    categoria:      despesa?.categoria      || "Fixo",
     centroCusto:    despesa?.centroCusto    || "",
     fornecedor:     despesa?.fornecedor     || "",
     formaPagamento: despesa?.formaPagamento || "pix",
@@ -597,7 +384,7 @@ function ModalNovaDespesa({ despesa, despesas, categorias, onCriarCategoria, onD
           <div>
             <div className="modal-title">{isEdit ? "Editar Despesa" : "Nova Despesa"}</div>
             <div className="modal-sub">
-              {isEdit ? `Editando ${despesa.id} — ${despesa.descricao}` : "Preencha os dados da despesa"}
+              {isEdit ? `Editando ${despesa.id}` : "Preencha os dados da despesa"}
             </div>
           </div>
           <button className="modal-close" onClick={onClose}>
@@ -606,150 +393,77 @@ function ModalNovaDespesa({ despesa, despesas, categorias, onCriarCategoria, onD
         </div>
 
         <div className="modal-body">
-
           {/* Descrição */}
           <div className="form-group">
             <label className="form-label">Descrição <span className="form-label-req">*</span></label>
-            <input
-              className={`form-input ${erros.descricao ? "err" : ""}`}
-              value={form.descricao}
-              onChange={e => set("descricao", e.target.value)}
-              placeholder="Ex: Aluguel, energia elétrica..."
-              autoFocus
-            />
+            <input className={`form-input ${erros.descricao ? "err" : ""}`} value={form.descricao} onChange={e => set("descricao", e.target.value)} placeholder="Ex: Aluguel, energia elétrica..." autoFocus />
             {erros.descricao && <div className="form-error">{erros.descricao}</div>}
           </div>
 
-          {/* Valor + Vencimento + Forma Pagamento */}
+          {/* Valor + Vencimento + Forma */}
           <div className="form-row-3">
             <div className="form-group form-group-0">
               <label className="form-label">Valor (R$) <span className="form-label-req">*</span></label>
-              <input
-                className={`form-input ${erros.valor ? "err" : ""}`}
-                type="number" min="0" step="0.01"
-                value={form.valor}
-                onChange={e => set("valor", e.target.value)}
-                placeholder="0,00"
-              />
+              <input className={`form-input ${erros.valor ? "err" : ""}`} type="number" min="0" step="0.01" value={form.valor} onChange={e => set("valor", e.target.value)} />
               {erros.valor && <div className="form-error">{erros.valor}</div>}
             </div>
             <div className="form-group form-group-0">
               <label className="form-label">Vencimento <span className="form-label-req">*</span></label>
-              <input
-                className={`form-input ${erros.vencimento ? "err" : ""}`}
-                type="date"
-                value={form.vencimento}
-                onChange={e => set("vencimento", e.target.value)}
-              />
+              <input className={`form-input ${erros.vencimento ? "err" : ""}`} type="date" value={form.vencimento} onChange={e => set("vencimento", e.target.value)} />
               {erros.vencimento && <div className="form-error">{erros.vencimento}</div>}
             </div>
             <div className="form-group form-group-0">
               <label className="form-label">Forma de pagamento</label>
               <div className="chip-group" style={{ marginTop: 2 }}>
                 {FORMAS_PAG.map(fp => (
-                  <button
-                    key={fp.value}
-                    className={`chip ${form.formaPagamento === fp.value ? "active" : ""}`}
-                    onClick={() => set("formaPagamento", fp.value)}
-                    type="button"
-                  >
-                    <fp.Icon size={11} style={{ display: "inline", marginRight: 4, verticalAlign: "middle" }} />
-                    {fp.label}
+                  <button key={fp.value} className={`chip ${form.formaPagamento === fp.value ? "active" : ""}`} onClick={() => set("formaPagamento", fp.value)} type="button">
+                    <fp.Icon size={11} style={{ display: "inline", marginRight: 4 }} /> {fp.label}
                   </button>
                 ))}
               </div>
             </div>
           </div>
 
-          {/* Categoria + Centro de custo + Fornecedor */}
+          {/* Categoria, Centro, Fornecedor */}
           <div className="form-row-3" style={{ marginTop: 14 }}>
             <div className="form-group form-group-0">
               <label className="form-label">Categoria</label>
-              <div className="cat-select-row">
-                <select
-                  className="form-input"
-                  value={form.categoria}
-                  onChange={e => set("categoria", e.target.value)}
-                  style={{ flex: 1 }}
-                >
-                  {categorias.length === 0 && (
-                    <option value="">— Sem categorias —</option>
-                  )}
-                  {categorias.map(c => (
-                    <option key={c.id} value={c.nome}>{c.nome}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="cat-toggle-btn"
-                  onClick={() => setShowCatManager(v => !v)}
-                  title="Gerenciar categorias"
-                >
-                  <Plus size={11} />
-                </button>
-              </div>
-              {showCatManager && (
-                <CategoriasManager
-                  categorias={categorias}
-                  onCriar={onCriarCategoria}
-                  onDesativar={onDesativarCategoria}
-                />
-              )}
+              <select className="form-input" value={form.categoria} onChange={e => set("categoria", e.target.value)}>
+                {CATEGORIAS_DEFAULT.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
             <div className="form-group form-group-0">
               <label className="form-label">Centro de custo</label>
-              <input
-                className="form-input"
-                value={form.centroCusto}
-                onChange={e => set("centroCusto", e.target.value)}
-                placeholder="Ex: Marketing, TI..."
-              />
+              <input className="form-input" value={form.centroCusto} onChange={e => set("centroCusto", e.target.value)} placeholder="Ex: Marketing..." />
             </div>
             <div className="form-group form-group-0">
               <label className="form-label">Fornecedor</label>
-              <input
-                className="form-input"
-                value={form.fornecedor}
-                onChange={e => set("fornecedor", e.target.value)}
-                placeholder="Nome do fornecedor"
-              />
+              <input className="form-input" value={form.fornecedor} onChange={e => set("fornecedor", e.target.value)} placeholder="Nome do fornecedor" />
             </div>
           </div>
 
           <hr className="form-divider" />
 
-          {/* Recorrência */}
+          {/* Recorrência e Parcelamento (mesmo do original) */}
           <div className="form-group">
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
-                <input
-                  type="checkbox"
-                  checked={form.recorrente}
-                  onChange={e => set("recorrente", e.target.checked)}
-                  style={{ accentColor: "var(--gold)", width: 15, height: 15 }}
-                />
-                <span className="form-label" style={{ marginBottom: 0 }}>Despesa recorrente</span>
-              </label>
-            </div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input type="checkbox" checked={form.recorrente} onChange={e => set("recorrente", e.target.checked)} style={{ accentColor: "var(--gold)" }} />
+              <span className="form-label" style={{ marginBottom: 0 }}>Despesa recorrente</span>
+            </label>
 
             {form.recorrente && (
-              <div className="form-row-3">
+              <div className="form-row-3" style={{ marginTop: 10 }}>
                 <div className="form-group form-group-0">
                   <label className="form-label">Tipo</label>
                   <select className="form-input" value={form.tipoRecorrencia} onChange={e => set("tipoRecorrencia", e.target.value)}>
-                    <option value="semanal">Semanal</option>
                     <option value="mensal">Mensal</option>
+                    <option value="semanal">Semanal</option>
                     <option value="anual">Anual</option>
                   </select>
                 </div>
                 <div className="form-group form-group-0">
                   <label className="form-label">Intervalo</label>
-                  <input
-                    type="number" min="1" className="form-input"
-                    value={form.intervalo}
-                    onChange={e => set("intervalo", e.target.value)}
-                    placeholder="1"
-                  />
+                  <input type="number" min="1" className="form-input" value={form.intervalo} onChange={e => set("intervalo", e.target.value)} />
                 </div>
                 <div className="form-group form-group-0">
                   <label className="form-label">Data fim (opcional)</label>
@@ -759,47 +473,22 @@ function ModalNovaDespesa({ despesa, despesas, categorias, onCriarCategoria, onD
             )}
           </div>
 
-          {/* Parcelamento (somente criação) */}
           {!isEdit && (
-            <div className="form-group form-group-0">
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
-                  <input
-                    type="checkbox"
-                    checked={form.parcelado}
-                    disabled={form.recorrente}
-                    onChange={e => set("parcelado", e.target.checked)}
-                    style={{ accentColor: "var(--gold)", width: 15, height: 15 }}
-                  />
-                  <span className="form-label" style={{ marginBottom: 0 }}>
-                    Parcelado {form.recorrente && <span style={{ color: "var(--text-3)" }}>(indisponível com recorrência)</span>}
-                  </span>
-                </label>
-              </div>
+            <div className="form-group">
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                <input type="checkbox" checked={form.parcelado} disabled={form.recorrente} onChange={e => set("parcelado", e.target.checked)} style={{ accentColor: "var(--gold)" }} />
+                <span className="form-label" style={{ marginBottom: 0 }}>Parcelado</span>
+              </label>
               {form.parcelado && !form.recorrente && (
-                <div style={{ maxWidth: 160 }}>
-                  <label className="form-label">Número de parcelas</label>
-                  <input
-                    type="number" min="2" max="60" className="form-input"
-                    value={form.totalParcelas}
-                    onChange={e => set("totalParcelas", e.target.value)}
-                  />
-                </div>
+                <input type="number" min="2" max="60" className="form-input" style={{ width: "160px", marginTop: 8 }} value={form.totalParcelas} onChange={e => set("totalParcelas", e.target.value)} />
               )}
             </div>
           )}
 
-          {/* Observação */}
-          <div className="form-group" style={{ marginTop: 14, marginBottom: 0 }}>
+          <div className="form-group" style={{ marginTop: 14 }}>
             <label className="form-label">Observação</label>
-            <input
-              className="form-input"
-              value={form.observacao}
-              onChange={e => set("observacao", e.target.value)}
-              placeholder="Opcional"
-            />
+            <input className="form-input" value={form.observacao} onChange={e => set("observacao", e.target.value)} placeholder="Opcional" />
           </div>
-
         </div>
 
         <div className="modal-footer">
@@ -813,9 +502,7 @@ function ModalNovaDespesa({ despesa, despesas, categorias, onCriarCategoria, onD
   );
 }
 
-/* ════════════════════════════════════════
-   MODAL: Registrar Pagamento
-   ════════════════════════════════════════ */
+/* Modal Pagar */
 function ModalPagar({ despesa, onConfirm, onClose }) {
   const [formaPag, setFormaPag] = useState(despesa.formaPagamento || "pix");
   const [pagando, setPagando] = useState(false);
@@ -836,43 +523,23 @@ function ModalPagar({ despesa, onConfirm, onClose }) {
           </div>
           <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)" /></button>
         </div>
-
         <div className="modal-body">
-          <div className="pay-info">
-            <div className="pay-info-row">
-              <span>Valor</span>
-              <span className="pay-info-val" style={{ color: "var(--green)" }}>{fmtR$(despesa.valor)}</span>
-            </div>
-            <div className="pay-info-row">
-              <span>Vencimento</span>
-              <span className="pay-info-val">{fmtData(despesa.vencimento)}</span>
-            </div>
-            {despesa.categoria && (
-              <div className="pay-info-row">
-                <span>Categoria</span>
-                <span className="pay-info-val">{despesa.categoria}</span>
-              </div>
-            )}
+          <div className="pay-info" style={{ background: "var(--s2)", border: "1px solid var(--border)", borderRadius: "10px", padding: "14px 16px", marginBottom: "16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}><span>Valor</span><span style={{ fontWeight: 600, color: "var(--green)" }}>{fmtR$(despesa.valor)}</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}><span>Vencimento</span><span>{fmtData(despesa.vencimento)}</span></div>
           </div>
 
-          <div className="form-group form-group-0">
+          <div className="form-group">
             <label className="form-label">Forma de pagamento</label>
-            <div className="chip-group" style={{ marginTop: 6 }}>
+            <div className="chip-group">
               {FORMAS_PAG.map(fp => (
-                <button
-                  key={fp.value}
-                  className={`chip ${formaPag === fp.value ? "active" : ""}`}
-                  onClick={() => setFormaPag(fp.value)}
-                  type="button"
-                >
-                  <fp.Icon size={11} style={{ display: "inline", marginRight: 4, verticalAlign: "middle" }} />
-                  {fp.label}
+                <button key={fp.value} className={`chip ${formaPag === fp.value ? "active" : ""}`} onClick={() => setFormaPag(fp.value)}>
+                  <fp.Icon size={11} style={{ marginRight: 4 }} /> {fp.label}
                 </button>
               ))}
             </div>
           </div>
         </div>
-
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn-success" onClick={handlePagar} disabled={pagando}>
@@ -884,9 +551,7 @@ function ModalPagar({ despesa, onConfirm, onClose }) {
   );
 }
 
-/* ════════════════════════════════════════
-   MODAL: Confirmar Exclusão
-   ════════════════════════════════════════ */
+/* Modal Confirm Delete */
 function ModalConfirmDelete({ despesa, onConfirm, onClose }) {
   const [excluindo, setExcluindo] = useState(false);
 
@@ -903,14 +568,11 @@ function ModalConfirmDelete({ despesa, onConfirm, onClose }) {
           <div className="modal-title">Excluir Despesa</div>
           <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)" /></button>
         </div>
-        <div className="confirm-body">
-          <div className="confirm-icon-wrap confirm-icon-del">
+        <div style={{ padding: "24px 22px", textAlign: "center" }}>
+          <div style={{ width: "44px", height: "44px", background: "var(--red-d)", borderRadius: "50%", margin: "0 auto 14px", display: "flex", alignItems: "center", justifyContent: "center" }}>
             <Trash2 size={18} color="var(--red)" />
           </div>
-          <p>
-            Deseja excluir <strong>{despesa.descricao}</strong>?<br />
-            Esta ação não pode ser desfeita.
-          </p>
+          <p>Deseja excluir <strong>{despesa.descricao}</strong>?<br />Esta ação não pode ser desfeita.</p>
         </div>
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
@@ -923,203 +585,222 @@ function ModalConfirmDelete({ despesa, onConfirm, onClose }) {
   );
 }
 
-/* ════════════════════════════════════════
-   STATUS BADGE
-   ════════════════════════════════════════ */
 function StatusBadge({ status }) {
   const map = {
-    pago:      { cls: "status-pago",     Icon: CheckCircle, label: "Pago" },
-    pendente:  { cls: "status-pendente", Icon: Clock,       label: "Pendente" },
-    vencido:   { cls: "status-vencido",  Icon: AlertCircle, label: "Vencido" },
-    cancelado: { cls: "status-cancelado",Icon: X,           label: "Cancelado" },
+    pago: { cls: "status-pago", Icon: CheckCircle, label: "Pago" },
+    pendente: { cls: "status-pendente", Icon: Clock, label: "Pendente" },
+    vencido: { cls: "status-vencido", Icon: AlertCircle, label: "Vencido" },
   };
   const s = map[status] || map.pendente;
   return (
     <span className={`status-badge ${s.cls}`}>
-      <s.Icon size={10} />
-      {s.label}
+      <s.Icon size={10} /> {s.label}
     </span>
   );
 }
 
+
+const gerarCodigoDespesa = async (uid) => {
+  const ref = doc(db, "users", uid, "meta", "counters");
+
+  return await runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(ref);
+
+    let numero = 1;
+
+    if (snap.exists()) {
+      numero = (snap.data().despesa || 0) + 1;
+    }
+
+    transaction.set(ref, { despesa: numero }, { merge: true });
+
+    return `D${String(numero).padStart(4, "0")}`;
+  });
+};
+
+
 /* ════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ════════════════════════════════════════ */
+
+
 export default function Despesas() {
   const [uid, setUid] = useState(null);
   const [despesas, setDespesas] = useState([]);
-  const [despesaIdCnt, setDespesaIdCnt] = useState(0);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Filtros
   const [filtroStatus, setFiltroStatus] = useState("todas");
   const [filtroCategoria, setFiltroCategoria] = useState("todas");
   const [filtroPeriodo, setFiltroPeriodo] = useState("mes");
   const [periodoCustom, setPeriodoCustom] = useState({ inicio: "", fim: "" });
 
-  // Categorias dinâmicas
-  const { categorias, criarCategoria, desativarCategoria } = useCategorias(uid);
+  const [modalNovo, setModalNovo] = useState(false);
+  const [editando, setEditando] = useState(null);
+  const [pagando, setPagando] = useState(null);
+  const [deletando, setDeletando] = useState(null);
 
-  // Modais
-  const [modalNovo, setModalNovo]     = useState(false);
-  const [editando, setEditando]       = useState(null);
-  const [pagando, setPagando]         = useState(null);
-  const [deletando, setDeletando]     = useState(null);
-
-  /* ── Auth ── */
+  /* Auth */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => setUid(user?.uid || null));
     return unsub;
   }, []);
 
-  /* ── Firestore ── */
-  useEffect(() => {
+  /* Firestore */
+ useEffect(() => {
     if (!uid) { setLoading(false); return; }
 
-    const userRef   = doc(db, "users", uid);
     const despesasCol = collection(db, "users", uid, "despesas");
-    const q = query(despesasCol, orderBy("vencimento", "asc"));
+    const q = query(despesasCol,);
 
-    const unsubUser = onSnapshot(userRef, (snap) => {
-      if (snap.exists()) setDespesaIdCnt(snap.data().despesaIdCnt || 0);
-    });
-
-    const unsubDesp = onSnapshot(q, (snap) => {
+    const unsub = onSnapshot(q, (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // Rotina diária: atualizar status vencido
-      const batch = writeBatch(db);
-      let mudou = false;
-      docs.forEach(d => {
-        const novoStatus = calcularStatus(d.vencimento, d.status);
-        if (novoStatus !== d.status) {
-          batch.update(doc(db, "users", uid, "despesas", d.id), { status: novoStatus });
-          mudou = true;
-        }
-      });
-      if (mudou) batch.commit();
+     const updatedDocs = docs.map(d => ({
+      ...d,
+      status: calcularStatus(d.vencimento, d.status || "pendente")
+    }));
 
-      setDespesas(docs.map(d => ({ ...d, status: calcularStatus(d.vencimento, d.status) })));
-      setLoading(false);
+    // Ordenamos no cliente (mais estável)
+    updatedDocs.sort((a, b) => {
+      const dateA = parseDate(a.vencimento);
+      const dateB = parseDate(b.vencimento);
+      return (dateA || 0) - (dateB || 0);
     });
 
-    return () => { unsubUser(); unsubDesp(); };
-  }, [uid]);
+    setDespesas(updatedDocs);
+    setLoading(false);
+  }, (error) => {
+    console.error("Erro no onSnapshot:", error);
+    setLoading(false);
+  });
 
-  /* ── Criar despesa(s) ── */
+  return () => unsub();
+}, [uid]);
+
+
+   
+  /* ── SALVAR NOVA DESPESA (ID AUTOMÁTICO) ── */
   const handleAdd = async (form) => {
+const codigo = await gerarCodigoDespesa(uid);
+     
+     const gerarCodigo = () => {
+  const now = Date.now().toString().slice(-4);
+  const rand = Math.floor(100 + Math.random() * 900);
+  return `DESP-${now}${rand}`;
+};
+     
     if (!uid) return;
-    let cnt = despesaIdCnt;
 
-    if (form.parcelado && form.totalParcelas > 1) {
-      // Parcelamento: cria múltiplas despesas com IDs sequenciais
-      const grupoId = `G${Date.now()}`;
-      const batch = writeBatch(db);
+    try {
+      const baseData = {
+  ...form,
+  codigo,
+  status: calcularStatus(form.vencimento, "pendente"),
+  dataCriacao: new Date().toISOString(),
+};
 
-      for (let i = 0; i < form.totalParcelas; i++) {
-        const newId = gerarIdDespesa(cnt);
-        const dataVenc = (() => {
-          const d = new Date(form.vencimento + "T12:00:00");
-          d.setMonth(d.getMonth() + i);
-          return d.toISOString().split("T")[0];
-        })();
-        const status = calcularStatus(dataVenc, "pendente");
+      if (form.parcelado && form.totalParcelas > 1) {
+      const codigoBase = codigo;
+        const grupoId = `G${Date.now()}`;
+        const batch = writeBatch(db);
 
-        batch.set(doc(db, "users", uid, "despesas", newId), {
-          ...form, parcelado: true, grupoId,
-          parcelaAtual: i + 1,
-          vencimento: dataVenc, status,
-          dataCriacao: new Date().toISOString(),
-        });
-        cnt++;
+        for (let i = 0; i < form.totalParcelas; i++) {
+          const dataVenc = new Date(form.vencimento);
+          dataVenc.setMonth(dataVenc.getMonth() + i);
+          const vencStr = dataVenc.toISOString().split("T")[0];
+
+          batch.set(doc(collection(db, "users", uid, "despesas")), {
+            ...baseData,
+            codigo: `${codigoBase}-${i + 1}`,
+            parcelado: true,
+            grupoId,
+            parcelaAtual: i + 1,
+            vencimento: vencStr,
+            status: calcularStatus(vencStr, "pendente"),
+          });
+        }
+        await batch.commit();
+      } else {
+        await addDoc(collection(db, "users", uid, "despesas"), baseData);
       }
 
-      batch.set(doc(db, "users", uid), { despesaIdCnt: cnt }, { merge: true });
-      await batch.commit();
-    } else {
-      // Despesa única
-      const newId = gerarIdDespesa(cnt);
-      const status = calcularStatus(form.vencimento, "pendente");
-
-      await setDoc(doc(db, "users", uid, "despesas", newId), {
-        ...form, status, dataCriacao: new Date().toISOString(),
-      });
-      await setDoc(doc(db, "users", uid), { despesaIdCnt: cnt + 1 }, { merge: true });
+      setModalNovo(false);
+    } catch (error) {
+      console.error("Erro ao salvar despesa:", error);
+      alert("Erro ao salvar despesa. Verifique o console.");
     }
-
-    setModalNovo(false);
   };
 
-  /* ── Editar ── */
   const handleEdit = async (form) => {
     if (!uid || !editando) return;
-    const status = calcularStatus(form.vencimento, editando.status);
-    await setDoc(doc(db, "users", uid, "despesas", editando.id), { ...form, status }, { merge: true });
-    setEditando(null);
+    try {
+      const status = calcularStatus(form.vencimento, editando.status);
+      await setDoc(doc(db, "users", uid, "despesas", editando.id), { ...form, status }, { merge: true });
+      setEditando(null);
+    } catch (error) {
+      console.error("Erro ao editar:", error);
+    }
   };
 
-  /* ── Pagar ── */
   const handlePagar = async (formaPagamento) => {
     if (!uid || !pagando) return;
-    const ref = doc(db, "users", uid, "despesas", pagando.id);
+    try {
+      await setDoc(doc(db, "users", uid, "despesas", pagando.id), {
+        status: "pago",
+        formaPagamento,
+        dataPagamento: new Date().toISOString().split("T")[0],
+      }, { merge: true });
 
-    await setDoc(ref, {
-      status: "pago",
-      formaPagamento,
-      dataPagamento: new Date().toISOString().split("T")[0],
-    }, { merge: true });
-
-    // Recorrência: gerar próximo lançamento
-    if (pagando.recorrente) {
-      const dataFimOk = !pagando.dataFim || new Date(pagando.dataFim) > new Date();
-      if (dataFimOk) {
-        const novaData = proximaData(pagando.vencimento, pagando.tipoRecorrencia, pagando.intervalo || 1);
-        if (novaData) {
-          const cnt = despesaIdCnt;
-          const newId = gerarIdDespesa(cnt);
-          const novoStatus = calcularStatus(novaData, "pendente");
-          await setDoc(doc(db, "users", uid, "despesas", newId), {
-            descricao:      pagando.descricao,
-            valor:          pagando.valor,
-            vencimento:     novaData,
-            categoria:      pagando.categoria,
-            centroCusto:    pagando.centroCusto,
-            fornecedor:     pagando.fornecedor,
-            formaPagamento: pagando.formaPagamento,
-            recorrente:     true,
-            tipoRecorrencia:pagando.tipoRecorrencia,
-            intervalo:      pagando.intervalo,
-            dataFim:        pagando.dataFim || null,
-            recorrenciaOrigemId: pagando.id,
-            status:         novoStatus,
-            dataCriacao:    new Date().toISOString(),
-          });
-          await setDoc(doc(db, "users", uid), { despesaIdCnt: cnt + 1 }, { merge: true });
+      if (pagando.recorrente) {
+        const dataFimOk = !pagando.dataFim || new Date(pagando.dataFim) > new Date();
+        if (dataFimOk) {
+          const novaData = proximaData(pagando.vencimento, pagando.tipoRecorrencia, pagando.intervalo || 1);
+          if (novaData) {
+            await addDoc(collection(db, "users", uid, "despesas"), {
+              descricao: pagando.descricao,
+              valor: pagando.valor,
+              vencimento: novaData,
+              categoria: pagando.categoria,
+              centroCusto: pagando.centroCusto,
+              fornecedor: pagando.fornecedor,
+              formaPagamento: pagando.formaPagamento,
+              recorrente: true,
+              tipoRecorrencia: pagando.tipoRecorrencia,
+              intervalo: pagando.intervalo,
+              dataFim: pagando.dataFim,
+              recorrenciaOrigemId: pagando.id,
+              status: calcularStatus(novaData, "pendente"),
+              dataCriacao: new Date().toISOString(),
+            });
+          }
         }
       }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setPagando(null);
     }
-
-    setPagando(null);
   };
 
-  /* ── Desfazer pagamento ── */
   const handleDesfazerPagamento = async (despesa) => {
     if (!uid) return;
     const status = calcularStatus(despesa.vencimento, "pendente");
-    await setDoc(doc(db, "users", uid, "despesas", despesa.id), {
-      status, dataPagamento: null,
-    }, { merge: true });
+    await setDoc(doc(db, "users", uid, "despesas", despesa.id), { status, dataPagamento: null }, { merge: true });
   };
 
-  /* ── Deletar ── */
   const handleDelete = async () => {
     if (!uid || !deletando) return;
-    await deleteDoc(doc(db, "users", uid, "despesas", deletando.id));
-    setDeletando(null);
+    try {
+      await deleteDoc(doc(db, "users", uid, "despesas", deletando.id));
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setDeletando(null);
+    }
   };
 
-  /* ── Filtros e métricas ── */
+  /* Filtros e Métricas */
   const mesAtual = new Date().getMonth();
   const anoAtual = new Date().getFullYear();
 
@@ -1198,7 +879,6 @@ export default function Despesas() {
     <>
       <style>{CSS}</style>
 
-      {/* Topbar */}
       <header className="desp-topbar">
         <div className="desp-topbar-title">
           <h1>Despesas</h1>
@@ -1207,11 +887,7 @@ export default function Despesas() {
 
         <div className="desp-search">
           <Search size={13} color="var(--text-3)" />
-          <input
-            placeholder="Buscar por descrição, fornecedor..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+          <input placeholder="Buscar por descrição, fornecedor..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
 
         <div style={{ marginLeft: "auto" }}>
@@ -1221,102 +897,59 @@ export default function Despesas() {
         </div>
       </header>
 
-      {/* Cards de métricas */}
       <div className="desp-metrics">
         <div className="metric-card metric-card-red">
-          <div className="metric-icon metric-icon-red">
-            <AlertCircle size={15} color="var(--red)" />
-          </div>
+          <div className="metric-icon metric-icon-red"><AlertCircle size={15} color="var(--red)" /></div>
           <div className="metric-label">Vencidas</div>
           <div className="metric-val metric-val-red">{metricas.vencidas}</div>
           <div className="metric-sub">despesas em atraso</div>
         </div>
-
         <div className="metric-card metric-card-amber">
-          <div className="metric-icon metric-icon-amber">
-            <AlertTriangle size={15} color="var(--gold)" />
-          </div>
+          <div className="metric-icon metric-icon-amber"><AlertTriangle size={15} color="var(--gold)" /></div>
           <div className="metric-label">Vencem em 3 dias</div>
           <div className="metric-val metric-val-amber">{metricas.em3dias}</div>
           <div className="metric-sub">requerem atenção</div>
         </div>
-
         <div className="metric-card metric-card-purple">
-          <div className="metric-icon metric-icon-purple">
-            <Clock size={15} color="#8b5cf6" />
-          </div>
+          <div className="metric-icon metric-icon-purple"><Clock size={15} color="#8b5cf6" /></div>
           <div className="metric-label">Total Pendente</div>
           <div className="metric-val metric-val-purple" style={{ fontSize: 17 }}>{fmtR$(metricas.totalPendente)}</div>
           <div className="metric-sub">a pagar</div>
         </div>
-
         <div className="metric-card metric-card-green">
-          <div className="metric-icon metric-icon-green">
-            <TrendingUp size={15} color="var(--green)" />
-          </div>
+          <div className="metric-icon metric-icon-green"><TrendingUp size={15} color="var(--green)" /></div>
           <div className="metric-label">Pago este mês</div>
           <div className="metric-val metric-val-green" style={{ fontSize: 17 }}>{fmtR$(metricas.totalPago)}</div>
           <div className="metric-sub">liquidado</div>
         </div>
       </div>
 
-      {/* Filtros */}
       <div className="desp-filters">
         <span className="filter-label">Mostrar:</span>
-        {[
-          { value: "todas",    label: "Todas" },
-          { value: "pendente", label: "Pendentes" },
-          { value: "vencido",  label: "Vencidas" },
-          { value: "pago",     label: "Pagas" },
-        ].map(f => (
-          <button
-            key={f.value}
-            className={`filter-chip ${filtroStatus === f.value ? "active" : ""}`}
-            onClick={() => setFiltroStatus(f.value)}
-          >
-            {f.label}
+        {["todas", "pendente", "vencido", "pago"].map(s => (
+          <button key={s} className={`filter-chip ${filtroStatus === s ? "active" : ""}`} onClick={() => setFiltroStatus(s)}>
+            {s === "todas" ? "Todas" : s === "pendente" ? "Pendentes" : s === "vencido" ? "Vencidas" : "Pagas"}
           </button>
         ))}
-
-        <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 4px" }} />
 
         <select className="filter-select" value={filtroPeriodo} onChange={e => setFiltroPeriodo(e.target.value)}>
           <option value="mes">Este mês</option>
           <option value="semana">Esta semana</option>
           <option value="todas">Tudo</option>
-          <option value="custom">Período personalizado</option>
         </select>
-
-        {filtroPeriodo === "custom" && (
-          <div className="periodo-custom">
-            <input
-              type="date"
-              value={periodoCustom.inicio}
-              onChange={e => setPeriodoCustom(p => ({ ...p, inicio: e.target.value }))}
-            />
-            <span>até</span>
-            <input
-              type="date"
-              value={periodoCustom.fim}
-              onChange={e => setPeriodoCustom(p => ({ ...p, fim: e.target.value }))}
-            />
-          </div>
-        )}
 
         <select className="filter-select" value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}>
           <option value="todas">Todas categorias</option>
-          {categoriasFiltro.map(c => <option key={c} value={c}>{c}</option>)}
+          {categorias.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
 
-      {/* Tabela */}
       <div className="desp-table-wrap">
         <div className="desp-table-header">
           <span className="desp-table-title">Despesas</span>
           <span className="count-badge">{despesasFiltradas.length}</span>
         </div>
 
-        {/* Cabeçalho */}
         <div className="desp-row desp-row-head">
           <span>ID</span>
           <span>Descrição</span>
@@ -1335,64 +968,31 @@ export default function Despesas() {
           <div className="desp-empty">Nenhuma despesa encontrada.</div>
         ) : despesasFiltradas.map(d => (
           <div key={d.id} className="desp-row">
-            {/* ID */}
-            <span className="desp-id">
-              {d.id}
-              {d.recorrente && (
-                <RefreshCw size={9} className="recorr-icon" style={{ marginLeft: 5, verticalAlign: "middle" }} />
-              )}
-            </span>
+            <span className="desp-id">{d.codigo || d.id}</span>
 
-            {/* Descrição */}
             <div>
               <div className="desp-desc">
                 {d.descricao}
-                {d.parcelado && d.totalParcelas && (
-                  <span className="parcel-badge" style={{ marginLeft: 6 }}>
-                    {d.parcelaAtual}/{d.totalParcelas}
-                  </span>
-                )}
+                {d.parcelado && <span className="parcel-badge" style={{ marginLeft: 6 }}>{d.parcelaAtual}/{d.totalParcelas}</span>}
               </div>
               {d.observacao && <div className="desp-desc-obs">{d.observacao}</div>}
             </div>
 
-            {/* Categoria */}
             <span className="cat-badge">{d.categoria || "—"}</span>
-
-            {/* Valor */}
             <span className="desp-valor">{fmtR$(d.valor)}</span>
-
-            {/* Vencimento */}
             <span>{fmtData(d.vencimento)}</span>
-
-            {/* Status */}
             <StatusBadge status={d.status} />
-
-            {/* Fornecedor */}
             <span style={{ color: "var(--text-2)", fontSize: 12 }}>{d.fornecedor || "—"}</span>
+            <span style={{ fontSize: 12 }}>{d.dataPagamento ? fmtData(d.dataPagamento) : "—"}</span>
 
-            {/* Data pagamento */}
-            <span style={{ fontSize: 12 }}>
-              {d.dataPagamento ? fmtData(d.dataPagamento) : "—"}
-            </span>
-
-            {/* Ações */}
             <div className="desp-actions">
               {d.status !== "pago" && d.status !== "cancelado" && (
-                <button
-                  className="btn-icon btn-icon-pay"
-                  title="Registrar pagamento"
-                  onClick={() => setPagando(d)}
-                >
+                <button className="btn-icon btn-icon-pay" title="Pagar" onClick={() => setPagando(d)}>
                   <CheckCircle size={13} />
                 </button>
               )}
               {d.status === "pago" && (
-                <button
-                  className="btn-icon btn-icon-undo"
-                  title="Desfazer pagamento"
-                  onClick={() => handleDesfazerPagamento(d)}
-                >
+                <button className="btn-icon btn-icon-undo" title="Desfazer" onClick={() => handleDesfazerPagamento(d)}>
                   <RotateCcw size={13} />
                 </button>
               )}
@@ -1408,33 +1008,10 @@ export default function Despesas() {
       </div>
 
       {/* Modais */}
-      {modalNovo && (
-        <ModalNovaDespesa
-          despesas={despesas}
-          categorias={categorias}
-          onCriarCategoria={criarCategoria}
-          onDesativarCategoria={desativarCategoria}
-          onSave={handleAdd}
-          onClose={() => setModalNovo(false)}
-        />
-      )}
-      {editando && (
-        <ModalNovaDespesa
-          despesa={editando}
-          despesas={despesas}
-          categorias={categorias}
-          onCriarCategoria={criarCategoria}
-          onDesativarCategoria={desativarCategoria}
-          onSave={handleEdit}
-          onClose={() => setEditando(null)}
-        />
-      )}
-      {pagando && (
-        <ModalPagar despesa={pagando} onConfirm={handlePagar} onClose={() => setPagando(null)} />
-      )}
-      {deletando && (
-        <ModalConfirmDelete despesa={deletando} onConfirm={handleDelete} onClose={() => setDeletando(null)} />
-      )}
+      {modalNovo && <ModalNovaDespesa onSave={handleAdd} onClose={() => setModalNovo(false)} />}
+      {editando && <ModalNovaDespesa despesa={editando} onSave={handleEdit} onClose={() => setEditando(null)} />}
+      {pagando && <ModalPagar despesa={pagando} onConfirm={handlePagar} onClose={() => setPagando(null)} />}
+      {deletando && <ModalConfirmDelete despesa={deletando} onConfirm={handleDelete} onClose={() => setDeletando(null)} />}
     </>
   );
 }
