@@ -401,13 +401,25 @@ const CSS = `
   .confirm-icon { font-size: 28px; margin-bottom: 12px; }
 
   /* ── Recibo Print ── */
+  /*
+   * ATENÇÃO: não usar "body > *:not(#recibo-print-root) { display:none }"
+   * porque em React o #recibo-print-root fica dentro do #root (filho do body),
+   * o que faz o #root inteiro sumir levando o recibo junto.
+   * A abordagem correta é visibility: hidden no body e visible no root do recibo,
+   * pois visibility pode ser sobreposta por filhos, diferente de display.
+   */
   @media print {
-    body > *:not(#recibo-print-root) { display: none !important; }
-    #recibo-print-root { display: block !important; }
+    body { visibility: hidden !important; }
+    #recibo-print-root {
+      visibility: visible !important;
+      display: block !important;
+      position: fixed; top: 0; left: 0; width: 100%; z-index: 99999;
+    }
+    #recibo-print-root * { visibility: visible !important; }
     .recibo-print {
       font-family: 'Courier New', monospace;
       width: 80mm; margin: 0 auto; padding: 8mm;
-      font-size: 12px; color: #000;
+      font-size: 12px; color: #000 !important; background: #fff;
     }
     .recibo-print * { color: #000 !important; }
   }
@@ -420,6 +432,26 @@ const CSS = `
     font-size: 12px; color: var(--text-2);
   }
   .nv-livre-info strong { color: var(--gold); }
+
+  /* ── Parcelas cartão ── */
+  .nv-parcelas-wrap {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;
+  }
+  .nv-parcela-btn {
+    padding: 5px 11px; border-radius: 7px; font-size: 11px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border);
+    background: var(--s2); color: var(--text-2);
+    font-family: 'DM Sans', sans-serif; transition: all .13s;
+    white-space: nowrap;
+  }
+  .nv-parcela-btn:hover { background: var(--s3); color: var(--text); }
+  .nv-parcela-btn.active {
+    background: rgba(200,165,94,0.15); border-color: var(--gold); color: var(--gold);
+  }
+  .nv-taxa-info {
+    font-size: 11px; color: var(--text-3); margin-top: 6px;
+  }
+  .nv-taxa-info strong { color: var(--text-2); }
 `;
 
 /* ── Helpers ── */
@@ -441,6 +473,16 @@ const FORMAS_PAGAMENTO = [
   "Pix", "Dinheiro", "Cartão de Crédito", "Cartão de Débito",
   "Boleto", "Transferência", "Sinal", "Parcelado", "Outro",
 ];
+
+/* Taxas padrão — usadas como fallback enquanto o Firestore carrega */
+const TAXAS_DEFAULT = {
+  debito:     1.99,
+  pix:        0,
+  credito_1:  2.99, credito_2:  3.19, credito_3:  3.39,
+  credito_4:  3.59, credito_5:  3.79, credito_6:  3.99,
+  credito_7:  4.19, credito_8:  4.39, credito_9:  4.59,
+  credito_10: 4.79, credito_11: 4.99, credito_12: 5.19,
+};
 
 function filtrarPorPeriodo(vendas, period) {
   if (period === "Tudo") return vendas;
@@ -465,6 +507,14 @@ function imprimirRecibo(venda) {
   const itens = venda.itens || [];
   const subtotal  = itens.reduce((s, i) => s + (i.preco || 0) * (i.qtd || 1), 0);
   const descontos = itens.reduce((s, i) => s + (i.desconto || 0), 0);
+
+  /* Informações de parcelamento e taxa */
+  const temTaxa   = venda.valorTaxa > 0;
+  const temParc   = venda.parcelas > 1;
+  const pgtoLabel = temParc
+    ? `${venda.formaPagamento} — ${venda.parcelas}x`
+    : (venda.formaPagamento || "—");
+
   el.innerHTML = `
     <div class="recibo-print">
       <div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:8px;">ASSENT</div>
@@ -472,7 +522,7 @@ function imprimirRecibo(venda) {
       <div>ID: ${venda.id}</div>
       <div>Data: ${fmtData(venda.data)}</div>
       <div>Cliente: ${venda.cliente || "—"}</div>
-      <div>Pgto: ${venda.formaPagamento || "—"}</div>
+      <div>Pgto: ${pgtoLabel}</div>
       <div style="border-top:1px dashed #000;margin:8px 0;"></div>
       ${itens.map(i => `
         <div>${i.nome || i.produto || "Item livre"}</div>
@@ -483,9 +533,11 @@ function imprimirRecibo(venda) {
       `).join("")}
       <div style="border-top:1px dashed #000;margin:8px 0;"></div>
       ${descontos > 0 ? `<div style="display:flex;justify-content:space-between;"><span>Descontos</span><span>-${fmtR$(descontos)}</span></div>` : ""}
+      ${temTaxa ? `<div style="display:flex;justify-content:space-between;font-size:11px;color:#555;"><span>Taxa cartão (${venda.taxaPercentual}%)</span><span>${fmtR$(venda.valorTaxa)}</span></div>` : ""}
       <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:14px;">
         <span>TOTAL</span><span>${fmtR$(venda.total)}</span>
       </div>
+      ${temParc ? `<div style="font-size:11px;margin-top:4px;text-align:right;">${venda.parcelas}x de ${fmtR$(venda.total / venda.parcelas)}</div>` : ""}
       ${venda.observacao ? `<div style="margin-top:10px;font-size:11px;">Obs: ${venda.observacao}</div>` : ""}
       <div style="text-align:center;font-size:10px;margin-top:12px;">Obrigado!</div>
     </div>
@@ -510,7 +562,7 @@ function exportarCSV(vendas) {
 /* ══════════════════════════════════════════════════
    MODAL: Nova / Editar Venda  ← VERSÃO CORRIGIDA
    ══════════════════════════════════════════════════ */
-function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, onSave, onClose }) {
+function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, taxas, onSave, onClose }) {
   const isEdit = !!venda;
 
   const [tipo, setTipo] = useState(venda?.tipo || "produto");
@@ -528,6 +580,9 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
   const [vendedor, setVendedor] = useState(venda?.vendedor || "");
   const [formaPgto, setFormaPgto] = useState(venda?.formaPagamento || "");
   const [observacao, setObservacao] = useState(venda?.observacao || "");
+
+  /* Parcelas — só relevante quando formaPgto === "Cartão de Crédito" */
+  const [parcelas, setParcelas] = useState(venda?.parcelas || 1);
 
   // Itens + Venda livre
   const [itens, setItens] = useState(
@@ -630,6 +685,30 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
     return { subtotal, descontos, custo, total, lucro: total - custo };
   }, [itens, tipo, livreValor, livreDesc]);
 
+  /* ── Taxa de cartão — calculado de forma isolada, não altera lógica de calculos ── */
+  const taxaInfo = useMemo(() => {
+    const isCredito = formaPgto === "Cartão de Crédito";
+    const isDebito  = formaPgto === "Cartão de Débito";
+
+    if (!isCredito && !isDebito) {
+      return { taxaPercentual: 0, valorTaxa: 0, parcelas: null, exibe: false };
+    }
+
+    let chave, numParcelas;
+    if (isDebito) {
+      chave = "debito";
+      numParcelas = null;
+    } else {
+      numParcelas = parcelas || 1;
+      chave = `credito_${numParcelas}`;
+    }
+
+    const taxaPercentual = parseFloat(taxas?.[chave] ?? TAXAS_DEFAULT[chave] ?? 0) || 0;
+    const valorTaxa = parseFloat((calculos.total * (taxaPercentual / 100)).toFixed(2));
+
+    return { taxaPercentual, valorTaxa, parcelas: numParcelas, exibe: true };
+  }, [formaPgto, parcelas, taxas, calculos.total]);
+
   const validar = () => {
     const e = {};
     if (!clienteSearch.trim()) e.cliente = "Informe o cliente.";
@@ -658,6 +737,10 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
       descontos: calculos.descontos,
       custoTotal: calculos.custo,
       lucroEstimado: calculos.lucro,
+      /* ── Taxa de cartão (0 quando não é cartão — compatível com dados antigos) ── */
+      parcelas:       taxaInfo.parcelas,
+      taxaPercentual: taxaInfo.taxaPercentual,
+      valorTaxa:      taxaInfo.valorTaxa,
     };
 
     if (tipo === "livre") {
@@ -793,12 +876,40 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
               <select 
                 className={`form-input ${erros.formaPgto ? "err" : ""}`} 
                 value={formaPgto} 
-                onChange={e => setFormaPgto(e.target.value)}
+                onChange={e => { setFormaPgto(e.target.value); setParcelas(1); }}
               >
                 <option value="">— Selecionar —</option>
                 {FORMAS_PAGAMENTO.map(f => <option key={f} value={f}>{f}</option>)}
               </select>
               {erros.formaPgto && <div className="form-error">{erros.formaPgto}</div>}
+
+              {/* Seletor de parcelas — aparece somente para Cartão de Crédito */}
+              {formaPgto === "Cartão de Crédito" && (
+                <div style={{ marginTop: 10 }}>
+                  <div className="form-label" style={{ marginBottom: 6 }}>Parcelas</div>
+                  <div className="nv-parcelas-wrap">
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(n => {
+                      const chave = `credito_${n}`;
+                      const taxa  = parseFloat(taxas?.[chave] ?? TAXAS_DEFAULT[chave] ?? 0);
+                      return (
+                        <button
+                          key={n}
+                          type="button"
+                          className={`nv-parcela-btn ${parcelas === n ? "active" : ""}`}
+                          onClick={() => setParcelas(n)}
+                        >
+                          {n}x <span style={{ opacity: 0.7, fontSize: 10 }}>({taxa}%)</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {taxaInfo.taxaPercentual > 0 && (
+                    <div className="nv-taxa-info">
+                      Taxa de <strong>{taxaInfo.taxaPercentual}%</strong> = <strong>{fmtR$(taxaInfo.valorTaxa)}</strong> sobre o total
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -965,6 +1076,12 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
                 <div className="nv-total-val" style={{ color: "var(--red)" }}>{fmtR$(calculos.custo)}</div>
               </div>
             )}
+            {taxaInfo.exibe && (
+              <div className="nv-total-cell">
+                <div className="nv-total-label">Taxa Cartão ({taxaInfo.taxaPercentual}%)</div>
+                <div className="nv-total-val" style={{ color: "var(--red)" }}>{fmtR$(taxaInfo.valorTaxa)}</div>
+              </div>
+            )}
             <div className="nv-total-cell">
               <div className="nv-total-label">Total</div>
               <div className="nv-total-val" style={{ color: "var(--green)" }}>{fmtR$(calculos.total)}</div>
@@ -1056,9 +1173,32 @@ function ModalDetalheVenda({ venda, onClose, onEditar, onExcluir }) {
             </div>
             <div className="dv-meta-card">
               <div className="dv-meta-label">Pagamento</div>
-              <div className="dv-meta-val">{venda.formaPagamento || "—"}</div>
+              <div className="dv-meta-val">
+                {venda.formaPagamento || "—"}
+                {venda.parcelas > 1 && (
+                  <span style={{ marginLeft: 6, fontSize: 11, color: "var(--gold)" }}>
+                    {venda.parcelas}x
+                  </span>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Taxa de cartão — exibe somente se existir */}
+          {venda.valorTaxa > 0 && (
+            <div className="dv-meta" style={{ gridTemplateColumns: "1fr 1fr", marginTop: -6 }}>
+              <div className="dv-meta-card">
+                <div className="dv-meta-label">Taxa Cartão ({venda.taxaPercentual}%)</div>
+                <div className="dv-meta-val" style={{ color: "var(--red)" }}>{fmtR$(venda.valorTaxa)}</div>
+              </div>
+              {venda.parcelas > 1 && (
+                <div className="dv-meta-card">
+                  <div className="dv-meta-label">Valor por Parcela</div>
+                  <div className="dv-meta-val">{fmtR$(venda.total / venda.parcelas)}</div>
+                </div>
+              )}
+            </div>
+          )}
 
           {venda.vendedor && (
             <div className="dv-meta" style={{ gridTemplateColumns: "1fr", marginTop: -6 }}>
@@ -1200,6 +1340,8 @@ export default function Vendas() {
   const [servicos, setServicos]   = useState([]);
   const [vendedores, setVendedores] = useState([]);
   const [vendaIdCnt, setVendaIdCnt] = useState(0);
+  /* Taxas de cartão — carregadas uma vez do Firestore, com fallback nos defaults */
+  const [taxas, setTaxas] = useState(TAXAS_DEFAULT);
 
   const [search, setSearch]   = useState("");
   const [period, setPeriod]   = useState("Tudo");
@@ -1252,6 +1394,15 @@ useEffect(() => {
   const unsub1 = onSnapshot(userRef, (snap) => {
     if (snap.exists()) setVendaIdCnt(snap.data().vendaIdCnt || 0);
   });
+
+  /* Carrega taxas de cartão uma vez (getDoc, não listener — dado estático da sessão) */
+  getDoc(doc(db, "users", uid, "config", "geral"))
+    .then(snap => {
+      if (snap.exists() && snap.data().taxas) {
+        setTaxas(prev => ({ ...TAXAS_DEFAULT, ...snap.data().taxas }));
+      }
+    })
+    .catch(() => { /* mantém os TAXAS_DEFAULT em caso de falha */ });
 
   const unsub2 = onSnapshot(vendasCol, (snap) => {
     const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1475,6 +1626,7 @@ useEffect(() => {
           produtos={produtos}
           servicos={servicos}
           vendedores={vendedores}
+          taxas={taxas}
           onSave={handleSave}
           onClose={() => setModalNova(false)}
         />
@@ -1488,6 +1640,7 @@ useEffect(() => {
           produtos={produtos}
           servicos={servicos}
           vendedores={vendedores}
+          taxas={taxas}
           onSave={handleSave}
           onClose={() => setEditando(null)}
         />
