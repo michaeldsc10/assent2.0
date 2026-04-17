@@ -210,6 +210,131 @@ const CSS = `
   .cl-actions { display: flex; align-items: center; gap: 5px; justify-content: flex-end; }
 
   .cl-empty, .cl-loading { padding: 56px 20px; text-align: center; color: var(--text-3); }
+
+  /* ── Modal Histórico ── */
+  .hist-kpis {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+    margin-bottom: 18px;
+  }
+  .hist-kpi {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 13px 16px;
+  }
+  .hist-kpi-label {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .07em; color: var(--text-3); margin-bottom: 6px;
+  }
+  .hist-kpi-val {
+    font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 700;
+  }
+
+  .hist-periods {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px;
+  }
+  .hist-period-btn {
+    padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 500;
+    background: var(--s3); border: 1px solid var(--border);
+    color: var(--text-2); cursor: pointer; transition: all .13s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .hist-period-btn:hover { background: var(--s2); color: var(--text); }
+  .hist-period-btn.active {
+    background: rgba(200,165,94,0.15); border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  .hist-section-label {
+    font-size: 10px; font-weight: 600; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--text-3);
+    margin-bottom: 10px;
+  }
+
+  .hist-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px; border-radius: 8px;
+    background: var(--s2); border: 1px solid var(--border);
+    margin-bottom: 7px; cursor: pointer; transition: border-color .13s;
+  }
+  .hist-row:hover { border-color: var(--border-h); }
+  .hist-venda-id {
+    font-family: 'Sora', sans-serif; font-size: 11px;
+    color: var(--gold); font-weight: 500; min-width: 60px;
+  }
+  .hist-venda-data { font-size: 12px; color: var(--text-2); flex: 1; }
+  .hist-fp {
+    font-size: 11px; padding: 2px 8px; border-radius: 4px;
+    background: var(--s3); border: 1px solid var(--border); color: var(--text-2);
+  }
+  .hist-total {
+    font-family: 'Sora', sans-serif; font-size: 13px;
+    color: var(--green); font-weight: 600; margin-left: auto;
+  }
+  .hist-empty {
+    padding: 32px; text-align: center; color: var(--text-3);
+    font-size: 13px;
+  }
+
+  /* ── Modal Detalhe Venda ── */
+  .vd-meta {
+    display: flex; gap: 20px; flex-wrap: wrap;
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 9px; padding: 12px 15px; margin-bottom: 14px;
+    font-size: 12px; color: var(--text-2);
+  }
+  .vd-meta-row strong { color: var(--text); }
+
+  .btn-imprimir {
+    display: flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 8px; margin-bottom: 16px;
+    background: var(--s3); border: 1px solid var(--border);
+    color: var(--text-2); cursor: pointer; font-size: 12px;
+    font-family: 'DM Sans', sans-serif; transition: all .13s;
+  }
+  .btn-imprimir:hover { background: var(--s2); color: var(--text); }
+
+  .vd-table {
+    border: 1px solid var(--border); border-radius: 9px;
+    overflow: hidden; margin-bottom: 14px;
+  }
+  .vd-thead {
+    display: grid;
+    grid-template-columns: 1fr 60px 100px 100px 90px 100px;
+    padding: 9px 14px; gap: 8px;
+    background: var(--s2); border-bottom: 1px solid var(--border);
+    font-size: 9px; font-weight: 600; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--text-3);
+  }
+  .vd-trow {
+    display: grid;
+    grid-template-columns: 1fr 60px 100px 100px 90px 100px;
+    padding: 9px 14px; gap: 8px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px; color: var(--text-2); align-items: center;
+  }
+  .vd-trow:last-child { border-bottom: none; }
+  .vd-nome { color: var(--text); font-size: 13px; }
+
+  .vd-totals {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 9px; padding: 12px 15px;
+  }
+  .vd-total-cell { flex: 1; min-width: 90px; }
+  .vd-total-label {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .06em; color: var(--text-3); margin-bottom: 4px;
+  }
+  .vd-total-val {
+    font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 700;
+  }
+
+  /* Confirm body */
+  .confirm-body {
+    padding: 28px 22px; text-align: center;
+    font-size: 13px; color: var(--text-2); line-height: 1.6;
+  }
+  .confirm-icon { font-size: 32px; margin-bottom: 12px; }
+  .confirm-body strong { color: var(--text); }
 `;
 
 /* ── Helpers ── */
@@ -228,7 +353,37 @@ const fmtData = (d) => {
 
 const gerarIdCliente = (cnt) => `C${String(cnt + 1).padStart(4, "0")}`;
 
-/* ======================= MODAIS (Cole aqui os 4 modais completos do arquivo antigo) ======================= */
+/* ── Filtro de período para histórico ── */
+const PERIODS_HIST = ["Tudo", "Este mês", "Últimos 3 meses", "Este ano"];
+
+const filtrarPorPeriodo = (vendas, period) => {
+  if (period === "Tudo") return vendas;
+  const now = new Date();
+  return vendas.filter((v) => {
+    try {
+      const data = v.data?.toDate ? v.data.toDate() : new Date(v.data);
+      if (isNaN(data)) return false;
+      if (period === "Este mês") {
+        return (
+          data.getMonth() === now.getMonth() &&
+          data.getFullYear() === now.getFullYear()
+        );
+      }
+      if (period === "Últimos 3 meses") {
+        const diffMs = now - data;
+        return diffMs >= 0 && diffMs <= 1000 * 60 * 60 * 24 * 90;
+      }
+      if (period === "Este ano") {
+        return data.getFullYear() === now.getFullYear();
+      }
+    } catch {
+      return false;
+    }
+    return true;
+  });
+};
+
+/* ======================= MODAIS ======================= */
 
 function ModalNovoCliente({ cliente, clientes, onSave, onClose }) {
   const isEdit = !!cliente;
