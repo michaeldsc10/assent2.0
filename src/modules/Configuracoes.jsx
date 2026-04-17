@@ -120,7 +120,7 @@ const CSS = `
 
   .cfg-root {
     display: flex; flex-direction: column;
-    height: 100%; overflow: hidden;
+    height: 100%;
   }
   .cfg-topbar {
     padding: 14px 22px;
