@@ -404,24 +404,14 @@ const novoEstoque = Math.max(0, estoqueAtual + delta);
       const movCol     = collection(db, "users", uid, "movimentacoes_estoque");
 
       /* Transação atômica: evita race conditions de estoque */
-      await runTransaction(db, async (tx) )=> {
-         
-         const oldQtd = movimento?.quantidade || 0;
-const newQtd = Number(form.quantidade);
+     const oldQtd = isEditing ? Number(movimento.quantidade) || 0 : 0;
+const newQtd = Number(form.quantidade) || 0;
 
-// delta real
 const delta = newQtd - oldQtd;
 
 const estoqueReal = prodSnap.data().estoque ?? 0;
 
-if (isEditing) {
-  const oldQtd = movimento.quantidade;
-  const newQtd = Number(form.quantidade);
-  const delta = newQtd - oldQtd;
-
-  const quantidadeFinal = isEditing
-  ? delta
-  : Number(form.quantidade);
+const quantidadeFinal = isEditing ? delta : newQtd;
 
 const novoEst = Math.max(0, estoqueReal + quantidadeFinal);
 
