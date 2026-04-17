@@ -838,7 +838,7 @@ const handleExcluir = (mov) => {
 
       {/* Toast de feedback */}
       <Toast msg={toast.msg} tipo={toast.tipo} />
-    </>
+   
      {movimentoExcluir && (
   <div className="modal-overlay">
     <div className="modal-box">
@@ -856,6 +856,7 @@ const handleExcluir = (mov) => {
         </button>
         <button onClick={confirmarExclusao}>
           Excluir
+            </>
         </button>
       </div>
     </div>
