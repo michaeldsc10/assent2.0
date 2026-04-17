@@ -457,7 +457,7 @@ const novoEst = Math.max(0, estoqueReal + quantidadeFinal);
     
       console.error("Erro ao salvar entrada:", err);
       setErrGlobal(err.message || "Erro ao salvar. Tente novamente.");
-    } finally {
+    
       setSalvando(false);
     }
   };
