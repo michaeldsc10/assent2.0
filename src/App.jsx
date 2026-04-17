@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { onAuthStateChanged, auth } from "./lib/firebase";
 import Auth from "./components/Auth";
 import Dashboard from "./Dashboard";
+import Agenda from "./modules/Agenda/Agenda";
 
 function App() {
   const [user, setUser] = useState(null);
