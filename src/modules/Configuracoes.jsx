@@ -5,9 +5,9 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Building2, Lock, CreditCard, LayoutDashboard, Package, Users, Wrench,
-  Eye, EyeOff, Check, AlertCircle, Save, ArrowDownToLine, ShoppingCart, Clock, Wallet, TrendingDown, Truck, BarChart3,
-  ChevronRight, Camera, Shield, Calendar, Settings, Zap, UserCheck, Search, ArrowUpRight, ArrowDownRight, Bell
+  Building2, Lock, CreditCard, LayoutDashboard, Package,
+  Eye, EyeOff, Check, AlertCircle, Save,
+  ChevronRight, Camera, Shield,
 } from "lucide-react";
 
 import { db, auth, onAuthStateChanged } from "../lib/firebase";
@@ -60,7 +60,7 @@ const MENU_SECTIONS = [
   { key: "servicos",        label: "Serviços",           sub: "Catálogo de serviços",     icon: "🔧", locked: false },
   { key: "entrada_estoque", label: "Entrada de Estoque", sub: "Movimentação de entrada",  icon: "📥", locked: false },
   { key: "vendas",          label: "Vendas",             sub: "PDV e registro de vendas", icon: "🛒", locked: false },
-  { key: "fiado",           label: "A Receber",  sub: "Contas a receber",                 icon: "💳",  locked: false },
+  { key: "fiado",           label: "Fiado / A Receber",  sub: "Contas a receber",         icon: "💳", locked: false },
   { key: "caixa",           label: "Caixa Diário",       sub: "Abertura e fechamento",    icon: "💰", locked: false },
   { key: "despesas",        label: "Despesas",           sub: "Controle de saídas",       icon: "📉", locked: false },
   { key: "fornecedores",    label: "Fornecedores",       sub: "Cadastro de fornecedores", icon: "🏭", locked: false },
