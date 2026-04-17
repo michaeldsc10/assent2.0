@@ -18,56 +18,6 @@ import {
   updatePassword,
 } from "firebase/auth";
 
-
-
-/* ── Validadores CPF / CNPJ ── */
-const validarCPF = (cpf) => {
-  cpf = cpf.replace(/\D/g, "");
-  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
-
-  let soma = 0;
-  for (let i = 0; i < 9; i++) soma += parseInt(cpf[i]) * (10 - i);
-  let resto = soma % 11;
-  const digito1 = resto < 2 ? 0 : 11 - resto;
-  if (digito1 !== parseInt(cpf[9])) return false;
-
-  soma = 0;
-  for (let i = 0; i < 10; i++) soma += parseInt(cpf[i]) * (11 - i);
-  resto = soma % 11;
-  const digito2 = resto < 2 ? 0 : 11 - resto;
-  return digito2 === parseInt(cpf[10]);
-};
-
-const validarCNPJ = (cnpj) => {
-  cnpj = cnpj.replace(/\D/g, "");
-  if (cnpj.length !== 14 || /^(\d)\1+$/.test(cnpj)) return false;
-
-  let tamanho = cnpj.length - 2;
-  let numeros = cnpj.substring(0, tamanho);
-  let digitos = cnpj.substring(tamanho);
-  let soma = 0;
-  let pos = tamanho - 7;
-
-  for (let i = tamanho; i >= 1; i--) {
-    soma += parseInt(numeros.charAt(tamanho - i)) * pos--;
-    if (pos < 2) pos = 9;
-  }
-  let resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
-  if (resultado !== parseInt(digitos.charAt(0))) return false;
-
-  tamanho++;
-  numeros = cnpj.substring(0, tamanho);
-  soma = 0;
-  pos = tamanho - 7;
-  for (let i = tamanho; i >= 1; i--) {
-    soma += parseInt(numeros.charAt(tamanho - i)) * pos--;
-    if (pos < 2) pos = 9;
-  }
-  resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
-  return resultado === parseInt(digitos.charAt(1));
-};
-
-
 /* ── CSS ── */
 const CSS = `
   /* Shared */
@@ -96,7 +46,8 @@ const CSS = `
   .cfg-topbar-title p { font-size: 11px; color: var(--text-2); margin-top: 2px; }
 
   .cfg-body {
-    display: flex; flex: 1; overflow: hidden;
+    display: flex; flex: 1;
+    overflow: hidden; min-height: 0;
   }
 
   /* Sidebar nav */
@@ -104,7 +55,7 @@ const CSS = `
     width: 220px; flex-shrink: 0;
     background: var(--s1); border-right: 1px solid var(--border);
     padding: 16px 10px; display: flex; flex-direction: column; gap: 2px;
-    overflow-y: auto;
+    overflow-y: auto; min-height: 0;
   }
   .cfg-nav-item {
     display: flex; align-items: center; gap: 10px;
@@ -136,7 +87,7 @@ const CSS = `
   .cfg-panel {
     flex: 1; overflow-y: auto; padding: 24px;
     display: flex; flex-direction: column; gap: 20px;
-    animation: fadeIn .18s ease;
+    animation: fadeIn .18s ease; min-height: 0;
   }
   .cfg-panel::-webkit-scrollbar { width: 3px; }
   .cfg-panel::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
@@ -423,16 +374,13 @@ const CSS = `
 `;
 
 /* ── Seções do menu lateral do sistema ── */
+/* Adicione aqui apenas módulos que existem no sistema. */
 const MENU_SECTIONS = [
-  { key: "dashboard",  label: "Dashboard",     sub: "Visão geral e KPIs",     icon: "📊", locked: true  },
-  { key: "clientes",   label: "Clientes",      sub: "Cadastro e histórico",   icon: "👥", locked: false },
-  { key: "vendas",     label: "Vendas",        sub: "PDV e registro de vendas",icon: "🛒", locked: false },
-  { key: "estoque",    label: "Estoque",       sub: "Controle de produtos",   icon: "📦", locked: false },
-  { key: "crm",        label: "CRM Retenção",  sub: "Relacionamento com clientes", icon: "🎯", locked: false },
-  { key: "relatorios", label: "Relatórios",    sub: "Análises e exportações", icon: "📈", locked: false },
-  { key: "agenda",     label: "Agenda",        sub: "Compromissos e tarefas", icon: "📅", locked: false },
-  { key: "catalogo",   label: "Catálogo",      sub: "Produtos e preços",      icon: "🏷️", locked: false },
-  { key: "config",     label: "Configurações", sub: "Esta tela",              icon: "⚙️", locked: true  },
+  { key: "dashboard", label: "Dashboard",  sub: "Visão geral e KPIs",      icon: "📊", locked: true  },
+  { key: "clientes",  label: "Clientes",   sub: "Cadastro e histórico",    icon: "👥", locked: false },
+  { key: "vendas",    label: "Vendas",     sub: "PDV e registro de vendas", icon: "🛒", locked: false },
+  { key: "estoque",   label: "Estoque",    sub: "Controle de produtos",    icon: "📦", locked: false },
+  { key: "config",    label: "Configurações", sub: "Esta tela",            icon: "⚙️", locked: true  },
 ];
 
 /* ── Taxas de cartão default ── */
@@ -514,50 +462,17 @@ function PassInput({ value, onChange, placeholder, className }) {
    SEÇÃO: Empresa
    ══════════════════════════════════════════════════════ */
 function SecaoEmpresa({ config, onSave }) {
-
-  useEffect(() => {
-  if (!config) return;
-
-  setForm({
-    nomeEmpresa: config?.empresa?.nomeEmpresa || "",
-    cnpj:        config?.empresa?.cnpj        || "",
-    telefone:    config?.empresa?.telefone    || "",
-    endereco:    config?.empresa?.endereco    || "",
-    logo:        config?.empresa?.logo        || "",
+  const [form, setForm]       = useState({
+    nomeEmpresa: config?.nomeEmpresa || "",
+    cnpj:        config?.cnpj        || "",
+    telefone:    config?.telefone    || "",
+    endereco:    config?.endereco    || "",
+    logo:        config?.logo        || "",
   });
-}, [config]);
-   
-  const [form, setForm] = useState({
-    nomeEmpresa: config?.empresa?.nomeEmpresa || config?.nomeEmpresa || "",
-    cnpj:        config?.empresa?.cnpj        || config?.cnpj        || "",
-    telefone:    config?.empresa?.telefone    || config?.telefone    || "",
-    endereco:    config?.empresa?.endereco    || config?.endereco    || "",
-    logo:        config?.empresa?.logo        || config?.logo        || "",
-  });
-  const [erros, setErros] = useState({});
   const [salvando, setSalvando] = useState(false);
   const fileRef = useRef();
 
-  const set = (k, v) => {
-    setForm(f => ({ ...f, [k]: v }));
-    if (erros[k]) setErros(e => ({ ...e, [k]: "" }));
-  };
-
-  const validarEmpresa = () => {
-    const e = {};
-    if (form.cnpj?.trim()) {
-      const clean = form.cnpj.replace(/\D/g, "");
-      if (clean.length === 11) {
-        if (!validarCPF(clean)) e.cnpj = "CPF inválido. Verifique os dígitos.";
-      } else if (clean.length === 14) {
-        if (!validarCNPJ(clean)) e.cnpj = "CNPJ inválido. Verifique os dígitos.";
-      } else {
-        e.cnpj = "CPF (11 dígitos) ou CNPJ (14 dígitos) inválido.";
-      }
-    }
-    setErros(e);
-    return Object.keys(e).length === 0;
-  };
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleLogo = (e) => {
     const file = e.target.files?.[0];
@@ -572,13 +487,10 @@ function SecaoEmpresa({ config, onSave }) {
   };
 
   const handleSalvar = async () => {
-    if (!validarEmpresa()) return;
-
     setSalvando(true);
-    await onSave({ empresa: form });          
+    await onSave({ empresa: form });
     setSalvando(false);
   };
-
 
   return (
     <div className="cfg-card">
@@ -854,20 +766,26 @@ function SecaoFinanceiro({ config, onSave }) {
    SEÇÃO: Visibilidade do Menu
    ══════════════════════════════════════════════════════ */
 function SecaoMenu({ config, onSave }) {
-  const initVisible = () => {
+  const buildVisivel = (cfg) => {
     const base = {};
     MENU_SECTIONS.forEach(s => {
-      base[s.key] = config?.menuVisivel?.[s.key] !== undefined
-        ? config.menuVisivel[s.key]
+      base[s.key] = cfg?.menuVisivel?.[s.key] !== undefined
+        ? cfg.menuVisivel[s.key]
         : true;
     });
     return base;
   };
 
-  const [visivel, setVisivel]   = useState(initVisible);
+  const [visivel, setVisivel]   = useState(() => buildVisivel(config));
   const [salvando, setSalvando] = useState(false);
 
+  // Sincroniza quando config chega do Firestore (carregamento assíncrono)
+  useEffect(() => {
+    if (config) setVisivel(buildVisivel(config));
+  }, [config]);
+
   const toggle = (key, val) => setVisivel(v => ({ ...v, [key]: val }));
+
 
   const handleSalvar = async () => {
     setSalvando(true);
@@ -1091,7 +1009,7 @@ export default function Configuracoes() {
    Para outros módulos acessarem taxas, estoque mínimo etc.
    ══════════════════════════════════════════════════════ */
 export function useConfiguracoes(uid) {
-  const [config, setConfig] = useState(null);
+  const [config, setConfig]   = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -1112,12 +1030,6 @@ export function useConfiguracoes(uid) {
     taxas:          config?.taxas         || TAXAS_DEFAULT,
     estoqueMinimo:  config?.estoqueMinimo ?? 5,
     menuVisivel:    config?.menuVisivel   || {},
-    empresa: config?.empresa || {                     // ← compatibilidade com dados antigos/novos
-      nomeEmpresa: config?.nomeEmpresa || "",
-      cnpj:        config?.cnpj        || "",
-      telefone:    config?.telefone    || "",
-      endereco:    config?.endereco    || "",
-      logo:        config?.logo        || "",
-    },
+    empresa:        config?.empresa       || {},
   };
 }
