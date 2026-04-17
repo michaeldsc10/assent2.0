@@ -54,7 +54,7 @@ const validarCNPJ = (cnpj) => {
    CONSTANTES
    ══════════════════════════════════════════════════════ */
 const MENU_SECTIONS = [
-  { key: "dashboard",       label: "Dashboard",         sub: "Visão geral e KPIs",       icon: LayoutDashboard, locked: true  },
+  { key: "dashboard",       label: "Dashboard",         sub: "Visão geral e KPIs",       icon: "👥", locked: true  },
   { key: "clientes",        label: "Clientes",           sub: "Cadastro e histórico",     icon: "👥", locked: false },
   { key: "produtos",        label: "Produtos",           sub: "Catálogo de produtos",     icon: "📦", locked: false },
   { key: "servicos",        label: "Serviços",           sub: "Catálogo de serviços",     icon: "🔧", locked: false },
