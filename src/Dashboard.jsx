@@ -432,7 +432,7 @@ export default function Dashboard() {
       case "Agenda":           return <Agenda />;
       case "Fornecedores":     return <Fornecedores />;
       case "A Receber":        return <AReceber />;
-      case "Relatórios"        return <Relatorios />;
+      case "Relatórios":        return <Relatorios />;
         
       default:                 return renderDashboard();
     }
