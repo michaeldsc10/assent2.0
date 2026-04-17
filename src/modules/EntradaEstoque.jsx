@@ -855,9 +855,9 @@ const handleExcluir = (mov) => {
           Cancelar
         </button>
         <button onClick={confirmarExclusao}>
-          Excluir
-            </>
+          Excluir 
         </button>
+         </>
       </div>
     </div>
   </div>
