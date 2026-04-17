@@ -857,10 +857,11 @@ const handleExcluir = (mov) => {
         <button onClick={confirmarExclusao}>
           Excluir 
         </button>
-         </>
+         
       </div>
     </div>
   </div>
+       </>
 )}
   );
 }
