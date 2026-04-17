@@ -3,23 +3,38 @@
    Modal de detalhes do evento com suporte a impressão
    ═══════════════════════════════════════════════════ */
 
-import { X, Printer, Edit2, CheckCircle2, Trash2 } from "lucide-react";
+import { X, Printer, Edit2, CheckCircle2, Calendar, Clock, User, Users, Tag, MapPin, FileText, Info } from "lucide-react";
 import { TIPO_ESTILO, fmtData, fmtDataLonga } from "./Agenda";
 
-/* ── Linha de detalhe ── */
-function DetalheRow({ label, value, valueStyle }) {
+/* ── Card de detalhe individual ── */
+function DetalheCard({ icon: Icon, label, value, valueStyle, fullWidth = false, accent = false }) {
   if (!value && value !== 0) return null;
   return (
     <div style={{
-      display: "grid", gridTemplateColumns: "130px 1fr", gap: "8px",
-      padding: "9px 0", borderBottom: "1px solid var(--border)", alignItems: "start",
+      gridColumn: fullWidth ? "1 / -1" : "span 1",
+      background: accent ? "rgba(91,142,240,0.06)" : "var(--bg-2, rgba(255,255,255,0.04))",
+      border: `1px solid ${accent ? "rgba(91,142,240,0.2)" : "var(--border, rgba(255,255,255,0.08))"}`,
+      borderRadius: 10,
+      padding: "12px 14px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 6,
     }}>
-      <span style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".06em", color: "var(--text-3)", paddingTop: 2 }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 6,
+        fontSize: 10, fontWeight: 700, textTransform: "uppercase",
+        letterSpacing: ".08em", color: "var(--text-3, #888)",
+      }}>
+        {Icon && <Icon size={11} strokeWidth={2.5} />}
         {label}
-      </span>
-      <span style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.5, ...valueStyle }}>
+      </div>
+      <div style={{
+        fontSize: 13.5, color: "var(--text-1, #fff)",
+        fontWeight: 500, lineHeight: 1.5,
+        ...valueStyle,
+      }}>
         {value}
-      </span>
+      </div>
     </div>
   );
 }
@@ -29,23 +44,22 @@ function abrirJanelaPrint(evento) {
   const estilo = TIPO_ESTILO[evento.tipo] || TIPO_ESTILO["Outro"];
 
   const linhas = [
-    ["Tipo",              evento.tipo],
-    ["Data",              fmtDataLonga(evento.data)],
-    ["Horário",           evento.horario],
-    ["Cliente",           evento.cliente],
-    ["Responsável",       evento.responsavel],
-    ["Venda vinculada",   evento.vendaId],
-    ["Endereço",          evento.endereco],
-    ["Observações",       evento.observacao],
-    ["Status",            evento.status === "concluido" ? "Concluído" : "Pendente"],
-    ["Criado em",         evento.dataCriacao ? new Date(evento.dataCriacao).toLocaleDateString("pt-BR") : null],
-  ].filter(([, v]) => v);
+    ["calendar", "Data",            fmtDataLonga(evento.data)],
+    ["clock",    "Horário",         evento.horario],
+    ["user",     "Cliente",         evento.cliente],
+    ["users",    "Responsável",     evento.responsavel],
+    ["tag",      "Venda vinculada", evento.vendaId],
+    ["map-pin",  "Endereço",        evento.endereco],
+    ["file",     "Observações",     evento.observacao],
+    ["check",    "Status",          evento.status === "concluido" ? "Concluído ✓" : "Pendente"],
+    ["info",     "Criado em",       evento.dataCriacao ? new Date(evento.dataCriacao).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" }) : null],
+  ].filter(([, , v]) => v);
 
-  const trs = linhas.map(([l, v]) => `
-    <tr>
-      <td class="label">${l}</td>
-      <td class="value">${v}</td>
-    </tr>
+  const grid = linhas.map(([, l, v]) => `
+    <div class="card">
+      <div class="card-label">${l}</div>
+      <div class="card-value">${v}</div>
+    </div>
   `).join("");
 
   const html = `<!DOCTYPE html>
@@ -54,46 +68,126 @@ function abrirJanelaPrint(evento) {
   <meta charset="UTF-8" />
   <title>Evento — ${evento.titulo}</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@500&display=swap');
+
     * { margin: 0; padding: 0; box-sizing: border-box; }
+
     body {
-      font-family: 'Segoe UI', Arial, sans-serif;
-      color: #111; background: #fff; padding: 40px;
+      font-family: 'DM Sans', 'Segoe UI', sans-serif;
+      color: #111;
+      background: #fff;
+      padding: 48px;
+      max-width: 760px;
+      margin: 0 auto;
     }
-    .header { margin-bottom: 28px; border-bottom: 2px solid #111; padding-bottom: 16px; }
-    .header-meta { font-size: 11px; color: #666; margin-bottom: 6px; letter-spacing: .04em; }
-    .titulo { font-size: 22px; font-weight: 700; }
+
+    /* ── HEADER ── */
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 32px;
+      padding-bottom: 24px;
+      border-bottom: 1.5px solid #e8e8e8;
+    }
+    .header-left {}
+    .app-label {
+      font-size: 10px; font-weight: 700; letter-spacing: .1em;
+      text-transform: uppercase; color: #aaa; margin-bottom: 10px;
+    }
+    .titulo {
+      font-size: 26px; font-weight: 700; color: #0a0a0a;
+      line-height: 1.2; margin-bottom: 10px;
+    }
     .badge {
-      display: inline-block; margin-top: 8px;
-      padding: 3px 10px; border-radius: 20px;
-      font-size: 11px; font-weight: 600;
-      background: #f0f0f0; color: #333;
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 12px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; letter-spacing: .04em;
+      background: #f0f4ff; color: #3b6ef0;
+      border: 1px solid #d0dcfc;
     }
-    table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    tr { border-bottom: 1px solid #e5e5e5; }
-    td { padding: 10px 8px; font-size: 13px; vertical-align: top; }
-    td.label {
-      width: 150px; font-weight: 600; color: #555;
-      font-size: 11px; text-transform: uppercase; letter-spacing: .04em; padding-top: 12px;
+    .data-destaque {
+      font-size: 13px; font-weight: 500; color: #444;
+      margin-top: 6px; line-height: 1.6;
     }
-    td.value { color: #111; line-height: 1.5; }
-    .footer { margin-top: 32px; font-size: 10px; color: #aaa; text-align: right; }
+
+    /* ── GRID DE CARDS ── */
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .card {
+      background: #fafafa;
+      border: 1px solid #ebebeb;
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+    .card.full { grid-column: 1 / -1; }
+    .card-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .08em; color: #888; margin-bottom: 5px;
+    }
+    .card-value {
+      font-size: 13.5px; font-weight: 500; color: #111; line-height: 1.5;
+    }
+    .card-value.mono {
+      font-family: 'DM Mono', monospace;
+      color: #3b6ef0;
+    }
+    .card-value.status-ok {
+      color: #1a9e6b; font-weight: 600;
+    }
+
+    /* ── FOOTER ── */
+    .footer {
+      margin-top: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 16px;
+      border-top: 1px solid #ebebeb;
+      font-size: 10px; color: #bbb;
+    }
+    .footer-brand { font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+
+    @media print {
+      body { padding: 32px; }
+    }
   </style>
 </head>
 <body>
   <div class="header">
-    <div class="header-meta">ASSENT — Agenda de Eventos</div>
-    <div class="titulo">${evento.titulo}</div>
-    <div class="badge">${evento.tipo || "Outro"}</div>
+    <div class="header-left">
+      <div class="app-label">ASSENT · Agenda de Eventos</div>
+      <div class="titulo">${evento.titulo}</div>
+      <div class="badge">${evento.tipo || "Outro"}</div>
+      <div class="data-destaque">${fmtDataLonga(evento.data)}${evento.horario ? ` · ${evento.horario}` : ""}</div>
+    </div>
   </div>
-  <table>
-    <tbody>${trs}</tbody>
-  </table>
-  <div class="footer">Impresso em ${new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</div>
+
+  <div class="grid">
+    ${linhas.map(([, l, v], i) => {
+      const isMono = l === "Venda vinculada";
+      const isStatus = l === "Status";
+      const isFull = l === "Observações" || l === "Endereço";
+      return `<div class="card${isFull ? " full" : ""}">
+        <div class="card-label">${l}</div>
+        <div class="card-value${isMono ? " mono" : ""}${isStatus && v.includes("✓") ? " status-ok" : ""}">${v}</div>
+      </div>`;
+    }).join("")}
+  </div>
+
+  <div class="footer">
+    <span class="footer-brand">ASSENT</span>
+    <span>Impresso em ${new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}</span>
+  </div>
+
   <script>window.onload = () => { window.print(); window.onafterprint = () => window.close(); }<\/script>
 </body>
 </html>`;
 
-  const win = window.open("", "_blank", "width=700,height=600");
+  const win = window.open("", "_blank", "width=800,height=700");
   if (win) {
     win.document.write(html);
     win.document.close();
@@ -111,12 +205,25 @@ export default function EventoModal({ evento, onClose, onConcluir, onEditar, onE
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box modal-box-lg">
+      <div className="modal-box modal-box-lg" style={{ overflow: "hidden", padding: 0 }}>
 
-        {/* Header */}
-        <div className="modal-header">
+        {/* ── Faixa de cor do tipo no topo ── */}
+        <div style={{
+          height: 4,
+          background: estilo.color,
+          opacity: 0.7,
+          borderRadius: "12px 12px 0 0",
+        }} />
+
+        {/* ── Header ── */}
+        <div style={{
+          padding: "20px 22px 16px",
+          borderBottom: "1px solid var(--border)",
+          display: "flex", alignItems: "flex-start", gap: 14,
+        }}>
+          {/* Badge de tipo + título */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
               <span
                 className="ag-badge"
                 style={{ background: estilo.bg, color: estilo.color, flexShrink: 0 }}
@@ -132,55 +239,97 @@ export default function EventoModal({ evento, onClose, onConcluir, onEditar, onE
                 </span>
               )}
             </div>
+
+            {/* Título */}
             <div
               className="modal-title"
               style={{
-                marginTop: 8,
+                fontSize: 19, fontWeight: 700, lineHeight: 1.25,
                 textDecoration: concluido ? "line-through" : "none",
-                opacity: concluido ? 0.65 : 1,
+                opacity: concluido ? 0.5 : 1,
+                marginBottom: 5,
               }}
             >
               {evento.titulo}
             </div>
-            <div className="modal-sub" style={{ marginTop: 4 }}>
-              {fmtDataLonga(evento.data)}{evento.horario ? ` às ${evento.horario}` : ""}
+
+            {/* Sub — data + hora */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 6,
+              fontSize: 12.5, color: "var(--text-3)",
+            }}>
+              <Calendar size={11} strokeWidth={2} />
+              <span>{fmtDataLonga(evento.data)}</span>
+              {evento.horario && (
+                <>
+                  <span style={{ opacity: .4 }}>·</span>
+                  <Clock size={11} strokeWidth={2} />
+                  <span>{evento.horario}</span>
+                </>
+              )}
             </div>
           </div>
-          <button className="modal-close" onClick={onClose} style={{ flexShrink: 0 }}>
+
+          {/* Botão fechar */}
+          <button className="modal-close" onClick={onClose} style={{ flexShrink: 0, marginTop: 2 }}>
             <X size={14} color="var(--text-2)" />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="modal-body" style={{ paddingTop: 10, paddingBottom: 10 }}>
-          <DetalheRow label="Data"            value={fmtData(evento.data)} />
-          <DetalheRow label="Horário"         value={evento.horario} />
-          <DetalheRow label="Cliente"         value={evento.cliente} />
-          <DetalheRow label="Responsável"     value={evento.responsavel} />
-          <DetalheRow
-            label="Venda vinculada"
-            value={evento.vendaId}
-            valueStyle={{ color: "#5b8ef0", fontFamily: "'Sora', sans-serif", fontWeight: 500 }}
-          />
-          <DetalheRow label="Endereço"        value={evento.endereco} />
-          <DetalheRow
-            label="Observações"
-            value={evento.observacao}
-            valueStyle={{ whiteSpace: "pre-wrap" }}
-          />
+        {/* ── Body — grid de cards ── */}
+        <div style={{
+          padding: "16px 22px",
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 10,
+        }}>
+          <DetalheCard icon={Calendar} label="Data"        value={fmtData(evento.data)} />
+          <DetalheCard icon={Clock}    label="Horário"     value={evento.horario} />
+          <DetalheCard icon={User}     label="Cliente"     value={evento.cliente} />
+          <DetalheCard icon={Users}    label="Responsável" value={evento.responsavel} />
+
+          {evento.vendaId && (
+            <DetalheCard
+              icon={Tag} label="Venda vinculada" value={evento.vendaId}
+              accent
+              valueStyle={{ color: "#5b8ef0", fontFamily: "'Sora', monospace", fontWeight: 600, letterSpacing: ".02em" }}
+            />
+          )}
+
+          {evento.endereco && (
+            <DetalheCard icon={MapPin} label="Endereço" value={evento.endereco} fullWidth />
+          )}
+
+          {evento.observacao && (
+            <DetalheCard
+              icon={FileText} label="Observações" value={evento.observacao}
+              fullWidth
+              valueStyle={{ whiteSpace: "pre-wrap", fontSize: 13 }}
+            />
+          )}
+
           {evento.dataCriacao && (
-            <DetalheRow
-              label="Criado em"
+            <DetalheCard
+              icon={Info} label="Criado em"
               value={new Date(evento.dataCriacao).toLocaleDateString("pt-BR", {
                 day: "2-digit", month: "long", year: "numeric",
               })}
-              valueStyle={{ color: "var(--text-3)", fontSize: 12 }}
+              fullWidth
+              valueStyle={{ color: "var(--text-3)", fontSize: 12, fontWeight: 400 }}
             />
           )}
         </div>
 
-        {/* Footer */}
-        <div className="modal-footer" style={{ justifyContent: "space-between" }}>
+        {/* ── Footer ── */}
+        <div
+          className="modal-footer"
+          style={{
+            justifyContent: "space-between",
+            borderTop: "1px solid var(--border)",
+            padding: "14px 22px",
+            background: "var(--bg-2, rgba(255,255,255,0.02))",
+          }}
+        >
           {/* Esquerda: Imprimir */}
           <button
             className="btn-secondary"
