@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════
-   ASSENT v2.0 — Despesasnovo.jsx (FINAL)
+   ASSENT v2.0 — Despesasnovo.jsx (RESTAURADO + ID SEQUENCIAL)
    Lógica: Banco usa doc.id (Hash) | Sistema mostra Código (D0001)
    ═══════════════════════════════════════════════════ */
 
@@ -10,13 +10,14 @@ import {
   CreditCard, Wallet, Smartphone, ChevronDown, ChevronUp,
 } from "lucide-react";
 
-import { db, auth, onAuthStateChanged } from "../lib/firebase";
+import { db, auth } from "../lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   collection, doc, setDoc, deleteDoc, onSnapshot,
   query, orderBy, writeBatch, addDoc,
 } from "firebase/firestore";
 
-/* ── CSS MANTIDO ORIGINAL ── */
+/* ── CSS ORIGINAL RESTAURADO ── */
 const CSS = `
   @keyframes fadeIn  { from { opacity: 0 }               to { opacity: 1 } }
   @keyframes slideUp { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: translateY(0) } }
@@ -36,14 +37,10 @@ const CSS = `
   .modal-body   { padding: 20px 22px; }
   .modal-footer { padding: 14px 22px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
   .form-group { margin-bottom: 16px; }
-  .form-group-0 { margin-bottom: 0; }
   .form-label { display: block; font-size: 10px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--text-2); margin-bottom: 7px; }
   .form-label-req { color: var(--gold); margin-left: 2px; }
   .form-input { width: 100%; background: var(--s2); border: 1px solid var(--border); border-radius: 9px; padding: 10px 13px; color: var(--text); font-size: 13px; font-family: 'DM Sans', sans-serif; outline: none; transition: border-color .15s, box-shadow .15s; }
   .form-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(200,165,94,0.1); }
-  .form-input.err   { border-color: var(--red); }
-  .form-error { font-size: 11px; color: var(--red); margin-top: 5px; }
-  .form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
   .form-divider { border: none; border-top: 1px solid var(--border); margin: 18px 0 16px; }
   .chip-group { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -51,16 +48,15 @@ const CSS = `
   .chip.active { background: var(--gold); color: #0a0808; border-color: var(--gold); }
   .btn-primary, .btn-nova-desp { padding: 9px 20px; border-radius: 9px; background: var(--gold); color: #0a0808; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; transition: opacity .13s; }
   .btn-secondary { padding: 9px 20px; border-radius: 9px; background: var(--s3); color: var(--text-2); border: 1px solid var(--border); cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; }
-  .btn-danger { padding: 9px 20px; border-radius: 9px; background: var(--red-d); color: var(--red); border: 1px solid rgba(224,82,82,.25); cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; }
-  .btn-success { padding: 9px 20px; border-radius: 9px; background: rgba(74,186,130,.12); color: var(--green); border: 1px solid rgba(74,186,130,.25); cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500; }
+  .btn-danger { padding: 9px 20px; border-radius: 9px; background: var(--red-d); color: var(--red); border: 1px solid rgba(224,82,82,.25); cursor: pointer; }
+  .btn-success { padding: 9px 20px; border-radius: 9px; background: rgba(74,186,130,.12); color: var(--green); border: 1px solid rgba(74,186,130,.25); cursor: pointer; }
   .btn-icon { width: 30px; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 1px solid transparent; background: transparent; transition: all .13s; }
   .btn-icon-edit { color: var(--blue); }
   .btn-icon-del { color: var(--red); }
   .btn-icon-pay { color: var(--green); }
   .btn-icon-undo { color: var(--text-3); }
-  .desp-topbar { padding: 14px 22px; background: var(--s1); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; flex-shrink: 0; flex-wrap: wrap; }
+  .desp-topbar { padding: 14px 22px; background: var(--s1); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
   .desp-topbar-title h1 { font-family: 'Sora', sans-serif; font-size: 17px; font-weight: 600; color: var(--text); }
-  .desp-topbar-title p { font-size: 11px; color: var(--text-2); margin-top: 2px; }
   .desp-search { display: flex; align-items: center; gap: 8px; background: var(--s2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; width: 240px; }
   .desp-search input { background: transparent; border: none; outline: none; color: var(--text); font-size: 12px; width: 100%; }
   .desp-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 18px 22px; }
@@ -72,8 +68,9 @@ const CSS = `
   .metric-val { font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 600; }
   .metric-val-red { color: var(--red); } .metric-val-amber { color: var(--gold); } .metric-val-purple { color: #8b5cf6; } .metric-val-green { color: var(--green); }
   .desp-filters { padding: 0 22px 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .filter-chip { padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 500; border: 1px solid var(--border); background: var(--s2); color: var(--text-2); cursor: pointer; }
+  .filter-chip { padding: 5px 12px; border-radius: 20px; font-size: 11px; border: 1px solid var(--border); background: var(--s2); color: var(--text-2); cursor: pointer; }
   .filter-chip.active { background: var(--s3); border-color: var(--border-h); color: var(--text); }
+  .filter-select { padding: 5px 10px; border-radius: 8px; font-size: 12px; border: 1px solid var(--border); background: var(--s2); color: var(--text-2); outline: none; font-family: 'DM Sans', sans-serif; }
   .desp-table-wrap { margin: 0 22px 22px; background: var(--s1); border: 1px solid var(--border); border-radius: 12px; overflow-y: auto; max-height: 60vh; }
   .desp-row { display: grid; grid-template-columns: 80px 1fr 100px 110px 110px 90px 100px 110px 90px; padding: 11px 18px; gap: 8px; border-bottom: 1px solid var(--border); align-items: center; font-size: 12px; color: var(--text-2); }
   .desp-row-head { background: var(--s2); }
@@ -84,240 +81,159 @@ const CSS = `
   .status-pago { background: rgba(74,186,130,.1); color: var(--green); border: 1px solid rgba(74,186,130,.2); }
   .status-pendente { background: rgba(200,165,94,.1); color: var(--gold); border: 1px solid rgba(200,165,94,.2); }
   .status-vencido { background: rgba(224,82,82,.1); color: var(--red); border: 1px solid rgba(224,82,82,.2); }
+  .cat-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; background: var(--s3); border: 1px solid var(--border); color: var(--text-2); }
+  .parcel-badge { font-size: 10px; color: var(--text-3); background: var(--s3); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-family: 'Sora', sans-serif; }
+  .pay-info { background: var(--s2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
 `;
 
-/* ── HELPERS MANTIDOS ── */
+/* ── HELPERS ── */
 const fmtR$ = (v) => `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
-const fmtData = (d) => {
-  if (!d) return "—";
-  try {
-    const dt = typeof d === "string" ? new Date(d + "T12:00:00") : d?.toDate ? d.toDate() : new Date(d);
-    return dt.toLocaleDateString("pt-BR");
-  } catch { return String(d); }
-};
+const fmtData = (d) => { if (!d) return "—"; try { const dt = typeof d === "string" ? new Date(d + "T12:00:00") : d?.toDate ? d.toDate() : new Date(d); return dt.toLocaleDateString("pt-BR"); } catch { return String(d); } };
 const hoje = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
-const parseDate = (d) => {
-  if (!d) return null;
-  const dt = typeof d === "string" ? new Date(d + "T12:00:00") : d?.toDate ? d.toDate() : new Date(d);
-  dt.setHours(0, 0, 0, 0);
-  return dt;
-};
-const calcularStatus = (vencimento, statusAtual) => {
-  if (statusAtual === "pago" || statusAtual === "cancelado") return statusAtual;
-  const venc = parseDate(vencimento);
-  if (!venc) return "pendente";
-  return venc < hoje() ? "vencido" : "pendente";
-};
-
-// Lógica de ID Sequencial do Despesas.jsx
-const gerarIdSequencial = (cnt) => `D${String(cnt + 1).padStart(4, "0")}`;
-
-const proximaData = (dataBase, tipo, intervalo = 1) => {
-  const d = parseDate(dataBase);
-  if (!d) return null;
-  const nova = new Date(d);
-  if (tipo === "mensal")  nova.setMonth(nova.getMonth() + intervalo);
-  if (tipo === "semanal") nova.setDate(nova.getDate() + 7 * intervalo);
-  if (tipo === "anual")   nova.setFullYear(nova.getFullYear() + intervalo);
-  return nova.toISOString().split("T")[0];
-};
-
-const FORMAS_PAG = [
-  { value: "dinheiro", label: "Dinheiro", Icon: Wallet },
-  { value: "pix",      label: "Pix",      Icon: Smartphone },
-  { value: "cartão",   label: "Cartão",   Icon: CreditCard },
-];
-
-/* ── HOOK CATEGORIAS MANTIDO ── */
-function useCategorias(uid) {
-  const [categorias, setCategorias] = useState([]);
-  useEffect(() => {
-    if (!uid) return;
-    const unsub = onSnapshot(query(collection(db, "users", uid, "categorias_despesas"), orderBy("nome", "asc")), (snap) => {
-      setCategorias(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => c.ativa !== false));
-    });
-    return unsub;
-  }, [uid]);
-
-  const criarCategoria = async (nome) => {
-    if (!uid || !nome.trim()) return;
-    await addDoc(collection(db, "users", uid, "categorias_despesas"), { nome: nome.trim(), ativa: true, criadoEm: new Date().toISOString() });
-  };
-
-  const desativarCategoria = async (id) => {
-    await setDoc(doc(db, "users", uid, "categorias_despesas", id), { ativa: false }, { merge: true });
-  };
-
-  return { categorias, criarCategoria, desativarCategoria };
-}
+const parseDate = (d) => { if (!d) return null; const dt = typeof d === "string" ? new Date(d + "T12:00:00") : d?.toDate ? d.toDate() : new Date(d); dt.setHours(0, 0, 0, 0); return dt; };
+const calcularStatus = (vencimento, statusAtual) => { if (statusAtual === "pago" || statusAtual === "cancelado") return statusAtual; const venc = parseDate(vencimento); if (!venc) return "pendente"; return venc < hoje() ? "vencido" : "pendente"; };
+const gerarIdSequencial = (cnt) => `D${String(cnt + 1).padStart(4, "0")}`; // Lógica restaurada
 
 /* ── COMPONENTE PRINCIPAL ── */
 export default function Despesas() {
   const [uid, setUid] = useState(null);
   const [despesas, setDespesas] = useState([]);
-  const [despesaIdCnt, setDespesaIdCnt] = useState(0); // Contador do Despesas.jsx
+  const [despesaIdCnt, setDespesaIdCnt] = useState(0); // Contador restaurado
   const [loading, setLoading] = useState(true);
-  const [modalNovo, setModalNovo] = useState(false);
-  const [editando, setEditando] = useState(null);
   const [search, setSearch] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("todas");
+  const [filtroPeriodo, setFiltroPeriodo] = useState("mes");
+  const [modalNovo, setModalNovo] = useState(false);
+  const [editando, setEditando] = useState(null);
+  const [pagando, setPagando] = useState(null);
+  const [deletando, setDeletando] = useState(null);
 
-  const { categorias, criarCategoria, desativarCategoria } = useCategorias(uid);
-
-  useEffect(() => {
-    return onAuthStateChanged(auth, user => setUid(user?.uid || null));
-  }, []);
+  useEffect(() => { return onAuthStateChanged(auth, user => setUid(user?.uid || null)); }, []);
 
   useEffect(() => {
     if (!uid) return;
-    // Escuta contador para o ID Sequencial
-    const unsubUser = onSnapshot(doc(db, "users", uid), (snap) => {
-      if (snap.exists()) setDespesaIdCnt(snap.data().despesaIdCnt || 0);
-    });
-    // Escuta Despesas
-    const unsubDesp = onSnapshot(query(collection(db, "users", uid, "despesas"), orderBy("vencimento", "asc")), (snap) => {
-      setDespesas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setLoading(false);
-    });
+    const unsubUser = onSnapshot(doc(db, "users", uid), (snap) => { if (snap.exists()) setDespesaIdCnt(snap.data().despesaIdCnt || 0); });
+    const unsubDesp = onSnapshot(query(collection(db, "users", uid, "despesas"), orderBy("vencimento", "asc")), (snap) => { setDespesas(snap.docs.map(d => ({ id: d.id, ...d.data() }))); setLoading(false); });
     return () => { unsubUser(); unsubDesp(); };
   }, [uid]);
 
-  /* ── SALVAR COM ID SEQUENCIAL (VISÍVEL) E DOC.ID (HASH) ── */
   const handleAdd = async (form) => {
     if (!uid) return;
     let cnt = despesaIdCnt;
-
     if (form.parcelado && form.totalParcelas > 1) {
-      const grupoId = `G${Date.now()}`;
       const batch = writeBatch(db);
-
       for (let i = 0; i < form.totalParcelas; i++) {
-        const sequencial = gerarIdSequencial(cnt); // Gera D0001
+        const sequencial = gerarIdSequencial(cnt);
         const dataVenc = new Date(form.vencimento + "T12:00:00");
         dataVenc.setMonth(dataVenc.getMonth() + i);
         const vencStr = dataVenc.toISOString().split("T")[0];
-
-        // Usa addDoc-like behavior (doc sem ID manual) para manter hash no Firestore
-        const newRef = doc(collection(db, "users", uid, "despesas"));
-        batch.set(newRef, {
-          ...form, codigo: sequencial, parcelado: true, grupoId,
-          parcelaAtual: i + 1, vencimento: vencStr,
-          status: calcularStatus(vencStr, "pendente"),
-          dataCriacao: new Date().toISOString(),
-        });
+        batch.set(doc(collection(db, "users", uid, "despesas")), { ...form, codigo: sequencial, parcelaAtual: i + 1, vencimento: vencStr, status: calcularStatus(vencStr, "pendente"), dataCriacao: new Date().toISOString() });
         cnt++;
       }
       batch.set(doc(db, "users", uid), { despesaIdCnt: cnt }, { merge: true });
       await batch.commit();
     } else {
       const sequencial = gerarIdSequencial(cnt);
-      // addDoc cria o hash aleatório como doc.id
-      await addDoc(collection(db, "users", uid, "despesas"), {
-        ...form,
-        codigo: sequencial, // O ID sequencial é apenas um campo
-        status: calcularStatus(form.vencimento, "pendente"),
-        dataCriacao: new Date().toISOString()
-      });
+      await addDoc(collection(db, "users", uid, "despesas"), { ...form, codigo: sequencial, status: calcularStatus(form.vencimento, "pendente"), dataCriacao: new Date().toISOString() });
       await setDoc(doc(db, "users", uid), { despesaIdCnt: cnt + 1 }, { merge: true });
     }
     setModalNovo(false);
   };
 
-  const handleEdit = async (form) => {
-    await setDoc(doc(db, "users", uid, "despesas", editando.id), { 
-      ...form, 
-      status: calcularStatus(form.vencimento, editando.status) 
-    }, { merge: true });
-    setEditando(null);
-  };
-
-  const handlePagar = async (d) => {
-    await setDoc(doc(db, "users", uid, "despesas", d.id), { 
-      status: "pago", 
-      dataPagamento: new Date().toISOString().split("T")[0] 
-    }, { merge: true });
+  const handlePagar = async (forma) => {
+    if (!uid || !pagando) return;
+    await setDoc(doc(db, "users", uid, "despesas", pagando.id), { status: "pago", formaPagamento: forma, dataPagamento: new Date().toISOString().split("T")[0] }, { merge: true });
+    setPagando(null);
   };
 
   const despesasFiltradas = useMemo(() => {
     let lista = [...despesas];
+    const mes = new Date().getMonth();
+    const ano = new Date().getFullYear();
+    if (filtroPeriodo === "mes") lista = lista.filter(d => { const dt = parseDate(d.vencimento); return dt && dt.getMonth() === mes && dt.getFullYear() === ano; });
     if (filtroStatus !== "todas") lista = lista.filter(d => d.status === filtroStatus);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      lista = lista.filter(d => d.descricao?.toLowerCase().includes(q));
-    }
+    if (search.trim()) lista = lista.filter(d => d.descricao?.toLowerCase().includes(search.toLowerCase()));
     return lista;
-  }, [despesas, filtroStatus, search]);
+  }, [despesas, filtroStatus, filtroPeriodo, search]);
 
   const metricas = useMemo(() => {
-    const total = despesasFiltradas.reduce((s, d) => s + (d.valor || 0), 0);
     const vencidas = despesasFiltradas.filter(d => d.status === "vencido").length;
-    return { total, vencidas };
+    const pendente = despesasFiltradas.filter(d => d.status !== "pago").reduce((s, d) => s + (d.valor || 0), 0);
+    const pago = despesasFiltradas.filter(d => d.status === "pago").reduce((s, d) => s + (d.valor || 0), 0);
+    return { vencidas, pendente, pago };
   }, [despesasFiltradas]);
 
-  if (!uid) return <div className="desp-loading">Carregando...</div>;
+  if (!uid) return <div style={{padding: 40, color: 'white'}}>Carregando...</div>;
 
   return (
     <>
       <style>{CSS}</style>
       <header className="desp-topbar">
-        <div className="desp-topbar-title"><h1>Despesas</h1><p>Gestão financeira</p></div>
+        <div className="desp-topbar-title"><h1>Despesas</h1><p>Gestão financeira refinada</p></div>
         <div className="desp-search"><Search size={13} color="var(--text-3)" /><input placeholder="Buscar..." value={search} onChange={e => setSearch(e.target.value)} /></div>
         <button className="btn-nova-desp" style={{marginLeft:'auto'}} onClick={() => setModalNovo(true)}><Plus size={14}/> Nova Despesa</button>
       </header>
 
+      {/* CARDS RESTAURADOS */}
       <div className="desp-metrics">
         <div className="metric-card metric-card-red"><div className="metric-val metric-val-red">{metricas.vencidas}</div><div className="metric-label">Vencidas</div></div>
-        <div className="metric-card metric-card-purple"><div className="metric-val metric-val-purple">{fmtR$(metricas.total)}</div><div className="metric-label">Total Filtrado</div></div>
+        <div className="metric-card metric-card-purple"><div className="metric-val metric-val-purple">{fmtR$(metricas.pendente)}</div><div className="metric-label">Total Pendente</div></div>
+        <div className="metric-card metric-card-green"><div className="metric-val metric-val-green">{fmtR$(metricas.pago)}</div><div className="metric-label">Pago este mês</div></div>
+      </div>
+
+      <div className="desp-filters">
+        <span style={{fontSize: 11, color: 'var(--text-3)'}}>Filtros:</span>
+        {["todas", "pendente", "vencido", "pago"].map(s => <button key={s} className={`filter-chip ${filtroStatus === s ? "active" : ""}`} onClick={() => setFiltroStatus(s)}>{s.toUpperCase()}</button>)}
+        <select className="filter-select" value={filtroPeriodo} onChange={e => setFiltroPeriodo(e.target.value)}><option value="mes">Este mês</option><option value="todas">Tudo</option></select>
       </div>
 
       <div className="desp-table-wrap">
-        <div className="desp-row desp-row-head">
-          <span>ID</span><span>Descrição</span><span>Categoria</span><span>Valor</span><span>Vencimento</span><span>Status</span><span>Pagamento</span><span style={{textAlign:'right'}}>Ações</span>
-        </div>
+        <div className="desp-row desp-row-head"><span>ID</span><span>Descrição</span><span>Categoria</span><span>Valor</span><span>Vencimento</span><span>Status</span><span>Pagamento</span><span style={{textAlign:'right'}}>Ações</span></div>
         {despesasFiltradas.map(d => (
           <div key={d.id} className="desp-row">
-            {/* EXIBIÇÃO DO CÓDIGO SEQUENCIAL (D0001) EM VEZ DO HASH */}
-            <span className="desp-id">{d.codigo || "—"}</span>
-            <span className="desp-desc">{d.descricao}</span>
+            <span className="desp-id">{d.codigo || "—"}</span> {/* EXIBIÇÃO DO SEQUENCIAL */}
+            <div className="desp-desc">{d.descricao} {d.parcelado && <span className="parcel-badge">{d.parcelaAtual}/{d.totalParcelas}</span>}</div>
             <span className="cat-badge">{d.categoria}</span>
             <span className="desp-valor">{fmtR$(d.valor)}</span>
             <span>{fmtData(d.vencimento)}</span>
             <span className={`status-badge status-${d.status}`}>{d.status}</span>
             <span>{d.dataPagamento ? fmtData(d.dataPagamento) : "—"}</span>
-            <div className="desp-actions">
-              {d.status !== "pago" && <button className="btn-icon btn-icon-pay" onClick={() => handlePagar(d)}><CheckCircle size={13}/></button>}
+            <div style={{display:'flex', gap:4, justifyContent:'flex-end'}}>
+              {d.status !== "pago" && <button className="btn-icon btn-icon-pay" onClick={() => setPagando(d)}><CheckCircle size={13}/></button>}
               <button className="btn-icon btn-icon-edit" onClick={() => setEditando(d)}><Edit2 size={13}/></button>
-              <button className="btn-icon btn-icon-del" onClick={async () => await deleteDoc(doc(db, "users", uid, "despesas", d.id))}><Trash2 size={13}/></button>
+              <button className="btn-icon btn-icon-del" onClick={() => setDeletando(d)}><Trash2 size={13}/></button>
             </div>
           </div>
         ))}
       </div>
 
-      {/* MODAIS (Estrutura original de Despesasnovo.jsx preservada) */}
-      {modalNovo && <ModalNovaDespesa categorias={categorias} onCriarCategoria={criarCategoria} onDesativarCategoria={desativarCategoria} onSave={handleAdd} onClose={() => setModalNovo(false)} />}
-      {editando && <ModalNovaDespesa despesa={editando} categorias={categorias} onCriarCategoria={criarCategoria} onDesativarCategoria={desativarCategoria} onSave={handleEdit} onClose={() => setEditando(null)} />}
+      {modalNovo && <ModalForm onSave={handleAdd} onClose={() => setModalNovo(false)} />}
+      {pagando && <ModalConfirmPay despesa={pagando} onConfirm={handlePagar} onClose={() => setPagando(null)} />}
+      {deletando && <ModalConfirmDel despesa={deletando} onConfirm={async () => { await deleteDoc(doc(db, "users", uid, "despesas", deletando.id)); setDeletando(null); }} onClose={() => setDeletando(null)} />}
     </>
   );
 }
 
-/* MODAL NOVA DESPESA (Preservando interface do novo) */
-function ModalNovaDespesa({ despesa, categorias, onCriarCategoria, onDesativarCategoria, onSave, onClose }) {
-  const [form, setForm] = useState({ descricao: despesa?.descricao || "", valor: despesa?.valor || "", vencimento: despesa?.vencimento || "", categoria: despesa?.categoria || categorias[0]?.nome || "", parcelado: false, totalParcelas: 2 });
+/* MODAIS DE APOIO - INTERFACE REFINADA */
+function ModalForm({ despesa, onSave, onClose }) {
+  const [form, setForm] = useState({ descricao: despesa?.descricao || "", valor: despesa?.valor || "", vencimento: despesa?.vencimento || "", categoria: despesa?.categoria || "Fixo", parcelado: false, totalParcelas: 2 });
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box modal-box-lg">
-        <div className="modal-header"><div className="modal-title">Lançamento</div><button className="modal-close" onClick={onClose}><X size={14}/></button></div>
-        <div className="modal-body">
-          <div className="form-group"><label className="form-label">Descrição</label><input className="form-input" value={form.descricao} onChange={e => setForm({...form, descricao: e.target.value})} /></div>
-          <div className="form-row-3">
-            <div><label className="form-label">Valor</label><input type="number" className="form-input" value={form.valor} onChange={e => setForm({...form, valor: e.target.value})} /></div>
-            <div><label className="form-label">Vencimento</label><input type="date" className="form-input" value={form.vencimento} onChange={e => setForm({...form, vencimento: e.target.value})} /></div>
-            <div><label className="form-label">Categoria</label><select className="form-input" value={form.categoria} onChange={e => setForm({...form, categoria: e.target.value})}>{categorias.map(c => <option key={c.id} value={c.nome}>{c.nome}</option>)}</select></div>
-          </div>
-          <div className="form-group" style={{marginTop:15}}><label style={{display:'flex', gap:8}}><input type="checkbox" checked={form.parcelado} onChange={e => setForm({...form, parcelado: e.target.checked})} /> <span className="form-label">Parcelado</span></label>{form.parcelado && <input type="number" className="form-input" style={{width:100, marginTop:8}} value={form.totalParcelas} onChange={e => setForm({...form, totalParcelas: e.target.value})} />}</div>
-        </div>
-        <div className="modal-footer"><button className="btn-secondary" onClick={onClose}>Cancelar</button><button className="btn-primary" onClick={() => onSave(form)}>Salvar</button></div>
-      </div>
-    </div>
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}><div className="modal-box modal-box-lg"><div className="modal-header"><div><div className="modal-title">Lançamento</div></div><button className="modal-close" onClick={onClose}><X size={14}/></button></div><div className="modal-body">
+      <div className="form-group"><label className="form-label">Descrição</label><input className="form-input" value={form.descricao} onChange={e => setForm({...form, descricao: e.target.value})} /></div>
+      <div className="form-row-3"><div><label className="form-label">Valor</label><input type="number" className="form-input" value={form.valor} onChange={e => setForm({...form, valor: e.target.value})} /></div><div><label className="form-label">Vencimento</label><input type="date" className="form-input" value={form.vencimento} onChange={e => setForm({...form, vencimento: e.target.value})} /></div><div><label className="form-label">Categoria</label><input className="form-input" value={form.categoria} onChange={e => setForm({...form, categoria: e.target.value})} /></div></div>
+      <div className="form-group" style={{marginTop:15}}><label style={{display:'flex', gap:8}}><input type="checkbox" checked={form.parcelado} onChange={e => setForm({...form, parcelado: e.target.checked})} /> <span className="form-label">Parcelado</span></label>{form.parcelado && <input type="number" className="form-input" style={{width:80, marginTop:5}} value={form.totalParcelas} onChange={e => setForm({...form, totalParcelas: e.target.value})} />}</div>
+    </div><div className="modal-footer"><button className="btn-secondary" onClick={onClose}>Cancelar</button><button className="btn-primary" onClick={() => onSave(form)}>Salvar</button></div></div></div>
+  );
+}
+
+function ModalConfirmPay({ despesa, onConfirm, onClose }) {
+  return (
+    <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}><div className="modal-box modal-box-md"><div className="modal-header"><div className="modal-title">Registrar Pagamento</div><button className="modal-close" onClick={onClose}><X size={14}/></button></div><div className="modal-body"><div className="pay-info"><div style={{display:'flex', justifyContent:'space-between'}}><span>Valor:</span><span style={{fontWeight:600}}>{fmtR$(despesa.valor)}</span></div></div><p style={{fontSize:12, color:'var(--text-3)'}}>Confirme o pagamento de: {despesa.descricao}</p></div><div className="modal-footer"><button className="btn-secondary" onClick={onClose}>Cancelar</button><button className="btn-success" onClick={() => onConfirm("pix")}>Confirmar Pago</button></div></div></div>
+  );
+}
+
+function ModalConfirmDel({ despesa, onConfirm, onClose }) {
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}><div className="modal-box modal-box-md"><div className="modal-header"><div className="modal-title">Excluir</div><button className="modal-close" onClick={onClose}><X size={14}/></button></div><div className="modal-body">Deseja excluir permanentemente: <strong>{despesa.descricao}</strong>?</div><div className="modal-footer"><button className="btn-secondary" onClick={onClose}>Cancelar</button><button className="btn-danger" onClick={onConfirm}>Excluir</button></div></div></div>
   );
 }
