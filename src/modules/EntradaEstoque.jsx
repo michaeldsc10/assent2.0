@@ -450,7 +450,7 @@ const novoEst = Math.max(0, estoqueReal + quantidadeFinal);
   estoqueNovo: novoEst,
   dataAtualizacao: serverTimestamp(),
 }, { merge: true });
-      });
+      
 
       onSalvo("Entrada registrada com sucesso!");
       onClose();
