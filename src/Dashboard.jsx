@@ -20,7 +20,8 @@ import Configuracoes from "./modules/Configuracoes.jsx";
 import Despesas from "./modules/Despesas.jsx";
 import EntradaEstoque from "./modules/EntradaEstoque.jsx";
 import Agenda from "./modules/Agenda/Agenda.jsx";
-import Fornecedores "./modules/Fornecedores.jsx";
+import Fornecedores from "./modules/Fornecedores.jsx";
+import Areceber from "./modules/Areceber.jsx";
 
 /* ── Firebase (Adicionado para o filtro) ── */
 import { db, auth } from "./lib/firebase";
@@ -78,7 +79,7 @@ const NAV = [
   { section: "OPERAÇÕES", items: [
     { icon: ArrowDownToLine, label: "Entrada de Estoque" },
     { icon: ShoppingCart,    label: "Vendas" },
-    { icon: Clock,           label: "Fiado / A Receber" },
+    { icon: Clock,           label: "A Receber" },
     { icon: Wallet,          label: "Caixa Diário" },
     { icon: TrendingDown,    label: "Despesas" },
     { icon: Truck,           label: "Fornecedores" },
@@ -429,7 +430,7 @@ export default function Dashboard() {
       case "Entrada de Estoque": return <EntradaEstoque />;
       case "Agenda":           return <Agenda />;
       case "Fornecedores":     return <Fornecedores />;
-
+      case "A Receber":        return <Areceber />;
         
       default:                 return renderDashboard();
     }
