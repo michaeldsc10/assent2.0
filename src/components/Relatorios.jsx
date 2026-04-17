@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 
 import { db, auth, onAuthStateChanged } from "../lib/firebase";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, doc, getDoc } from "firebase/firestore";
 
 import FiltroPeriodo, { getIntervalo, dentroDoIntervalo } from "./FiltroPeriodo";
 import CardResumo from "./CardResumo";
@@ -235,6 +235,40 @@ const CSS = `
 .dre-positivo { color: var(--green) !important; }
 .dre-negativo { color: var(--red) !important; }
 .dre-neutro   { color: var(--text-2) !important; }
+
+/* ── Banner de resultado final (lucro / prejuízo) ── */
+.dre-resultado-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-radius: 12px; margin-top: 14px;
+  border: 1px solid transparent;
+}
+.dre-resultado-banner.lucro {
+  background: rgba(74,222,128,0.08);
+  border-color: rgba(74,222,128,0.25);
+}
+.dre-resultado-banner.prejuizo {
+  background: rgba(224,82,82,0.08);
+  border-color: rgba(224,82,82,0.25);
+}
+.dre-resultado-esquerda {
+  display: flex; align-items: center; gap: 10px;
+}
+.dre-resultado-emoji { font-size: 20px; line-height: 1; }
+.dre-resultado-textos { display: flex; flex-direction: column; gap: 2px; }
+.dre-resultado-titulo {
+  font-family: 'Sora', sans-serif; font-size: 13px;
+  font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+}
+.dre-resultado-banner.lucro    .dre-resultado-titulo { color: var(--green); }
+.dre-resultado-banner.prejuizo .dre-resultado-titulo { color: var(--red); }
+.dre-resultado-sub {
+  font-size: 11px; color: var(--text-3);
+}
+.dre-resultado-valor {
+  font-family: 'Sora', sans-serif; font-size: 20px; font-weight: 700;
+}
+.dre-resultado-banner.lucro    .dre-resultado-valor { color: var(--green); }
+.dre-resultado-banner.prejuizo .dre-resultado-valor { color: var(--red); }
 
 /* ── Ranking de despesas ── */
 .rank-item {
@@ -472,29 +506,73 @@ function exportarExcel(nomeRelatorio, sheets) {
 /* ══════════════════════════════════════════════════════
    RELATÓRIO: DRE
    ══════════════════════════════════════════════════════ */
-function RelatorioDRE({ vendas, despesas, intervalo }) {
+function RelatorioDRE({ vendas, despesas, intervalo, uid }) {
+  /* Estado para guardar taxas do Firestore (config/geral) — usadas só como fallback */
+  const [configTaxas, setConfigTaxas] = useState(null);
+
+  /* Busca config/geral uma única vez quando uid estiver disponível */
+  useEffect(() => {
+    if (!uid) return;
+    getDoc(doc(db, "users", uid, "config", "geral"))
+      .then((snap) => {
+        if (snap.exists()) setConfigTaxas(snap.data()?.taxas || {});
+      })
+      .catch(() => {}); // não bloqueia se config não existir
+  }, [uid]);
+
+  /* ── Helper de fallback: calcula taxa com base em config/geral ──
+     Só chamado quando v.valorTaxa não existe no documento da venda.
+     Estrutura: taxas.credito_1, taxas.debito, taxas.pix (strings em %)
+     Vendas.jsx usa credito_1 para "Cartão de Crédito" → mantemos o mesmo mapeamento. */
+  const calcularTaxaFallback = useCallback((venda) => {
+    if (!configTaxas) return 0;
+    const fp = venda.formaPagamento || "";
+    let pct = 0;
+    if (fp === "Cartão de Crédito") pct = parseFloat(configTaxas.credito_1) || 0;
+    else if (fp === "Cartão de Débito") pct = parseFloat(configTaxas.debito)   || 0;
+    else if (fp === "Pix")              pct = parseFloat(configTaxas.pix)       || 0;
+    // Dinheiro, Boleto, Transferência, Sinal etc. → pct = 0
+    return pct > 0 ? parseFloat(((Number(venda.total || 0)) * (pct / 100)).toFixed(2)) : 0;
+  }, [configTaxas]);
+
   const dados = useMemo(() => {
     const vFiltradas = vendas.filter((v) => dentroDoIntervalo(v.data, intervalo));
     const dFiltradas = despesas.filter((d) => dentroDoIntervalo(d.data, intervalo));
 
     const receitaBruta = vFiltradas.reduce((s, v) => s + Number(v.total || 0), 0);
 
-    /* Custo dos produtos: campo custo nas vendas ou nas linhas de itens */
-    const custoTotal = vFiltradas.reduce((s, v) => {
-      if (v.itens?.length) {
-        return s + v.itens.reduce((si, it) =>
-          si + (Number(it.custo || it.precoCusto || 0) * Number(it.quantidade || 1)), 0);
-      }
-      return s + Number(v.custo || v.custoTotal || 0);
+    /* Descontos totais (campo salvo no payload de Vendas.jsx como v.descontos) */
+    const descontosTotais = vFiltradas.reduce((s, v) => s + Number(v.descontos || 0), 0);
+
+    /* ── TAXAS DE CARTÃO ──
+       Prioridade 1: v.valorTaxa — valor em R$ calculado e gravado no momento da venda.
+       Prioridade 2: fallback usando config/geral (para vendas antigas sem o campo). */
+    const taxasCartao = vFiltradas.reduce((s, v) => {
+      const taxa = v.valorTaxa != null
+        ? Number(v.valorTaxa)          // campo real gravado pelo Vendas.jsx
+        : calcularTaxaFallback(v);     // fallback para vendas sem o campo
+      return s + taxa;
     }, 0);
 
-    const lucroBruto = receitaBruta - custoTotal;
+    /* receitaLiquida = receitaBruta - descontos - taxasCartao
+       Nota: v.total já desconta descontos de itens, mas descontosTotais é exibido
+       separadamente no DRE para transparência. A subtração evita dupla contagem. */
+    const receitaLiquida = receitaBruta - descontosTotais - taxasCartao;
 
+    /* Custo dos produtos: usa custoTotal salvo no payload, fallback nos itens */
+    const custoTotal = vFiltradas.reduce((s, v) => {
+      if (v.custoTotal != null) return s + Number(v.custoTotal);
+      if (v.itens?.length) {
+        return s + v.itens.reduce((si, it) =>
+          si + (Number(it.custo || 0) * Number(it.qtd || it.quantidade || 1)), 0);
+      }
+      return s + Number(v.custo || 0);
+    }, 0);
+
+    const lucroBruto    = receitaLiquida - custoTotal;
     const totalDespesas = dFiltradas.reduce((s, d) => s + Number(d.valor || 0), 0);
-
-    const lucroLiquido = lucroBruto - totalDespesas;
-
-    const margem = receitaBruta > 0 ? (lucroLiquido / receitaBruta) * 100 : 0;
+    const lucroLiquido  = lucroBruto - totalDespesas;
+    const margem        = receitaBruta > 0 ? (lucroLiquido / receitaBruta) * 100 : 0;
 
     /* Despesas por categoria */
     const porCategoria = {};
@@ -503,13 +581,29 @@ function RelatorioDRE({ vendas, despesas, intervalo }) {
       porCategoria[cat] = (porCategoria[cat] || 0) + Number(d.valor || 0);
     });
 
+    /* Diagnóstico — verificar quais vendas usaram valorTaxa real vs. fallback */
+    const comValorTaxa = vFiltradas.filter((v) => v.valorTaxa != null).length;
+    console.log(
+      "[DRE] vendas no período:", vFiltradas.length,
+      "| com valorTaxa gravado:", comValorTaxa,
+      "| em fallback:", vFiltradas.length - comValorTaxa,
+      "\n[DRE] receitaBruta:", receitaBruta,
+      "| descontos:", descontosTotais,
+      "| taxasCartao:", taxasCartao,
+      "| receitaLiquida:", receitaLiquida,
+      "| custoTotal:", custoTotal,
+      "| totalDespesas:", totalDespesas,
+      "| lucroLiquido:", lucroLiquido,
+    );
+
     return {
-      receitaBruta, custoTotal, lucroBruto,
+      receitaBruta, receitaLiquida, descontosTotais,
+      taxasCartao, custoTotal, lucroBruto,
       totalDespesas, lucroLiquido, margem,
       qtdeVendas: vFiltradas.length,
       porCategoria,
     };
-  }, [vendas, despesas, intervalo]);
+  }, [vendas, despesas, intervalo, calcularTaxaFallback]);
 
   const pct = (v) =>
     dados.receitaBruta > 0
@@ -522,6 +616,8 @@ function RelatorioDRE({ vendas, despesas, intervalo }) {
       colunas: ["Item", "Valor (R$)", "% Receita"],
       dados: [
         ["Receita Bruta (Vendas)", dados.receitaBruta.toFixed(2), pct(dados.receitaBruta)],
+        ["(-) Taxas de Cartão",   `-${dados.taxasCartao.toFixed(2)}`, pct(dados.taxasCartao)],
+        ["= Receita Líquida",     dados.receitaLiquida.toFixed(2), pct(dados.receitaLiquida)],
         ["(-) Custos de Produtos",  `-${dados.custoTotal.toFixed(2)}`, pct(dados.custoTotal)],
         ["= Lucro Bruto",          dados.lucroBruto.toFixed(2),  pct(dados.lucroBruto)],
         ["(-) Despesas Totais",    `-${dados.totalDespesas.toFixed(2)}`, pct(dados.totalDespesas)],
@@ -593,6 +689,20 @@ function RelatorioDRE({ vendas, despesas, intervalo }) {
           <span className="dre-val dre-positivo">{fmtR$(dados.receitaBruta)}</span>
           <span className="dre-pct">{pct(dados.receitaBruta)}</span>
         </div>
+        {dados.taxasCartao > 0 && (
+          <div className="dre-row">
+            <span className="dre-sub-label">(-) Taxas de Cartão</span>
+            <span className="dre-val dre-negativo">- {fmtR$(dados.taxasCartao)}</span>
+            <span className="dre-pct">{pct(dados.taxasCartao)}</span>
+          </div>
+        )}
+        {dados.taxasCartao > 0 && (
+          <div className="dre-row" style={{ background: "rgba(0,0,0,0.08)" }}>
+            <span className="dre-label">= Receita Líquida</span>
+            <span className="dre-val dre-positivo">{fmtR$(dados.receitaLiquida)}</span>
+            <span className="dre-pct">{pct(dados.receitaLiquida)}</span>
+          </div>
+        )}
 
         {/* Custos */}
         <div className="dre-row dre-row-cat">CUSTOS</div>
@@ -647,6 +757,29 @@ function RelatorioDRE({ vendas, despesas, intervalo }) {
           </span>
         </div>
       </div>
+
+      {/* ── Banner de resultado final ── */}
+      {(() => {
+        const isLucro = dados.lucroLiquido >= 0;
+        return (
+          <div className={`dre-resultado-banner ${isLucro ? "lucro" : "prejuizo"}`}>
+            <div className="dre-resultado-esquerda">
+              <span className="dre-resultado-emoji">{isLucro ? "✅" : "❌"}</span>
+              <div className="dre-resultado-textos">
+                <span className="dre-resultado-titulo">
+                  {isLucro ? "Lucro do Período" : "Prejuízo do Período"}
+                </span>
+                <span className="dre-resultado-sub">
+                  {isLucro
+                    ? `Margem líquida: ${fmtPct(dados.margem)}`
+                    : `Margem líquida: ${fmtPct(dados.margem)}`}
+                </span>
+              </div>
+            </div>
+            <span className="dre-resultado-valor">{fmtR$(dados.lucroLiquido)}</span>
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -773,9 +906,16 @@ function RelatorioFinanceiro({ caixa, intervalo }) {
 function RelatorioDespesas({ despesas, intervalo }) {
   const dados = useMemo(() => {
     const filtradas = despesas
-      .filter((d) => dentroDoIntervalo(d.data, intervalo))
+      /* CORREÇÃO 2: tenta d.data e fallback para d.dataVencimento no filtro */
+      .filter((d) => {
+        if (dentroDoIntervalo(d.data, intervalo)) return true;
+        /* Se d.data não existir, tenta vencimento como data principal */
+        if (!d.data && dentroDoIntervalo(d.dataVencimento || d.vencimento, intervalo)) return true;
+        return false;
+      })
       .sort((a, b) => {
-        const da = parseDate(a.data), db2 = parseDate(b.data);
+        const da = parseDate(a.data || a.dataVencimento || a.vencimento);
+        const db2 = parseDate(b.data || b.dataVencimento || b.vencimento);
         return (db2 || 0) - (da || 0);
       });
 
@@ -799,9 +939,13 @@ function RelatorioDespesas({ despesas, intervalo }) {
   const handleExport = () => {
     exportarExcel("despesas", [{
       nome: "Despesas",
-      colunas: ["Data", "Descrição", "Categoria", "Valor (R$)"],
+      colunas: ["Data Lançamento", "Vencimento", "Descrição", "Categoria", "Valor (R$)"],
       dados: dados.filtradas.map((d) => [
-        fmtData(d.data), d.descricao || "—", d.categoria || "—", Number(d.valor || 0).toFixed(2),
+        fmtData(d.data),
+        fmtData(d.dataVencimento || d.vencimento),
+        d.descricao || "—",
+        d.categoria || "—",
+        Number(d.valor || 0).toFixed(2),
       ]),
     }]);
   };
@@ -858,7 +1002,22 @@ function RelatorioDespesas({ despesas, intervalo }) {
         empty="Nenhuma despesa no período."
         data={dados.filtradas}
         columns={[
-          { key: "data",      label: "Data",      render: (v) => fmtData(v) },
+          { key: "data",      label: "Data Lançamento", render: (v) => fmtData(v) },
+          {
+            key: "dataVencimento",
+            label: "Vencimento",
+            render: (v, row) => {
+              const raw = v || row.vencimento;
+              if (!raw) return <span style={{ color: "var(--text-3)" }}>—</span>;
+              const dias = getDiasRestantes(raw);
+              const color = dias !== null && dias < 0
+                ? "var(--red)"
+                : dias !== null && dias <= 3
+                ? "var(--gold)"
+                : "var(--text-2)";
+              return <span style={{ color }}>{fmtData(raw)}</span>;
+            },
+          },
           { key: "descricao", label: "Descrição" },
           { key: "categoria", label: "Categoria" },
           {
@@ -1013,29 +1172,53 @@ function RelatorioVendas({ vendas, intervalo }) {
 function RelatorioEstoque({ produtos }) {
   /* Estoque não usa filtro de período — é snapshot atual */
   const dados = useMemo(() => {
-    const total = produtos.length;
-    const valorTotal = produtos.reduce(
-      (s, p) => s + Number(p.precoVenda || 0) * Number(p.quantidade || 0), 0
-    );
-    const baixoEstoque = produtos.filter(
-      (p) => Number(p.quantidade || 0) <= Number(p.estoqueMinimo || p.estoque_minimo || 5)
-    );
-    const semEstoque = produtos.filter((p) => Number(p.quantidade || 0) === 0);
+    /* CORREÇÃO 4: campos corretos do Firestore são p.estoque, p.preco, p.custo, p.margem
+       Estrutura real: produtos/{id} { custo, estoque, preco, margem, nome } */
+    console.log("[Estoque] produtos carregados:", produtos.length,
+      "| exemplo:", produtos[0] ? JSON.stringify(Object.keys(produtos[0])) : "vazio");
 
-    const sorted = [...produtos].sort((a, b) => Number(a.quantidade || 0) - Number(b.quantidade || 0));
-    return { total, valorTotal, baixoEstoque, semEstoque, sorted };
+    const estoque    = (p) => Number(p.estoque   ?? p.quantidade ?? 0);
+    const precoVenda = (p) => Number(p.preco      ?? p.precoVenda ?? 0);
+    const precoCusto = (p) => Number(p.custo      ?? p.precoCusto ?? 0);
+    const estoqueMin = (p) => Number(p.estoqueMinimo ?? p.estoque_minimo ?? 5);
+
+    const total = produtos.length;
+
+    /* Valor em estoque = preco de venda × quantidade em estoque */
+    const valorTotal = produtos.reduce(
+      (s, p) => s + precoVenda(p) * estoque(p), 0
+    );
+
+    /* Valor de custo em estoque */
+    const valorCusto = produtos.reduce(
+      (s, p) => s + precoCusto(p) * estoque(p), 0
+    );
+
+    const baixoEstoque = produtos.filter(
+      (p) => estoque(p) > 0 && estoque(p) <= estoqueMin(p)
+    );
+    const semEstoque = produtos.filter((p) => estoque(p) === 0);
+
+    /* Ordena do menor para o maior estoque */
+    const sorted = [...produtos].sort((a, b) => estoque(a) - estoque(b));
+
+    return { total, valorTotal, valorCusto, baixoEstoque, semEstoque, sorted,
+             /* helpers reutilizados no render */ _estoque: estoque, _preco: precoVenda, _custo: precoCusto };
   }, [produtos]);
+
+  const { _estoque, _preco, _custo } = dados;
 
   const handleExport = () => {
     exportarExcel("estoque", [{
       nome: "Estoque",
-      colunas: ["Produto", "Quantidade", "Preço Venda (R$)", "Preço Custo (R$)", "Valor Total (R$)"],
+      colunas: ["Produto", "Estoque Atual", "Preço Venda (R$)", "Custo (R$)", "Margem (%)", "Valor Total (R$)"],
       dados: dados.sorted.map((p) => [
         p.nome || "—",
-        Number(p.quantidade || 0),
-        Number(p.precoVenda || 0).toFixed(2),
-        Number(p.precoCusto || 0).toFixed(2),
-        (Number(p.precoVenda || 0) * Number(p.quantidade || 0)).toFixed(2),
+        _estoque(p),
+        _preco(p).toFixed(2),
+        _custo(p).toFixed(2),
+        Number(p.margem || 0).toFixed(1),
+        (_preco(p) * _estoque(p)).toFixed(2),
       ]),
     }]);
   };
@@ -1053,7 +1236,13 @@ function RelatorioEstoque({ produtos }) {
           icon={<DollarSign size={18} />}
           label="Valor em Estoque"
           value={fmtR$(dados.valorTotal)}
-          sub="valor de venda" trend="neutral" colorVar="var(--green)"
+          sub="pelo preço de venda" trend="neutral" colorVar="var(--green)"
+        />
+        <CardResumo
+          icon={<DollarSign size={18} />}
+          label="Custo do Estoque"
+          value={fmtR$(dados.valorCusto)}
+          sub="pelo preço de custo" trend="neutral" colorVar="var(--text-2)"
         />
         <CardResumo
           icon={<AlertCircle size={18} />}
@@ -1085,12 +1274,12 @@ function RelatorioEstoque({ produtos }) {
             data={dados.baixoEstoque}
             columns={[
               { key: "nome", label: "Produto" },
-              { key: "quantidade", label: "Qtd Atual", align: "center",
-                render: (v) => <span style={{ color: "var(--red)", fontWeight: 700 }}>{v}</span> },
+              { key: "estoque", label: "Qtd Atual", align: "center",
+                render: (v, row) => <span style={{ color: "var(--red)", fontWeight: 700 }}>{_estoque(row)}</span> },
               { key: "estoqueMinimo", label: "Mínimo", align: "center",
                 render: (v, row) => v ?? row.estoque_minimo ?? 5 },
-              { key: "precoVenda", label: "Preço", align: "right",
-                render: (v) => fmtR$(v) },
+              { key: "preco", label: "Preço", align: "right",
+                render: (v, row) => fmtR$(_preco(row)) },
             ]}
             empty=""
           />
@@ -1105,13 +1294,20 @@ function RelatorioEstoque({ produtos }) {
         columns={[
           { key: "nome",      label: "Produto" },
           { key: "categoria", label: "Categoria" },
-          { key: "quantidade", label: "Qtd", align: "center" },
-          { key: "precoVenda", label: "Preço Venda", align: "right",
-            render: (v) => fmtR$(v) },
-          { key: "precoCusto", label: "Custo", align: "right",
-            render: (v) => fmtR$(v) },
-          { key: "precoVenda", label: "Valor em Estoque", align: "right",
-            render: (v, row) => fmtR$(Number(v || 0) * Number(row.quantidade || 0)) },
+          { key: "estoque",   label: "Estoque", align: "center",
+            render: (v, row) => {
+              const qt = _estoque(row);
+              const color = qt === 0 ? "var(--red)" : qt <= 5 ? "var(--gold)" : "var(--green)";
+              return <span style={{ color, fontWeight: 600 }}>{qt}</span>;
+            }},
+          { key: "preco",  label: "Preço Venda", align: "right",
+            render: (v, row) => fmtR$(_preco(row)) },
+          { key: "custo",  label: "Custo", align: "right",
+            render: (v, row) => fmtR$(_custo(row)) },
+          { key: "margem", label: "Margem %", align: "right",
+            render: (v) => <span style={{ color: "var(--gold)" }}>{Number(v || 0).toFixed(1)}%</span> },
+          { key: "estoque", label: "Valor em Estoque", align: "right",
+            render: (v, row) => fmtR$(_preco(row) * _estoque(row)) },
         ]}
       />
 
@@ -1133,29 +1329,59 @@ function RelatorioClientes({ clientes, vendas, intervalo }) {
 
     /* Clientes que compraram no período */
     const vendasPeriodo = vendas.filter((v) => dentroDoIntervalo(v.data, intervalo));
-    const idsAtivos = new Set(vendasPeriodo.map((v) => v.clienteId || v.cliente_id).filter(Boolean));
-    const ativos = clientes.filter((c) => idsAtivos.has(c.id));
+
+    console.log("[Clientes] total clientes:", total,
+      "| vendas no período:", vendasPeriodo.length,
+      "| exemplo venda keys:", vendasPeriodo[0] ? JSON.stringify(Object.keys(vendasPeriodo[0])) : "sem vendas");
+
+    /* CORREÇÃO 5: Vendas.jsx salva v.cliente (string nome), não v.clienteId.
+       Estratégia: primeiro tenta match por ID, fallback por nome normalizado */
+    const idsAtivos = new Set();
+    const nomesAtivos = new Set();
+    vendasPeriodo.forEach((v) => {
+      if (v.clienteId)  idsAtivos.add(v.clienteId);
+      if (v.cliente_id) idsAtivos.add(v.cliente_id);
+      if (v.cliente)    nomesAtivos.add((v.cliente || "").trim().toLowerCase());
+    });
+
+    const ativos = clientes.filter((c) =>
+      idsAtivos.has(c.id) ||
+      nomesAtivos.has((c.nome || "").trim().toLowerCase())
+    );
+
+    console.log("[Clientes] idsAtivos:", idsAtivos.size,
+      "| nomesAtivos:", nomesAtivos.size,
+      "| ativos encontrados:", ativos.length);
 
     /* Clientes com fiado */
     const comFiado = clientes.filter((c) => Number(c.fiado || c.debito || 0) > 0);
     const totalFiado = comFiado.reduce((s, c) => s + Number(c.fiado || c.debito || 0), 0);
 
-    /* Top clientes por valor gasto no período */
+    /* Top clientes por valor gasto no período — resolve tanto por id quanto por nome */
     const gastosPorCliente = {};
     vendasPeriodo.forEach((v) => {
-      const id = v.clienteId || v.cliente_id;
-      if (!id) return;
-      gastosPorCliente[id] = (gastosPorCliente[id] || 0) + Number(v.total || 0);
+      /* Tenta resolver o cliente: prioriza id, fallback nome */
+      const chave = v.clienteId || v.cliente_id || (v.cliente || "").trim().toLowerCase();
+      if (!chave) return;
+      gastosPorCliente[chave] = (gastosPorCliente[chave] || 0) + Number(v.total || 0);
     });
+
     const topClientes = Object.entries(gastosPorCliente)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
-      .map(([id, total2]) => {
-        const c = clientes.find((x) => x.id === id);
-        return { id, nome: c?.nome || id, total: total2 };
+      .map(([chave, totalGasto]) => {
+        const c = clientes.find(
+          (x) => x.id === chave || (x.nome || "").trim().toLowerCase() === chave
+        );
+        return { chave, nome: c?.nome || chave, total: totalGasto };
       });
 
-    return { total, ativos, comFiado, totalFiado, topClientes };
+    /* Lista completa ordenada por nome */
+    const listaCompleta = [...clientes].sort((a, b) =>
+      (a.nome || "").localeCompare(b.nome || "", "pt-BR")
+    );
+
+    return { total, ativos, comFiado, totalFiado, topClientes, listaCompleta };
   }, [clientes, vendas, intervalo]);
 
   const handleExport = () => {
@@ -1200,7 +1426,7 @@ function RelatorioClientes({ clientes, vendas, intervalo }) {
             <span className="tr-title">Top Clientes no Período</span>
           </div>
           {dados.topClientes.map((c, i) => (
-            <div key={c.id} className="rank-item">
+            <div key={c.chave || c.nome} className="rank-item">
               <span className="rank-num">#{i + 1}</span>
               <span className="rank-label">{c.nome}</span>
               <span className="rank-val">{fmtR$(c.total)}</span>
@@ -1225,6 +1451,28 @@ function RelatorioClientes({ clientes, vendas, intervalo }) {
         />
       )}
 
+      {/* CORREÇÃO 5: Lista completa de todos os clientes — estava ausente */}
+      <TabelaRelatorio
+        title="Todos os Clientes"
+        count={dados.total}
+        empty="Nenhum cliente cadastrado."
+        data={dados.listaCompleta}
+        columns={[
+          { key: "id",       label: "ID", render: (v) => <span style={{ color: "var(--gold)", fontFamily: "'Sora', sans-serif", fontSize: 11 }}>{v}</span> },
+          { key: "nome",     label: "Nome" },
+          { key: "telefone", label: "Telefone" },
+          { key: "cpf",      label: "CPF / CNPJ" },
+          { key: "email",    label: "E-mail" },
+          { key: "fiado",    label: "Fiado", align: "right",
+            render: (v, row) => {
+              const val = Number(v || row.debito || 0);
+              return val > 0
+                ? <span className="val-neg">{fmtR$(val)}</span>
+                : <span style={{ color: "var(--text-3)" }}>—</span>;
+            }},
+        ]}
+      />
+
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button className="btn-secondary" onClick={handleExport}>
           <Download size={13} /> Exportar Excel
@@ -1242,26 +1490,47 @@ function RelatorioAgenda({ agenda, intervalo }) {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
+    /* CORREÇÃO 6: log para debugar campos reais da agenda */
+    console.log("[Agenda] total itens:", agenda.length,
+      "| exemplo keys:", agenda[0] ? JSON.stringify(Object.keys(agenda[0])) : "vazio",
+      "| exemplo item:", agenda[0] ? JSON.stringify(agenda[0]) : "vazio");
+
+    /* Helper: extrai a data do item tentando múltiplos campos possíveis */
+    const getDataAgenda = (a) =>
+      a.data || a.dataHora || a.inicio || a.date || a.start || a.dataInicio || null;
+
     /* Agenda usa a data do compromisso como referência */
     const filtrada = agenda
-      .filter((a) => dentroDoIntervalo(a.data || a.dataHora, intervalo))
+      .filter((a) => {
+        const rawDate = getDataAgenda(a);
+        /* Se periodo for "todos" (intervalo sem datas), mostra tudo */
+        if (!intervalo.de && !intervalo.ate) return true;
+        return dentroDoIntervalo(rawDate, intervalo);
+      })
       .sort((a, b) => {
-        const da = parseDate(a.data || a.dataHora);
-        const db2 = parseDate(b.data || b.dataHora);
+        const da = parseDate(getDataAgenda(a));
+        const db2 = parseDate(getDataAgenda(b));
         return (da || 0) - (db2 || 0);
       });
 
+    console.log("[Agenda] filtrada:", filtrada.length,
+      "| intervalo:", intervalo.de?.toLocaleDateString("pt-BR"), "→", intervalo.ate?.toLocaleDateString("pt-BR"));
+
     const futuros = filtrada.filter((a) => {
-      const dt = parseDate(a.data || a.dataHora);
+      const dt = parseDate(getDataAgenda(a));
       return dt && dt >= hoje;
     });
     const passados = filtrada.filter((a) => {
-      const dt = parseDate(a.data || a.dataHora);
+      const dt = parseDate(getDataAgenda(a));
       return dt && dt < hoje;
     });
 
-    return { filtrada, futuros, passados };
+    console.log("[Agenda] futuros:", futuros.length, "| passados:", passados.length);
+
+    return { filtrada, futuros, passados, getDataAgenda };
   }, [agenda, intervalo]);
+
+  const { getDataAgenda } = dados;
 
   const getBadge = (rawDate) => {
     const dias = getDiasRestantes(rawDate);
@@ -1277,7 +1546,7 @@ function RelatorioAgenda({ agenda, intervalo }) {
       nome: "Agenda",
       colunas: ["Data", "Hora", "Título", "Tipo", "Status", "Descrição"],
       dados: dados.filtrada.map((a) => [
-        fmtData(a.data || a.dataHora),
+        fmtData(getDataAgenda(a)),
         a.hora || "—",
         a.titulo || a.title || "—",
         a.tipo || a.type || "—",
@@ -1288,7 +1557,7 @@ function RelatorioAgenda({ agenda, intervalo }) {
   };
 
   const renderItem = (a, i) => {
-    const rawDate = a.data || a.dataHora;
+    const rawDate = getDataAgenda(a);
     const dt = parseDate(rawDate);
     const badge = getBadge(rawDate);
     const dia  = dt ? dt.getDate() : "?";
@@ -1474,7 +1743,7 @@ export default function Relatorios() {
       );
     }
     switch (ativo) {
-      case "dre":        return <RelatorioDRE vendas={vendas} despesas={despesas} intervalo={intervalo} />;
+      case "dre":        return <RelatorioDRE vendas={vendas} despesas={despesas} intervalo={intervalo} uid={uid} />;
       case "financeiro": return <RelatorioFinanceiro caixa={caixa} intervalo={intervalo} />;
       case "vendas":     return <RelatorioVendas vendas={vendas} intervalo={intervalo} />;
       case "despesas":   return <RelatorioDespesas despesas={despesas} intervalo={intervalo} />;
@@ -1499,11 +1768,7 @@ export default function Relatorios() {
               <p>{TITULO_RELATORIO[ativo]}</p>
             </div>
           </div>
-          <div className="rel-actions">
-            <button className="btn-secondary" onClick={handlePrint} data-print-hide>
-              <Printer size={13} /> Imprimir
-            </button>
-          </div>
+          {/* rel-actions removido daqui — botões foram para o cabeçalho do conteúdo */}
         </header>
 
         <div className="rel-body">
@@ -1542,6 +1807,20 @@ export default function Relatorios() {
               dataFim={dataFim}
               setDataFim={setDataFim}
             />
+
+            {/* CORREÇÃO 3: Cabeçalho do relatório ativo com botões de ação juntos */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <span className="rel-section-title">
+                <ChevronRight size={15} />
+                {TITULO_RELATORIO[ativo]}
+              </span>
+              <div style={{ display: "flex", gap: 8 }} data-print-hide>
+                <button className="btn-secondary" onClick={handlePrint}
+                  style={{ fontSize: 12, padding: "6px 14px" }}>
+                  <Printer size={13} /> Imprimir
+                </button>
+              </div>
+            </div>
 
             {/* Conteúdo do relatório */}
             {renderConteudo()}
