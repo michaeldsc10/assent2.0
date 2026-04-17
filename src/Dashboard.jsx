@@ -21,7 +21,7 @@ import Despesas from "./modules/Despesas.jsx";
 import EntradaEstoque from "./modules/EntradaEstoque.jsx";
 import Agenda from "./modules/Agenda/Agenda.jsx";
 import Fornecedores from "./modules/Fornecedores.jsx";
-import Areceber from "./modules/Areceber.jsx";
+import AReceber from "./modules/AReceber.jsx";
 
 /* ── Firebase (Adicionado para o filtro) ── */
 import { db, auth } from "./lib/firebase";
@@ -430,7 +430,7 @@ export default function Dashboard() {
       case "Entrada de Estoque": return <EntradaEstoque />;
       case "Agenda":           return <Agenda />;
       case "Fornecedores":     return <Fornecedores />;
-      case "A Receber":        return <Areceber />;
+      case "A Receber":        return <AReceber />;
         
       default:                 return renderDashboard();
     }
