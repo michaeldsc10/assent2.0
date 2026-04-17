@@ -632,7 +632,7 @@ const novoEst = Math.max(0, estoqueReal + quantidadeFinal);
       </div>
     </div>
   );
-}
+
 
 /* ══════════════════════════════════════════════════════
    FUNÇÃO PURA: Calcular novo estoque
