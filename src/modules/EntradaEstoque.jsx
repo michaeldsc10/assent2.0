@@ -404,7 +404,7 @@ const novoEstoque = Math.max(0, estoqueAtual + delta);
       const movCol     = collection(db, "users", uid, "movimentacoes_estoque");
 
       /* Transação atômica: evita race conditions de estoque */
-      await runTransaction(db, async (tx) => {
+      await runTransaction(db, async (tx) )=> {
          
          const oldQtd = movimento?.quantidade || 0;
 const newQtd = Number(form.quantidade);
@@ -460,7 +460,7 @@ const novoEst = Math.max(0, estoqueReal + quantidadeFinal);
     
       setSalvando(false);
     }
-  };
+  
 
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
