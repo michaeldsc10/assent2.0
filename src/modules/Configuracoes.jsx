@@ -53,13 +53,6 @@ const validarCNPJ = (cnpj) => {
 /* ══════════════════════════════════════════════════════
    CONSTANTES
    ══════════════════════════════════════════════════════ */
-
-/*
-  MENU_SECTIONS — fonte única de verdade dos módulos do sistema.
-  locked: true  → sempre visível (sem toggle)
-  locked: false → o usuário pode ocultar
-  Adicione módulos aqui à medida que forem implementados.
-*/
 const MENU_SECTIONS = [
   { key: "dashboard",       label: "Dashboard",         sub: "Visão geral e KPIs",       icon: "📊", locked: true  },
   { key: "clientes",        label: "Clientes",           sub: "Cadastro e histórico",     icon: "👥", locked: false },
@@ -78,10 +71,6 @@ const MENU_SECTIONS = [
   { key: "config",          label: "Configurações",      sub: "Esta tela",                icon: "⚙️", locked: true  },
 ];
 
-/*
-  TAXAS — débito, PIX e crédito 1x–12x individualmente.
-  Salvo como: taxas: { debito, pix, credito_1 … credito_12 }
-*/
 const TAXAS_DEFAULT = {
   debito:     "1.99",
   pix:        "0.00",
@@ -120,7 +109,7 @@ const CSS = `
 
   .cfg-root {
     display: flex; flex-direction: column;
-    height: 100%;
+    height: 100vh; width: 100%; overflow: hidden;
   }
   .cfg-topbar {
     padding: 14px 22px;
@@ -132,10 +121,6 @@ const CSS = `
   }
   .cfg-topbar-title p { font-size: 11px; color: var(--text-2); margin-top: 2px; }
 
-  /*
-    SCROLL FIX: flex children têm min-height: auto por padrão.
-    Sem min-height: 0 explícito, o overflow-y nunca dispara.
-  */
   .cfg-body {
     display: flex; flex: 1;
     overflow: hidden; min-height: 0;
@@ -144,12 +129,13 @@ const CSS = `
     width: 220px; flex-shrink: 0;
     background: var(--s1); border-right: 1px solid var(--border);
     padding: 16px 10px; display: flex; flex-direction: column; gap: 2px;
-    overflow-y: auto; min-height: 0;
+    overflow-y: auto;
   }
   .cfg-panel {
     flex: 1; overflow-y: auto; padding: 24px;
     display: flex; flex-direction: column; gap: 20px;
-    animation: fadeIn .18s ease; min-height: 0;
+    animation: fadeIn .18s ease; 
+    height: 100%;
   }
   .cfg-panel::-webkit-scrollbar { width: 3px; }
   .cfg-panel::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
@@ -176,6 +162,7 @@ const CSS = `
   .cfg-card {
     background: var(--s1); border: 1px solid var(--border);
     border-radius: 14px; overflow: hidden; animation: slideUp .18s ease;
+    flex-shrink: 0;
   }
   .cfg-card-header {
     padding: 16px 20px; border-bottom: 1px solid var(--border);
@@ -281,7 +268,6 @@ const CSS = `
   }
   .btn-logo-remove:hover { background: rgba(224,82,82,.18); }
 
-  /* ── Tabela de taxas ── */
   .taxa-table { width: 100%; border-collapse: collapse; }
   .taxa-table thead tr { background: var(--s2); }
   .taxa-table th {
@@ -310,7 +296,6 @@ const CSS = `
     transition: border-color .15s, box-shadow .15s; text-align: right;
   }
   .taxa-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(200,165,94,0.1); }
-  .taxa-input.err   { border-color: var(--red); }
   .taxa-pct { font-size: 12px; color: var(--text-3); margin-left: 5px; }
   .taxa-section-divider td {
     padding: 5px 14px; font-size: 9px; font-weight: 700; letter-spacing: .08em;
@@ -318,7 +303,6 @@ const CSS = `
     background: var(--s3); border-bottom: 1px solid var(--border);
   }
 
-  /* ── Menu toggles ── */
   .menu-toggle-list { display: flex; flex-direction: column; gap: 6px; }
   .menu-toggle-item {
     display: flex; align-items: center; gap: 12px;
@@ -339,7 +323,6 @@ const CSS = `
     border: 1px solid var(--border); border-radius: 20px; padding: 2px 8px; white-space: nowrap;
   }
 
-  /* ── Toggle switch ── */
   .toggle-switch { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
   .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
   .toggle-track {
@@ -362,8 +345,6 @@ const CSS = `
     font-size: 12px; color: var(--text-3); background: var(--s3); border: 1px solid var(--border);
     border-radius: 8px; padding: 10px 14px; margin-top: 12px; line-height: 1.6;
   }
-  .estoque-hint strong { color: var(--text-2); }
-
   .cfg-spinner {
     width: 14px; height: 14px; border-radius: 50%;
     border: 2px solid rgba(0,0,0,0.15); border-top-color: #0a0808;
@@ -424,7 +405,7 @@ function PassInput({ value, onChange, placeholder, className }) {
 }
 
 /* ══════════════════════════════════════════════════════
-   SEÇÃO: Empresa
+   SEÇÕES
    ══════════════════════════════════════════════════════ */
 function SecaoEmpresa({ config, onSave }) {
   const [form, setForm] = useState({
@@ -553,9 +534,6 @@ function SecaoEmpresa({ config, onSave }) {
   );
 }
 
-/* ══════════════════════════════════════════════════════
-   SEÇÃO: Segurança
-   ══════════════════════════════════════════════════════ */
 function SecaoSeguranca() {
   const [form, setForm]         = useState({ senhaAtual: "", novaSenha: "", confirmar: "" });
   const [erros, setErros]       = useState({});
@@ -640,13 +618,6 @@ function SecaoSeguranca() {
   );
 }
 
-/* ══════════════════════════════════════════════════════
-   SEÇÃO: Financeiro — Taxa de Máquina de Cartão
-   ─────────────────────────────────────────────────────
-   Firestore: taxas: { debito, pix, credito_1 … credito_12 }
-   ══════════════════════════════════════════════════════ */
-
-/* Normaliza input: aceita vírgula, remove lixo, max 2 casas decimais */
 const normalizaTaxa = (raw) => {
   let v = String(raw).replace(",", ".").replace(/[^0-9.]/g, "");
   const parts = v.split(".");
@@ -668,11 +639,8 @@ function SecaoFinanceiro({ config, onSave }) {
   const [erros, setErros]       = useState({});
   const [salvando, setSalvando] = useState(false);
 
-  /* Sincroniza quando config chega do Firestore */
   useEffect(() => {
-    if (config?.taxas) {
-      setTaxas(prev => ({ ...TAXAS_DEFAULT, ...config.taxas }));
-    }
+    if (config?.taxas) setTaxas(prev => ({ ...TAXAS_DEFAULT, ...config.taxas }));
   }, [config]);
 
   const setTaxa = (k, raw) => {
@@ -683,20 +651,15 @@ function SecaoFinanceiro({ config, onSave }) {
 
   const validar = () => {
     const e = {};
-    Object.keys(taxas).forEach(k => {
-      if (!taxaValida(taxas[k])) e[k] = "Inválido";
-    });
+    Object.keys(taxas).forEach(k => { if (!taxaValida(taxas[k])) e[k] = "Inválido"; });
     setErros(e);
     return Object.keys(e).length === 0;
   };
 
   const handleSalvar = async () => {
     if (!validar()) return;
-    // Converte para float com 2 casas antes de persistir
     const taxasFinais = {};
-    Object.keys(taxas).forEach(k => {
-      taxasFinais[k] = parseFloat(parseFloat(taxas[k]).toFixed(2));
-    });
+    Object.keys(taxas).forEach(k => { taxasFinais[k] = parseFloat(parseFloat(taxas[k]).toFixed(2)); });
     setSalvando(true);
     await onSave({ taxas: taxasFinais });
     setSalvando(false);
@@ -708,12 +671,7 @@ function SecaoFinanceiro({ config, onSave }) {
       <td><span className="taxa-tipo-badge">{tipo}</span></td>
       <td style={{ textAlign: "right" }}>
         <span style={{ display: "inline-flex", alignItems: "center" }}>
-          <input
-            className={`taxa-input ${erros[chave] ? "err" : ""}`}
-            value={taxas[chave] ?? ""}
-            onChange={e => setTaxa(chave, e.target.value)}
-            inputMode="decimal"
-          />
+          <input className={`taxa-input ${erros[chave] ? "err" : ""}`} value={taxas[chave] ?? ""} onChange={e => setTaxa(chave, e.target.value)} inputMode="decimal" />
           <span className="taxa-pct">%</span>
         </span>
       </td>
@@ -729,21 +687,13 @@ function SecaoFinanceiro({ config, onSave }) {
           <div className="cfg-card-sub">Usada para calcular lucro líquido nas vendas</div>
         </div>
       </div>
-
       <div className="cfg-card-body" style={{ padding: 0 }}>
         <table className="taxa-table">
-          <thead>
-            <tr>
-              <th>Modalidade</th>
-              <th>Tipo</th>
-              <th style={{ textAlign: "right" }}>Taxa (%)</th>
-            </tr>
-          </thead>
+          <thead><tr><th>Modalidade</th><th>Tipo</th><th style={{ textAlign: "right" }}>Taxa (%)</th></tr></thead>
           <tbody>
             <tr className="taxa-section-divider"><td colSpan={3}>Outros</td></tr>
             <TaxaRow chave="debito" label="Débito" tipo="Débito" />
             <TaxaRow chave="pix"    label="PIX"    tipo="PIX"    />
-
             <tr className="taxa-section-divider"><td colSpan={3}>Crédito</td></tr>
             {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
               <TaxaRow key={n} chave={`credito_${n}`} label={`Crédito ${n}x`} tipo="Crédito" />
@@ -751,13 +701,7 @@ function SecaoFinanceiro({ config, onSave }) {
           </tbody>
         </table>
       </div>
-
       <div className="cfg-card-footer">
-        {Object.keys(erros).length > 0 && (
-          <span style={{ fontSize: 11, color: "var(--red)", marginRight: "auto", alignSelf: "center" }}>
-            Corrija os valores inválidos antes de salvar.
-          </span>
-        )}
         <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
           {salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Taxas</>}
         </button>
@@ -766,21 +710,10 @@ function SecaoFinanceiro({ config, onSave }) {
   );
 }
 
-/* ══════════════════════════════════════════════════════
-   SEÇÃO: Menu do Sistema
-   ─────────────────────────────────────────────────────
-   • locked: true  → sempre visível, sem toggle
-   • Estado salvo: config.menuVisivel.{key} = boolean
-   • Salvamento atômico via merge — não toca outras configs
-   ══════════════════════════════════════════════════════ */
-
-/* Fora do componente para evitar recriação a cada render */
 const buildVisivel = (cfg) => {
   const base = {};
   MENU_SECTIONS.forEach(s => {
-    base[s.key] = s.locked
-      ? true
-      : (cfg?.menuVisivel?.[s.key] !== undefined ? cfg.menuVisivel[s.key] : true);
+    base[s.key] = s.locked ? true : (cfg?.menuVisivel?.[s.key] !== undefined ? cfg.menuVisivel[s.key] : true);
   });
   return base;
 };
@@ -790,10 +723,7 @@ function SecaoMenu({ config, onSave }) {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro]         = useState("");
 
-  /* Sincroniza quando config chega do Firestore (mount assíncrono) */
-  useEffect(() => {
-    if (config !== null) setVisivel(buildVisivel(config));
-  }, [config]);
+  useEffect(() => { if (config !== null) setVisivel(buildVisivel(config)); }, [config]);
 
   const toggle = useCallback((key, val) => {
     setVisivel(prev => ({ ...prev, [key]: val }));
@@ -801,110 +731,52 @@ function SecaoMenu({ config, onSave }) {
   }, []);
 
   const handleSalvar = async () => {
-    setSalvando(true);
-    setErro("");
+    setSalvando(true); setErro("");
     try {
-      /* Salva apenas as chaves não-locked (locked são sempre true e não precisam ser persistidas) */
       const menuVisivel = {};
       MENU_SECTIONS.forEach(s => { if (!s.locked) menuVisivel[s.key] = visivel[s.key]; });
       await onSave({ menuVisivel });
-    } catch {
-      setErro("Falha ao salvar. Verifique sua conexão e tente novamente.");
-    } finally {
-      setSalvando(false);
-    }
+    } catch { setErro("Falha ao salvar. Verifique sua conexão."); }
+    finally { setSalvando(false); }
   };
 
   return (
     <div className="cfg-card">
       <div className="cfg-card-header">
         <div className="cfg-card-header-icon"><LayoutDashboard size={15} /></div>
-        <div>
-          <div className="cfg-card-title">Visibilidade do Menu</div>
-          <div className="cfg-card-sub">Oculte seções que não utiliza para manter o foco</div>
-        </div>
+        <div><div className="cfg-card-title">Visibilidade do Menu</div><div className="cfg-card-sub">Oculte seções que não utiliza</div></div>
       </div>
-
       <div className="cfg-card-body">
-        {erro && (
-          <div className="cfg-alert" style={{ background: "rgba(224,82,82,0.08)", border: "1px solid rgba(224,82,82,0.25)", color: "var(--red)", marginBottom: 14 }}>
-            <AlertCircle size={14} style={{ flexShrink: 0 }} />{erro}
-          </div>
-        )}
         <div className="menu-toggle-list">
           {MENU_SECTIONS.map(s => (
             <div key={s.key} className="menu-toggle-item">
               <div className="menu-toggle-icon">{s.icon}</div>
-              <div style={{ flex: 1 }}>
-                <div className="menu-toggle-label">{s.label}</div>
-                <div className="menu-toggle-sub">{s.sub}</div>
-              </div>
-              {s.locked
-                ? <span className="menu-toggle-locked">Sempre visível</span>
-                : <Toggle checked={!!visivel[s.key]} onChange={val => toggle(s.key, val)} />
-              }
+              <div style={{ flex: 1 }}><div className="menu-toggle-label">{s.label}</div><div className="menu-toggle-sub">{s.sub}</div></div>
+              {s.locked ? <span className="menu-toggle-locked">Sempre visível</span> : <Toggle checked={!!visivel[s.key]} onChange={val => toggle(s.key, val)} />}
             </div>
           ))}
         </div>
       </div>
-
-      <div className="cfg-card-footer">
-        <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
-          {salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Menu</>}
-        </button>
-      </div>
+      <div className="cfg-card-footer"><button className="btn-primary" onClick={handleSalvar} disabled={salvando}>{salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Menu</>}</button></div>
     </div>
   );
 }
 
-/* ══════════════════════════════════════════════════════
-   SEÇÃO: Estoque Mínimo
-   ══════════════════════════════════════════════════════ */
 function SecaoEstoque({ config, onSave }) {
   const [minimo, setMinimo]     = useState(config?.estoqueMinimo ?? 5);
   const [salvando, setSalvando] = useState(false);
-
-  useEffect(() => {
-    if (config?.estoqueMinimo !== undefined) setMinimo(config.estoqueMinimo);
-  }, [config]);
-
-  const handleSalvar = async () => {
-    setSalvando(true);
-    await onSave({ estoqueMinimo: Number(minimo) });
-    setSalvando(false);
-  };
-
+  useEffect(() => { if (config?.estoqueMinimo !== undefined) setMinimo(config.estoqueMinimo); }, [config]);
+  const handleSalvar = async () => { setSalvando(true); await onSave({ estoqueMinimo: Number(minimo) }); setSalvando(false); };
   return (
     <div className="cfg-card">
       <div className="cfg-card-header">
         <div className="cfg-card-header-icon"><Package size={15} /></div>
-        <div>
-          <div className="cfg-card-title">Estoque Mínimo Padrão</div>
-          <div className="cfg-card-sub">Alertas quando o produto atingir este limite</div>
-        </div>
+        <div><div className="cfg-card-title">Estoque Mínimo Padrão</div><div className="cfg-card-sub">Alertas quando o limite for atingido</div></div>
       </div>
       <div className="cfg-card-body">
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label className="form-label">Quantidade mínima padrão</label>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <input type="number" min="0" max="9999" className="form-input"
-              style={{ maxWidth: 160 }} value={minimo}
-              onChange={e => setMinimo(e.target.value)} />
-            <span style={{ fontSize: 12, color: "var(--text-3)" }}>unidades</span>
-          </div>
-        </div>
-        <div className="estoque-hint">
-          <strong>Como funciona:</strong> Quando um produto atingir ou ficar abaixo de{" "}
-          <strong>{minimo || 0} unidade{Number(minimo) !== 1 ? "s" : ""}</strong>, ele será marcado
-          como crítico no módulo de Estoque. Você pode sobrescrever esse valor individualmente em
-          cada produto.
-        </div>
+        <div className="form-group"><label className="form-label">Quantidade mínima padrão</label><div style={{ display: "flex", alignItems: "center", gap: 10 }}><input type="number" min="0" className="form-input" style={{ maxWidth: 160 }} value={minimo} onChange={e => setMinimo(e.target.value)} /><span style={{ fontSize: 12, color: "var(--text-3)" }}>unidades</span></div></div>
       </div>
-      <div className="cfg-card-footer">
-        <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
-          {salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Estoque</>}
-        </button>
-      </div>
+      <div className="cfg-card-footer"><button className="btn-primary" onClick={handleSalvar} disabled={salvando}>{salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Estoque</>}</button></div>
     </div>
   );
 }
@@ -927,24 +799,16 @@ export default function Configuracoes() {
   useEffect(() => {
     if (!uid) { setLoading(false); return; }
     const ref = doc(db, "users", uid, "config", "geral");
-    getDoc(ref)
-      .then(snap => setConfig(snap.exists() ? snap.data() : {}))
-      .catch(() => setConfig({}))
-      .finally(() => setLoading(false));
+    getDoc(ref).then(snap => setConfig(snap.exists() ? snap.data() : {})).catch(() => setConfig({})).finally(() => setLoading(false));
   }, [uid]);
 
-  /* Salvamento atômico — merge garante que nunca sobrescreve outras configs */
   const handleSave = useCallback(async (partial) => {
     if (!uid) return;
     try {
       await setDoc(doc(db, "users", uid, "config", "geral"), partial, { merge: true });
       setConfig(prev => ({ ...prev, ...partial }));
-      setToast({ msg: "Configurações salvas com sucesso!", type: "success" });
-    } catch (err) {
-      console.error("[Configuracoes] handleSave:", err);
-      setToast({ msg: "Erro ao salvar. Tente novamente.", type: "error" });
-      throw err; // permite que SecaoMenu trate o erro localmente
-    }
+      setToast({ msg: "Configurações salvas!", type: "success" });
+    } catch (err) { setToast({ msg: "Erro ao salvar.", type: "error" }); throw err; }
   }, [uid]);
 
   const renderSecao = () => {
@@ -974,11 +838,7 @@ export default function Configuracoes() {
           <nav className="cfg-nav">
             <span className="cfg-nav-group-label">Configurações</span>
             {NAV.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                className={`cfg-nav-item ${secao === id ? "active" : ""}`}
-                onClick={() => setSecao(id)}
-              >
+              <button key={id} className={`cfg-nav-item ${secao === id ? "active" : ""}`} onClick={() => setSecao(id)}>
                 <Icon size={15} className="cfg-nav-icon" />
                 <span className="cfg-nav-label">{label}</span>
                 {secao === id && <ChevronRight size={13} color="var(--text-3)" />}
@@ -991,40 +851,23 @@ export default function Configuracoes() {
           </main>
         </div>
       </div>
-
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </>
   );
 }
 
-/* ══════════════════════════════════════════════════════
-   HOOK EXPORTÁVEL: useConfiguracoes(uid)
-   Para outros módulos lerem taxas, estoque mínimo, etc.
-   ══════════════════════════════════════════════════════ */
 export function useConfiguracoes(uid) {
   const [config, setConfig]   = useState(null);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     if (!uid) { setLoading(false); return; }
-    getDoc(doc(db, "users", uid, "config", "geral"))
-      .then(snap => setConfig(snap.exists() ? snap.data() : {}))
-      .catch(() => setConfig({}))
-      .finally(() => setLoading(false));
+    getDoc(doc(db, "users", uid, "config", "geral")).then(snap => setConfig(snap.exists() ? snap.data() : {})).catch(() => setConfig({})).finally(() => setLoading(false));
   }, [uid]);
-
   return {
-    config,
-    loading,
-    taxas:         { ...TAXAS_DEFAULT, ...(config?.taxas || {}) },
+    config, loading,
+    taxas: { ...TAXAS_DEFAULT, ...(config?.taxas || {}) },
     estoqueMinimo: config?.estoqueMinimo ?? 5,
-    menuVisivel:   config?.menuVisivel   || {},
-    empresa: config?.empresa || {
-      nomeEmpresa: config?.nomeEmpresa || "",
-      cnpj:        config?.cnpj        || "",
-      telefone:    config?.telefone    || "",
-      endereco:    config?.endereco    || "",
-      logo:        config?.logo        || "",
-    },
+    menuVisivel: config?.menuVisivel || {},
+    empresa: config?.empresa || { nomeEmpresa: config?.nomeEmpresa || "", cnpj: config?.cnpj || "", telefone: config?.telefone || "", endereco: config?.endereco || "", logo: config?.logo || "" },
   };
 }
