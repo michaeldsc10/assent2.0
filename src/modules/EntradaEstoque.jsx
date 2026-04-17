@@ -339,7 +339,7 @@ function ModalEntrada({ uid, produtos, fornecedores, movimentacao, onSalvo, onCl
 
   /* Produto selecionado — para o preview */
   const produtoSelecionado = useMemo(
-    () => produtos.find((p) => p.id === form.produtoId) || null,
+    () => produtos.find((p) => p._docId === form.produtoId) || null,
     [form.produtoId, produtos]
   );
 
@@ -375,7 +375,9 @@ function ModalEntrada({ uid, produtos, fornecedores, movimentacao, onSalvo, onCl
     setErrGlobal("");
 
     try {
-      const produtoRef = doc(db, "users", uid, "produtos", form.produtoId);
+      const produtoSelecionadoObj = produtos.find((p) => p.id === form.produtoId || p._docId === form.produtoId);
+      const produtoDocId = produtoSelecionadoObj?._docId || form.produtoId;
+      const produtoRef = doc(db, "users", uid, "produtos", produtoDocId);
 
       if (isEdit) {
         /* ── EDIÇÃO ──────────────────────────────────────────────
@@ -441,7 +443,7 @@ function ModalEntrada({ uid, produtos, fornecedores, movimentacao, onSalvo, onCl
           tx.update(produtoRef, atualizaProduto);
 
           tx.set(movRef, {
-            produtoId:       sanitize(form.produtoId),
+            produtoId:       produtoDocId,
             produtoNome:     sanitize(prodSnap.data().nome || ""),
             quantidade:      qtdN,
             tipo:            "entrada",
@@ -514,7 +516,7 @@ function ModalEntrada({ uid, produtos, fornecedores, movimentacao, onSalvo, onCl
             >
               <option value="">Selecione um produto...</option>
               {produtos.map((p) => (
-                <option key={p.id} value={p.id}>
+                <option key={p._docId} value={p._docId}>
                   {p.nome}{p.sku ? ` (${p.sku})` : ""}
                 </option>
               ))}
@@ -660,7 +662,7 @@ function ModalEntrada({ uid, produtos, fornecedores, movimentacao, onSalvo, onCl
    O documento é deletado e o produto atualizado
    atomicamente na mesma runTransaction.
    ══════════════════════════════════════════════════════ */
-function ModalConfirmDelete({ uid, movimentacao, onSalvo, onClose }) {
+function ModalConfirmDelete({ uid, movimentacao, produtos, onSalvo, onClose }) {
   const [excluindo, setExcluindo] = useState(false);
   const [errGlobal, setErrGlobal] = useState("");
 
@@ -670,7 +672,11 @@ function ModalConfirmDelete({ uid, movimentacao, onSalvo, onClose }) {
     setErrGlobal("");
 
     try {
-      const produtoRef = doc(db, "users", uid, "produtos", movimentacao.produtoId);
+      const produtoSelecionadoObj = (produtos || []).find(
+        (p) => p._docId === movimentacao.produtoId || p.id === movimentacao.produtoId
+      );
+      const produtoDocId = produtoSelecionadoObj?._docId || movimentacao.produtoId;
+      const produtoRef = doc(db, "users", uid, "produtos", produtoDocId);
       const movRef     = doc(db, "users", uid, "movimentacoes_estoque", movimentacao.id);
 
       await runTransaction(db, async (tx) => {
@@ -779,7 +785,7 @@ export default function EntradaEstoque() {
 
     const unsubP = onSnapshot(
       collection(db, "users", uid, "produtos"),
-      (snap) => setProdutos(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      (snap) => setProdutos(snap.docs.map((d) => ({ ...d.data(), id: d.id, _docId: d.id })))
     );
 
     const unsubF = onSnapshot(
@@ -927,6 +933,7 @@ export default function EntradaEstoque() {
         <ModalConfirmDelete
           uid={uid}
           movimentacao={deletando}
+          produtos={produtos}
           onSalvo={(msg) => { showToast(msg, "sucesso"); setDeletando(null); }}
           onClose={() => setDeletando(null)}
         />
