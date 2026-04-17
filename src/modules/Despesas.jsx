@@ -1039,9 +1039,9 @@ export default function Despesas() {
 
       batch.set(doc(db, "users", uid), { despesaIdCnt: cnt }, { merge: true });
       await batch.commit();
-    } else {
-      // Despesa única
-      } else {
+    } 
+    else {
+     
   // Despesa única
   const sequencialId = gerarIdDespesa(cnt); // Gera D0001
   const status = calcularStatus(form.vencimento, "pendente");
