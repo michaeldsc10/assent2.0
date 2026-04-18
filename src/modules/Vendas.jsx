@@ -1116,7 +1116,11 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
                         const ns = [...itemSearches];
                         ns[idx] = e.target.value;
                         setItemSearches(ns);
-                        atualizarItem(idx, "nome", e.target.value);
+                        /* Ao redigitar, desvincula o item do catálogo —
+                           o usuário precisa selecionar novamente para bloquear o preço */
+                        const novo = [...itens];
+                        novo[idx] = { ...novo[idx], nome: e.target.value, produtoId: "" };
+                        setItens(novo);
                         setItemAC(idx);
                       }}
                       onFocus={() => setItemAC(idx)}
@@ -1153,22 +1157,46 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
                   </div>
 
                   <div>
-                    <div className="nv-item-field-label">Preço Unit. (R$)</div>
+                    <div className="nv-item-field-label">
+                      Preço Unit. (R$)
+                      {item.produtoId && (
+                        <span
+                          title="Valor definido pelo cadastro — não editável"
+                          style={{ marginLeft: 5, fontSize: 10, color: "var(--text-3)", verticalAlign: "middle" }}
+                        >🔒</span>
+                      )}
+                    </div>
                     <input
                       type="number" min="0" step="0.01"
                       className="form-input"
                       value={item.preco}
-                      onChange={e => atualizarItem(idx, "preco", e.target.value)}
+                      readOnly={!!item.produtoId}
+                      style={item.produtoId
+                        ? { opacity: 0.6, cursor: "not-allowed", background: "var(--s3)", userSelect: "none" }
+                        : {}}
+                      onChange={e => !item.produtoId && atualizarItem(idx, "preco", e.target.value)}
                     />
                   </div>
 
                   <div>
-                    <div className="nv-item-field-label">Custo Unit. (R$)</div>
+                    <div className="nv-item-field-label">
+                      Custo Unit. (R$)
+                      {item.produtoId && (
+                        <span
+                          title="Valor definido pelo cadastro — não editável"
+                          style={{ marginLeft: 5, fontSize: 10, color: "var(--text-3)", verticalAlign: "middle" }}
+                        >🔒</span>
+                      )}
+                    </div>
                     <input
                       type="number" min="0" step="0.01"
                       className="form-input"
                       value={item.custo}
-                      onChange={e => atualizarItem(idx, "custo", e.target.value)}
+                      readOnly={!!item.produtoId}
+                      style={item.produtoId
+                        ? { opacity: 0.6, cursor: "not-allowed", background: "var(--s3)", userSelect: "none" }
+                        : {}}
+                      onChange={e => !item.produtoId && atualizarItem(idx, "custo", e.target.value)}
                     />
                   </div>
 
