@@ -562,16 +562,10 @@ function SecaoEmpresa({ config, onSave }) {
   };
 
   const handleSalvar = async () => {
+    if (!validarEmpresa()) return;
     setSalvando(true);
-    setErro("");
     try {
-      /* Aqui está o pulo do gato: 
-         Salvando o objeto inteiro 'visivel' no campo 'menuVisivel' do Firestore.
-      */
-      await onSave({ menuVisivel: visivel });
-      setToast({ msg: "Menu atualizado com sucesso!", type: "success" });
-    } catch {
-      setErro("Falha ao salvar. Verifique sua conexão.");
+      await onSave({ empresa: form });
     } finally {
       setSalvando(false);
     }
