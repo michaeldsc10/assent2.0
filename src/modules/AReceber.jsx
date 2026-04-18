@@ -800,14 +800,43 @@ export default function AReceber() {
       const novoValorPago     = Number((conta.valorPago + valorRecebido).toFixed(2));
       const novoValorRestante = Math.max(0, Number((conta.valorTotal - novoValorPago).toFixed(2)));
       const novoStatus        = calcStatus(novoValorRestante, conta.dataVencimento);
+      const agora             = new Date().toISOString();
 
+      /* 1. Atualiza o documento em a_receber (comportamento existente) */
       const ref = doc(db, "users", uid, "a_receber", conta.id);
       await updateDoc(ref, {
         valorPago:       novoValorPago,
         valorRestante:   novoValorRestante,
         status:          novoStatus,
-        dataAtualizacao: new Date().toISOString(),
+        dataAtualizacao: agora,
       });
+
+      /* 2. ── REGIME DE CAIXA: registrar entrada no Caixa ──────────────────
+         Toda confirmação de pagamento gera uma entrada no Caixa.
+         · Se a conta veio de uma venda (origem === "venda"), usa o referenciaId
+           da venda para que o DRE consiga somar o valor recebido agora.
+         · Se for conta manual (origem !== "venda"), ainda registra no Caixa
+           mas com origem "a_receber" — o DRE não contabiliza essas entradas
+           como receita de venda, mantendo a consistência atual.
+         Garantia anti-duplicação: cada chamada a handlePagamento representa
+         um evento de pagamento distinto (data e valor diferentes do sinal
+         original), nunca é a mesma operação executada duas vezes. */
+      try {
+        const ehVenda = conta.origem === "venda";
+        await addDoc(collection(db, "users", uid, "caixa"), {
+          tipo:         "entrada",
+          origem:       ehVenda ? "venda" : "a_receber",
+          referenciaId: ehVenda ? (conta.referenciaId || null) : conta.id,
+          valor:        valorRecebido,
+          descricao:    `Recebimento — ${conta.clienteNome || ""}${conta.descricao ? ` · ${conta.descricao}` : ""}`,
+          data:         agora,
+          criadoEm:     agora,
+        });
+      } catch (errCaixa) {
+        /* O a_receber já foi atualizado. O Caixa falhou isoladamente.
+           Não reverte o pagamento — exibe aviso discreto no console. */
+        console.error("[AReceber] Pagamento registrado, mas erro ao lançar no Caixa:", errCaixa);
+      }
 
       setPagamento(null);
     } catch (err) {
