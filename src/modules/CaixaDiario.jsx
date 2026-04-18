@@ -3,7 +3,8 @@
    Estrutura Firestore:
      empresas/{empresaId}/caixa_diario/{docId}   → lançamentos
      empresas/{empresaId}/contadores/caixa_diario → contador sequencial
-     empresas/{empresaId}/resumo_caixa/atual      → saldo atual
+     empresas/{empresaId}/resumo_caixa/atual           → saldo atual
+     empresas/{empresaId}/caixas_diarios/{dataISO}     → sessões de caixa (aberto/fechado)
    ═══════════════════════════════════════════════════ */
 
 import { useState, useEffect, useMemo } from "react";
@@ -11,7 +12,7 @@ import {
   Search, Plus, X, Download, Filter,
   TrendingUp, TrendingDown, DollarSign,
   ArrowUpCircle, ArrowDownCircle, AlertCircle,
-  ChevronDown, RefreshCw,
+  ChevronDown, RefreshCw, Lock, Unlock, History, CheckCircle, Clock,
 } from "lucide-react";
 
 import { db, auth } from "../lib/firebase";
@@ -27,6 +28,8 @@ import {
   runTransaction,
   serverTimestamp,
   getDocs,
+  setDoc,
+  getDoc,
 } from "firebase/firestore";
 
 /* ═══════════════════════════════════════════════════
@@ -301,6 +304,95 @@ export function montarValoresDaVenda({ valorBruto, taxaPercentual = 0, custo = 0
   const liquido = Math.round((bruto - taxa) * 100) / 100;
   const lucro   = Math.round((liquido - custo) * 100) / 100;
   return { bruto, taxa, liquido, custo, lucro };
+}
+
+
+/* ═══════════════════════════════════════════════════
+   SESSÕES DE CAIXA — funções de Abrir / Fechar
+   Estrutura do documento em caixas_diarios/{dataISO}:
+     status:          "aberto" | "fechado"
+     data:            "2026-04-18"  (chave = ID do doc)
+     saldoAbertura:   number
+     saldoFechamento: number | null
+     totalEntradas:   number
+     totalSaidas:     number
+     totalTaxas:      number
+     lancamentosIds:  string[]
+     abertoPor:       usuarioId
+     fechadoPor:      usuarioId | null
+     abertoEm:        Timestamp
+     fechadoEm:       Timestamp | null
+   ═══════════════════════════════════════════════════ */
+
+/** Retorna a chave de data ISO local (ex: "2026-04-18") */
+export function dataISOHoje() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+/**
+ * Abre o caixa do dia. Idempotente — se já existir um caixa aberto hoje, retorna sem erro.
+ * @param {string} empresaId
+ * @param {string} usuarioId
+ * @param {number} saldoAbertura  - saldo informado pelo operador na abertura
+ */
+export async function abrirCaixa(empresaId, usuarioId, saldoAbertura = 0) {
+  const dataISO = dataISOHoje();
+  const ref = doc(db, "empresas", empresaId, "caixas_diarios", dataISO);
+  const snap = await getDoc(ref);
+  if (snap.exists() && snap.data().status === "aberto") return; // já aberto
+  await setDoc(ref, {
+    status:          "aberto",
+    data:            dataISO,
+    saldoAbertura,
+    saldoFechamento: null,
+    totalEntradas:   0,
+    totalSaidas:     0,
+    totalTaxas:      0,
+    lancamentosIds:  [],
+    abertoPor:       usuarioId,
+    fechadoPor:      null,
+    abertoEm:        serverTimestamp(),
+    fechadoEm:       null,
+  }, { merge: false });
+}
+
+/**
+ * Fecha o caixa do dia, calculando os totais a partir dos lançamentos do dia.
+ * Pode ser chamado manualmente ou pelo fechamento automático às 23:59.
+ * @param {string} empresaId
+ * @param {string} usuarioId
+ * @param {Object[]} lancamentosDoDia  - lançamentos já carregados (evita nova query)
+ * @param {number}  saldoAtual         - saldo atual do resumo_caixa
+ */
+export async function fecharCaixa(empresaId, usuarioId, lancamentosDoDia, saldoAtual) {
+  const dataISO = dataISOHoje();
+  const ref = doc(db, "empresas", empresaId, "caixas_diarios", dataISO);
+  const snap = await getDoc(ref);
+  if (!snap.exists() || snap.data().status !== "aberto") return; // nada a fechar
+
+  let totalEntradas = 0, totalSaidas = 0, totalTaxas = 0;
+  const lancamentosIds = [];
+
+  for (const l of lancamentosDoDia) {
+    const liquido = l.valores?.liquido ?? l.valor ?? 0;
+    const taxa    = l.valores?.taxa    ?? 0;
+    if (l.tipo === "entrada") totalEntradas += liquido;
+    else                      totalSaidas   += liquido;
+    totalTaxas += taxa;
+    lancamentosIds.push(l.id);
+  }
+
+  await setDoc(ref, {
+    status:          "fechado",
+    saldoFechamento: saldoAtual,
+    totalEntradas:   Math.round(totalEntradas * 100) / 100,
+    totalSaidas:     Math.round(totalSaidas   * 100) / 100,
+    totalTaxas:      Math.round(totalTaxas    * 100) / 100,
+    lancamentosIds,
+    fechadoPor:      usuarioId,
+    fechadoEm:       serverTimestamp(),
+  }, { merge: true });
 }
 
 
@@ -709,6 +801,82 @@ const CSS = `
     .cx-row > *:nth-child(7),
     .cx-row > *:nth-child(8) { display: none; }
   }
+
+  /* ── Caixa Fechado — tela de abertura ── */
+  .cx-gate {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 60px 22px; gap: 20px; text-align: center;
+  }
+  .cx-gate-icon {
+    width: 64px; height: 64px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(200,165,94,.1); border: 1px solid rgba(200,165,94,.25);
+  }
+  .cx-gate-title {
+    font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 700; color: var(--text);
+  }
+  .cx-gate-sub { font-size: 13px; color: var(--text-2); max-width: 340px; line-height: 1.6; }
+  .cx-gate-form {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 14px; padding: 22px; width: 100%; max-width: 360px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+
+  /* ── Status badge do caixa na topbar ── */
+  .cx-status-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .cx-status-aberto  { background: rgba(74,222,128,.1);  color: var(--green); border: 1px solid rgba(74,222,128,.25); }
+  .cx-status-fechado { background: rgba(224,82,82,.08);  color: var(--red);   border: 1px solid rgba(224,82,82,.2); }
+
+  /* ── Botão fechar caixa ── */
+  .btn-fechar-caixa {
+    display: flex; align-items: center; gap: 7px;
+    padding: 8px 16px; border-radius: 9px;
+    background: rgba(224,82,82,.1); color: var(--red);
+    border: 1px solid rgba(224,82,82,.25); cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    whiteSpace: nowrap; transition: background .13s;
+  }
+  .btn-fechar-caixa:hover { background: rgba(224,82,82,.18); }
+
+  /* ── Histórico de caixas ── */
+  .cx-historico-wrap {
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden; margin-top: 14px;
+  }
+  .cx-hist-row {
+    display: grid;
+    grid-template-columns: 120px 90px 1fr 1fr 1fr 110px;
+    align-items: center; padding: 11px 18px; gap: 12px;
+    border-bottom: 1px solid var(--border); transition: background .1s; cursor: pointer;
+  }
+  .cx-hist-row:last-child { border-bottom: none; }
+  .cx-hist-row:not(.cx-row-head):hover { background: var(--s2); }
+  .cx-hist-row > span { font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ── Modal detalhe caixa ── */
+  .cx-resumo-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px;
+  }
+  .cx-resumo-card {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .cx-resumo-card-label { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); margin-bottom: 5px; }
+  .cx-resumo-card-val   { font-family: 'Sora', sans-serif; font-size: 16px; font-weight: 700; color: var(--text); }
+  .cx-resumo-card-val.green { color: var(--green); }
+  .cx-resumo-card-val.red   { color: var(--red);   }
+
+  @media (max-width: 900px) {
+    .cx-hist-row {
+      grid-template-columns: 110px 80px 1fr 1fr 90px;
+    }
+    .cx-hist-row > *:nth-child(5) { display: none; }
+  }
+
 `;
 
 /* ═══════════════════════════════════════════════════
@@ -1122,6 +1290,228 @@ function ModalDetalheLancamento({ lancamento, onClose }) {
   );
 }
 
+
+/* ═══════════════════════════════════════════════════
+   MODAL — Confirmar Abertura de Caixa
+   ═══════════════════════════════════════════════════ */
+
+function ModalAbrirCaixa({ saldoAtual, onConfirm, onClose }) {
+  const [saldoAbertura, setSaldoAbertura] = useState(String(saldoAtual || 0));
+  const [salvando, setSalvando] = useState(false);
+
+  const handleConfirm = async () => {
+    setSalvando(true);
+    try {
+      await onConfirm(parseFloat(String(saldoAbertura).replace(",", ".")) || 0);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box modal-box-md" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">Abrir Caixa</div>
+            <div className="modal-sub">Informe o saldo de abertura</div>
+          </div>
+          <button className="modal-close" onClick={onClose}><X size={14} /></button>
+        </div>
+        <div className="modal-body">
+          <div style={{
+            background: "rgba(74,222,128,.06)", border: "1px solid rgba(74,222,128,.2)",
+            borderRadius: 10, padding: "12px 14px", marginBottom: 18,
+            display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--text-2)",
+          }}>
+            <Unlock size={16} color="var(--green)" />
+            O caixa será aberto para o dia de hoje. Todos os lançamentos ficarão vinculados a esta sessão.
+          </div>
+          <div className="form-group">
+            <label className="form-label">Saldo de Abertura (R$)</label>
+            <input
+              className="form-input"
+              type="number" min="0" step="0.01" placeholder="0,00"
+              value={saldoAbertura}
+              onChange={e => setSaldoAbertura(e.target.value)}
+              autoFocus
+            />
+            <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 5 }}>
+              Geralmente o saldo em espécie disponível no momento da abertura.
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose} disabled={salvando}>Cancelar</button>
+          <button className="btn-primary" onClick={handleConfirm} disabled={salvando}>
+            {salvando ? <RefreshCw size={13} style={{ animation: "spin 1s linear infinite" }} /> : <Unlock size={13} />}
+            {salvando ? "Abrindo..." : "Abrir Caixa"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   MODAL — Confirmar Fechamento de Caixa
+   ═══════════════════════════════════════════════════ */
+
+function ModalFecharCaixa({ caixaHoje, totalEntradas, totalSaidas, totalTaxas, saldoAtual, onConfirm, onClose }) {
+  const [salvando, setSalvando] = useState(false);
+  const resultado = Math.round((totalEntradas - totalSaidas) * 100) / 100;
+
+  const handleConfirm = async () => {
+    setSalvando(true);
+    try {
+      await onConfirm();
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box modal-box-md" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">Fechar Caixa</div>
+            <div className="modal-sub">Resumo do dia — {new Date().toLocaleDateString("pt-BR")}</div>
+          </div>
+          <button className="modal-close" onClick={onClose}><X size={14} /></button>
+        </div>
+        <div className="modal-body">
+          <div style={{
+            background: "rgba(224,82,82,.06)", border: "1px solid rgba(224,82,82,.2)",
+            borderRadius: 10, padding: "12px 14px", marginBottom: 18,
+            display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--text-2)",
+          }}>
+            <Lock size={16} color="var(--red)" />
+            Após fechar, não será possível adicionar lançamentos a este caixa. Esta ação não pode ser desfeita.
+          </div>
+
+          <div className="cx-resumo-grid">
+            <div className="cx-resumo-card">
+              <div className="cx-resumo-card-label">Saldo Abertura</div>
+              <div className="cx-resumo-card-val">{fmtR$(caixaHoje?.saldoAbertura ?? 0)}</div>
+            </div>
+            <div className="cx-resumo-card">
+              <div className="cx-resumo-card-label">Saldo Atual</div>
+              <div className="cx-resumo-card-val">{fmtR$(saldoAtual)}</div>
+            </div>
+            <div className="cx-resumo-card">
+              <div className="cx-resumo-card-label">Total Entradas</div>
+              <div className="cx-resumo-card-val green">{fmtR$(totalEntradas)}</div>
+            </div>
+            <div className="cx-resumo-card">
+              <div className="cx-resumo-card-label">Total Saídas</div>
+              <div className="cx-resumo-card-val red">{fmtR$(totalSaidas)}</div>
+            </div>
+          </div>
+
+          {[
+            ["Taxas deduzidas", fmtR$(totalTaxas), "var(--text-3)"],
+            ["Resultado do dia", fmtR$(resultado), resultado >= 0 ? "var(--green)" : "var(--red)"],
+          ].map(([label, val, color]) => (
+            <div key={label} className="cx-detalhe-row">
+              <span className="cx-detalhe-label">{label}</span>
+              <span className="cx-detalhe-val" style={{ color, fontWeight: 700 }}>{val}</span>
+            </div>
+          ))}
+        </div>
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose} disabled={salvando}>Cancelar</button>
+          <button
+            onClick={handleConfirm} disabled={salvando}
+            style={{
+              display: "flex", alignItems: "center", gap: 7, padding: "9px 20px",
+              borderRadius: 9, background: "rgba(224,82,82,.12)", color: "var(--red)",
+              border: "1px solid rgba(224,82,82,.3)", cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600,
+              opacity: salvando ? 0.5 : 1,
+            }}
+          >
+            {salvando ? <RefreshCw size={13} style={{ animation: "spin 1s linear infinite" }} /> : <Lock size={13} />}
+            {salvando ? "Fechando..." : "Confirmar Fechamento"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   MODAL — Detalhe de um Caixa Histórico
+   ═══════════════════════════════════════════════════ */
+
+function ModalDetalheCaixaHistorico({ caixa, onClose }) {
+  const resultado = Math.round(((caixa.totalEntradas ?? 0) - (caixa.totalSaidas ?? 0)) * 100) / 100;
+  const aberto  = caixa.status === "aberto";
+
+  const linhas = [
+    ["Data",            caixa.data],
+    ["Status",          aberto ? "Aberto" : "Fechado"],
+    ["Saldo Abertura",  fmtR$(caixa.saldoAbertura ?? 0)],
+    ["Saldo Fechamento",aberto ? "—" : fmtR$(caixa.saldoFechamento ?? 0)],
+    ["Total Entradas",  fmtR$(caixa.totalEntradas ?? 0)],
+    ["Total Saídas",    fmtR$(caixa.totalSaidas   ?? 0)],
+    ["Taxas Deduzidas", fmtR$(caixa.totalTaxas    ?? 0)],
+    ["Resultado",       fmtR$(resultado)],
+    ["Lançamentos",     String(caixa.lancamentosIds?.length ?? 0)],
+    ["Aberto por",      caixa.abertoPor ?? "—"],
+    ["Fechado por",     caixa.fechadoPor ?? "—"],
+  ];
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box modal-box-md" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">Caixa · {caixa.data}</div>
+            <div className="modal-sub">
+              <span className={`cx-status-badge ${aberto ? "cx-status-aberto" : "cx-status-fechado"}`}>
+                {aberto ? <Unlock size={10} /> : <Lock size={10} />}
+                {aberto ? "Aberto" : "Fechado"}
+              </span>
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose}><X size={14} /></button>
+        </div>
+        <div className="modal-body">
+          <div className="cx-resumo-grid" style={{ marginBottom: 16 }}>
+            <div className="cx-resumo-card">
+              <div className="cx-resumo-card-label">Entradas</div>
+              <div className="cx-resumo-card-val green">{fmtR$(caixa.totalEntradas ?? 0)}</div>
+            </div>
+            <div className="cx-resumo-card">
+              <div className="cx-resumo-card-label">Saídas</div>
+              <div className="cx-resumo-card-val red">{fmtR$(caixa.totalSaidas ?? 0)}</div>
+            </div>
+            <div className="cx-resumo-card">
+              <div className="cx-resumo-card-label">Resultado</div>
+              <div className={`cx-resumo-card-val ${resultado >= 0 ? "green" : "red"}`}>{fmtR$(resultado)}</div>
+            </div>
+            <div className="cx-resumo-card">
+              <div className="cx-resumo-card-label">Taxas</div>
+              <div className="cx-resumo-card-val" style={{ color: "var(--text-3)" }}>{fmtR$(caixa.totalTaxas ?? 0)}</div>
+            </div>
+          </div>
+
+          {linhas.map(([label, val]) => (
+            <div key={label} className="cx-detalhe-row">
+              <span className="cx-detalhe-label">{label}</span>
+              <span className="cx-detalhe-val">{val}</span>
+            </div>
+          ))}
+        </div>
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Fechar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════
    COMPONENTE PRINCIPAL — CaixaDiario
    ═══════════════════════════════════════════════════ */
@@ -1138,6 +1528,12 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
   const [modalNovo,   setModalNovo]   = useState(false);
   const [detalhe,     setDetalhe]     = useState(null);
   const [toast,       setToast]       = useState(null);
+  const [caixaHoje,   setCaixaHoje]   = useState(null);      // sessão do caixa de hoje
+  const [caixasHist,  setCaixasHist]  = useState([]);         // histórico de caixas anteriores
+  const [modalAbrir,  setModalAbrir]  = useState(false);
+  const [modalFechar, setModalFechar] = useState(false);
+  const [modalCaixaDet, setModalCaixaDet] = useState(null);   // caixa selecionado no histórico
+  const [loadingCaixa, setLoadingCaixa] = useState(true);
 
   /* ── Auth ── */
   useEffect(() => {
@@ -1183,6 +1579,50 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
     return unsub;
   }, [empresaId]);
 
+  /* ── Snapshot caixa de hoje ── */
+  useEffect(() => {
+    if (!empresaId) return;
+    setLoadingCaixa(true);
+    const dataISO = dataISOHoje();
+    const ref = doc(db, "empresas", empresaId, "caixas_diarios", dataISO);
+    const unsub = onSnapshot(ref, (snap) => {
+      setCaixaHoje(snap.exists() ? { id: snap.id, ...snap.data() } : null);
+      setLoadingCaixa(false);
+    });
+    return unsub;
+  }, [empresaId]);
+
+  /* ── Snapshot histórico de caixas (últimos 30) ── */
+  useEffect(() => {
+    if (!empresaId) return;
+    const ref = collection(db, "empresas", empresaId, "caixas_diarios");
+    const q   = query(ref, orderBy("data", "desc"), limit(30));
+    const unsub = onSnapshot(q, (snap) => {
+      setCaixasHist(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, [empresaId]);
+
+  /* ── Fechamento automático às 23:59 ── */
+  useEffect(() => {
+    if (!empresaId || !uid) return;
+    const checar = () => {
+      const agora = new Date();
+      if (agora.getHours() === 23 && agora.getMinutes() === 59) {
+        // filtra só lançamentos de hoje antes de fechar
+        const hoje = new Date(); hoje.setHours(0,0,0,0);
+        const lancHoje = lancamentos.filter(l => {
+          const d = l.data?.toDate ? l.data.toDate() : new Date(l.data ?? l.criadoEm);
+          return d >= hoje;
+        });
+        fecharCaixa(empresaId, uid, lancHoje, resumo.saldoAtual).catch(console.error);
+      }
+    };
+    checar(); // checa imediatamente ao montar
+    const intervalo = setInterval(checar, 30_000); // checa a cada 30s
+    return () => clearInterval(intervalo);
+  }, [empresaId, uid, lancamentos, resumo.saldoAtual]);
+
   /* ── Toast helper ── */
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
@@ -1200,6 +1640,37 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
       console.error("Erro ao criar lançamento:", err);
       showToast(err.message || "Erro ao registrar lançamento.", "error");
       throw err; // para manter o modal aberto
+    }
+  };
+
+  /* ── Abrir caixa ── */
+  const handleAbrirCaixa = async (saldoAbertura) => {
+    if (!uid || !empresaId) return;
+    try {
+      await abrirCaixa(empresaId, uid, saldoAbertura);
+      setModalAbrir(false);
+      showToast("Caixa aberto com sucesso!");
+    } catch (err) {
+      console.error("Erro ao abrir caixa:", err);
+      showToast(err.message || "Erro ao abrir o caixa.", "error");
+    }
+  };
+
+  /* ── Fechar caixa ── */
+  const handleFecharCaixa = async () => {
+    if (!uid || !empresaId) return;
+    try {
+      const hoje = new Date(); hoje.setHours(0,0,0,0);
+      const lancHoje = lancamentos.filter(l => {
+        const d = l.data?.toDate ? l.data.toDate() : new Date(l.data ?? l.criadoEm);
+        return d >= hoje;
+      });
+      await fecharCaixa(empresaId, uid, lancHoje, resumo.saldoAtual);
+      setModalFechar(false);
+      showToast("Caixa fechado com sucesso!");
+    } catch (err) {
+      console.error("Erro ao fechar caixa:", err);
+      showToast(err.message || "Erro ao fechar o caixa.", "error");
     }
   };
 
@@ -1231,6 +1702,98 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
   }, [lancamentosFiltrados]);
 
   if (!uid) return <div className="cx-loading">Carregando autenticação...</div>;
+  if (loadingCaixa) return <div className="cx-loading">Carregando caixa...</div>;
+
+  /* ── Tela de abertura quando caixa está fechado ou nunca foi aberto ── */
+  if (!caixaHoje || caixaHoje.status !== "aberto") {
+    return (
+      <>
+        <style>{CSS}</style>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <header className="cx-topbar">
+          <div className="cx-topbar-title">
+            <h1>Caixa Diário</h1>
+            <p>Controle de entradas e saídas financeiras</p>
+          </div>
+          <div className="cx-topbar-right">
+            <span className="cx-status-badge cx-status-fechado"><Lock size={10} /> Fechado</span>
+          </div>
+        </header>
+        <div className="cx-gate">
+          <div className="cx-gate-icon"><Lock size={28} color="var(--gold)" /></div>
+          <div className="cx-gate-title">Caixa Fechado</div>
+          <div className="cx-gate-sub">
+            O caixa de hoje ainda não foi aberto. Abra o caixa para começar a registrar lançamentos.
+          </div>
+          <button className="btn-primary" style={{ fontSize: 14, padding: "11px 28px" }} onClick={() => setModalAbrir(true)}>
+            <Unlock size={15} /> Abrir Caixa
+          </button>
+        </div>
+
+        {/* Histórico de caixas anteriores */}
+        {caixasHist.length > 0 && (
+          <div className="ag-content" style={{ marginTop: 0 }}>
+            <div className="cx-historico-wrap">
+              <div className="cx-table-header">
+                <div className="cx-table-title">
+                  <History size={13} /> Histórico de Caixas
+                  <span className="cx-count-badge">{caixasHist.length}</span>
+                </div>
+              </div>
+              <div className="cx-hist-row cx-row-head">
+                <span>DATA</span>
+                <span>STATUS</span>
+                <span>ENTRADAS</span>
+                <span>SAÍDAS</span>
+                <span>TAXAS</span>
+                <span>RESULTADO</span>
+              </div>
+              {caixasHist.map(c => {
+                const resultado = Math.round(((c.totalEntradas ?? 0) - (c.totalSaidas ?? 0)) * 100) / 100;
+                return (
+                  <div key={c.id} className="cx-hist-row" onClick={() => setModalCaixaDet(c)}>
+                    <span style={{ color: "var(--text)", fontWeight: 500 }}>{c.data}</span>
+                    <span>
+                      <span className={`cx-status-badge ${c.status === "aberto" ? "cx-status-aberto" : "cx-status-fechado"}`} style={{ fontSize: 10 }}>
+                        {c.status === "aberto" ? <Unlock size={9} /> : <Lock size={9} />}
+                        {c.status === "aberto" ? "Aberto" : "Fechado"}
+                      </span>
+                    </span>
+                    <span style={{ color: "var(--green)", fontWeight: 600 }}>{fmtR$(c.totalEntradas ?? 0)}</span>
+                    <span style={{ color: "var(--red)",   fontWeight: 600 }}>{fmtR$(c.totalSaidas   ?? 0)}</span>
+                    <span style={{ color: "var(--text-3)" }}>{fmtR$(c.totalTaxas ?? 0)}</span>
+                    <span style={{ color: resultado >= 0 ? "var(--green)" : "var(--red)", fontFamily: "Sora, sans-serif", fontWeight: 700 }}>
+                      {fmtR$(resultado)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {modalAbrir && (
+          <ModalAbrirCaixa
+            saldoAtual={resumo.saldoAtual}
+            onConfirm={handleAbrirCaixa}
+            onClose={() => setModalAbrir(false)}
+          />
+        )}
+        {modalCaixaDet && (
+          <ModalDetalheCaixaHistorico
+            caixa={modalCaixaDet}
+            onClose={() => setModalCaixaDet(null)}
+          />
+        )}
+        {toast && (
+          <div className={`cx-toast ${toast.type}`}>
+            {toast.type === "success" ? <ArrowUpCircle size={14} /> : <AlertCircle size={14} />}
+            {toast.msg}
+          </div>
+        )}
+      </>
+    );
+  }
 
   return (
     <>
@@ -1254,6 +1817,13 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
         </div>
 
         <div className="cx-topbar-right">
+          <span className="cx-status-badge cx-status-aberto"><Unlock size={10} /> Aberto</span>
+          <button
+            className="btn-fechar-caixa"
+            onClick={() => setModalFechar(true)}
+          >
+            <Lock size={13} /> Fechar Caixa
+          </button>
           <button
             onClick={() => setModalNovo(true)}
             style={{
@@ -1370,6 +1940,48 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
         </div>
       </div>
 
+      {/* Histórico de caixas anteriores */}
+      {caixasHist.filter(c => c.id !== dataISOHoje()).length > 0 && (
+        <div className="ag-content" style={{ marginTop: 0 }}>
+          <div className="cx-historico-wrap">
+            <div className="cx-table-header">
+              <div className="cx-table-title">
+                <History size={13} /> Histórico de Caixas
+                <span className="cx-count-badge">{caixasHist.filter(c => c.id !== dataISOHoje()).length}</span>
+              </div>
+            </div>
+            <div className="cx-hist-row cx-row-head">
+              <span>DATA</span>
+              <span>STATUS</span>
+              <span>ENTRADAS</span>
+              <span>SAÍDAS</span>
+              <span>TAXAS</span>
+              <span>RESULTADO</span>
+            </div>
+            {caixasHist.filter(c => c.id !== dataISOHoje()).map(c => {
+              const resultado = Math.round(((c.totalEntradas ?? 0) - (c.totalSaidas ?? 0)) * 100) / 100;
+              return (
+                <div key={c.id} className="cx-hist-row" onClick={() => setModalCaixaDet(c)}>
+                  <span style={{ color: "var(--text)", fontWeight: 500 }}>{c.data}</span>
+                  <span>
+                    <span className={`cx-status-badge ${c.status === "aberto" ? "cx-status-aberto" : "cx-status-fechado"}`} style={{ fontSize: 10 }}>
+                      {c.status === "aberto" ? <Unlock size={9} /> : <Lock size={9} />}
+                      {c.status === "aberto" ? "Aberto" : "Fechado"}
+                    </span>
+                  </span>
+                  <span style={{ color: "var(--green)", fontWeight: 600 }}>{fmtR$(c.totalEntradas ?? 0)}</span>
+                  <span style={{ color: "var(--red)",   fontWeight: 600 }}>{fmtR$(c.totalSaidas   ?? 0)}</span>
+                  <span style={{ color: "var(--text-3)" }}>{fmtR$(c.totalTaxas ?? 0)}</span>
+                  <span style={{ color: resultado >= 0 ? "var(--green)" : "var(--red)", fontFamily: "Sora, sans-serif", fontWeight: 700 }}>
+                    {fmtR$(resultado)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Modais */}
       {modalNovo && (
         <ModalNovoLancamento
@@ -1386,6 +1998,25 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
         <ModalDetalheLancamento
           lancamento={detalhe}
           onClose={() => setDetalhe(null)}
+        />
+      )}
+
+      {modalFechar && (
+        <ModalFecharCaixa
+          caixaHoje={caixaHoje}
+          totalEntradas={totalEntradas}
+          totalSaidas={totalSaidas}
+          totalTaxas={lancamentosFiltrados.reduce((s, l) => s + (l.valores?.taxa ?? 0), 0)}
+          saldoAtual={resumo.saldoAtual}
+          onConfirm={handleFecharCaixa}
+          onClose={() => setModalFechar(false)}
+        />
+      )}
+
+      {modalCaixaDet && (
+        <ModalDetalheCaixaHistorico
+          caixa={modalCaixaDet}
+          onClose={() => setModalCaixaDet(null)}
         />
       )}
 
