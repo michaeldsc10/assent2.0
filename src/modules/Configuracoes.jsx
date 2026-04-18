@@ -102,21 +102,21 @@ const NAV = [
    Combinação: Alt + tecla → navega para o módulo
    ══════════════════════════════════════════════════════ */
 export const ATALHOS_MAP = [
-  { code: "Digit1", display: "Alt + 1", key: "dashboard"       },
-  { code: "Digit2", display: "Alt + 2", key: "clientes"        },
-  { code: "Digit3", display: "Alt + 3", key: "produtos"        },
-  { code: "Digit4", display: "Alt + 4", key: "servicos"        },
-  { code: "Digit5", display: "Alt + 5", key: "entrada_estoque" },
-  { code: "Digit6", display: "Alt + 6", key: "vendas"          },
-  { code: "Digit7", display: "Alt + 7", key: "fiado"           },
-  { code: "Digit8", display: "Alt + 8", key: "caixa"           },
-  { code: "Digit9", display: "Alt + 9", key: "despesas"        },
-  { code: "KeyF",   display: "Alt + F", key: "fornecedores"    },
-  { code: "KeyR",   display: "Alt + R", key: "relatorios"      },
-  { code: "KeyA",   display: "Alt + A", key: "agenda"          },
-  { code: "KeyO",   display: "Alt + O", key: "orcamentos"      },
-  { code: "KeyM",   display: "Alt + M", key: "vendedores"      },
-  { code: "KeyG",   display: "Alt + G", key: "config"          },
+  { code: "KeyD", display: "Alt + D", key: "dashboard",       hint: "Dashboard"           },
+  { code: "KeyC", display: "Alt + C", key: "clientes",        hint: "Clientes"             },
+  { code: "KeyP", display: "Alt + P", key: "produtos",        hint: "Produtos"             },
+  { code: "KeyS", display: "Alt + S", key: "servicos",        hint: "Serviços"             },
+  { code: "KeyE", display: "Alt + E", key: "entrada_estoque", hint: "Entrada"              },
+  { code: "KeyV", display: "Alt + V", key: "vendas",          hint: "Vendas"               },
+  { code: "KeyF", display: "Alt + F", key: "fiado",           hint: "Fiado (F de Fiado)"   },
+  { code: "KeyX", display: "Alt + X", key: "caixa",           hint: "Caixa (Cx)"           },
+  { code: "KeyZ", display: "Alt + Z", key: "despesas",        hint: "Despesas"             },
+  { code: "KeyN", display: "Alt + N", key: "fornecedores",    hint: "forNecedores"         },
+  { code: "KeyR", display: "Alt + R", key: "relatorios",      hint: "Relatórios"           },
+  { code: "KeyA", display: "Alt + A", key: "agenda",          hint: "Agenda"               },
+  { code: "KeyO", display: "Alt + O", key: "orcamentos",      hint: "Orçamentos"           },
+  { code: "KeyM", display: "Alt + M", key: "vendedores",      hint: "equipe (Membros)"     },
+  { code: "KeyG", display: "Alt + G", key: "config",          hint: "confiGurações"        },
 ];
 
 /* Lookup rápido: code → key do módulo */
@@ -914,17 +914,16 @@ function SecaoAtalhos({ menuVisivel = {} }) {
           Módulos ocultos no menu não respondem ao atalho.
         </div>
         <div className="atalhos-list">
-          {ATALHOS_MAP.map(({ code, display, key }) => {
+          {ATALHOS_MAP.map(({ code, display, key, hint }) => {
             const section = MENU_SECTIONS.find(s => s.key === key);
             if (!section) return null;
-            /* Um módulo está acessível se for locked ou se estiver visível */
             const ativo = section.locked || menuVisivel[key] !== false;
             return (
               <div key={code} className={`atalho-item${ativo ? "" : " atalho-disabled"}`}>
                 <div className="atalho-icon">{section.icon}</div>
                 <div className="atalho-info">
                   <div className="atalho-label">{section.label}</div>
-                  <div className="atalho-sub">{section.sub}</div>
+                  <div className="atalho-sub">{hint}</div>
                 </div>
                 <kbd className="atalho-key">{display}</kbd>
                 {!ativo && <span className="atalho-hidden-badge">Oculto no menu</span>}
