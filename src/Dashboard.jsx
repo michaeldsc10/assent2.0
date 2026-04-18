@@ -71,6 +71,31 @@ const KEY_MAP = {
   "Configurações": "config"
 };
 
+/* ── Atalhos de teclado: Alt + tecla → módulo ──
+   code: event.code  |  label: valor que setModule espera
+   dbKey: chave em menuVisivel para checar visibilidade      */
+const ATALHOS_TECLADO = [
+  { code: "KeyD", label: "Dashboard",           dbKey: "dashboard"       },
+  { code: "KeyC", label: "Clientes",            dbKey: "clientes"        },
+  { code: "KeyP", label: "Produtos",            dbKey: "produtos"        },
+  { code: "KeyS", label: "Serviços",            dbKey: "servicos"        },
+  { code: "KeyE", label: "Entrada de Estoque",  dbKey: "entrada_estoque" },
+  { code: "KeyV", label: "Vendas",              dbKey: "vendas"          },
+  { code: "KeyF", label: "A Receber",           dbKey: "fiado"           },
+  { code: "KeyX", label: "Caixa Diário",        dbKey: "caixa"           },
+  { code: "KeyZ", label: "Despesas",            dbKey: "despesas"        },
+  { code: "KeyN", label: "Fornecedores",        dbKey: "fornecedores"    },
+  { code: "KeyR", label: "Relatórios",          dbKey: "relatorios"      },
+  { code: "KeyA", label: "Agenda",              dbKey: "agenda"          },
+  { code: "KeyO", label: "Orçamentos",          dbKey: "orcamentos"      },
+  { code: "KeyM", label: "Vendedores",          dbKey: "vendedores"      },
+  { code: "KeyG", label: "Configurações",       dbKey: "config"          },
+];
+/* Módulos sempre visíveis (locked: true no Configuracoes) */
+const LOCKED_KEYS = new Set(["dashboard", "config"]);
+/* Lookup rápido: code → atalho */
+const ATALHO_LOOKUP = Object.fromEntries(ATALHOS_TECLADO.map(a => [a.code, a]));
+
 const NAV = [
   { section: "BÁSICO", items: [
     { icon: LayoutDashboard, label: "Dashboard" },
@@ -393,6 +418,36 @@ export default function Dashboard() {
       if (snap.exists()) setMenuVisivel(snap.data().menuVisivel || {});
     });
   }, [uid]);
+
+  // Atalhos de teclado globais: Alt + tecla
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Apenas Alt + tecla
+      if (!e.altKey) return;
+
+      // Bloquear se foco está em campo de texto
+      const tag = document.activeElement?.tagName;
+      if (
+        tag === "INPUT"    ||
+        tag === "TEXTAREA" ||
+        document.activeElement?.isContentEditable
+      ) return;
+
+      // Verificar se existe atalho mapeado para esta tecla
+      const atalho = ATALHO_LOOKUP[e.code];
+      if (!atalho) return;
+
+      // Verificar visibilidade do módulo
+      if (!LOCKED_KEYS.has(atalho.dbKey) && menuVisivel[atalho.dbKey] === false) return;
+
+      // Navegar — bloqueia ação padrão do navegador (ex: Alt+F abre menu)
+      e.preventDefault();
+      setModule(atalho.label);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [menuVisivel]);
 
   const kpiMain = [
     { label: "Receita Bruta",  value: "R$ 480,00", trend: "+71.4%", up: true,  accent: "var(--green)",  sub: "1 venda · este mês" },
