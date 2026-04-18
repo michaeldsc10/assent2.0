@@ -19,6 +19,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import {
   collection, doc, setDoc, deleteDoc,
   onSnapshot, runTransaction, increment, getDoc, addDoc,
+  query, where, getDocs,
 } from "firebase/firestore";
 
 /* ── CSS ── */
@@ -1650,6 +1651,81 @@ useEffect(() => {
         /* Salvar venda */
         tx.set(doc(db, "users", uid, "vendas", vendaExistente.id), payload, { merge: true });
       });
+
+      /* ── RESET FINANCEIRO ──────────────────────────────────────────────────
+         A venda foi alterada (forma de pagamento, valor, etc.).
+         Para manter o regime de caixa consistente:
+           1. Apaga TODAS as entradas de caixa vinculadas a esta venda
+           2. Apaga TODOS os documentos de a_receber vinculados a esta venda
+           3. Recria com base no novo payload (igual ao fluxo de venda nova)
+         Isso garante que o DRE nunca some valores de estados conflitantes.
+      ──────────────────────────────────────────────────────────────────────── */
+      const vendaId = vendaExistente.id;
+
+      try {
+        /* 1. Apagar entradas de caixa antigas desta venda */
+        const caixaSnap = await getDocs(
+          query(
+            collection(db, "users", uid, "caixa"),
+            where("origem", "==", "venda"),
+            where("referenciaId", "==", vendaId)
+          )
+        );
+        await Promise.all(caixaSnap.docs.map((d) => deleteDoc(d.ref)));
+
+        /* 2. Apagar documentos de a_receber antigos desta venda */
+        const arSnap = await getDocs(
+          query(
+            collection(db, "users", uid, "a_receber"),
+            where("origem", "==", "venda"),
+            where("referenciaId", "==", vendaId)
+          )
+        );
+        await Promise.all(arSnap.docs.map((d) => deleteDoc(d.ref)));
+
+        /* 3. Recriar entrada de caixa com base no novo payload */
+        const valorParaCaixa = Number(payload.valorRecebido ?? payload.total ?? 0);
+        if (valorParaCaixa > 0) {
+          await addDoc(collection(db, "users", uid, "caixa"), {
+            tipo:           "entrada",
+            origem:         "venda",
+            referenciaId:   vendaId,
+            valor:          valorParaCaixa,
+            descricao:      `Venda ${vendaId} — ${payload.cliente || "Consumidor Final"} (editada)`,
+            formaPagamento: payload.formaPagamento,
+            data:           payload.data || new Date().toISOString(),
+            criadoEm:       new Date().toISOString(),
+          });
+        }
+
+        /* 4. Recriar a_receber se ainda há sinal pendente no novo payload */
+        if (payload.formaPagamento === "Sinal" && payload.valorRestante > 0) {
+          const now = new Date().toISOString();
+          await addDoc(collection(db, "users", uid, "a_receber"), {
+            descricao:       "Venda - Pagamento pendente",
+            clienteNome:     payload.cliente || "Consumidor Final",
+            valorTotal:      payload.valorRestante,
+            valorPago:       0,
+            valorRestante:   payload.valorRestante,
+            dataVencimento:  payload.dataVencSinal,
+            status:          "pendente",
+            origem:          "venda",
+            referenciaId:    vendaId,
+            dataCriacao:     now,
+            dataAtualizacao: now,
+          });
+        }
+      } catch (errFinanceiro) {
+        /* A venda e o estoque já foram atualizados com sucesso.
+           Falha isolada no reset financeiro — loga para diagnóstico. */
+        console.error("[Vendas] Venda editada, mas erro no reset financeiro:", errFinanceiro);
+        alert(
+          `Venda ${vendaId} atualizada!\n\n` +
+          `⚠️ Não foi possível ajustar os lançamentos financeiros automaticamente. ` +
+          `Verifique manualmente as entradas de Caixa e A Receber desta venda.`
+        );
+      }
+
       setEditando(null);
       setDetalhe(null);
       return;
