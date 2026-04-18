@@ -73,3 +73,24 @@ button:focus-visible {
     background-color: var(--color-black);
   }
 }
+
+/* ─────────────────────────────────────────────────────
+   Reset: impede que os estilos globais de button acima
+   interfiram nos módulos do sistema (Dashboard e filhos)
+───────────────────────────────────────────────────── */
+.ag-app button,
+.ag-app button:hover,
+.ag-app button:focus,
+.ag-app button:focus-visible {
+  border-radius: unset;
+  border: unset;
+  padding: unset;
+  font-size: unset;
+  font-weight: unset;
+  font-family: unset;
+  background-color: unset;
+  transition: unset;
+  border-color: unset;
+  outline: unset;
+  transform: unset;
+}
