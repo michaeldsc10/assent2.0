@@ -65,7 +65,7 @@ const KEY_MAP = {
   "Fornecedores": "fornecedores",
   "Relatórios": "relatorios",
   "Agenda": "agenda",
-  "Atalhos": "atalhos",
+  "Orçamentos": "orcamentos",
   "Vendedores": "vendedores",
   "Configurações": "config"
 };
@@ -90,7 +90,7 @@ const NAV = [
     { icon: Calendar,   label: "Agenda" },
   ]},
   { section: "SISTEMA", items: [
-    { icon: Zap,        label: "Atalhos" },
+    { icon: Zap,        label: "Orçamentos" },
     { icon: UserCheck,  label: "Vendedores" },
     { icon: Settings,   label: "Configurações" },
   ]},
