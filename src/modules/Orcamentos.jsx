@@ -479,10 +479,6 @@ function imprimirOrcamento(orc, empresa) {
   const telefone = empresa?.telefone|| "";
   const logo64   = empresa?.logo    || "";
 
-  const logoJustify =
-    logoPos==="centro"  ? "center"   :
-    logoPos==="direita" ? "flex-end" : "flex-start";
-
   const rf       = orc.resumoFinanceiro || {};
   const subtotal = rf.subtotal   || 0;
   const desc     = rf.descontos  || 0;
@@ -496,110 +492,144 @@ function imprimirOrcamento(orc, empresa) {
         : new Date(orc.datas.validade)).toLocaleDateString("pt-BR")
     : "—";
 
-  el.innerHTML = `
-<div style="
-  font-family:'Georgia','Times New Roman',serif;
-  width:100%;box-sizing:border-box;
-  background:#ffffff;color:#1a1a2e;
-">
+  /* ── Blocos reutilizáveis ── */
+  const logoImg = logo64
+    ? `<img src="${logo64}" style="height:52px;max-width:160px;object-fit:contain;display:block;"/>`
+    : `<div style="font-size:21px;font-weight:800;letter-spacing:-0.5px;color:${txtColor};">${nomeEmp}</div>`;
 
-  <!-- HEADER — cor escolhida aplicada aqui e na tabela -->
-  <div style="background:${bgColor};color:${txtColor};padding:26px 40px 20px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;box-sizing:border-box;">
-    <div style="display:flex;flex-direction:column;align-items:${logoJustify};gap:6px;flex:1;min-width:0;">
-      ${logo64
-        ? `<img src="${logo64}" style="height:54px;max-width:180px;object-fit:contain;display:block;"/>`
-        : `<div style="font-size:22px;font-weight:700;letter-spacing:-.5px;">${nomeEmp}</div>`
-      }
-      ${logo64 ? `<div style="font-size:14px;font-weight:700;opacity:.9;">${nomeEmp}</div>` : ""}
-      <div style="font-size:11px;opacity:.72;line-height:1.7;margin-top:2px;">
-        ${cnpj     ? `CNPJ: ${cnpj}<br>` : ""}
-        ${endereco ? `${endereco}<br>`   : ""}
-        ${telefone ? `Tel: ${telefone}`  : ""}
-      </div>
-    </div>
-    <div style="text-align:right;flex-shrink:0;">
-      <div style="font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;opacity:.65;margin-bottom:4px;">ORÇAMENTO</div>
-      <div style="font-size:30px;font-weight:700;letter-spacing:-1px;line-height:1;">${orc.codigo||orc.id}</div>
-      <div style="font-size:11px;opacity:.68;margin-top:6px;">Emitido em: ${fmtData(orc.datas?.criacao)}</div>
-    </div>
+  const companyMeta = (align) => `
+    <div style="font-size:10px;color:${txtColor};opacity:0.65;line-height:1.85;margin-top:4px;text-align:${align};">
+      ${cnpj     ? `CNPJ: ${cnpj}<br>` : ""}
+      ${endereco ? `${endereco}<br>`    : ""}
+      ${telefone ? `Tel: ${telefone}`   : ""}
+    </div>`;
+
+  const companyBlock = (align="left") => `
+    <div style="display:flex;flex-direction:column;align-items:${align==="center"?"center":align==="right"?"flex-end":"flex-start"};gap:3px;">
+      ${logoImg}
+      ${logo64 ? `<div style="font-size:12px;font-weight:700;color:${txtColor};opacity:0.88;margin-top:2px;">${nomeEmp}</div>` : ""}
+      ${companyMeta(align)}
+    </div>`;
+
+  const orcBlock = (align="right") => `
+    <div style="text-align:${align};flex-shrink:0;">
+      <div style="font-size:8.5px;font-weight:700;letter-spacing:0.22em;text-transform:uppercase;color:${txtColor};opacity:0.55;margin-bottom:3px;">ORÇAMENTO</div>
+      <div style="font-size:30px;font-weight:800;letter-spacing:-1px;line-height:1;color:${txtColor};">${orc.codigo||orc.id}</div>
+      <div style="font-size:10px;color:${txtColor};opacity:0.6;margin-top:7px;">Emitido em: ${fmtData(orc.datas?.criacao)}</div>
+    </div>`;
+
+  /* ── Layout do cabeçalho por posição da logo ── */
+  let headerInner;
+  if (logoPos === "centro") {
+    headerInner = `
+      <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:start;padding:28px 44px 24px;box-sizing:border-box;gap:16px;">
+        <div></div>
+        ${companyBlock("center")}
+        <div style="display:flex;justify-content:flex-end;">${orcBlock("right")}</div>
+      </div>`;
+  } else if (logoPos === "direita") {
+    headerInner = `
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:28px 44px 24px;box-sizing:border-box;gap:24px;">
+        ${orcBlock("left")}
+        ${companyBlock("right")}
+      </div>`;
+  } else {
+    /* esquerda — padrão */
+    headerInner = `
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;padding:28px 44px 24px;box-sizing:border-box;gap:24px;">
+        ${companyBlock("left")}
+        ${orcBlock("right")}
+      </div>`;
+  }
+
+  el.innerHTML = `
+<div style="-webkit-print-color-adjust:exact;print-color-adjust:exact;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;width:100%;box-sizing:border-box;background:#ffffff;color:#0f172a;">
+
+  <!-- CABEÇALHO -->
+  <div style="background:${bgColor};color:${txtColor};">
+    ${headerInner}
   </div>
 
   <!-- Faixa decorativa -->
-  <div style="height:3px;background:linear-gradient(90deg,${bgColor},${bgColor}55,transparent);"></div>
+  <div style="height:4px;background:linear-gradient(90deg,${bgColor},${bgColor}44,transparent);"></div>
 
   <!-- CORPO -->
-  <div style="padding:26px 40px;box-sizing:border-box;">
+  <div style="padding:26px 44px 24px;box-sizing:border-box;">
 
     <!-- Card do cliente -->
-    <div style="display:flex;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:22px;">
-      <div style="background:${bgColor};color:${txtColor};padding:14px 18px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;writing-mode:vertical-lr;transform:rotate(180deg);min-width:40px;flex-shrink:0;">CLIENTE</div>
-      <div style="padding:14px 20px;flex:1;">
-        <div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:3px;">${orc.cliente?.nome||"—"}</div>
-        ${orc.cliente?.telefone ? `<div style="font-size:12px;color:#64748b;">Tel: ${orc.cliente.telefone}</div>` : ""}
+    <div style="display:flex;align-items:center;gap:16px;border-left:4px solid ${bgColor};background:#f8fafc;border-radius:0 10px 10px 0;padding:14px 20px;margin-bottom:24px;">
+      <div style="font-size:8px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#94a3b8;white-space:nowrap;">CLIENTE</div>
+      <div style="width:1px;height:28px;background:#e2e8f0;flex-shrink:0;"></div>
+      <div>
+        <div style="font-size:16px;font-weight:700;color:#0f172a;line-height:1.2;">${orc.cliente?.nome||"—"}</div>
+        ${orc.cliente?.telefone ? `<div style="font-size:11px;color:#64748b;margin-top:3px;">Tel: ${orc.cliente.telefone}</div>` : ""}
       </div>
     </div>
 
-    <!-- Tabela de itens — cabeçalho usa bgColor -->
-    <table style="width:100%;border-collapse:collapse;margin-bottom:4px;table-layout:fixed;">
-      <colgroup><col style="width:auto;"><col style="width:56px;"><col style="width:120px;"><col style="width:130px;"></colgroup>
+    <!-- Tabela de itens -->
+    <table style="width:100%;border-collapse:collapse;margin-bottom:2px;table-layout:fixed;">
+      <colgroup><col><col style="width:52px;"><col style="width:118px;"><col style="width:128px;"></colgroup>
       <thead>
         <tr>
-          <th style="background:${bgColor};color:${txtColor};text-align:left;padding:10px 14px;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;">Item</th>
-          <th style="background:${bgColor};color:${txtColor};text-align:center;padding:10px 8px;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;">Qtd</th>
-          <th style="background:${bgColor};color:${txtColor};text-align:right;padding:10px 14px;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;">Unitário</th>
-          <th style="background:${bgColor};color:${txtColor};text-align:right;padding:10px 14px;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;">Total</th>
+          <th style="background:${bgColor};color:${txtColor};text-align:left;padding:10px 14px;font-size:8.5px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;">ITEM</th>
+          <th style="background:${bgColor};color:${txtColor};text-align:center;padding:10px 8px;font-size:8.5px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;">QTD</th>
+          <th style="background:${bgColor};color:${txtColor};text-align:right;padding:10px 14px;font-size:8.5px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;">UNITÁRIO</th>
+          <th style="background:${bgColor};color:${txtColor};text-align:right;padding:10px 14px;font-size:8.5px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;">TOTAL</th>
         </tr>
       </thead>
       <tbody>
         ${itens.map((item,i)=>`
-          <tr style="border-bottom:1px solid #f1f5f9;background:${i%2===0?"#ffffff":"#fafbff"};">
-            <td style="padding:11px 14px;word-break:break-word;">
+          <tr style="${i!==itens.length-1?"border-bottom:1px solid #f1f5f9;":""}background:${i%2===0?"#ffffff":"#f8fafc"};">
+            <td style="padding:12px 14px;word-break:break-word;">
               <div style="font-weight:600;font-size:13px;color:#0f172a;">${item.nome||"—"}</div>
-              <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;margin-top:1px;">${item.tipo}</div>
+              <div style="font-size:8.5px;color:#94a3b8;text-transform:uppercase;margin-top:2px;letter-spacing:0.06em;">${item.tipo}</div>
             </td>
-            <td style="padding:11px 8px;text-align:center;font-size:13px;color:#475569;">${item.quantidade}</td>
-            <td style="padding:11px 14px;text-align:right;font-size:13px;color:#475569;">${fmtR$(item.valorUnitario)}</td>
-            <td style="padding:11px 14px;text-align:right;font-size:13px;font-weight:700;color:#0f172a;">${fmtR$(item.valorTotal)}</td>
+            <td style="padding:12px 8px;text-align:center;font-size:13px;color:#475569;">${item.quantidade}</td>
+            <td style="padding:12px 14px;text-align:right;font-size:13px;color:#475569;">${fmtR$(item.valorUnitario)}</td>
+            <td style="padding:12px 14px;text-align:right;font-size:14px;font-weight:700;color:#0f172a;">${fmtR$(item.valorTotal)}</td>
           </tr>`).join("")}
       </tbody>
     </table>
 
     <!-- Resumo financeiro -->
-    <div style="display:flex;justify-content:flex-end;margin-bottom:22px;">
-      <div style="min-width:260px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:24px;margin-top:2px;">
+      <div style="min-width:272px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.04);">
         ${(desc>0||acr>0)?`
-          <div style="padding:10px 16px;border-bottom:1px solid #f1f5f9;">
-            <div style="display:flex;justify-content:space-between;font-size:12px;color:#64748b;margin-bottom:4px;"><span>Subtotal</span><span>${fmtR$(subtotal)}</span></div>
+          <div style="padding:12px 18px;border-bottom:1px solid #f1f5f9;">
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:#64748b;margin-bottom:5px;"><span>Subtotal</span><span>${fmtR$(subtotal)}</span></div>
             ${desc>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:#ef4444;"><span>Descontos</span><span>−${fmtR$(desc)}</span></div>`:""}
             ${acr>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:#059669;"><span>Acréscimos</span><span>+${fmtR$(acr)}</span></div>`:""}
           </div>`:""}
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:${bgColor};color:${txtColor};">
-          <span style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;">TOTAL</span>
-          <span style="font-size:20px;font-weight:700;">${fmtR$(total)}</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:15px 18px;background:${bgColor};color:${txtColor};">
+          <span style="font-size:9px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;opacity:0.8;">TOTAL</span>
+          <span style="font-size:22px;font-weight:800;letter-spacing:-0.5px;">${fmtR$(total)}</span>
         </div>
       </div>
     </div>
 
     ${orc.descricaoLivre?`
-      <div style="border-left:3px solid ${bgColor};border:1px solid #e2e8f0;border-left-width:3px;border-left-color:${bgColor};border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:22px;background:#fafbff;">
-        <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#64748b;margin-bottom:5px;">Observações</div>
-        <div style="font-size:13px;color:#374151;line-height:1.65;">${orc.descricaoLivre}</div>
+      <!-- Observações -->
+      <div style="border-left:4px solid ${bgColor};background:#f8fafc;border-radius:0 10px 10px 0;padding:13px 18px;margin-bottom:26px;">
+        <div style="font-size:8.5px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">OBSERVAÇÕES</div>
+        <div style="font-size:13px;color:#374151;line-height:1.7;">${orc.descricaoLivre}</div>
       </div>`:""}
 
     <!-- Rodapé: validade + assinatura -->
-    <div style="display:flex;justify-content:space-between;align-items:flex-end;border-top:1px solid #e2e8f0;padding-top:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;border-top:1px solid #e2e8f0;padding-top:22px;">
       <div>
-        <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px;">Validade do orçamento</div>
-        <div style="font-size:15px;font-weight:700;color:#0f172a;">${validade}</div>
+        <div style="font-size:8.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.12em;margin-bottom:5px;">VALIDADE DO ORÇAMENTO</div>
+        <div style="font-size:16px;font-weight:800;color:#0f172a;">${validade}</div>
       </div>
-      <div style="text-align:center;min-width:220px;">
-        <div style="border-top:1.5px solid #0f172a;padding-top:8px;font-size:11px;color:#64748b;">Assinatura do cliente</div>
+      <div style="text-align:center;min-width:232px;">
+        <div style="height:1.5px;background:#cbd5e1;margin-bottom:9px;"></div>
+        <div style="font-size:10px;color:#94a3b8;letter-spacing:0.04em;">Assinatura do cliente</div>
       </div>
     </div>
 
-    <div style="text-align:center;font-size:9px;color:#94a3b8;margin-top:16px;padding-top:12px;border-top:1px dashed #e2e8f0;">
+    <div style="text-align:center;font-size:9px;color:#94a3b8;margin-top:20px;padding-top:12px;border-top:1px dashed #e2e8f0;letter-spacing:0.04em;">
       ${nomeEmp} &mdash; Documento gerado via ASSENT v2.0
     </div>
+
   </div>
 </div>`;
 
