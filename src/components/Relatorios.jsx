@@ -506,7 +506,7 @@ function exportarExcel(nomeRelatorio, sheets) {
 /* ══════════════════════════════════════════════════════
    RELATÓRIO: DRE
    ══════════════════════════════════════════════════════ */
-function RelatorioDRE({ vendas, despesas, intervalo, uid }) {
+function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
   /* Estado para guardar taxas do Firestore (config/geral) — usadas só como fallback */
   const [configTaxas, setConfigTaxas] = useState(null);
 
@@ -536,31 +536,83 @@ function RelatorioDRE({ vendas, despesas, intervalo, uid }) {
   }, [configTaxas]);
 
   const dados = useMemo(() => {
-    const vFiltradas = vendas.filter((v) => dentroDoIntervalo(v.data, intervalo));
     const dFiltradas = despesas.filter((d) => dentroDoIntervalo(d.data, intervalo));
 
-    const receitaBruta = vFiltradas.reduce((s, v) => s + Number(v.total || 0), 0);
+    /* ══════════════════════════════════════════════════════════════════
+       REGIME DE CAIXA PURO — RECEITA
+       ══════════════════════════════════════════════════════════════════
+       Fonte de receita em dois grupos:
 
-    /* Descontos totais (campo salvo no payload de Vendas.jsx como v.descontos) */
-    const descontosTotais = vFiltradas.reduce((s, v) => s + Number(v.descontos || 0), 0);
+       1. SISTEMA NOVO: entradas no caixa com origem = "venda"
+          → Data de referência = data do lançamento no caixa (quando o dinheiro entrou)
+          → Valor = o que foi efetivamente recebido (sinal parcial ou total)
 
-    /* ── TAXAS DE CARTÃO ──
-       Prioridade 1: v.valorTaxa — valor em R$ calculado e gravado no momento da venda.
-       Prioridade 2: fallback usando config/geral (para vendas antigas sem o campo). */
-    const taxasCartao = vFiltradas.reduce((s, v) => {
+       2. SISTEMA LEGADO: vendas sem campo statusPagamento
+          → Não têm lançamento de caixa correspondente
+          → Fallback: tratamos como integralmente recebidas (compatibilidade)
+          → Data de referência = data da venda
+    ═══════════════════════════════════════════════════════════════════ */
+
+    /* Grupo 1 — Entradas de venda no caixa (sistema novo) */
+    const caixaVendas = caixa.filter((c) =>
+      c.origem === "venda" &&
+      (c.tipo || "").toLowerCase().includes("entrada") &&
+      dentroDoIntervalo(c.data, intervalo)
+    );
+
+    /* IDs de vendas já cobertas pelo caixa (para evitar dupla contagem) */
+    const vendasCobertasPorCaixa = new Set(
+      caixaVendas.map((c) => c.referenciaId).filter(Boolean)
+    );
+
+    /* Grupo 2 — Vendas legadas (sem statusPagamento) não cobertas pelo caixa */
+    const vendasLegadas = vendas.filter((v) =>
+      v.statusPagamento == null &&
+      !vendasCobertasPorCaixa.has(v.id) &&
+      dentroDoIntervalo(v.data, intervalo)
+    );
+
+    /* Receita real recebida no período */
+    const receitaCaixa   = caixaVendas.reduce((s, c) => s + Number(c.valor || 0), 0);
+    const receitaLegados = vendasLegadas.reduce((s, v) => s + Number(v.total || 0), 0);
+    const receitaBruta   = receitaCaixa + receitaLegados;
+
+    /* ══════════════════════════════════════════════════════════════════
+       CUSTOS — vinculados às vendas que geraram receita
+       ══════════════════════════════════════════════════════════════════
+       Para vendas novas (cobertas pelo caixa): busca o documento de venda
+       pelo referenciaId para obter custos/taxas reais.
+       Para vendas legadas: usa os campos diretamente.
+    ═══════════════════════════════════════════════════════════════════ */
+
+    /* Mapa id → venda para lookup rápido */
+    const vendasMap = Object.fromEntries(vendas.map((v) => [v.id, v]));
+
+    /* Vendas novas correspondentes às entradas de caixa */
+    const vendasNovas = caixaVendas
+      .map((c) => c.referenciaId ? vendasMap[c.referenciaId] : null)
+      .filter(Boolean)
+      /* Deduplica: mesma venda pode ter múltiplas entradas (parcelas futuras) */
+      .filter((v, idx, arr) => arr.findIndex((x) => x.id === v.id) === idx);
+
+    /* Todas as vendas que compõem a receita deste período */
+    const todasVendasReceita = [...vendasNovas, ...vendasLegadas];
+
+    /* Descontos */
+    const descontosTotais = todasVendasReceita.reduce((s, v) => s + Number(v.descontos || 0), 0);
+
+    /* Taxas de cartão */
+    const taxasCartao = todasVendasReceita.reduce((s, v) => {
       const taxa = v.valorTaxa != null
-        ? Number(v.valorTaxa)          // campo real gravado pelo Vendas.jsx
-        : calcularTaxaFallback(v);     // fallback para vendas sem o campo
+        ? Number(v.valorTaxa)
+        : calcularTaxaFallback(v);
       return s + taxa;
     }, 0);
 
-    /* receitaLiquida = receitaBruta - descontos - taxasCartao
-       Nota: v.total já desconta descontos de itens, mas descontosTotais é exibido
-       separadamente no DRE para transparência. A subtração evita dupla contagem. */
     const receitaLiquida = receitaBruta - descontosTotais - taxasCartao;
 
-    /* Custo dos produtos: usa custoTotal salvo no payload, fallback nos itens */
-    const custoTotal = vFiltradas.reduce((s, v) => {
+    /* Custo dos produtos */
+    const custoTotal = todasVendasReceita.reduce((s, v) => {
       if (v.custoTotal != null) return s + Number(v.custoTotal);
       if (v.itens?.length) {
         return s + v.itens.reduce((si, it) =>
@@ -581,12 +633,10 @@ function RelatorioDRE({ vendas, despesas, intervalo, uid }) {
       porCategoria[cat] = (porCategoria[cat] || 0) + Number(d.valor || 0);
     });
 
-    /* Diagnóstico — verificar quais vendas usaram valorTaxa real vs. fallback */
-    const comValorTaxa = vFiltradas.filter((v) => v.valorTaxa != null).length;
+    /* Diagnóstico */
     console.log(
-      "[DRE] vendas no período:", vFiltradas.length,
-      "| com valorTaxa gravado:", comValorTaxa,
-      "| em fallback:", vFiltradas.length - comValorTaxa,
+      "[DRE — Caixa] entradas de venda no período:", caixaVendas.length,
+      "| vendas legadas (fallback):", vendasLegadas.length,
       "\n[DRE] receitaBruta:", receitaBruta,
       "| descontos:", descontosTotais,
       "| taxasCartao:", taxasCartao,
@@ -600,10 +650,13 @@ function RelatorioDRE({ vendas, despesas, intervalo, uid }) {
       receitaBruta, receitaLiquida, descontosTotais,
       taxasCartao, custoTotal, lucroBruto,
       totalDespesas, lucroLiquido, margem,
-      qtdeVendas: vFiltradas.length,
+      qtdeVendas: todasVendasReceita.length,
       porCategoria,
+      /* informativo */
+      _entradaNovasCaixa: caixaVendas.length,
+      _vendasLegadas: vendasLegadas.length,
     };
-  }, [vendas, despesas, intervalo, calcularTaxaFallback]);
+  }, [vendas, despesas, caixa, intervalo, calcularTaxaFallback]);
 
   const pct = (v) =>
     dados.receitaBruta > 0
@@ -676,7 +729,20 @@ function RelatorioDRE({ vendas, despesas, intervalo, uid }) {
       {/* Tabela DRE */}
       <div className="tr-wrap">
         <div className="tr-header">
-          <span className="tr-title">Demonstração do Resultado do Exercício</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span className="tr-title">Demonstração do Resultado do Exercício</span>
+            <span
+              title={`Regime de Caixa: ${dados._entradaNovasCaixa} entrada(s) do caixa + ${dados._vendasLegadas} venda(s) legada(s) como fallback`}
+              style={{
+                fontSize: 10, fontWeight: 600, padding: "2px 8px",
+                borderRadius: 20, background: "rgba(74,222,128,0.1)",
+                border: "1px solid rgba(74,222,128,0.25)", color: "var(--green)",
+                cursor: "default",
+              }}
+            >
+              ✓ Regime de Caixa
+            </span>
+          </div>
           <button className="btn-secondary" style={{ fontSize: 11, padding: "5px 12px" }} onClick={handleExport}>
             <Download size={12} /> Excel
           </button>
@@ -1743,7 +1809,7 @@ export default function Relatorios() {
       );
     }
     switch (ativo) {
-      case "dre":        return <RelatorioDRE vendas={vendas} despesas={despesas} intervalo={intervalo} uid={uid} />;
+      case "dre":        return <RelatorioDRE vendas={vendas} despesas={despesas} caixa={caixa} intervalo={intervalo} uid={uid} />;
       case "financeiro": return <RelatorioFinanceiro caixa={caixa} intervalo={intervalo} />;
       case "vendas":     return <RelatorioVendas vendas={vendas} intervalo={intervalo} />;
       case "despesas":   return <RelatorioDespesas despesas={despesas} intervalo={intervalo} />;
