@@ -23,6 +23,7 @@ import Agenda from "./modules/Agenda/Agenda.jsx";
 import Fornecedores from "./modules/Fornecedores.jsx";
 import AReceber from "./modules/AReceber.jsx";
 import Relatorios from "./components/Relatorios.jsx";
+import CaixaDiario from "./modules/CaixaDiario.jsx";
 
 /* ── Firebase (Adicionado para o filtro) ── */
 import { db, auth } from "./lib/firebase";
@@ -433,6 +434,7 @@ export default function Dashboard() {
       case "Fornecedores":     return <Fornecedores />;
       case "A Receber":        return <AReceber />;
       case "Relatórios":        return <Relatorios />;
+      case "Caixa Diário":     return <CaixaDiario />;
         
       default:                 return renderDashboard();
     }
