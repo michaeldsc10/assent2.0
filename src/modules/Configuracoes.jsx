@@ -7,7 +7,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Building2, Lock, CreditCard, LayoutDashboard, Package,
   Eye, EyeOff, Check, AlertCircle, Save,
-  ChevronRight, Camera, Shield,
+  ChevronRight, Camera, Shield, Keyboard,
 } from "lucide-react";
 
 import { db, auth, onAuthStateChanged } from "../lib/firebase";
@@ -94,7 +94,73 @@ const NAV = [
   { id: "financeiro", label: "Financeiro",       icon: CreditCard     },
   { id: "menu",       label: "Menu do Sistema",  icon: LayoutDashboard},
   { id: "estoque",    label: "Estoque",          icon: Package        },
+  { id: "atalhos",    label: "Atalhos",          icon: Keyboard       },
 ];
+
+/* ══════════════════════════════════════════════════════
+   MAPEAMENTO DE ATALHOS DE TECLADO
+   Combinação: Alt + tecla → navega para o módulo
+   ══════════════════════════════════════════════════════ */
+export const ATALHOS_MAP = [
+  { code: "Digit1", display: "Alt + 1", key: "dashboard"       },
+  { code: "Digit2", display: "Alt + 2", key: "clientes"        },
+  { code: "Digit3", display: "Alt + 3", key: "produtos"        },
+  { code: "Digit4", display: "Alt + 4", key: "servicos"        },
+  { code: "Digit5", display: "Alt + 5", key: "entrada_estoque" },
+  { code: "Digit6", display: "Alt + 6", key: "vendas"          },
+  { code: "Digit7", display: "Alt + 7", key: "fiado"           },
+  { code: "Digit8", display: "Alt + 8", key: "caixa"           },
+  { code: "Digit9", display: "Alt + 9", key: "despesas"        },
+  { code: "KeyF",   display: "Alt + F", key: "fornecedores"    },
+  { code: "KeyR",   display: "Alt + R", key: "relatorios"      },
+  { code: "KeyA",   display: "Alt + A", key: "agenda"          },
+  { code: "KeyO",   display: "Alt + O", key: "orcamentos"      },
+  { code: "KeyM",   display: "Alt + M", key: "vendedores"      },
+  { code: "KeyG",   display: "Alt + G", key: "config"          },
+];
+
+/* Lookup rápido: code → key do módulo */
+const ATALHO_LOOKUP = Object.fromEntries(ATALHOS_MAP.map(a => [a.code, a.key]));
+
+/* ══════════════════════════════════════════════════════
+   HOOK: useAtalhosTeclado
+   Deve ser chamado no App.jsx (raiz), onde setModule e
+   menuVisivel já existem. Zero dependência de Configuracoes.
+   ══════════════════════════════════════════════════════ */
+export function useAtalhosTeclado(setModule, menuVisivel = {}) {
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      /* 1. Apenas combinações Alt + tecla */
+      if (!e.altKey) return;
+
+      /* 2. Ignorar se foco está em campo de texto */
+      const tag = document.activeElement?.tagName;
+      if (
+        tag === "INPUT"    ||
+        tag === "TEXTAREA" ||
+        document.activeElement?.isContentEditable
+      ) return;
+
+      /* 3. Verificar se o código tem atalho mapeado */
+      const moduleKey = ATALHO_LOOKUP[e.code];
+      if (!moduleKey) return;
+
+      /* 4. Verificar visibilidade do módulo */
+      const section = MENU_SECTIONS.find(s => s.key === moduleKey);
+      if (!section) return;
+      /* Módulos locked são sempre visíveis; os outros precisam estar ativos */
+      if (!section.locked && menuVisivel[moduleKey] === false) return;
+
+      /* 5. Navegar — previne ação padrão do navegador (ex: Alt+F abre menu) */
+      e.preventDefault();
+      setModule(moduleKey);
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [setModule, menuVisivel]);
+}
 
 /* ══════════════════════════════════════════════════════
    CSS
@@ -356,6 +422,45 @@ const CSS = `
   }
   .cfg-loading {
     padding: 56px 20px; text-align: center; color: var(--text-3); font-size: 13px;
+  }
+
+  /* ── Seção Atalhos ── */
+  .atalhos-intro {
+    font-size: 12px; color: var(--text-3); line-height: 1.7;
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 9px; padding: 12px 14px; margin-bottom: 4px;
+  }
+  .atalhos-intro strong { color: var(--gold); font-weight: 600; }
+  .atalhos-list { display: flex; flex-direction: column; gap: 6px; }
+  .atalho-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; border-radius: 9px;
+    border: 1px solid var(--border); background: var(--s2);
+    transition: border-color .13s, opacity .13s;
+  }
+  .atalho-item:not(.atalho-disabled):hover { border-color: var(--border-h); }
+  .atalho-disabled { opacity: .38; }
+  .atalho-icon {
+    width: 28px; height: 28px; border-radius: 7px;
+    background: var(--s3); border: 1px solid var(--border-h);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-size: 14px;
+  }
+  .atalho-info { flex: 1; min-width: 0; }
+  .atalho-label { font-size: 13px; color: var(--text); font-family: 'DM Sans', sans-serif; }
+  .atalho-sub   { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+  .atalho-key {
+    font-family: 'DM Mono', 'Courier New', monospace;
+    font-size: 11px; font-weight: 700; white-space: nowrap;
+    background: var(--s3); border: 1px solid var(--border-h);
+    border-bottom-width: 2px; border-radius: 6px;
+    padding: 3px 10px; color: var(--gold); letter-spacing: .04em;
+    flex-shrink: 0;
+  }
+  .atalho-hidden-badge {
+    font-size: 10px; color: var(--text-3); background: var(--s3);
+    border: 1px solid var(--border); border-radius: 20px;
+    padding: 2px 8px; white-space: nowrap; flex-shrink: 0;
   }
 `;
 
@@ -790,9 +895,52 @@ function SecaoEstoque({ config, onSave }) {
 }
 
 /* ══════════════════════════════════════════════════════
+   SEÇÃO ATALHOS — informativa, preparada para expansão
+   ══════════════════════════════════════════════════════ */
+function SecaoAtalhos({ menuVisivel = {} }) {
+  return (
+    <div className="cfg-card">
+      <div className="cfg-card-header">
+        <div className="cfg-card-header-icon"><Keyboard size={15} /></div>
+        <div>
+          <div className="cfg-card-title">Atalhos de Teclado</div>
+          <div className="cfg-card-sub">Navegue rapidamente usando o teclado</div>
+        </div>
+      </div>
+      <div className="cfg-card-body">
+        <div className="atalhos-intro">
+          Use <strong>Alt + tecla</strong> para saltar diretamente para qualquer módulo.{" "}
+          Atalhos são desativados automaticamente quando você está digitando em um campo.
+          Módulos ocultos no menu não respondem ao atalho.
+        </div>
+        <div className="atalhos-list">
+          {ATALHOS_MAP.map(({ code, display, key }) => {
+            const section = MENU_SECTIONS.find(s => s.key === key);
+            if (!section) return null;
+            /* Um módulo está acessível se for locked ou se estiver visível */
+            const ativo = section.locked || menuVisivel[key] !== false;
+            return (
+              <div key={code} className={`atalho-item${ativo ? "" : " atalho-disabled"}`}>
+                <div className="atalho-icon">{section.icon}</div>
+                <div className="atalho-info">
+                  <div className="atalho-label">{section.label}</div>
+                  <div className="atalho-sub">{section.sub}</div>
+                </div>
+                <kbd className="atalho-key">{display}</kbd>
+                {!ativo && <span className="atalho-hidden-badge">Oculto no menu</span>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════ */
-export default function Configuracoes() {
+export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
   const [uid, setUid]         = useState(null);
   const [config, setConfig]   = useState(null);
   const [loading, setLoading] = useState(true);
@@ -827,6 +975,7 @@ export default function Configuracoes() {
       case "financeiro": return <SecaoFinanceiro config={config} onSave={handleSave} />;
       case "menu":       return <SecaoMenu       config={config} onSave={handleSave} />;
       case "estoque":    return <SecaoEstoque    config={config} onSave={handleSave} />;
+      case "atalhos":    return <SecaoAtalhos    menuVisivel={menuVisivelProp ?? config?.menuVisivel ?? {}} />;
       default:           return null;
     }
   };
