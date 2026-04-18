@@ -76,21 +76,18 @@ button:focus-visible {
 
 /* ─────────────────────────────────────────────────────
    Reset: impede que os estilos globais de button acima
-   interfiram nos módulos do sistema (Dashboard e filhos)
+   interfiram nos botões de ícone do sistema (lápis,
+   lixeira, X, cifrão, etc.) sem afetar outros botões.
 ───────────────────────────────────────────────────── */
-.ag-app button,
-.ag-app button:hover,
-.ag-app button:focus,
-.ag-app button:focus-visible {
-  border-radius: unset;
-  border: unset;
-  padding: unset;
-  font-size: unset;
-  font-weight: unset;
-  font-family: unset;
-  background-color: unset;
-  transition: unset;
-  border-color: unset;
-  outline: unset;
-  transform: unset;
+.ag-app .btn-icon,
+.ag-app .btn-icon:hover,
+.ag-app .btn-icon:focus,
+.ag-app .btn-icon:focus-visible {
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  background-color: transparent;
+  border-color: transparent;
+  outline: none;
+  transform: none;
 }
