@@ -12,7 +12,7 @@ import {
   Search, Plus, X, Download, Filter,
   TrendingUp, TrendingDown, DollarSign,
   ArrowUpCircle, ArrowDownCircle, AlertCircle,
-  ChevronDown, RefreshCw, Lock, Unlock, History, CheckCircle, Clock,
+  ChevronDown, RefreshCw,
 } from "lucide-react";
 
 import { db, auth } from "../lib/firebase";
@@ -1324,7 +1324,7 @@ function ModalAbrirCaixa({ saldoAtual, onConfirm, onClose }) {
             borderRadius: 10, padding: "12px 14px", marginBottom: 18,
             display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--text-2)",
           }}>
-            <Unlock size={16} color="var(--green)" />
+            <ArrowUpCircle size={16} color="var(--green)" />
             O caixa será aberto para o dia de hoje. Todos os lançamentos ficarão vinculados a esta sessão.
           </div>
           <div className="form-group">
@@ -1344,7 +1344,7 @@ function ModalAbrirCaixa({ saldoAtual, onConfirm, onClose }) {
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose} disabled={salvando}>Cancelar</button>
           <button className="btn-primary" onClick={handleConfirm} disabled={salvando}>
-            {salvando ? <RefreshCw size={13} style={{ animation: "spin 1s linear infinite" }} /> : <Unlock size={13} />}
+            {salvando ? <RefreshCw size={13} style={{ animation: "spin 1s linear infinite" }} /> : <ArrowUpCircle size={13} />}
             {salvando ? "Abrindo..." : "Abrir Caixa"}
           </button>
         </div>
@@ -1386,7 +1386,7 @@ function ModalFecharCaixa({ caixaHoje, totalEntradas, totalSaidas, totalTaxas, s
             borderRadius: 10, padding: "12px 14px", marginBottom: 18,
             display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: "var(--text-2)",
           }}>
-            <Lock size={16} color="var(--red)" />
+            <AlertCircle size={16} color="var(--red)" />
             Após fechar, não será possível adicionar lançamentos a este caixa. Esta ação não pode ser desfeita.
           </div>
 
@@ -1431,7 +1431,7 @@ function ModalFecharCaixa({ caixaHoje, totalEntradas, totalSaidas, totalTaxas, s
               opacity: salvando ? 0.5 : 1,
             }}
           >
-            {salvando ? <RefreshCw size={13} style={{ animation: "spin 1s linear infinite" }} /> : <Lock size={13} />}
+            {salvando ? <RefreshCw size={13} style={{ animation: "spin 1s linear infinite" }} /> : <AlertCircle size={13} />}
             {salvando ? "Fechando..." : "Confirmar Fechamento"}
           </button>
         </div>
@@ -1470,7 +1470,7 @@ function ModalDetalheCaixaHistorico({ caixa, onClose }) {
             <div className="modal-title">Caixa · {caixa.data}</div>
             <div className="modal-sub">
               <span className={`cx-status-badge ${aberto ? "cx-status-aberto" : "cx-status-fechado"}`}>
-                {aberto ? <Unlock size={10} /> : <Lock size={10} />}
+                {aberto ? <ArrowUpCircle size={10} /> : <AlertCircle size={10} />}
                 {aberto ? "Aberto" : "Fechado"}
               </span>
             </div>
@@ -1716,17 +1716,17 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
             <p>Controle de entradas e saídas financeiras</p>
           </div>
           <div className="cx-topbar-right">
-            <span className="cx-status-badge cx-status-fechado"><Lock size={10} /> Fechado</span>
+            <span className="cx-status-badge cx-status-fechado"><AlertCircle size={10} /> Fechado</span>
           </div>
         </header>
         <div className="cx-gate">
-          <div className="cx-gate-icon"><Lock size={28} color="var(--gold)" /></div>
+          <div className="cx-gate-icon"><AlertCircle size={28} color="var(--gold)" /></div>
           <div className="cx-gate-title">Caixa Fechado</div>
           <div className="cx-gate-sub">
             O caixa de hoje ainda não foi aberto. Abra o caixa para começar a registrar lançamentos.
           </div>
           <button className="btn-primary" style={{ fontSize: 14, padding: "11px 28px" }} onClick={() => setModalAbrir(true)}>
-            <Unlock size={15} /> Abrir Caixa
+            <ArrowUpCircle size={15} /> Abrir Caixa
           </button>
         </div>
 
@@ -1736,7 +1736,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
             <div className="cx-historico-wrap">
               <div className="cx-table-header">
                 <div className="cx-table-title">
-                  <History size={13} /> Histórico de Caixas
+                  <RefreshCw size={13} /> Histórico de Caixas
                   <span className="cx-count-badge">{caixasHist.length}</span>
                 </div>
               </div>
@@ -1755,7 +1755,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
                     <span style={{ color: "var(--text)", fontWeight: 500 }}>{c.data}</span>
                     <span>
                       <span className={`cx-status-badge ${c.status === "aberto" ? "cx-status-aberto" : "cx-status-fechado"}`} style={{ fontSize: 10 }}>
-                        {c.status === "aberto" ? <Unlock size={9} /> : <Lock size={9} />}
+                        {c.status === "aberto" ? <ArrowUpCircle size={9} /> : <AlertCircle size={9} />}
                         {c.status === "aberto" ? "Aberto" : "Fechado"}
                       </span>
                     </span>
@@ -1817,12 +1817,12 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
         </div>
 
         <div className="cx-topbar-right">
-          <span className="cx-status-badge cx-status-aberto"><Unlock size={10} /> Aberto</span>
+          <span className="cx-status-badge cx-status-aberto"><ArrowUpCircle size={10} /> Aberto</span>
           <button
             className="btn-fechar-caixa"
             onClick={() => setModalFechar(true)}
           >
-            <Lock size={13} /> Fechar Caixa
+            <AlertCircle size={13} /> Fechar Caixa
           </button>
           <button
             onClick={() => setModalNovo(true)}
@@ -1946,7 +1946,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
           <div className="cx-historico-wrap">
             <div className="cx-table-header">
               <div className="cx-table-title">
-                <History size={13} /> Histórico de Caixas
+                <RefreshCw size={13} /> Histórico de Caixas
                 <span className="cx-count-badge">{caixasHist.filter(c => c.id !== dataISOHoje()).length}</span>
               </div>
             </div>
@@ -1965,7 +1965,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
                   <span style={{ color: "var(--text)", fontWeight: 500 }}>{c.data}</span>
                   <span>
                     <span className={`cx-status-badge ${c.status === "aberto" ? "cx-status-aberto" : "cx-status-fechado"}`} style={{ fontSize: 10 }}>
-                      {c.status === "aberto" ? <Unlock size={9} /> : <Lock size={9} />}
+                      {c.status === "aberto" ? <ArrowUpCircle size={9} /> : <AlertCircle size={9} />}
                       {c.status === "aberto" ? "Aberto" : "Fechado"}
                     </span>
                   </span>
