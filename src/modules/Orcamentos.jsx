@@ -328,6 +328,43 @@ const CSS = `
   }
   .orc-color-opt.sel { border-color:var(--gold);transform:scale(1.12);box-shadow:0 0 0 3px rgba(200,165,94,.25); }
 
+  /* ── Color picker customizado ── */
+  .orc-color-custom {
+    display:flex;align-items:center;gap:10px;margin-top:12px;
+    background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;
+  }
+  .orc-color-custom-label {
+    font-size:10px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);white-space:nowrap;
+  }
+  .orc-color-wheel {
+    width:36px;height:36px;border-radius:8px;cursor:pointer;
+    border:2px solid var(--border-h);padding:2px;background:transparent;
+    flex-shrink:0;
+  }
+  .orc-color-wheel::-webkit-color-swatch-wrapper { padding:0;border-radius:5px; }
+  .orc-color-wheel::-webkit-color-swatch { border:none;border-radius:5px; }
+  .orc-hex-input {
+    flex:1;min-width:0;background:var(--s3);border:1px solid var(--border);
+    border-radius:8px;padding:7px 11px;color:var(--text);font-size:13px;
+    font-family:'DM Sans',sans-serif;outline:none;letter-spacing:.04em;
+    transition:border-color .15s;
+  }
+  .orc-hex-input:focus { border-color:var(--gold); }
+  .orc-hex-input.err   { border-color:var(--red); }
+  .orc-hex-preview-pill {
+    height:28px;min-width:80px;border-radius:7px;
+    border:1px solid rgba(255,255,255,.08);
+    display:flex;align-items:center;justify-content:center;
+    font-size:10px;font-weight:600;flex-shrink:0;letter-spacing:.04em;
+  }
+  .orc-color-sep {
+    display:flex;align-items:center;gap:8px;margin-top:10px;
+    font-size:10px;color:var(--text-3);letter-spacing:.05em;text-transform:uppercase;
+  }
+  .orc-color-sep::before,.orc-color-sep::after {
+    content:"";flex:1;height:1px;background:var(--border);
+  }
+
   /* ── Posição logo ── */
   .orc-pos-btns { display:flex;gap:6px; }
   .orc-pos {
@@ -460,6 +497,20 @@ const filtroParaStatus = f => ({
   "Fechado":{sc:"fechado"}, "Perdido":{sc:"perdido"},
   "Expirado":{ss:"expirado"}, "Convertido":{ss:"convertido"},
 }[f] ?? null);
+
+/* Calcula cor de texto ideal (claro/escuro) a partir do hex de background */
+function calcTextColor(hex) {
+  try {
+    const c = hex.replace("#","");
+    const r = parseInt(c.slice(0,2),16);
+    const g = parseInt(c.slice(2,4),16);
+    const b = parseInt(c.slice(4,6),16);
+    if ([r,g,b].some(n=>isNaN(n))) return "#ffffff";
+    const lum = (0.299*r + 0.587*g + 0.114*b) / 255;
+    return lum > 0.55 ? "#0f172a" : "#ffffff";
+  } catch { return "#ffffff"; }
+}
+function hexValido(h) { return /^#[0-9a-fA-F]{6}$/.test(h); }
 
 /* ══════════════════════════════════════════════════
    IMPRESSÃO A4
@@ -984,6 +1035,7 @@ function ModalNovoOrc({ orc, uid, clientes, produtos, servicos, onSave, onClose 
   const [lCor,    setLCor]    = useState(orc?.configuracaoLayout?.corHeader||"#0f172a");
   const [lCorTxt, setLCorTxt] = useState(orc?.configuracaoLayout?.corTextoHeader||"#f8fafc");
   const [lLogo,   setLLogo]   = useState(orc?.configuracaoLayout?.posicaoLogo||"esquerda");
+  const [hexInput, setHexInput] = useState(orc?.configuracaoLayout?.corHeader||"#0f172a");
 
   const [salvando, setSalvando] = useState(false);
   const [erros,    setErros]    = useState({});
@@ -1221,16 +1273,67 @@ function ModalNovoOrc({ orc, uid, clientes, produtos, servicos, onSave, onClose 
 
           <div className="form-group">
             <label className="form-label">Cor do Cabeçalho (Impressão)</label>
+            {/* Presets */}
             <div className="orc-colors">
               {CORES_HEADER.map(c=>(
                 <div key={c.bg} className={`orc-color-opt ${lCor===c.bg?"sel":""}`}
                   style={{background:c.bg,outline:`1.5px solid ${lCor===c.bg?"var(--gold)":c.bg==="var(--border)"?"#ccc":c.bg}`}}
-                  onClick={()=>{setLCor(c.bg);setLCorTxt(c.text);}} title={c.bg}/>
+                  onClick={()=>{setLCor(c.bg);setLCorTxt(c.text);setHexInput(c.bg);}} title={c.bg}/>
               ))}
             </div>
-            <div style={{marginTop:8,fontSize:11,color:"var(--text-3)"}}>
-              Prévia: <span style={{background:lCor,color:lCorTxt,padding:"2px 12px",borderRadius:5,fontSize:11,display:"inline-block",marginTop:4}}>Cabeçalho do documento</span>
+
+            <div className="orc-color-sep">ou personalize</div>
+
+            {/* Custom color picker */}
+            <div className="orc-color-custom">
+              <span className="orc-color-custom-label">Cor</span>
+              {/* Roda de cores nativa */}
+              <input
+                type="color"
+                className="orc-color-wheel"
+                value={hexValido(lCor)?lCor:"#0f172a"}
+                onChange={e=>{
+                  const v = e.target.value;
+                  setLCor(v);
+                  setLCorTxt(calcTextColor(v));
+                  setHexInput(v);
+                }}
+                title="Abrir seletor de cor"
+              />
+              {/* Input de código hex */}
+              <input
+                type="text"
+                className={`orc-hex-input ${hexInput.length>1 && !hexValido(hexInput)?"err":""}`}
+                placeholder="#000000"
+                maxLength={7}
+                value={hexInput}
+                onChange={e=>{
+                  let v = e.target.value;
+                  if (v && !v.startsWith("#")) v = "#"+v;
+                  setHexInput(v);
+                  if (hexValido(v)) {
+                    setLCor(v);
+                    setLCorTxt(calcTextColor(v));
+                  }
+                }}
+                onBlur={e=>{
+                  if (!hexValido(hexInput)) {
+                    setHexInput(lCor); // restaura o valor válido atual
+                  }
+                }}
+              />
+              {/* Pílula de prévia */}
+              <div
+                className="orc-hex-preview-pill"
+                style={{background:lCor,color:lCorTxt}}
+              >
+                Cabeçalho
+              </div>
             </div>
+
+            {hexInput.length>1 && !hexValido(hexInput) && (
+              <div className="form-error" style={{marginTop:5}}>Código hex inválido. Ex: #1E40AF</div>
+            )}
           </div>
         </div>
         <div className="modal-footer">
