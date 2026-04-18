@@ -55,35 +55,47 @@ export const fmtData = (v) => {
 };
 
 /**
- * Retorna a data de início do período selecionado.
- * Retorna null para "Todos".
+ * Retorna { start, end } para o período selecionado.
+ * start = Date | null (null = "sem limite inferior")
+ * end   = sempre now (ou fim do dia de `to` no Personalizado)
  */
-function getPeriodStart(period) {
-  const now = new Date();
+function getPeriodBounds(period, customRange) {
+  const now   = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  if (period === "Personalizado" && customRange?.from && customRange?.to) {
+    const [fy, fm, fd] = customRange.from.split("-").map(Number);
+    const [ty, tm, td] = customRange.to.split("-").map(Number);
+    return {
+      start: new Date(fy, fm - 1, fd, 0, 0, 0, 0),
+      end:   new Date(ty, tm - 1, td, 23, 59, 59, 999),
+    };
+  }
+
   switch (period) {
-    case "Hoje":      return today;
-    case "7 dias":    return new Date(today.getTime() - 6  * 86_400_000);
-    case "30 dias":   return new Date(today.getTime() - 29 * 86_400_000);
-    case "Este mês":  return new Date(now.getFullYear(), now.getMonth(), 1);
-    case "Todos":     return null;
-    default:          return new Date(now.getFullYear(), now.getMonth(), 1);
+    case "Hoje":     return { start: today, end: now };
+    case "7 dias":   return { start: new Date(today.getTime() - 6  * 86_400_000), end: now };
+    case "30 dias":  return { start: new Date(today.getTime() - 29 * 86_400_000), end: now };
+    case "Este mês": return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: now };
+    case "Todos":    return { start: null, end: now };
+    default:         return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: now };
   }
 }
 
 /* ── Hook principal ───────────────────────────────── */
 
 /**
- * useDashboardData(uid, period)
+ * useDashboardData(uid, period, customRange?)
  *
  * Escuta em tempo real todas as coleções relevantes
  * e retorna métricas calculadas baseadas no período.
  *
- * @param {string}  uid    — UID do usuário autenticado
- * @param {string}  period — Período selecionado no dashboard
+ * @param {string}       uid         — UID do usuário autenticado
+ * @param {string}       period      — Período selecionado no dashboard
+ * @param {{ from: string, to: string }|null} customRange — Intervalo personalizado (YYYY-MM-DD)
  * @returns {object} métricas + loading
  */
-export function useDashboardData(uid, period = "Este mês") {
+export function useDashboardData(uid, period = "Este mês", customRange = null) {
   const [raw, setRaw] = useState({
     vendas:   [],
     clientes: [],
@@ -135,15 +147,15 @@ export function useDashboardData(uid, period = "Este mês") {
   /* ── Métricas computadas (memoizadas) ─────────── */
   const metrics = useMemo(() => {
     const { vendas, clientes, produtos, servicos, despesas, aReceber } = raw;
-    const periodStart = getPeriodStart(period);
-    const now = new Date();
+    const { start: periodStart, end: periodEnd } = getPeriodBounds(period, customRange);
+    const now  = new Date();
     const in30 = new Date(now.getTime() + 30 * 86_400_000);
 
     /* ── Filtra vendas pelo período ── */
     const vendasPeriodo = periodStart
       ? vendas.filter((v) => {
           const dt = toDate(v.data);
-          return dt && dt >= periodStart;
+          return dt && dt >= periodStart && dt <= periodEnd;
         })
       : vendas;
 
@@ -172,7 +184,7 @@ export function useDashboardData(uid, period = "Este mês") {
     /* Projeção 30 dias (taxa média diária × 30) */
     let projecao = 0;
     if (periodStart && receitaBruta > 0) {
-      const dias = Math.max(1, Math.round((now - periodStart) / 86_400_000));
+      const dias = Math.max(1, Math.round((periodEnd - periodStart) / 86_400_000));
       projecao = (receitaBruta / dias) * 30;
     }
 
@@ -232,10 +244,26 @@ export function useDashboardData(uid, period = "Este mês") {
         const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
         return { d: `${meses[ref.getMonth()]}/${String(ref.getFullYear()).slice(2)}`, v: total };
       });
+    } else if (period === "Personalizado" && periodStart) {
+      /* Personalizado: agrupa por dia entre from e to */
+      const totalDias = Math.round((periodEnd - periodStart) / 86_400_000) + 1;
+      const dias = Math.min(totalDias, 60);
+      faturamentoPorDia = Array.from({ length: dias }, (_, i) => {
+        const d    = new Date(periodStart.getTime() + i * 86_400_000);
+        const next = new Date(d.getTime() + 86_400_000);
+        const total = vendas
+          .filter((v) => { const dt = toDate(v.data); return dt && dt >= d && dt < next; })
+          .reduce((s, v) => s + (Number(v.total) || 0), 0);
+        return {
+          d: `${String(d.getDate()).padStart(2, "0")}/${d.getMonth() + 1}`,
+          v: total,
+        };
+      });
     } else {
       /* Agrupa por dia — usa o periodStart calculado */
       const start = periodStart ?? new Date(now.getFullYear(), now.getMonth(), 1);
-      const totalDias = Math.round((now - start) / 86_400_000) + 1;
+      const end   = periodEnd ?? now;
+      const totalDias = Math.round((end - start) / 86_400_000) + 1;
       const dias = Math.min(totalDias, 60); /* máximo 60 pontos */
       faturamentoPorDia = Array.from({ length: dias }, (_, i) => {
         const d    = new Date(start.getTime() + i * 86_400_000);
@@ -340,7 +368,7 @@ export function useDashboardData(uid, period = "Este mês") {
       topClientes,
       ultimasVendas,
     };
-  }, [raw, period]);
+  }, [raw, period, customRange]);
 
   return { ...metrics, loading };
 }
