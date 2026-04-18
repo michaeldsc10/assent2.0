@@ -37,6 +37,7 @@ import Fornecedores  from "./modules/Fornecedores.jsx";
 import AReceber      from "./modules/AReceber.jsx";
 import Relatorios    from "./components/Relatorios.jsx";
 import CaixaDiario   from "./modules/CaixaDiario.jsx";
+import Orcamentos     from "./modules/Orcamentos.jsx";
 
 /* ── Firebase ──────────────────────────────────── */
 import { db, auth, logout } from "./lib/firebase";
@@ -872,6 +873,7 @@ export default function Dashboard() {
       case "A Receber":           return <AReceber />;
       case "Relatórios":          return <Relatorios />;
       case "Caixa Diário":        return <CaixaDiario />;
+      case "Orçamentos":        return <Orcamentos />;
       default:                    return renderDashboard();
     }
   };
