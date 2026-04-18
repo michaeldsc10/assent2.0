@@ -157,7 +157,7 @@ const CSS = `
     --amber-d:      rgba(245,158,11,0.1);
     --sidebar-w:    220px;
     --sidebar-w-sm: 64px;
-    --header-h:     52px;
+    --header-h:     62px;
     --sidebar-transition: width 0.22s cubic-bezier(0.4,0,0.2,1);
     font-family: 'DM Sans', sans-serif;
     --font-display: 'Playfair Display', serif;
@@ -460,18 +460,23 @@ const CSS = `
 
   /* Topbar do dashboard */
   .ag-topbar {
-    padding: 13px 22px;
+    padding: 14px 24px;
     background: var(--s1);
     border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 14px;
+    display: flex; align-items: center; gap: 16px;
     flex-shrink: 0;
   }
   .ag-topbar-title { }
   .ag-topbar-title h1 {
-    font-family: var(--font-display); font-size: 18px; font-weight: 600;
-    color: var(--gold-brand); line-height: 1.2; letter-spacing: 0.01em;
+    font-family: var(--font-display); font-size: 26px; font-weight: 600;
+    color: var(--gold-brand); line-height: 1.15; letter-spacing: 0.01em;
+    background: linear-gradient(135deg, #D4AF37 10%, #e8ca60 55%, #c8a55e 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
-  .ag-topbar-title p { font-size: 11px; color: var(--text-2); margin-top: 2px; }
+  .ag-topbar-title p {
+    font-size: 11px; color: var(--text-3); margin-top: 3px; letter-spacing: 0.02em;
+  }
 
   .ag-search {
     display: flex; align-items: center; gap: 8px;
@@ -513,16 +518,35 @@ const CSS = `
   .ag-card {
     background: var(--s1); border: 1px solid var(--border);
     border-radius: 14px; padding: 20px;
-    transition: border-color .18s, box-shadow .18s;
+    transition: border-color .2s, box-shadow .2s, transform .2s;
   }
-  .ag-card:hover { border-color: var(--border-h); box-shadow: 0 4px 20px rgba(0,0,0,0.25); }
+  .ag-card:hover {
+    border-color: var(--border-h);
+    box-shadow: 0 6px 28px rgba(0,0,0,0.3);
+    transform: translateY(-2px);
+  }
+
+  /* Card clicável (mini stats) */
+  .ag-card-click {
+    cursor: pointer;
+  }
+  .ag-card-click:hover {
+    border-color: rgba(200,165,94,0.25);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+    transform: translateY(-3px);
+  }
+  .ag-card-click:active { transform: translateY(-1px); }
 
   .ag-card-bare {
     background: var(--s1); border: 1px solid var(--border);
     border-radius: 14px; overflow: hidden;
-    transition: border-color .18s, box-shadow .18s;
+    transition: border-color .2s, box-shadow .2s, transform .2s;
   }
-  .ag-card-bare:hover { border-color: var(--border-h); }
+  .ag-card-bare:hover {
+    border-color: var(--border-h);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+    transform: translateY(-1px);
+  }
 
   .ag-card-header {
     padding: 14px 18px;
@@ -841,10 +865,10 @@ export default function Dashboard() {
 
   /* ── Mini Stats ───────────────────────────────── */
   const miniStats = [
-    { label: "Clientes",          value: dash.numClientes,  icon: Users,        color: "var(--blue)",   dim: "var(--blue-d)" },
-    { label: "Produtos",          value: dash.numProdutos,  icon: Package,      color: "var(--gold)",   dim: "var(--gold-d)" },
-    { label: "Serviços",          value: dash.numServicos,  icon: Wrench,       color: "var(--green)",  dim: "var(--green-d)" },
-    { label: "Vendas no período", value: dash.numVendas,    icon: ShoppingCart, color: "var(--purple)", dim: "var(--purple-d)" },
+    { label: "Clientes",          value: dash.numClientes,  icon: Users,        color: "var(--blue)",   dim: "var(--blue-d)",   nav: "Clientes" },
+    { label: "Produtos",          value: dash.numProdutos,  icon: Package,      color: "var(--gold)",   dim: "var(--gold-d)",   nav: "Produtos" },
+    { label: "Serviços",          value: dash.numServicos,  icon: Wrench,       color: "var(--green)",  dim: "var(--green-d)",  nav: "Serviços" },
+    { label: "Vendas no período", value: dash.numVendas,    icon: ShoppingCart, color: "var(--purple)", dim: "var(--purple-d)", nav: "Vendas" },
   ];
 
   /* ── Resumo Despesas ──────────────────────────── */
@@ -911,7 +935,12 @@ export default function Dashboard() {
         {/* ── Mini Stats ── */}
         <div className="g4">
           {miniStats.map((s) => (
-            <div key={s.label} className="ag-card">
+            <div
+              key={s.label}
+              className="ag-card ag-card-click"
+              onClick={() => setModule(s.nav)}
+              title={`Ir para ${s.nav}`}
+            >
               <div className="ag-mini">
                 <div className="ag-mini-icon" style={{ background: s.dim }}>
                   <s.icon size={19} color={s.color} />
@@ -922,6 +951,12 @@ export default function Dashboard() {
                   </div>
                   <div className="ag-mini-lbl">{s.label}</div>
                 </div>
+              </div>
+              {/* Seta de atalho discreta */}
+              <div style={{
+                display: "flex", justifyContent: "flex-end", marginTop: 12,
+              }}>
+                <ChevronRight size={13} color={s.color} style={{ opacity: 0.5 }} />
               </div>
             </div>
           ))}
@@ -971,10 +1006,17 @@ export default function Dashboard() {
 
         {/* ── Gráficos ── */}
         <div className="g21">
-          {/* Faturamento por dia */}
+          {/* Faturamento por período */}
           <div className="ag-card">
-            <div className="ag-card-title" style={{ marginBottom: 16 }}>
-              Faturamento por dia — últimos 14 dias
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div className="ag-card-title">Faturamento por período</div>
+              <span style={{
+                fontSize: 10, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase",
+                color: "var(--gold)", background: "var(--gold-d)", padding: "3px 9px",
+                borderRadius: 20, border: "1px solid rgba(200,165,94,0.2)",
+              }}>
+                {period}
+              </span>
             </div>
             <ResponsiveContainer width="100%" height={180}>
               <AreaChart
