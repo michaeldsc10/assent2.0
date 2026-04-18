@@ -180,5 +180,427 @@
   &::after {
     right: 0;
     border-right-color: var(--border);
+  }#root {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+.login-container {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  background-color: var(--color-black);
+  overflow: hidden;
+}
+
+.login-left {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  background: radial-gradient(circle at center, #1a1a1a 0%, var(--color-black) 70%);
+  border-right: 1px solid rgba(212, 175, 55, 0.1);
+  overflow: hidden;
+}
+
+.login-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  background-color: var(--color-black);
+}
+
+@media (max-width: 768px) {
+  .login-left {
+    display: none;
   }
+  .login-right {
+    flex: 1;
+  }
+}
+
+/* LoginForm CSS */
+.login-form-card {
+  width: 100%;
+  max-width: 400px;
+  background: rgba(20, 20, 20, 0.8);
+  backdrop-filter: blur(10px);
+  padding: 3rem 2rem;
+  border-radius: 16px;
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(212, 175, 55, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.brand-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.brand-title {
+  font-family: 'Cormorant Garamond', serif !important;
+  font-size: 40px; /* Pouco maior que 30px para responsividade de logo */
+  color: #F0EDE6;
+  margin-bottom: 0.5rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1;
+}
+
+.brand-title span {
+  font-family: 'Cormorant Garamond', serif !important;
+  color: var(--color-gold);
+  font-style: italic;
+  font-weight: 400;
+}
+
+.brand-subtitle {
+  font-family: var(--font-sans-alt);
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  font-weight: 300;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.input-group label {
+  font-size: 0.875rem;
+  color: #cccccc;
+  font-weight: 500;
+}
+
+.input-group input {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: rgba(0, 0, 0, 0.5);
+  color: white;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  outline: none;
+}
+
+.input-group input:focus {
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 2px rgba(212, 175, 55, 0.2);
+}
+
+.forgot-password {
+  align-self: flex-end;
+  font-size: 0.8rem;
+  color: var(--color-gold);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.forgot-password:hover {
+  text-decoration: underline;
+  color: var(--color-gold-light);
+}
+
+.btn-submit {
+  width: 100%;
+  padding: 0.875rem;
+  border-radius: 8px;
+  background: var(--color-black);
+  color: #fff;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 1rem;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.4s ease;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+.btn-submit::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
+  transform: skewX(-25deg);
+  animation: none;
+  z-index: 1;
+}
+
+.btn-submit span {
+  position: relative;
+  z-index: 2;
+  transition: color 0.4s ease;
+}
+
+.btn-submit:hover {
+  background: linear-gradient(135deg, var(--color-gold) 0%, var(--color-gold-dark) 100%);
+  border-color: var(--color-gold);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(212, 175, 55, 0.4);
+}
+
+.btn-submit:hover span {
+  color: #000;
+  font-weight: 600;
+}
+
+.btn-submit:hover::before {
+  animation: shine 0.7s ease-in-out forwards;
+}
+
+@keyframes shine {
+  0% { left: -100%; }
+  100% { left: 200%; }
+}
+
+/* Overlay Text Layout */
+.brand-overlay-text {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  left: 4rem;
+}
+
+.brand-overlay-text.top-left {
+  top: 4rem;
+}
+
+.accent-line {
+  width: 40px;
+  height: 2px;
+  background-color: var(--color-gold);
+  margin-bottom: 1.5rem;
+}
+
+.main-slogan {
+  font-family: var(--font-serif);
+  font-size: 2.8rem;
+  line-height: 1.1;
+  font-weight: 400;
+  color: #fff;
+  margin-bottom: 1rem;
+}
+
+.main-slogan .gold-text {
+  color: var(--color-gold);
+}
+
+.sub-slogan {
+  font-family: var(--font-sans-alt);
+  font-size: 0.65rem;
+  letter-spacing: 0.2em;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.brand-overlay-text.bottom-left {
+  bottom: 4rem;
+}
+
+.accent-border {
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  padding-left: 1.5rem;
+}
+
+.accent-border p {
+  font-family: var(--font-serif);
+  font-size: 0.95rem;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 0.4rem;
+}
+
+.accent-border p:last-child {
+  margin-bottom: 0;
+}
+
+/* BrandAnimation CSS */
+.animation-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.floating-icon {
+  position: absolute;
+  color: var(--color-gold);
+  transition: all 1.5s cubic-bezier(0.16, 1, 0.3, 1);
+  opacity: 0.7;
+}
+
+
+
+.btn-organize {
+  position: absolute;
+  z-index: 10;
+  bottom: 30%;
+  background: transparent;
+  color: var(--color-gold);
+  border: 1px solid var(--color-gold);
+  padding: 1rem 2rem;
+  font-size: 1.2rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.5s ease;
+  backdrop-filter: blur(5px);
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.1);
+}
+
+.btn-organize:hover {
+  background: rgba(212, 175, 55, 0.1);
+  box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);
+  transform: scale(1.05);
+}
+
+.btn-organize.hidden {
+  opacity: 0;
+  transform: scale(0);
+  pointer-events: none;
+}
+
+.logo-reveal {
+  position: absolute;
+  width: 300px;
+  height: auto;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all 2s cubic-bezier(0.16, 1, 0.3, 1);
+  filter: drop-shadow(0 0 0 rgba(212, 175, 55, 0));
+  z-index: 5;
+}
+
+.logo-reveal.visible {
+  opacity: 1;
+  transform: scale(1);
+  filter: drop-shadow(0 0 30px rgba(212, 175, 55, 0.3));
+}
+
+.suck-effect {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--color-gold) 0%, transparent 70%);
+  opacity: 0;
+  transform: scale(0);
+  z-index: 20;
+  pointer-events: none;
+}
+
+.suck-effect.active {
+  animation: explode 1.5s cubic-bezier(0.16, 1, 0.3, 1) 1.2s forwards;
+}
+
+@keyframes explode {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  30% {
+    opacity: 0.8;
+    transform: scale(2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(10);
+  }
+}
+
+/* Add an idle floating animation to the icons */
+@keyframes float {
+  0%   { transform: translateY(0px); }
+  50%  { transform: translateY(-20px); }
+  100% { transform: translateY(0px); }
+}
+
+.idle-float {
+  animation: float 5s ease-in-out infinite;
+}
+
+@keyframes resistAndSuck {
+  0% {
+    transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1) rotate(var(--rot));
+    opacity: 0.7;
+    filter: blur(0px);
+  }
+  15% {
+    transform: translate(calc(-50% + (var(--tx) * 1.3)), calc(-50% + (var(--ty) * 1.3))) scale(1.1) rotate(calc(var(--rot) - 20deg));
+    opacity: 1;
+    filter: blur(1px);
+  }
+  30% {
+    transform: translate(calc(-50% + (var(--tx) * 1.25)), calc(-50% + (var(--ty) * 1.25))) scale(1.05) rotate(calc(var(--rot) + 15deg));
+    opacity: 0.9;
+    filter: blur(0px);
+  }
+  45% {
+    transform: translate(calc(-50% + (var(--tx) * 1.3)), calc(-50% + (var(--ty) * 1.3))) scale(1.1) rotate(var(--rot));
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0) rotate(720deg);
+    opacity: 0;
+    filter: blur(4px);
+  }
+}
+
+.floating-icon.sucked {
+  animation: resistAndSuck 1.6s cubic-bezier(0.5, 0, 0.2, 1) forwards !important;
+}
+
+.btn-organize {
+  position: absolute;
+  z-index: 10;
+  bottom: 30%;
+  background: transparent;
+  color: var(--color-gold);
+  border: 1px solid var(--color-gold);
+  padding: 1rem 2rem;
+  font-size: 1.2rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.5s ease;
+  backdrop-filter: blur(5px);
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.1);
+}
+
+.btn-organize:hover {
+  background: rgba(212, 175, 55, 0.1);
+  box-shadow: 0 0 30px rgba(212, 175, 55, 0.3);
+  transform: scale(1.05);
+}
+
+.btn-organize.hidden {
+  opacity: 0;
+  transform: scale(0);
+  pointer-events: none;
+}
+
+  
 }
