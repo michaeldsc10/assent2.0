@@ -322,6 +322,16 @@ const FORMAS_PAGAMENTO = [
   "Transferência bancária", "Boleto", "Cheque",
 ];
 
+/* Taxas padrão — fallback enquanto o Firestore carrega ou se não configuradas */
+const TAXAS_DEFAULT = {
+  debito:     1.99,
+  pix:        0,
+  credito_1:  2.99, credito_2:  3.19, credito_3:  3.39,
+  credito_4:  3.59, credito_5:  3.79, credito_6:  3.99,
+  credito_7:  4.19, credito_8:  4.39, credito_9:  4.59,
+  credito_10: 4.79, credito_11: 4.99, credito_12: 5.19,
+};
+
 /* ═══════════════════════════════════════════════════
    HELPERS
    ═══════════════════════════════════════════════════ */
@@ -705,14 +715,14 @@ const CSS = `
    MODAL — Novo Lançamento
    ═══════════════════════════════════════════════════ */
 
-function ModalNovoLancamento({ empresaId, usuarioId, saldoAtual, onSave, onClose }) {
+function ModalNovoLancamento({ empresaId, usuarioId, saldoAtual, taxas, onSave, onClose }) {
   const [tipo,           setTipo]           = useState("entrada");
   const [valorBruto,     setValorBruto]     = useState("");
-  const [taxa,           setTaxa]           = useState("0");
   const [custo,          setCusto]          = useState("0");
   const [descricao,      setDescricao]      = useState("");
   const [categoria,      setCategoria]      = useState("");
   const [formaPagamento, setFormaPagamento] = useState("");
+  const [parcelas,       setParcelas]       = useState(1);
   const [data,           setData]           = useState(() => {
     const d = new Date(); return d.toISOString().slice(0, 10);
   });
@@ -721,19 +731,49 @@ function ModalNovoLancamento({ empresaId, usuarioId, saldoAtual, onSave, onClose
 
   const categorias = tipo === "entrada" ? CATEGORIAS_ENTRADA : CATEGORIAS_SAIDA;
 
-  /* valores derivados — apenas para prévia visual, sem salvar esses cálculos */
-  const bruto   = parseFloat(String(valorBruto).replace(",", ".")) || 0;
-  const taxaNum = parseFloat(String(taxa).replace(",", "."))       || 0;
-  const custoNum= parseFloat(String(custo).replace(",", "."))      || 0;
+  /* ── Valores base ── */
+  const bruto    = parseFloat(String(valorBruto).replace(",", ".")) || 0;
+  const custoNum = parseFloat(String(custo).replace(",", "."))      || 0;
+
+  /* ── Taxa automática por forma de pagamento (espelha lógica do módulo Vendas) ── */
+  const taxaInfo = useMemo(() => {
+    const isCredito = formaPagamento === "Cartão crédito";
+    const isDebito  = formaPagamento === "Cartão débito";
+    const isPix     = formaPagamento === "PIX";
+
+    if (isPix) {
+      const pct = parseFloat(taxas?.pix ?? TAXAS_DEFAULT.pix ?? 0) || 0;
+      if (pct === 0) return { taxaPercentual: 0, valorTaxa: 0, exibe: false };
+      const valorTaxa = Math.round(bruto * (pct / 100) * 100) / 100;
+      return { taxaPercentual: pct, valorTaxa, exibe: true };
+    }
+
+    if (isDebito) {
+      const pct = parseFloat(taxas?.debito ?? TAXAS_DEFAULT.debito ?? 0) || 0;
+      const valorTaxa = Math.round(bruto * (pct / 100) * 100) / 100;
+      return { taxaPercentual: pct, valorTaxa, exibe: pct > 0 };
+    }
+
+    if (isCredito) {
+      const chave = `credito_${parcelas}`;
+      const pct = parseFloat(taxas?.[chave] ?? TAXAS_DEFAULT[chave] ?? 0) || 0;
+      const valorTaxa = Math.round(bruto * (pct / 100) * 100) / 100;
+      return { taxaPercentual: pct, valorTaxa, exibe: true };
+    }
+
+    return { taxaPercentual: 0, valorTaxa: 0, exibe: false };
+  }, [formaPagamento, parcelas, taxas, bruto]);
+
+  /* ── Derivados finais ── */
+  const taxaNum = taxaInfo.valorTaxa;
   const liquido = Math.round((bruto - taxaNum) * 100) / 100;
   const lucro   = Math.round((liquido - custoNum) * 100) / 100;
 
   const validar = () => {
     const e = {};
     if (!valorBruto || isNaN(bruto) || bruto <= 0) e.valorBruto = "Informe um valor bruto válido maior que zero.";
-    if (taxaNum < 0)    e.taxa  = "Taxa não pode ser negativa.";
     if (taxaNum > bruto) e.taxa = "Taxa não pode ser maior que o valor bruto.";
-    if (custoNum < 0)   e.custo = "Custo não pode ser negativo.";
+    if (custoNum < 0)    e.custo = "Custo não pode ser negativo.";
     if (!descricao.trim())  e.descricao = "Descrição obrigatória.";
     if (!categoria)         e.categoria = "Selecione uma categoria.";
     if (!formaPagamento)    e.formaPagamento = "Selecione a forma de pagamento.";
@@ -750,17 +790,10 @@ function ModalNovoLancamento({ empresaId, usuarioId, saldoAtual, onSave, onClose
         empresaId,
         usuarioId,
         tipo,
-        /* objeto valores completo — Caixa não calcula, apenas persiste */
-        valores: {
-          bruto,
-          taxa:    taxaNum,
-          liquido,
-          custo:   custoNum,
-          lucro,
-        },
+        valores: { bruto, taxa: taxaNum, liquido, custo: custoNum, lucro },
         descricao,
         categoria,
-        formaPagamento,
+        formaPagamento: formaPagamento + (formaPagamento === "Cartão crédito" && parcelas > 1 ? ` ${parcelas}x` : ""),
         data: new Date(data + "T12:00:00"),
         origem: "manual",
       };
@@ -812,26 +845,15 @@ function ModalNovoLancamento({ empresaId, usuarioId, saldoAtual, onSave, onClose
             {erros.valorBruto && <div className="form-error">{erros.valorBruto}</div>}
           </div>
 
-          {/* Taxa + Custo */}
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Taxa (R$)</label>
-              <input
-                className={`form-input ${erros.taxa ? "err" : ""}`}
-                type="number" min="0" step="0.01" placeholder="0,00"
-                value={taxa} onChange={e => setTaxa(e.target.value)}
-              />
-              {erros.taxa && <div className="form-error">{erros.taxa}</div>}
-            </div>
-            <div className="form-group">
-              <label className="form-label">Custo (R$)</label>
-              <input
-                className={`form-input ${erros.custo ? "err" : ""}`}
-                type="number" min="0" step="0.01" placeholder="0,00"
-                value={custo} onChange={e => setCusto(e.target.value)}
-              />
-              {erros.custo && <div className="form-error">{erros.custo}</div>}
-            </div>
+          {/* Custo */}
+          <div className="form-group">
+            <label className="form-label">Custo (R$)</label>
+            <input
+              className={`form-input ${erros.custo ? "err" : ""}`}
+              type="number" min="0" step="0.01" placeholder="0,00"
+              value={custo} onChange={e => setCusto(e.target.value)}
+            />
+            {erros.custo && <div className="form-error">{erros.custo}</div>}
           </div>
 
           {/* Descrição */}
@@ -863,12 +885,56 @@ function ModalNovoLancamento({ empresaId, usuarioId, saldoAtual, onSave, onClose
               <label className="form-label">Forma de Pagamento <span className="form-label-req">*</span></label>
               <select
                 className={`form-input ${erros.formaPagamento ? "err" : ""}`}
-                value={formaPagamento} onChange={e => setFormaPagamento(e.target.value)}
+                value={formaPagamento}
+                onChange={e => { setFormaPagamento(e.target.value); setParcelas(1); }}
               >
                 <option value="">Selecionar...</option>
                 {FORMAS_PAGAMENTO.map(f => <option key={f} value={f}>{f}</option>)}
               </select>
               {erros.formaPagamento && <div className="form-error">{erros.formaPagamento}</div>}
+
+              {/* Seletor de parcelas — aparece somente para Cartão crédito */}
+              {formaPagamento === "Cartão crédito" && (
+                <div style={{ marginTop: 10 }}>
+                  <div className="form-label" style={{ marginBottom: 6 }}>Parcelas</div>
+                  <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(n => {
+                      const chave = `credito_${n}`;
+                      const pct   = parseFloat(taxas?.[chave] ?? TAXAS_DEFAULT[chave] ?? 0);
+                      return (
+                        <button
+                          key={n}
+                          type="button"
+                          onClick={() => setParcelas(n)}
+                          style={{
+                            padding: "4px 9px", borderRadius: 7, fontSize: 11, fontWeight: 600,
+                            cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                            border: `1px solid ${parcelas === n ? "var(--gold)" : "var(--border)"}`,
+                            background: parcelas === n ? "rgba(200,165,94,0.15)" : "var(--s2)",
+                            color: parcelas === n ? "var(--gold)" : "var(--text-2)",
+                            transition: "all .13s", whiteSpace: "nowrap",
+                          }}
+                        >
+                          {n}x <span style={{ opacity: 0.7, fontSize: 10 }}>({pct}%)</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {taxaInfo.taxaPercentual > 0 && (
+                    <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 6 }}>
+                      Taxa de <strong style={{ color: "var(--text-2)" }}>{taxaInfo.taxaPercentual}%</strong> = <strong style={{ color: "var(--text-2)" }}>{fmtR$(taxaInfo.valorTaxa)}</strong> sobre o total
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Info de taxa para débito e PIX */}
+              {taxaInfo.exibe && formaPagamento !== "Cartão crédito" && (
+                <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 6 }}>
+                  Taxa de <strong style={{ color: "var(--text-2)" }}>{taxaInfo.taxaPercentual}%</strong> = <strong style={{ color: "var(--text-2)" }}>{fmtR$(taxaInfo.valorTaxa)}</strong> sobre o total
+                </div>
+              )}
+              {erros.taxa && <div className="form-error">{erros.taxa}</div>}
             </div>
           </div>
 
@@ -894,9 +960,9 @@ function ModalNovoLancamento({ empresaId, usuarioId, saldoAtual, onSave, onClose
               </div>
               {[
                 ["Bruto",   fmtR$(bruto),    "var(--text)"],
-                ["Taxa",    `- ${fmtR$(taxaNum)}`, "var(--red)"],
+                ["Taxa",    `- ${fmtR$(taxaNum)}`, taxaNum > 0 ? "var(--red)" : "var(--text-3)"],
                 ["Líquido", fmtR$(liquido),  "var(--text)"],
-                ["Custo",   `- ${fmtR$(custoNum)}`, "var(--red)"],
+                ["Custo",   `- ${fmtR$(custoNum)}`, custoNum > 0 ? "var(--red)" : "var(--text-3)"],
                 ["Lucro",   fmtR$(lucro),    lucro >= 0 ? "var(--green)" : "var(--red)"],
               ].map(([label, val, color]) => (
                 <div key={label} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
@@ -1065,6 +1131,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
   const [empresaId,   setEmpresaId]   = useState(empresaIdProp || null);
   const [lancamentos, setLancamentos] = useState([]);
   const [resumo,      setResumo]      = useState({ saldoAtual: 0 });
+  const [taxas,       setTaxas]       = useState(TAXAS_DEFAULT);
   const [loading,     setLoading]     = useState(true);
   const [search,      setSearch]      = useState("");
   const [period,      setPeriod]      = useState("Hoje");
@@ -1101,6 +1168,17 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
     const unsub = onSnapshot(ref, (snap) => {
       if (snap.exists()) setResumo(snap.data());
       else               setResumo({ saldoAtual: 0 });
+    });
+    return unsub;
+  }, [empresaId]);
+
+  /* ── Snapshot taxas de cartão (configuradas em configuracoes/taxas_cartao) ── */
+  useEffect(() => {
+    if (!empresaId) return;
+    const ref = doc(db, "empresas", empresaId, "configuracoes", "taxas_cartao");
+    const unsub = onSnapshot(ref, (snap) => {
+      if (snap.exists()) setTaxas({ ...TAXAS_DEFAULT, ...snap.data() });
+      else               setTaxas(TAXAS_DEFAULT);
     });
     return unsub;
   }, [empresaId]);
@@ -1298,6 +1376,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
           empresaId={empresaId}
           usuarioId={uid}
           saldoAtual={resumo.saldoAtual}
+          taxas={taxas}
           onSave={handleSave}
           onClose={() => setModalNovo(false)}
         />
