@@ -19,7 +19,8 @@ import {
   Filter,
 } from "lucide-react";
 
-import { db, auth, onAuthStateChanged } from "../lib/firebase";
+import { db, auth } from "../lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   doc,
