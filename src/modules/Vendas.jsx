@@ -256,6 +256,63 @@ const CSS = `
   .vd-total { font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 600; color: var(--green); }
   .vd-empty, .vd-loading { padding: 56px 20px; text-align: center; color: var(--text-3); font-size: 13px; }
 
+  /* ── Campo somente leitura (preço/custo bloqueado) ── */
+  .form-input[readonly] {
+    background: var(--s3); color: var(--text-3);
+    cursor: not-allowed; border-color: transparent;
+    opacity: .7;
+  }
+  .form-input[readonly]:focus { border-color: transparent; box-shadow: none; }
+  .nv-field-locked-hint {
+    font-size: 9px; color: var(--text-3); margin-top: 3px; font-style: italic;
+  }
+
+  /* ── Taxa na barra de totais ── */
+  .nv-taxa-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 9px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+    padding: 2px 7px; border-radius: 8px;
+    background: rgba(224,82,82,.1); border: 1px solid rgba(224,82,82,.2);
+    color: var(--red); margin-top: 3px;
+  }
+  .nv-taxa-chip.zero {
+    background: var(--s3); border-color: var(--border);
+    color: var(--text-3);
+  }
+
+  /* ── Recibo: preview em tela ── */
+  .recibo-preview-overlay {
+    position: fixed; inset: 0; z-index: 1200;
+    background: rgba(0,0,0,0.85); backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .recibo-preview-box {
+    background: #fff; color: #111;
+    border-radius: 12px; width: 100%; max-width: 400px;
+    max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.7);
+    padding: 28px 24px; font-family: 'Courier New', monospace;
+    font-size: 13px; line-height: 1.55;
+  }
+  .recibo-preview-actions {
+    display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px;
+  }
+
+  /* ── Recibo Print ── */
+  @media print {
+    body > *:not(#recibo-print-root) { display: none !important; }
+    #recibo-print-root { display: block !important; }
+    .recibo-print {
+      font-family: 'Courier New', monospace;
+      width: 80mm; margin: 0 auto; padding: 8mm 6mm;
+      font-size: 12px; color: #000; line-height: 1.5;
+    }
+    .recibo-print * { color: #000 !important; }
+  }
+  #recibo-print-root { display: none; }
+  .recibo-print { font-family: 'Courier New', monospace; }
+
   /* ── Modal Nova Venda ── */
   .nv-tabs {
     display: flex; gap: 6px; margin-bottom: 18px;
@@ -400,19 +457,6 @@ const CSS = `
   }
   .confirm-icon { font-size: 28px; margin-bottom: 12px; }
 
-  /* ── Recibo Print ── */
-  @media print {
-    body > *:not(#recibo-print-root) { display: none !important; }
-    #recibo-print-root { display: block !important; }
-    .recibo-print {
-      font-family: 'Courier New', monospace;
-      width: 80mm; margin: 0 auto; padding: 8mm;
-      font-size: 12px; color: #000;
-    }
-    .recibo-print * { color: #000 !important; }
-  }
-  #recibo-print-root { display: none; }
-
   /* ── Livre (venda sem produto) ── */
   .nv-livre-info {
     background: rgba(200,165,94,.07); border: 1px solid rgba(200,165,94,.2);
@@ -459,38 +503,90 @@ function filtrarPorPeriodo(vendas, period) {
 }
 
 /* ── Recibo de impressão ── */
-function imprimirRecibo(venda) {
+function imprimirRecibo(venda, nomeEmpresa = "ASSENT") {
   const el = document.getElementById("recibo-print-root");
   if (!el) return;
-  const itens = venda.itens || [];
-  const subtotal  = itens.reduce((s, i) => s + (i.preco || 0) * (i.qtd || 1), 0);
-  const descontos = itens.reduce((s, i) => s + (i.desconto || 0), 0);
+
+  const itens      = venda.itens || [];
+  const subtotal   = itens.reduce((s, i) => s + (i.preco || 0) * (i.qtd || 1), 0);
+  const descontos  = itens.reduce((s, i) => s + (i.desconto || 0), 0);
+  const total      = typeof venda.total === "number" ? venda.total : subtotal - descontos;
+  const taxa       = venda.taxaAplicada || 0;
+  const valorTaxa  = venda.valorTaxa   || 0;
+  const custoTotal = itens.reduce((s, i) => s + (i.custo || 0) * (i.qtd || 1), 0);
+  const lucro      = total - custoTotal - valorTaxa;
+  const empresa    = (nomeEmpresa || "ASSENT").toUpperCase();
+
+  const sep  = `<div style="border-top:1px dashed #555;margin:10px 0;"></div>`;
+  const line = (l, r, bold = false) =>
+    `<div style="display:flex;justify-content:space-between;${bold ? "font-weight:700;font-size:13px;" : ""}">
+      <span>${l}</span><span>${r}</span>
+    </div>`;
+
   el.innerHTML = `
-    <div class="recibo-print">
-      <div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:8px;">ASSENT</div>
-      <div style="text-align:center;font-size:11px;margin-bottom:12px;">Recibo de Venda</div>
-      <div>ID: ${venda.id}</div>
-      <div>Data: ${fmtData(venda.data)}</div>
-      <div>Cliente: ${venda.cliente || "—"}</div>
-      <div>Pgto: ${venda.formaPagamento || "—"}</div>
-      <div style="border-top:1px dashed #000;margin:8px 0;"></div>
-      ${itens.map(i => `
-        <div>${i.nome || i.produto || "Item livre"}</div>
-        <div style="display:flex;justify-content:space-between;font-size:11px;">
-          <span>${i.qtd}x ${fmtR$(i.preco)}</span>
-          <span>${fmtR$((i.preco || 0) * (i.qtd || 1) - (i.desconto || 0))}</span>
-        </div>
-      `).join("")}
-      <div style="border-top:1px dashed #000;margin:8px 0;"></div>
-      ${descontos > 0 ? `<div style="display:flex;justify-content:space-between;"><span>Descontos</span><span>-${fmtR$(descontos)}</span></div>` : ""}
-      <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:14px;">
-        <span>TOTAL</span><span>${fmtR$(venda.total)}</span>
+    <div class="recibo-print" style="width:80mm;max-width:320px;margin:0 auto;padding:16px 12px;background:#fff;color:#000;">
+
+      <!-- Cabeçalho -->
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="font-size:18px;font-weight:700;letter-spacing:2px;">${empresa}</div>
+        <div style="font-size:11px;margin-top:3px;color:#555;">Recibo de Venda</div>
       </div>
-      ${venda.observacao ? `<div style="margin-top:10px;font-size:11px;">Obs: ${venda.observacao}</div>` : ""}
-      <div style="text-align:center;font-size:10px;margin-top:12px;">Obrigado!</div>
+
+      ${sep}
+
+      <!-- Dados da venda -->
+      <div style="font-size:12px;margin-bottom:4px;">
+        ${line("ID da Venda:", venda.id || "—")}
+        ${line("Data:", fmtData(venda.data))}
+        ${line("Cliente:", venda.cliente || "—")}
+        ${line("Pagamento:", venda.formaPagamento || "—")}
+        ${venda.vendedor ? line("Vendedor:", venda.vendedor) : ""}
+      </div>
+
+      ${sep}
+
+      <!-- Itens -->
+      <div style="font-size:11px;margin-bottom:2px;">
+        <div style="font-weight:700;margin-bottom:6px;">ITENS</div>
+        ${itens.map(i => {
+          const totalItem = (i.preco || 0) * (i.qtd || 1) - (i.desconto || 0);
+          return `
+            <div style="margin-bottom:5px;">
+              <div style="font-weight:600;">${i.nome || "Item"}</div>
+              <div style="display:flex;justify-content:space-between;color:#444;">
+                <span>${i.qtd || 1}x ${fmtR$(i.preco)}</span>
+                <span>${i.desconto ? `desc: -${fmtR$(i.desconto)} → ` : ""}${fmtR$(totalItem)}</span>
+              </div>
+            </div>`;
+        }).join("")}
+      </div>
+
+      ${sep}
+
+      <!-- Valores -->
+      <div style="font-size:12px;">
+        ${descontos > 0 ? line("Subtotal bruto:", fmtR$(subtotal)) : ""}
+        ${descontos > 0 ? line("Descontos:", `-${fmtR$(descontos)}`) : ""}
+        ${taxa > 0      ? line(`Taxa (${venda.formaPagamento} ${taxa}%):`, `-${fmtR$(valorTaxa)}`) : ""}
+        <div style="height:4px;"></div>
+        ${line("TOTAL:", fmtR$(total), true)}
+        <div style="height:6px;"></div>
+        ${line("Custo:", fmtR$(custoTotal))}
+        ${line("Lucro Estimado:", fmtR$(lucro))}
+      </div>
+
+      ${sep}
+
+      <!-- Rodapé -->
+      ${venda.observacao ? `<div style="font-size:11px;color:#555;margin-bottom:8px;">Obs: ${venda.observacao}</div>` : ""}
+      <div style="text-align:center;font-size:11px;color:#555;margin-top:6px;">
+        Obrigado pela preferência! ✓
+      </div>
     </div>
   `;
-  window.print();
+
+  // Aguarda o DOM pintar antes de abrir a janela de impressão
+  setTimeout(() => window.print(), 150);
 }
 
 /* ── Exportar CSV ── */
@@ -571,6 +667,31 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
     );
   }, [tipo]);
 
+  /* ── Taxas: busca config uma vez, recalcula quando forma/total muda ── */
+  const [taxasConfig, setTaxasConfig] = useState({});
+  const [taxaInfo, setTaxaInfo]       = useState({ taxaAplicada: 0, valorTaxa: 0 });
+
+  useEffect(() => {
+    if (!uid) return;
+    getDoc(doc(db, "users", uid, "config", "geral"))
+      .then(snap => { if (snap.exists()) setTaxasConfig(snap.data()?.taxas || {}); })
+      .catch(() => {});
+  }, [uid]);
+
+  useEffect(() => {
+    let pct = 0;
+    if      (formaPgto === "Cartão de Crédito") pct = parseFloat(taxasConfig.credito_1) || 0;
+    else if (formaPgto === "Cartão de Débito")  pct = parseFloat(taxasConfig.debito)    || 0;
+    else if (formaPgto === "Pix")               pct = parseFloat(taxasConfig.pix)       || 0;
+
+    const base = calculos.total;
+    const valorTaxa = base > 0 && pct > 0
+      ? parseFloat((base * (pct / 100)).toFixed(2))
+      : 0;
+
+    setTaxaInfo({ taxaAplicada: pct, valorTaxa });
+  }, [formaPgto, calculos.total, taxasConfig]);
+
   /* Autocomplete de produtos/serviços */
   const catalogoFiltrado = (search, idx) => {
     const lista = tipo === "servico" ? servicos : produtos;
@@ -616,17 +737,18 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
     setItemSearches(itemSearches.filter((_, i) => i !== idx));
   };
 
-  /* Cálculos */
+  /* Cálculos — lucro já considera a taxa da operadora */
   const calculos = useMemo(() => {
     if (tipo === "livre") {
-      const val = parseFloat(livreValor) || 0;
-      const desc = parseFloat(livreDesc) || 0;
+      const val  = parseFloat(livreValor) || 0;
+      const desc = parseFloat(livreDesc)  || 0;
       return { subtotal: val, descontos: desc, custo: 0, total: val - desc, lucro: val - desc };
     }
     const subtotal  = itens.reduce((s, i) => s + (parseFloat(i.preco) || 0) * (parseInt(i.qtd) || 1), 0);
     const descontos = itens.reduce((s, i) => s + (parseFloat(i.desconto) || 0), 0);
-    const custo     = itens.reduce((s, i) => s + (parseFloat(i.custo) || 0) * (parseInt(i.qtd) || 1), 0);
+    const custo     = itens.reduce((s, i) => s + (parseFloat(i.custo)   || 0) * (parseInt(i.qtd) || 1), 0);
     const total     = subtotal - descontos;
+    // lucro será refinado pelo useEffect de taxa; aqui sem taxa (taxa ainda não calculada no 1º render)
     return { subtotal, descontos, custo, total, lucro: total - custo };
   }, [itens, tipo, livreValor, livreDesc]);
 
@@ -642,83 +764,67 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
     return Object.keys(e).length === 0;
   };
 
-  /* ── Busca as taxas de pagamento do módulo de Configurações ── */
-  const buscarTaxaPagamento = async (formaPagamento) => {
-    try {
-      const configRef = doc(db, "users", uid, "config", "geral");
-      const configSnap = await getDoc(configRef);
-      if (!configSnap.exists()) return { taxaAplicada: 0, valorTaxa: 0 };
-
-      const taxas = configSnap.data()?.taxas || {};
-      let taxa = 0;
-
-      if (formaPagamento === "Cartão de Crédito") {
-        taxa = parseFloat(taxas.credito_1) || 0;
-      } else if (formaPagamento === "Cartão de Débito") {
-        taxa = parseFloat(taxas.debito) || 0;
-      } else if (formaPagamento === "Pix") {
-        taxa = parseFloat(taxas.pix) || 0;
-      }
-      // Dinheiro, Boleto, Transferência, etc. → taxa = 0
-
-      const valorTaxa = calculos.total > 0 && taxa > 0
-        ? parseFloat((calculos.total * (taxa / 100)).toFixed(2))
-        : 0;
-
-      return { taxaAplicada: taxa, valorTaxa };
-    } catch {
-      // Em caso de qualquer erro, não bloqueia a venda
-      return { taxaAplicada: 0, valorTaxa: 0 };
-    }
-  };
-
   const handleSalvar = async () => {
     if (!validar()) return;
     setSalvando(true);
 
-    /* ── Buscar taxa antes de montar o payload ── */
-    const { taxaAplicada, valorTaxa } = await buscarTaxaPagamento(formaPgto);
+    const { taxaAplicada, valorTaxa } = taxaInfo;
+    // lucro final já desconta custo + taxa operadora
+    const lucroFinal = calculos.total - calculos.custo - valorTaxa;
 
     const payload = {
-      cliente: clienteSearch.trim(),
-      data: new Date(dataVenda + "T12:00:00"),
-      vendedor: vendedor.trim(),
+      cliente:        clienteSearch.trim(),
+      data:           new Date(dataVenda + "T12:00:00"),
+      vendedor:       vendedor.trim(),
       formaPagamento: formaPgto,
-      observacao: observacao.trim(),
+      observacao:     observacao.trim(),
       tipo,
-      total: calculos.total,
-      subtotal: calculos.subtotal,
-      descontos: calculos.descontos,
-      custoTotal: calculos.custo,
-      lucroEstimado: calculos.lucro,
-      /* ── NOVOS CAMPOS: taxa de pagamento ── */
-      taxaAplicada,   // percentual da taxa (ex: 1.99)
-      valorTaxa,      // valor em R$ descontado pela operadora
+      total:          calculos.total,
+      subtotal:       calculos.subtotal,
+      descontos:      calculos.descontos,
+      custoTotal:     calculos.custo,
+      lucroEstimado:  lucroFinal,
+      /* ── Campos de taxa (novos, não-quebram leituras antigas) ── */
+      taxaAplicada,   // percentual ex: 1.99
+      valorTaxa,      // valor em R$ ex: 2.31
     };
 
     if (tipo === "livre") {
       payload.itens = [{
-        nome: livreNome.trim(),
-        qtd: 1,
-        preco: parseFloat(livreValor) || 0,
-        custo: 0,
-        desconto: parseFloat(livreDesc) || 0,
+        nome:      livreNome.trim(),
+        qtd:       1,
+        preco:     parseFloat(livreValor) || 0,
+        custo:     0,
+        desconto:  parseFloat(livreDesc)  || 0,
         produtoId: null,
-        tipo: "livre",
+        tipo:      "livre",
       }];
-      payload.livreNome = livreNome.trim();
+      payload.livreNome  = livreNome.trim();
       payload.livreValor = parseFloat(livreValor) || 0;
-      payload.livreDesc = parseFloat(livreDesc) || 0;
+      payload.livreDesc  = parseFloat(livreDesc)  || 0;
     } else {
-      payload.itens = itens.map(i => ({
-        produtoId: i.produtoId || null,
-        nome: i.nome,
-        qtd: parseInt(i.qtd) || 1,
-        preco: parseFloat(i.preco) || 0,
-        custo: parseFloat(i.custo) || 0,
-        desconto: parseFloat(i.desconto) || 0,
-        tipo,
-      }));
+      // Segurança backend: se item tem produtoId, reforça o preço do catálogo
+      const catalogo = tipo === "servico" ? servicos : produtos;
+      payload.itens = itens.map(i => {
+        let precoFinal = parseFloat(i.preco) || 0;
+        let custoFinal = parseFloat(i.custo) || 0;
+        if (i.produtoId) {
+          const original = catalogo.find(p => p.id === i.produtoId);
+          if (original) {
+            precoFinal = original.preco || precoFinal;
+            custoFinal = original.custo || original.precoCusto || custoFinal;
+          }
+        }
+        return {
+          produtoId: i.produtoId || null,
+          nome:      i.nome,
+          qtd:       parseInt(i.qtd)    || 1,
+          preco:     precoFinal,
+          custo:     custoFinal,
+          desconto:  parseFloat(i.desconto) || 0,
+          tipo,
+        };
+      });
     }
 
     await onSave(payload, isEdit ? venda : null);
@@ -949,8 +1055,10 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
                       type="number" min="0" step="0.01"
                       className="form-input"
                       value={item.preco}
-                      onChange={e => atualizarItem(idx, "preco", e.target.value)}
+                      readOnly={!!item.produtoId}
+                      onChange={e => !item.produtoId && atualizarItem(idx, "preco", e.target.value)}
                     />
+                    {item.produtoId && <div className="nv-field-locked-hint">🔒 valor do cadastro</div>}
                   </div>
 
                   <div>
@@ -959,8 +1067,10 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
                       type="number" min="0" step="0.01"
                       className="form-input"
                       value={item.custo}
-                      onChange={e => atualizarItem(idx, "custo", e.target.value)}
+                      readOnly={!!item.produtoId}
+                      onChange={e => !item.produtoId && atualizarItem(idx, "custo", e.target.value)}
                     />
+                    {item.produtoId && <div className="nv-field-locked-hint">🔒 custo do cadastro</div>}
                   </div>
 
                   <div>
@@ -1006,8 +1116,23 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
               <div className="nv-total-val" style={{ color: "var(--green)" }}>{fmtR$(calculos.total)}</div>
             </div>
             <div className="nv-total-cell">
+              <div className="nv-total-label">Taxa Operadora</div>
+              {taxaInfo.taxaAplicada > 0 ? (
+                <>
+                  <div className="nv-total-val" style={{ color: "var(--red)" }}>-{fmtR$(taxaInfo.valorTaxa)}</div>
+                  <span className="nv-taxa-chip">{formaPgto} {taxaInfo.taxaAplicada}%</span>
+                </>
+              ) : (
+                <div className="nv-total-val" style={{ color: "var(--text-3)", fontSize: 11 }}>
+                  {formaPgto ? "Sem taxa" : "—"}
+                </div>
+              )}
+            </div>
+            <div className="nv-total-cell">
               <div className="nv-total-label">Lucro Est.</div>
-              <div className="nv-total-val" style={{ color: "var(--gold)" }}>{fmtR$(calculos.lucro)}</div>
+              <div className="nv-total-val" style={{ color: "var(--gold)" }}>
+                {fmtR$(calculos.total - calculos.custo - taxaInfo.valorTaxa)}
+              </div>
             </div>
           </div>
 
@@ -1042,7 +1167,7 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
 /* ══════════════════════════════════════════════════
    MODAL: Detalhe de Venda (clique na linha)
    ══════════════════════════════════════════════════ */
-function ModalDetalheVenda({ venda, onClose, onEditar, onExcluir }) {
+function ModalDetalheVenda({ venda, onClose, onEditar, onExcluir, nomeEmpresa }) {
   if (!venda) return null;
   const itens = venda.itens || [];
 
@@ -1050,7 +1175,10 @@ function ModalDetalheVenda({ venda, onClose, onEditar, onExcluir }) {
   const descontos  = itens.reduce((s, i) => s + (i.desconto || 0), 0);
   const custoTotal = itens.reduce((s, i) => s + (i.custo || 0) * (i.qtd || 1), 0);
   const total      = typeof venda.total === "number" ? venda.total : subtotal - descontos;
-  const lucro      = total - custoTotal;
+  const valorTaxa  = venda.valorTaxa   || 0;
+  const taxa       = venda.taxaAplicada || 0;
+  // Fórmula canônica: lucro = total - custo - taxaOperadora
+  const lucro      = total - custoTotal - valorTaxa;
 
   return (
     <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -1113,7 +1241,7 @@ function ModalDetalheVenda({ venda, onClose, onEditar, onExcluir }) {
           )}
 
           {/* Botão imprimir */}
-          <button className="dv-imprimir" onClick={() => imprimirRecibo(venda)}>
+          <button className="dv-imprimir" onClick={() => imprimirRecibo(venda, nomeEmpresa)}>
             <Printer size={13} /> Reimprimir Recibo
           </button>
 
@@ -1165,6 +1293,12 @@ function ModalDetalheVenda({ venda, onClose, onEditar, onExcluir }) {
               <div className="dv-total-label">Custo Total</div>
               <div className="dv-total-val" style={{ color: "var(--red)" }}>{fmtR$(custoTotal)}</div>
             </div>
+            {taxa > 0 && (
+              <div className="dv-total-cell">
+                <div className="dv-total-label">Taxa ({venda.formaPagamento} {taxa}%)</div>
+                <div className="dv-total-val" style={{ color: "var(--red)" }}>-{fmtR$(valorTaxa)}</div>
+              </div>
+            )}
             <div className="dv-total-cell">
               <div className="dv-total-label">Total</div>
               <div className="dv-total-val" style={{ color: "var(--green)" }}>{fmtR$(total)}</div>
@@ -1236,6 +1370,7 @@ export default function Vendas() {
   const [servicos, setServicos]   = useState([]);
   const [vendedores, setVendedores] = useState([]);
   const [vendaIdCnt, setVendaIdCnt] = useState(0);
+  const [nomeEmpresa, setNomeEmpresa] = useState("ASSENT");
 
   const [search, setSearch]   = useState("");
   const [period, setPeriod]   = useState("Tudo");
@@ -1277,6 +1412,13 @@ useEffect(() => {
   }
 
   setLoading(true);
+
+  // Buscar nome da empresa da configuração
+  getDoc(doc(db, "users", uid, "config", "geral"))
+    .then(snap => {
+      if (snap.exists()) setNomeEmpresa(snap.data()?.empresa?.nomeEmpresa || "ASSENT");
+    })
+    .catch(() => {});
 
   const userRef     = doc(db, "users", uid);
   const vendasCol   = collection(db, "users", uid, "vendas");
@@ -1369,7 +1511,7 @@ useEffect(() => {
     });
 
     /* Imprimir recibo após criar */
-    imprimirRecibo({ ...payload, id: novoId });
+    imprimirRecibo({ ...payload, id: novoId }, nomeEmpresa);
     setModalNova(false);
   };
 
@@ -1532,6 +1674,7 @@ useEffect(() => {
       {detalhe && (
         <ModalDetalheVenda
           venda={detalhe}
+          nomeEmpresa={nomeEmpresa}
           onClose={() => setDetalhe(null)}
           onEditar={(v) => { setDetalhe(null); setEditando(v); }}
           onExcluir={(v) => { setDetalhe(null); setDeletando(v); }}
