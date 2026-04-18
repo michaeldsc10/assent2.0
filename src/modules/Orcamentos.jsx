@@ -1,33 +1,34 @@
 /* ═══════════════════════════════════════════════════
    ASSENT v2.0 — Orcamentos.jsx
    Estrutura Firestore:
-     users/{uid}/orcamentos/{id}      → cada orçamento
-     users/{uid}                      → orcamentoCnt, vendaIdCnt (contadores)
-     users/{uid}/clientes/{id}        → clientes cadastrados
-     users/{uid}/produtos/{id}        → catálogo de produtos
-     users/{uid}/servicos/{id}        → catálogo de serviços
-     users/{uid}/config/geral         → dados da empresa
-                                        (empresa.nomeEmpresa, empresa.logo…)
+     users/{uid}/orcamentos/{id}
+     users/{uid}                    → orcamentoCnt, vendaIdCnt
+     users/{uid}/clientes/{id}
+     users/{uid}/produtos/{id}      → inclui campo "custo" / "precoCusto"
+     users/{uid}/servicos/{id}
+     users/{uid}/config/geral       → empresa.nomeEmpresa, empresa.logo…
+     users/{uid}/caixa              → lançamento automático ao converter
+     users/{uid}/vendedores/{id}
 
-   CORREÇÕES v2 (18/04/2026):
-     ✅ Firestore: todos os tx.get() ANTES de qualquer tx.set/tx.update
-     ✅ Impressão A4: layout sofisticado, cor do header aplicada, logo correta
-     ✅ Config: lê empresa.nomeEmpresa e empresa.logo (campos reais do Firestore)
-     ✅ Modais internos: zero uso de window.alert / window.confirm
+   CORREÇÕES v3 (18/04/2026):
+     ✅ Impressão: visibility:hidden no body + visible no root (igual a Vendas.jsx)
+     ✅ Custo do produto: buscado do Firestore durante a conversão
+     ✅ DRE: lançamento em caixa criado ao converter (regime de caixa)
+     ✅ Modal de Finalização: escolha de forma de pagamento e vendedor antes de converter
    ═══════════════════════════════════════════════════ */
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Search, Plus, X, Printer, FileText,
   CheckCircle, Clock, AlertTriangle,
-  TrendingUp, RefreshCw, User, List, Edit2,
+  TrendingUp, RefreshCw, User, List, Edit2, ShoppingCart,
 } from "lucide-react";
 
 import { db, auth } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection, doc, onSnapshot,
-  runTransaction, getDoc, Timestamp,
+  runTransaction, getDoc, addDoc, Timestamp,
   query, orderBy,
 } from "firebase/firestore";
 
@@ -35,11 +36,10 @@ import {
    CSS
    ══════════════════════════════════════════════════ */
 const CSS = `
-  @keyframes fadeIn  { from{opacity:0}            to{opacity:1} }
+  @keyframes fadeIn  { from{opacity:0}             to{opacity:1} }
   @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
   @keyframes scaleIn { from{opacity:0;transform:scale(.94)}       to{opacity:1;transform:scale(1)} }
 
-  /* ── Overlay ── */
   .modal-overlay {
     position:fixed;inset:0;z-index:1000;
     background:rgba(0,0,0,.82);backdrop-filter:blur(6px);
@@ -48,7 +48,6 @@ const CSS = `
   }
   .modal-overlay-top { z-index:1200; }
 
-  /* ── Box ── */
   .modal-box {
     background:var(--s1);border:1px solid var(--border-h);
     border-radius:18px;width:100%;max-width:520px;
@@ -63,8 +62,7 @@ const CSS = `
   .modal-box::-webkit-scrollbar-thumb { background:var(--text-3);border-radius:2px; }
 
   .modal-header {
-    padding:20px 24px 16px;
-    border-bottom:1px solid var(--border);
+    padding:20px 24px 16px;border-bottom:1px solid var(--border);
     display:flex;align-items:flex-start;justify-content:space-between;gap:12px;
     position:sticky;top:0;background:var(--s1);z-index:2;
   }
@@ -87,7 +85,7 @@ const CSS = `
     position:sticky;bottom:0;background:var(--s1);z-index:2;
   }
 
-  /* ── Toast / Confirm modal ── */
+  /* ── Toast / Confirm ── */
   .orc-toast-ov {
     position:fixed;inset:0;z-index:2000;
     display:flex;align-items:center;justify-content:center;
@@ -216,10 +214,8 @@ const CSS = `
     font-family:'Sora',sans-serif;font-size:11px;font-weight:600;
     background:var(--s3);border:1px solid var(--border-h);color:var(--text-2);padding:2px 9px;border-radius:20px;
   }
-
   .orc-row {
-    display:grid;
-    grid-template-columns:100px 1fr 110px 130px 120px 100px 80px;
+    display:grid;grid-template-columns:100px 1fr 110px 130px 120px 100px 80px;
     padding:11px 18px;gap:8px;border-bottom:1px solid var(--border);
     align-items:center;font-size:12px;color:var(--text-2);
     cursor:pointer;transition:background .1s;
@@ -229,18 +225,14 @@ const CSS = `
   .orc-row-head { background:var(--s2);cursor:default; }
   .orc-row-head:hover { background:var(--s2); }
   .orc-row-head span { font-size:10px;font-weight:500;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3); }
-
   .orc-codigo  { font-family:'Sora',sans-serif;font-size:11px;color:var(--gold);font-weight:600; }
   .orc-cliente { color:var(--text);font-size:13px;font-weight:500; }
   .orc-total   { font-family:'Sora',sans-serif;font-size:12px;font-weight:600;color:var(--green); }
   .orc-actions { display:flex;align-items:center;gap:5px;justify-content:flex-end; }
   .orc-empty,.orc-loading { padding:56px 20px;text-align:center;color:var(--text-3);font-size:13px; }
 
-  /* ── Badges de status ── */
-  .orc-status {
-    display:inline-flex;align-items:center;gap:4px;
-    padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap;
-  }
+  /* ── Status badges ── */
+  .orc-status { display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;white-space:nowrap; }
   .orc-st-rascunho   { background:var(--s3);color:var(--text-3);border:1px solid var(--border-h); }
   .orc-st-enviado    { background:rgba(91,142,240,.12);color:var(--blue);border:1px solid rgba(91,142,240,.2); }
   .orc-st-aguardando { background:rgba(200,165,94,.1);color:var(--gold);border:1px solid rgba(200,165,94,.25); }
@@ -276,7 +268,6 @@ const CSS = `
     font-family:'DM Sans',sans-serif;transition:all .13s;
   }
   .orc-add-item:hover { background:rgba(200,165,94,.14); }
-
   .orc-item-row {
     display:grid;grid-template-columns:80px 1fr 64px 100px 32px;
     gap:8px;align-items:start;margin-bottom:8px;
@@ -335,9 +326,7 @@ const CSS = `
     width:34px;height:34px;border-radius:8px;cursor:pointer;
     border:2px solid transparent;transition:all .13s;flex-shrink:0;
   }
-  .orc-color-opt.sel {
-    border-color:var(--gold);transform:scale(1.12);box-shadow:0 0 0 3px rgba(200,165,94,.25);
-  }
+  .orc-color-opt.sel { border-color:var(--gold);transform:scale(1.12);box-shadow:0 0 0 3px rgba(200,165,94,.25); }
 
   /* ── Posição logo ── */
   .orc-pos-btns { display:flex;gap:6px; }
@@ -360,7 +349,6 @@ const CSS = `
   .od-card { background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:10px 13px; }
   .od-lbl  { font-size:9px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text-3);margin-bottom:4px; }
   .od-val  { font-size:13px;color:var(--text);font-weight:500; }
-
   .od-table { background:var(--s2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px; }
   .od-thead {
     display:grid;grid-template-columns:1fr 56px 110px 110px;
@@ -374,39 +362,47 @@ const CSS = `
   }
   .od-trow:last-child { border-bottom:none; }
   .od-nome { color:var(--text);font-weight:500; }
-
-  .od-totals {
-    display:flex;gap:14px;padding:12px 14px;
-    background:var(--s2);border:1px solid var(--border);border-radius:10px;flex-wrap:wrap;
-  }
-
+  .od-totals { display:flex;gap:14px;padding:12px 14px;background:var(--s2);border:1px solid var(--border);border-radius:10px;flex-wrap:wrap; }
   .od-timeline { list-style:none;margin:0;padding:0; }
-  .od-event {
-    display:flex;align-items:flex-start;gap:10px;
-    padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;
-  }
+  .od-event { display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px; }
   .od-event:last-child { border-bottom:none; }
   .od-ev-tipo { font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--gold);min-width:84px;padding-top:1px; }
   .od-ev-desc { color:var(--text-2);flex:1; }
   .od-ev-data { color:var(--text-3);font-size:10px;white-space:nowrap; }
-
-  .od-aviso {
-    border-radius:10px;padding:11px 14px;font-size:12px;color:var(--text-2);
-    margin-bottom:14px;display:flex;align-items:center;gap:8px;
-  }
+  .od-aviso { border-radius:10px;padding:11px 14px;font-size:12px;color:var(--text-2);margin-bottom:14px;display:flex;align-items:center;gap:8px; }
   .od-aviso-warn { background:rgba(200,165,94,.07);border:1px solid rgba(200,165,94,.25); }
   .od-aviso-ok   { background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.2); }
   .od-aviso-exp  { background:rgba(100,100,100,.06);border:1px solid var(--border); }
 
-  /* ── Print ── */
-  @media print {
-    body > * { display:none !important; }
-    #orc-print-root {
-      display:block !important;
-      position:fixed;top:0;left:0;width:100%;z-index:99999;
-    }
+  /* ── Modal Finalizar Conversão ── */
+  .orc-fin-summary {
+    background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:16px;
   }
-  #orc-print-root { display:none; }
+  .orc-fin-row { display:flex;justify-content:space-between;font-size:12px;color:var(--text-2);margin-bottom:4px; }
+  .orc-fin-row:last-child { margin-bottom:0; }
+  .orc-fin-row strong { color:var(--text); }
+  .orc-fin-total { font-family:'Sora',sans-serif;font-size:16px;font-weight:700;color:var(--green);text-align:right;margin-top:8px; }
+
+  /* ══════════════════════════════════
+     IMPRESSÃO A4
+     ATENÇÃO: não usar "body > *" pois
+     em React o print-root fica dentro
+     de #root (filho do body).
+     Usar visibility:hidden no body e
+     visibility:visible no root do doc
+     (visibility se propaga para filhos,
+     display:none não permite override).
+  ══════════════════════════════════ */
+  @media print {
+    body { visibility: hidden !important; }
+    #orc-print-root {
+      visibility: visible !important;
+      display: block !important;
+      position: fixed; top: 0; left: 0; width: 100%; z-index: 99999;
+    }
+    #orc-print-root * { visibility: visible !important; }
+  }
+  #orc-print-root { display: none; }
 `;
 
 /* ══════════════════════════════════════════════════
@@ -421,6 +417,11 @@ const CORES_HEADER = [
   { bg:"#ffffff", text:"#0f172a" },
 ];
 
+const FORMAS_PAGAMENTO = [
+  "Pix","Dinheiro","Cartão de Crédito","Cartão de Débito",
+  "Boleto","Transferência","Sinal","Parcelado","Outro",
+];
+
 const SC_LABELS = {
   rascunho:"Rascunho", enviado:"Enviado",
   aguardando_resposta:"Aguardando", negociacao:"Negociação",
@@ -432,22 +433,18 @@ const SC_CLASS = {
   fechado:"orc-st-fechado", perdido:"orc-st-perdido",
 };
 const SS_CLASS = { ativo:"orc-st-ativo", expirado:"orc-st-expirado", convertido:"orc-st-convertido" };
-
-const FILTROS = ["Todos","Rascunho","Enviado","Aguardando","Negociação","Fechado","Perdido","Expirado","Convertido"];
+const FILTROS  = ["Todos","Rascunho","Enviado","Aguardando","Negociação","Fechado","Perdido","Expirado","Convertido"];
 
 /* ══════════════════════════════════════════════════
    HELPERS
    ══════════════════════════════════════════════════ */
 const fmtR$ = v => `R$ ${Number(v||0).toLocaleString("pt-BR",{minimumFractionDigits:2})}`;
-
 const fmtData = d => {
   if (!d) return "—";
   try { const dt = d?.toDate ? d.toDate() : new Date(d); return dt.toLocaleDateString("pt-BR"); }
   catch { return String(d); }
 };
-
 const gerarCodigo = cnt => `ORC-${String(cnt+1).padStart(4,"0")}`;
-
 const statusSistema = orc => {
   if (orc.statusSistema === "convertido") return "convertido";
   if (orc.statusSistema === "expirado")   return "expirado";
@@ -457,24 +454,15 @@ const statusSistema = orc => {
   }
   return "ativo";
 };
-
 const filtroParaStatus = f => ({
-  "Todos":null,
-  "Rascunho":{sc:"rascunho"},
-  "Enviado":{sc:"enviado"},
-  "Aguardando":{sc:"aguardando_resposta"},
-  "Negociação":{sc:"negociacao"},
-  "Fechado":{sc:"fechado"},
-  "Perdido":{sc:"perdido"},
-  "Expirado":{ss:"expirado"},
-  "Convertido":{ss:"convertido"},
+  "Todos":null, "Rascunho":{sc:"rascunho"}, "Enviado":{sc:"enviado"},
+  "Aguardando":{sc:"aguardando_resposta"}, "Negociação":{sc:"negociacao"},
+  "Fechado":{sc:"fechado"}, "Perdido":{sc:"perdido"},
+  "Expirado":{ss:"expirado"}, "Convertido":{ss:"convertido"},
 }[f] ?? null);
 
 /* ══════════════════════════════════════════════════
-   IMPRESSÃO A4 SOFISTICADA
-   - usa empresa.nomeEmpresa e empresa.logo (campos reais do Firestore)
-   - aplica a cor de header escolhida em toda a tabela e totais
-   - nunca corta conteúdo (largura 100%, box-sizing border-box)
+   IMPRESSÃO A4
    ══════════════════════════════════════════════════ */
 function imprimirOrcamento(orc, empresa) {
   const el = document.getElementById("orc-print-root");
@@ -485,23 +473,22 @@ function imprimirOrcamento(orc, empresa) {
   const txtColor = layout.corTextoHeader || "#f8fafc";
   const logoPos  = layout.posicaoLogo    || "esquerda";
 
-  /* Campos corretos conforme Firestore: empresa.nomeEmpresa, empresa.logo */
-  const nomeEmp = empresa?.nomeEmpresa || empresa?.nome || "ASSENT";
-  const cnpj    = empresa?.cnpj    || "";
-  const endereco = empresa?.endereco || "";
-  const telefone = empresa?.telefone || "";
-  const logo64   = empresa?.logo   || "";   /* campo "logo" no Firestore */
+  const nomeEmp  = empresa?.nomeEmpresa || empresa?.nome || "ASSENT";
+  const cnpj     = empresa?.cnpj    || "";
+  const endereco = empresa?.endereco|| "";
+  const telefone = empresa?.telefone|| "";
+  const logo64   = empresa?.logo    || "";
 
   const logoJustify =
-    logoPos === "centro" ? "center" :
-    logoPos === "direita" ? "flex-end" : "flex-start";
+    logoPos==="centro"  ? "center"   :
+    logoPos==="direita" ? "flex-end" : "flex-start";
 
   const rf       = orc.resumoFinanceiro || {};
-  const subtotal = rf.subtotal  || 0;
-  const desc     = rf.descontos || 0;
+  const subtotal = rf.subtotal   || 0;
+  const desc     = rf.descontos  || 0;
   const acr      = rf.acrescimos || 0;
   const total    = rf.totalFinal || 0;
-  const itens    = orc.itens || [];
+  const itens    = orc.itens     || [];
 
   const validade = orc.datas?.validade
     ? (orc.datas.validade?.toDate
@@ -514,17 +501,10 @@ function imprimirOrcamento(orc, empresa) {
   font-family:'Georgia','Times New Roman',serif;
   width:100%;box-sizing:border-box;
   background:#ffffff;color:#1a1a2e;
-  min-height:100vh;
 ">
 
-  <!-- HEADER com cor escolhida -->
-  <div style="
-    background:${bgColor};color:${txtColor};
-    padding:26px 40px 20px;
-    display:flex;align-items:flex-start;justify-content:space-between;gap:20px;
-    box-sizing:border-box;
-  ">
-    <!-- Empresa / logo -->
+  <!-- HEADER — cor escolhida aplicada aqui e na tabela -->
+  <div style="background:${bgColor};color:${txtColor};padding:26px 40px 20px;display:flex;align-items:flex-start;justify-content:space-between;gap:20px;box-sizing:border-box;">
     <div style="display:flex;flex-direction:column;align-items:${logoJustify};gap:6px;flex:1;min-width:0;">
       ${logo64
         ? `<img src="${logo64}" style="height:54px;max-width:180px;object-fit:contain;display:block;"/>`
@@ -537,18 +517,10 @@ function imprimirOrcamento(orc, empresa) {
         ${telefone ? `Tel: ${telefone}`  : ""}
       </div>
     </div>
-
-    <!-- ID do orçamento -->
     <div style="text-align:right;flex-shrink:0;">
-      <div style="font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;opacity:.65;margin-bottom:4px;">
-        ORÇAMENTO
-      </div>
-      <div style="font-size:30px;font-weight:700;letter-spacing:-1px;line-height:1;">
-        ${orc.codigo || orc.id}
-      </div>
-      <div style="font-size:11px;opacity:.68;margin-top:6px;">
-        Emitido em: ${fmtData(orc.datas?.criacao)}
-      </div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;opacity:.65;margin-bottom:4px;">ORÇAMENTO</div>
+      <div style="font-size:30px;font-weight:700;letter-spacing:-1px;line-height:1;">${orc.codigo||orc.id}</div>
+      <div style="font-size:11px;opacity:.68;margin-top:6px;">Emitido em: ${fmtData(orc.datas?.criacao)}</div>
     </div>
   </div>
 
@@ -559,35 +531,17 @@ function imprimirOrcamento(orc, empresa) {
   <div style="padding:26px 40px;box-sizing:border-box;">
 
     <!-- Card do cliente -->
-    <div style="
-      display:flex;border:1px solid #e2e8f0;border-radius:10px;
-      overflow:hidden;margin-bottom:22px;
-    ">
-      <div style="
-        background:${bgColor};color:${txtColor};
-        padding:14px 18px;display:flex;align-items:center;justify-content:center;
-        font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
-        writing-mode:vertical-lr;transform:rotate(180deg);
-        min-width:40px;flex-shrink:0;
-      ">CLIENTE</div>
+    <div style="display:flex;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;margin-bottom:22px;">
+      <div style="background:${bgColor};color:${txtColor};padding:14px 18px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;writing-mode:vertical-lr;transform:rotate(180deg);min-width:40px;flex-shrink:0;">CLIENTE</div>
       <div style="padding:14px 20px;flex:1;">
-        <div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:3px;">
-          ${orc.cliente?.nome || "—"}
-        </div>
-        ${orc.cliente?.telefone
-          ? `<div style="font-size:12px;color:#64748b;">Tel: ${orc.cliente.telefone}</div>`
-          : ""}
+        <div style="font-size:16px;font-weight:700;color:#0f172a;margin-bottom:3px;">${orc.cliente?.nome||"—"}</div>
+        ${orc.cliente?.telefone ? `<div style="font-size:12px;color:#64748b;">Tel: ${orc.cliente.telefone}</div>` : ""}
       </div>
     </div>
 
-    <!-- Tabela de itens -->
+    <!-- Tabela de itens — cabeçalho usa bgColor -->
     <table style="width:100%;border-collapse:collapse;margin-bottom:4px;table-layout:fixed;">
-      <colgroup>
-        <col style="width:auto;">
-        <col style="width:56px;">
-        <col style="width:120px;">
-        <col style="width:130px;">
-      </colgroup>
+      <colgroup><col style="width:auto;"><col style="width:56px;"><col style="width:120px;"><col style="width:130px;"></colgroup>
       <thead>
         <tr>
           <th style="background:${bgColor};color:${txtColor};text-align:left;padding:10px 14px;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;">Item</th>
@@ -606,75 +560,46 @@ function imprimirOrcamento(orc, empresa) {
             <td style="padding:11px 8px;text-align:center;font-size:13px;color:#475569;">${item.quantidade}</td>
             <td style="padding:11px 14px;text-align:right;font-size:13px;color:#475569;">${fmtR$(item.valorUnitario)}</td>
             <td style="padding:11px 14px;text-align:right;font-size:13px;font-weight:700;color:#0f172a;">${fmtR$(item.valorTotal)}</td>
-          </tr>
-        `).join("")}
+          </tr>`).join("")}
       </tbody>
     </table>
 
-    <!-- Resumo financeiro (alinhado à direita) -->
+    <!-- Resumo financeiro -->
     <div style="display:flex;justify-content:flex-end;margin-bottom:22px;">
       <div style="min-width:260px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;">
         ${(desc>0||acr>0)?`
           <div style="padding:10px 16px;border-bottom:1px solid #f1f5f9;">
-            <div style="display:flex;justify-content:space-between;font-size:12px;color:#64748b;margin-bottom:4px;">
-              <span>Subtotal</span><span>${fmtR$(subtotal)}</span>
-            </div>
-            ${desc>0?`
-              <div style="display:flex;justify-content:space-between;font-size:12px;color:#ef4444;">
-                <span>Descontos</span><span>−${fmtR$(desc)}</span>
-              </div>`:""
-            }
-            ${acr>0?`
-              <div style="display:flex;justify-content:space-between;font-size:12px;color:#059669;">
-                <span>Acréscimos</span><span>+${fmtR$(acr)}</span>
-              </div>`:""
-            }
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:#64748b;margin-bottom:4px;"><span>Subtotal</span><span>${fmtR$(subtotal)}</span></div>
+            ${desc>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:#ef4444;"><span>Descontos</span><span>−${fmtR$(desc)}</span></div>`:""}
+            ${acr>0?`<div style="display:flex;justify-content:space-between;font-size:12px;color:#059669;"><span>Acréscimos</span><span>+${fmtR$(acr)}</span></div>`:""}
           </div>`:""}
-        <div style="
-          display:flex;justify-content:space-between;align-items:center;
-          padding:14px 16px;background:${bgColor};color:${txtColor};
-        ">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:${bgColor};color:${txtColor};">
           <span style="font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;">TOTAL</span>
           <span style="font-size:20px;font-weight:700;">${fmtR$(total)}</span>
         </div>
       </div>
     </div>
 
-    <!-- Observações -->
     ${orc.descricaoLivre?`
-      <div style="
-        border-left:3px solid ${bgColor};border:1px solid #e2e8f0;
-        border-left-width:3px;border-left-color:${bgColor};
-        border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:22px;background:#fafbff;
-      ">
+      <div style="border-left:3px solid ${bgColor};border:1px solid #e2e8f0;border-left-width:3px;border-left-color:${bgColor};border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:22px;background:#fafbff;">
         <div style="font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#64748b;margin-bottom:5px;">Observações</div>
         <div style="font-size:13px;color:#374151;line-height:1.65;">${orc.descricaoLivre}</div>
       </div>`:""}
 
     <!-- Rodapé: validade + assinatura -->
-    <div style="
-      display:flex;justify-content:space-between;align-items:flex-end;
-      border-top:1px solid #e2e8f0;padding-top:20px;
-    ">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;border-top:1px solid #e2e8f0;padding-top:20px;">
       <div>
         <div style="font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px;">Validade do orçamento</div>
         <div style="font-size:15px;font-weight:700;color:#0f172a;">${validade}</div>
       </div>
       <div style="text-align:center;min-width:220px;">
-        <div style="border-top:1.5px solid #0f172a;padding-top:8px;font-size:11px;color:#64748b;">
-          Assinatura do cliente
-        </div>
+        <div style="border-top:1.5px solid #0f172a;padding-top:8px;font-size:11px;color:#64748b;">Assinatura do cliente</div>
       </div>
     </div>
 
-    <!-- Footer empresa -->
-    <div style="
-      text-align:center;font-size:9px;color:#94a3b8;
-      margin-top:16px;padding-top:12px;border-top:1px dashed #e2e8f0;
-    ">
+    <div style="text-align:center;font-size:9px;color:#94a3b8;margin-top:16px;padding-top:12px;border-top:1px dashed #e2e8f0;">
       ${nomeEmp} &mdash; Documento gerado via ASSENT v2.0
     </div>
-
   </div>
 </div>`;
 
@@ -682,7 +607,7 @@ function imprimirOrcamento(orc, empresa) {
 }
 
 /* ══════════════════════════════════════════════════
-   MODAL TOAST / CONFIRM (sem window.*)
+   MODAL TOAST / CONFIRM
    ══════════════════════════════════════════════════ */
 function ModalToast({ tipo="info", titulo, mensagem, okLabel="OK", cancelLabel="Cancelar", onOk, onCancel }) {
   const icons = { info:"💬", warn:"⚠️", error:"❌", success:"✅", confirm:"🔄" };
@@ -702,33 +627,105 @@ function ModalToast({ tipo="info", titulo, mensagem, okLabel="OK", cancelLabel="
 }
 
 /* ══════════════════════════════════════════════════
+   MODAL FINALIZAR CONVERSÃO
+   Permite escolher forma de pagamento e vendedor
+   antes de converter o orçamento em venda.
+   ══════════════════════════════════════════════════ */
+function ModalFinalizarConversao({ orc, uid, vendedores, onConfirmar, onClose }) {
+  const [formaPgto, setFormaPgto] = useState("Pix");
+  const [vendedor,  setVendedor]  = useState("");
+  const [erros,     setErros]     = useState({});
+
+  const total = orc.resumoFinanceiro?.totalFinal || 0;
+
+  const validar = () => {
+    const e = {};
+    if (!formaPgto) e.forma = "Selecione a forma de pagamento.";
+    setErros(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleConfirmar = () => {
+    if (!validar()) return;
+    onConfirmar({ formaPagamento: formaPgto, vendedor });
+  };
+
+  return (
+    <div className="modal-overlay modal-overlay-top" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal-box modal-box-sm" style={{maxWidth:480}}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title"><ShoppingCart size={16}/> Finalizar Conversão</div>
+            <div className="modal-sub">{orc.codigo} → Nova Venda</div>
+          </div>
+          <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)"/></button>
+        </div>
+        <div className="modal-body">
+
+          {/* Resumo do orçamento */}
+          <div className="orc-fin-summary">
+            <div className="orc-fin-row"><span>Cliente</span><strong>{orc.cliente?.nome}</strong></div>
+            <div className="orc-fin-row"><span>Itens</span><strong>{orc.itens?.length||0} item(s)</strong></div>
+            {(orc.resumoFinanceiro?.descontos||0)>0&&(
+              <div className="orc-fin-row"><span>Descontos</span><strong style={{color:"var(--red)"}}>−{fmtR$(orc.resumoFinanceiro.descontos)}</strong></div>
+            )}
+            <div className="orc-fin-total">{fmtR$(total)}</div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Forma de Pagamento <span className="form-label-req">*</span></label>
+            <select className={`orc-sel ${erros.forma?"err":""}`} value={formaPgto} onChange={e=>setFormaPgto(e.target.value)}>
+              {FORMAS_PAGAMENTO.map(f=><option key={f} value={f}>{f}</option>)}
+            </select>
+            {erros.forma && <div className="form-error">{erros.forma}</div>}
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Vendedor <span style={{color:"var(--text-3)",fontWeight:400}}>(opcional)</span></label>
+            <select className="orc-sel" value={vendedor} onChange={e=>setVendedor(e.target.value)}>
+              <option value="">— Sem vendedor —</option>
+              {vendedores.map(v=><option key={v.id} value={v.nome||v.id}>{v.nome||v.id}</option>)}
+            </select>
+          </div>
+
+          <div style={{fontSize:11,color:"var(--text-3)",lineHeight:1.6,marginTop:4}}>
+            Uma nova venda será criada com os itens deste orçamento. O custo real de cada produto será buscado automaticamente para cálculo correto do lucro estimado.
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn-green" onClick={handleConfirmar}>
+            <RefreshCw size={13}/> Converter em Venda
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════
    MODAL PIPELINE
    ══════════════════════════════════════════════════ */
 function ModalPipeline({ orc, uid, onClose, onUpdated }) {
-  const [status, setStatus]   = useState(orc.statusComercial||"rascunho");
+  const [status,   setStatus]   = useState(orc.statusComercial||"rascunho");
   const [salvando, setSalvando] = useState(false);
-  const [toast, setToast]     = useState(null);
+  const [toast,    setToast]    = useState(null);
 
   const handleSalvar = async () => {
     setSalvando(true);
     try {
-      const ref = doc(db,"users",uid,"orcamentos",orc.id);
-      /* Read ANTES do write */
+      const ref  = doc(db,"users",uid,"orcamentos",orc.id);
       const snap = await getDoc(ref);
       const interacoes = snap.data()?.interacoes||[];
-      await runTransaction(db, async tx => {
+      await runTransaction(db, async tx=>{
         tx.update(ref, {
-          statusComercial: status,
-          interacoes: [...interacoes, {
-            tipo:"edicao",
-            descricao:`Status comercial → "${SC_LABELS[status]||status}"`,
-            data:Timestamp.now(),
-          }],
+          statusComercial:status,
+          interacoes:[...interacoes,{tipo:"edicao",descricao:`Pipeline → "${SC_LABELS[status]||status}"`,data:Timestamp.now()}],
         });
       });
       onUpdated(); onClose();
     } catch(err) {
-      setToast({ tipo:"error", titulo:"Erro", mensagem:err.message, onOk:()=>setToast(null) });
+      setToast({tipo:"error",titulo:"Erro",mensagem:err.message,onOk:()=>setToast(null)});
     } finally { setSalvando(false); }
   };
 
@@ -736,10 +733,7 @@ function ModalPipeline({ orc, uid, onClose, onUpdated }) {
     <div className="modal-overlay modal-overlay-top" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal-box modal-box-sm">
         <div className="modal-header">
-          <div>
-            <div className="modal-title">Pipeline Comercial</div>
-            <div className="modal-sub">{orc.codigo}</div>
-          </div>
+          <div><div className="modal-title">Pipeline Comercial</div><div className="modal-sub">{orc.codigo}</div></div>
           <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)"/></button>
         </div>
         <div className="modal-body">
@@ -757,9 +751,7 @@ function ModalPipeline({ orc, uid, onClose, onUpdated }) {
         </div>
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
-            {salvando?"Salvando...":"Salvar"}
-          </button>
+          <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>{salvando?"Salvando...":"Salvar"}</button>
         </div>
       </div>
       {toast && <ModalToast {...toast}/>}
@@ -770,45 +762,43 @@ function ModalPipeline({ orc, uid, onClose, onUpdated }) {
 /* ══════════════════════════════════════════════════
    MODAL DETALHE
    ══════════════════════════════════════════════════ */
-function ModalDetalhe({ orc:orcInicial, uid, empresa, onClose, onEditar, onConverter }) {
-  const [orc,       setOrc]  = useState(orcInicial);
-  const [showPM,    setShowPM] = useState(false);
-  const [convertendo, setConv] = useState(false);
-  const [toast,     setToast]  = useState(null);
+function ModalDetalhe({ orc:orcInicial, uid, empresa, vendedores, onClose, onEditar, onConverter }) {
+  const [orc,        setOrc]        = useState(orcInicial);
+  const [showPM,     setShowPM]     = useState(false);
+  const [showFin,    setShowFin]    = useState(false);
+  const [convertendo,setConv]       = useState(false);
+  const [toast,      setToast]      = useState(null);
 
-  const ss      = statusSistema(orc);
-  const jaConv  = ss === "convertido";
+  const ss     = statusSistema(orc);
+  const jaConv = ss === "convertido";
   const podeCon = !!orc.cliente?.id && !jaConv;
 
-  const refreshOrc = useCallback(async () => {
+  const refreshOrc = useCallback(async()=>{
     const snap = await getDoc(doc(db,"users",uid,"orcamentos",orc.id));
     if (snap.exists()) setOrc({id:snap.id,...snap.data()});
   },[uid,orc.id]);
 
-  const handleConverter = () => {
+  /* Abre modal de finalização ao clicar em Converter */
+  const handleClickConverter = () => {
     if (!podeCon) return;
-    setToast({
-      tipo:"confirm",
-      titulo:"Converter em Venda?",
-      mensagem:`O orçamento ${orc.codigo} será convertido em uma nova venda. Esta ação não pode ser desfeita.`,
-      okLabel:"Sim, converter",
-      cancelLabel:"Cancelar",
-      onCancel:()=>setToast(null),
-      onOk:async()=>{
-        setToast(null); setConv(true);
-        try {
-          await onConverter(orc); onClose();
-        } catch(err) {
-          setToast({ tipo:"error", titulo:"Erro na conversão", mensagem:err.message, onOk:()=>setToast(null) });
-        } finally { setConv(false); }
-      },
-    });
+    setShowFin(true);
+  };
+
+  /* Executado após o usuário confirmar forma de pagamento + vendedor */
+  const handleConfirmarConversao = async ({ formaPagamento, vendedor }) => {
+    setShowFin(false);
+    setConv(true);
+    try {
+      await onConverter(orc, { formaPagamento, vendedor });
+      onClose();
+    } catch(err) {
+      setToast({tipo:"error",titulo:"Erro na conversão",mensagem:err.message,onOk:()=>setToast(null)});
+    } finally { setConv(false); }
   };
 
   return (
     <div className="modal-overlay" onClick={e=>e.target===e.currentTarget&&onClose()}>
       <div className="modal-box modal-box-xl">
-
         <div className="modal-header">
           <div>
             <div className="modal-title">
@@ -820,15 +810,12 @@ function ModalDetalhe({ orc:orcInicial, uid, empresa, onClose, onEditar, onConve
                 {ss.charAt(0).toUpperCase()+ss.slice(1)}
               </span>
             </div>
-            <div className="modal-sub">
-              Criado {fmtData(orc.datas?.criacao)} · Válido até {fmtData(orc.datas?.validade)}
-            </div>
+            <div className="modal-sub">Criado {fmtData(orc.datas?.criacao)} · Válido até {fmtData(orc.datas?.validade)}</div>
           </div>
           <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)"/></button>
         </div>
 
         <div className="modal-body">
-
           {jaConv && (
             <div className="od-aviso od-aviso-ok">
               <CheckCircle size={14} color="var(--green)"/>
@@ -838,7 +825,7 @@ function ModalDetalhe({ orc:orcInicial, uid, empresa, onClose, onEditar, onConve
           {!orc.cliente?.id && !jaConv && (
             <div className="od-aviso od-aviso-warn">
               <AlertTriangle size={14} color="var(--gold)"/>
-              Para converter em venda, o cliente precisa estar <strong>cadastrado no sistema</strong>.
+              Para converter em venda o cliente precisa estar <strong>cadastrado no sistema</strong>.
             </div>
           )}
           {ss==="expirado" && !jaConv && (
@@ -862,15 +849,10 @@ function ModalDetalhe({ orc:orcInicial, uid, empresa, onClose, onEditar, onConve
           <div className="od-sec">
             <div className="od-sec-title"><List size={11}/> Itens</div>
             <div className="od-table">
-              <div className="od-thead">
-                <span>Item</span><span>Qtd</span><span>Unit.</span><span>Total</span>
-              </div>
+              <div className="od-thead"><span>Item</span><span>Qtd</span><span>Unit.</span><span>Total</span></div>
               {(orc.itens||[]).map((item,i)=>(
                 <div className="od-trow" key={i}>
-                  <span className="od-nome">
-                    {item.nome}
-                    <span style={{fontSize:9,color:"var(--text-3)",marginLeft:6,textTransform:"uppercase"}}>{item.tipo}</span>
-                  </span>
+                  <span className="od-nome">{item.nome}<span style={{fontSize:9,color:"var(--text-3)",marginLeft:6,textTransform:"uppercase"}}>{item.tipo}</span></span>
                   <span>{item.quantidade}</span>
                   <span>{fmtR$(item.valorUnitario)}</span>
                   <span style={{color:"var(--green)",fontWeight:600}}>{fmtR$(item.valorTotal)}</span>
@@ -889,31 +871,15 @@ function ModalDetalhe({ orc:orcInicial, uid, empresa, onClose, onEditar, onConve
           <div className="od-sec">
             <div className="od-sec-title">💰 Resumo Financeiro</div>
             <div className="od-totals">
-              <div className="orc-tc">
-                <span className="orc-tc-lbl">Subtotal</span>
-                <span className="orc-tc-val">{fmtR$(orc.resumoFinanceiro?.subtotal)}</span>
-              </div>
-              {(orc.resumoFinanceiro?.descontos||0)>0 && (
-                <div className="orc-tc">
-                  <span className="orc-tc-lbl">Descontos</span>
-                  <span className="orc-tc-val" style={{color:"var(--red)"}}>−{fmtR$(orc.resumoFinanceiro.descontos)}</span>
-                </div>
-              )}
-              {(orc.resumoFinanceiro?.acrescimos||0)>0 && (
-                <div className="orc-tc">
-                  <span className="orc-tc-lbl">Acréscimos</span>
-                  <span className="orc-tc-val" style={{color:"var(--green)"}}>+{fmtR$(orc.resumoFinanceiro.acrescimos)}</span>
-                </div>
-              )}
-              <div className="orc-tc" style={{marginLeft:"auto"}}>
-                <span className="orc-tc-lbl">Total Final</span>
-                <span className="orc-tc-val" style={{color:"var(--green)",fontSize:16}}>{fmtR$(orc.resumoFinanceiro?.totalFinal)}</span>
-              </div>
+              <div className="orc-tc"><span className="orc-tc-lbl">Subtotal</span><span className="orc-tc-val">{fmtR$(orc.resumoFinanceiro?.subtotal)}</span></div>
+              {(orc.resumoFinanceiro?.descontos||0)>0&&<div className="orc-tc"><span className="orc-tc-lbl">Descontos</span><span className="orc-tc-val" style={{color:"var(--red)"}}>−{fmtR$(orc.resumoFinanceiro.descontos)}</span></div>}
+              {(orc.resumoFinanceiro?.acrescimos||0)>0&&<div className="orc-tc"><span className="orc-tc-lbl">Acréscimos</span><span className="orc-tc-val" style={{color:"var(--green)"}}>+{fmtR$(orc.resumoFinanceiro.acrescimos)}</span></div>}
+              <div className="orc-tc" style={{marginLeft:"auto"}}><span className="orc-tc-lbl">Total Final</span><span className="orc-tc-val" style={{color:"var(--green)",fontSize:16}}>{fmtR$(orc.resumoFinanceiro?.totalFinal)}</span></div>
             </div>
           </div>
 
           {/* Histórico */}
-          {(orc.interacoes||[]).length>0 && (
+          {(orc.interacoes||[]).length>0&&(
             <div className="od-sec">
               <div className="od-sec-title"><Clock size={11}/> Histórico</div>
               <ul className="od-timeline">
@@ -936,12 +902,8 @@ function ModalDetalhe({ orc:orcInicial, uid, empresa, onClose, onEditar, onConve
           <button className="btn-secondary" onClick={()=>imprimirOrcamento(orc,empresa)}>
             <Printer size={13}/> Imprimir
           </button>
-          {!jaConv && (
-            <button className="btn-secondary" onClick={()=>onEditar(orc)}>
-              <Edit2 size={13}/> Editar
-            </button>
-          )}
-          <button className="btn-green" onClick={handleConverter}
+          {!jaConv&&<button className="btn-secondary" onClick={()=>onEditar(orc)}><Edit2 size={13}/> Editar</button>}
+          <button className="btn-green" onClick={handleClickConverter}
             disabled={!podeCon||convertendo}
             title={!orc.cliente?.id?"Cliente precisa ser cadastrado":""}
           >
@@ -951,7 +913,16 @@ function ModalDetalhe({ orc:orcInicial, uid, empresa, onClose, onEditar, onConve
         </div>
       </div>
 
-      {showPM && <ModalPipeline orc={orc} uid={uid} onClose={()=>setShowPM(false)} onUpdated={refreshOrc}/>}
+      {showPM  && <ModalPipeline orc={orc} uid={uid} onClose={()=>setShowPM(false)} onUpdated={refreshOrc}/>}
+      {showFin && (
+        <ModalFinalizarConversao
+          orc={orc}
+          uid={uid}
+          vendedores={vendedores}
+          onConfirmar={handleConfirmarConversao}
+          onClose={()=>setShowFin(false)}
+        />
+      )}
       {toast && <ModalToast {...toast}/>}
     </div>
   );
@@ -994,19 +965,18 @@ function ModalNovoOrc({ orc, uid, clientes, produtos, servicos, onSave, onClose 
     return clientes.filter(c=>c.nome?.toLowerCase().includes(q)||c.telefone?.toLowerCase().includes(q)).slice(0,6);
   },[clientes,cliSearch]);
 
-  const selecionarCliente = c => {
-    setCliId(c.id); setCliNome(c.nome);
-    setCliTel(c.telefone||""); setCliSearch(c.nome); setCliAC(false);
+  const selecionarCliente = c=>{
+    setCliId(c.id); setCliNome(c.nome); setCliTel(c.telefone||""); setCliSearch(c.nome); setCliAC(false);
   };
 
-  const catFilt = (search, tipo) => {
+  const catFilt = (search,tipo)=>{
     const lista = tipo==="servico"?servicos:produtos;
     if(!search.trim()) return lista.slice(0,8);
     const q=search.toLowerCase();
     return lista.filter(p=>p.nome?.toLowerCase().includes(q)).slice(0,8);
   };
 
-  const selecionarCat = (idx,prod,tipo) => {
+  const selecionarCat = (idx,prod,tipo)=>{
     const n=[...itens];
     n[idx]={...n[idx],idRef:prod.id,nome:prod.nome,valorUnitario:prod.preco||0,
       valorTotal:(prod.preco||0)*(n[idx].quantidade||1),origem:"catalogo",tipo};
@@ -1014,7 +984,7 @@ function ModalNovoOrc({ orc, uid, clientes, produtos, servicos, onSave, onClose 
     const s=[...iSearch]; s[idx]=prod.nome; setISearch(s); setIAC(null);
   };
 
-  const updItem = (idx,campo,val) => {
+  const updItem=(idx,campo,val)=>{
     const n=[...itens]; n[idx]={...n[idx],[campo]:val};
     if(campo==="quantidade"||campo==="valorUnitario"){
       const q=parseInt(campo==="quantidade"?val:n[idx].quantidade)||1;
@@ -1024,8 +994,8 @@ function ModalNovoOrc({ orc, uid, clientes, produtos, servicos, onSave, onClose 
     setItens(n);
   };
 
-  const addItem = ()=>{ setItens([...itens,novoItem()]); setISearch([...iSearch,""]); };
-  const rmItem  = idx=>{ if(itens.length===1)return; setItens(itens.filter((_,i)=>i!==idx)); setISearch(iSearch.filter((_,i)=>i!==idx)); };
+  const addItem=()=>{ setItens([...itens,novoItem()]); setISearch([...iSearch,""]); };
+  const rmItem=idx=>{ if(itens.length===1)return; setItens(itens.filter((_,i)=>i!==idx)); setISearch(iSearch.filter((_,i)=>i!==idx)); };
 
   const calc = useMemo(()=>{
     const sub=itens.reduce((s,i)=>s+(parseFloat(i.valorTotal)||0),0);
@@ -1033,7 +1003,7 @@ function ModalNovoOrc({ orc, uid, clientes, produtos, servicos, onSave, onClose 
     return {subtotal:sub,descontos:d,acrescimos:a,totalFinal:Math.max(0,sub-d+a)};
   },[itens,descontos,acrescimos]);
 
-  const validar = ()=>{
+  const validar=()=>{
     const e={};
     const nome=cliOrigem==="cadastrado"?cliSearch.trim():cliNome.trim();
     if(!nome) e.cliNome="Informe o nome do cliente.";
@@ -1042,13 +1012,13 @@ function ModalNovoOrc({ orc, uid, clientes, produtos, servicos, onSave, onClose 
     setErros(e); return Object.keys(e).length===0;
   };
 
-  const handleSalvar = async () => {
+  const handleSalvar=async()=>{
     if(!validar()) return;
     setSalvando(true);
     const itensF=itens
       .filter(i=>i.nome.trim()&&i.valorUnitario>0)
       .map(i=>({
-        tipo:i.tipo, idRef:i.idRef||null, nome:i.nome.trim(),
+        tipo:i.tipo,idRef:i.idRef||null,nome:i.nome.trim(),
         quantidade:parseInt(i.quantidade)||1,
         valorUnitario:parseFloat(i.valorUnitario)||0,
         valorTotal:parseFloat(i.valorTotal)||0,
@@ -1070,13 +1040,11 @@ function ModalNovoOrc({ orc, uid, clientes, produtos, servicos, onSave, onClose 
         possuiItensManuais:itensF.some(i=>i.origem==="manual"),
       },
       statusComercial:statusCom,
-      configuracaoLayout:{ corHeader:lCor, corTextoHeader:lCorTxt, posicaoLogo:lLogo },
+      configuracaoLayout:{corHeader:lCor,corTextoHeader:lCorTxt,posicaoLogo:lLogo},
     };
-    try {
-      await onSave(payload, isEdit?orc:null);
-    } catch(err) {
-      setToast({tipo:"error",titulo:"Erro ao salvar",mensagem:err.message,onOk:()=>setToast(null)});
-    } finally { setSalvando(false); }
+    try { await onSave(payload, isEdit?orc:null); }
+    catch(err){ setToast({tipo:"error",titulo:"Erro ao salvar",mensagem:err.message,onOk:()=>setToast(null)}); }
+    finally { setSalvando(false); }
   };
 
   return (
@@ -1085,21 +1053,17 @@ function ModalNovoOrc({ orc, uid, clientes, produtos, servicos, onSave, onClose 
         <div className="modal-header">
           <div>
             <div className="modal-title">{isEdit?`Editando ${orc.codigo}`:"Novo Orçamento"}</div>
-            <div className="modal-sub">{isEdit?"Altere e salve":"Preencha os dados do orçamento"}</div>
+            <div className="modal-sub">{isEdit?"Altere e salve":"Preencha os dados"}</div>
           </div>
           <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)"/></button>
         </div>
-
         <div className="modal-body">
 
-          {/* Cliente */}
           <div className="orc-cli-toggle">
-            <button className={`orc-tog ${cliOrigem==="cadastrado"?"active":""}`}
-              onClick={()=>{setCliOrigem("cadastrado");setCliId(null);}}>
+            <button className={`orc-tog ${cliOrigem==="cadastrado"?"active":""}`} onClick={()=>{setCliOrigem("cadastrado");setCliId(null);}}>
               <User size={11}/> Cadastrado
             </button>
-            <button className={`orc-tog ${cliOrigem==="manual"?"active":""}`}
-              onClick={()=>{setCliOrigem("manual");setCliId(null);setCliSearch("");}}>
+            <button className={`orc-tog ${cliOrigem==="manual"?"active":""}`} onClick={()=>{setCliOrigem("manual");setCliId(null);setCliSearch("");}}>
               <Edit2 size={11}/> Manual
             </button>
           </div>
@@ -1107,25 +1071,14 @@ function ModalNovoOrc({ orc, uid, clientes, produtos, servicos, onSave, onClose 
           {cliOrigem==="cadastrado"?(
             <div className="form-group nv-autocomplete">
               <label className="form-label">Cliente <span className="form-label-req">*</span></label>
-              <input className={`form-input ${erros.cliNome?"err":""}`}
-                placeholder="Buscar cliente cadastrado..."
-                value={cliSearch}
-                onChange={e=>{setCliSearch(e.target.value);setCliId(null);setCliAC(true);}}
-                onFocus={()=>setCliAC(true)}
-                onBlur={()=>setTimeout(()=>setCliAC(false),180)}
-                autoComplete="off"/>
+              <input className={`form-input ${erros.cliNome?"err":""}`} placeholder="Buscar cliente cadastrado..."
+                value={cliSearch} onChange={e=>{setCliSearch(e.target.value);setCliId(null);setCliAC(true);}}
+                onFocus={()=>setCliAC(true)} onBlur={()=>setTimeout(()=>setCliAC(false),180)} autoComplete="off"/>
               {erros.cliNome&&<div className="form-error">{erros.cliNome}</div>}
               {cliAC&&(
                 <div className="nv-ac-list">
-                  {cliFilt.length===0
-                    ?<div className="nv-ac-empty">Nenhum cliente encontrado.</div>
-                    :cliFilt.map(c=>(
-                      <div key={c.id} className="nv-ac-item" onMouseDown={()=>selecionarCliente(c)}>
-                        <span>{c.nome}</span>
-                        <span className="nv-ac-item-sub">{c.telefone||""}</span>
-                      </div>
-                    ))
-                  }
+                  {cliFilt.length===0?<div className="nv-ac-empty">Nenhum cliente.</div>
+                    :cliFilt.map(c=>(<div key={c.id} className="nv-ac-item" onMouseDown={()=>selecionarCliente(c)}><span>{c.nome}</span><span className="nv-ac-item-sub">{c.telefone||""}</span></div>))}
                 </div>
               )}
               {cliId&&<div style={{fontSize:11,color:"var(--green)",marginTop:5}}>✅ Vinculado — conversão em venda habilitada.</div>}
@@ -1134,16 +1087,14 @@ function ModalNovoOrc({ orc, uid, clientes, produtos, servicos, onSave, onClose 
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Nome <span className="form-label-req">*</span></label>
-                <input className={`form-input ${erros.cliNome?"err":""}`}
-                  placeholder="Nome do cliente" value={cliNome}
-                  onChange={e=>setCliNome(e.target.value)}/>
+                <input className={`form-input ${erros.cliNome?"err":""}`} placeholder="Nome do cliente"
+                  value={cliNome} onChange={e=>setCliNome(e.target.value)}/>
                 {erros.cliNome&&<div className="form-error">{erros.cliNome}</div>}
               </div>
               <div className="form-group">
                 <label className="form-label">Telefone <span className="form-label-req">*</span></label>
-                <input className={`form-input ${erros.cliTel?"err":""}`}
-                  placeholder="(00) 00000-0000" value={cliTel}
-                  onChange={e=>setCliTel(e.target.value)}/>
+                <input className={`form-input ${erros.cliTel?"err":""}`} placeholder="(00) 00000-0000"
+                  value={cliTel} onChange={e=>setCliTel(e.target.value)}/>
                 {erros.cliTel&&<div className="form-error">{erros.cliTel}</div>}
               </div>
             </div>
@@ -1151,7 +1102,6 @@ function ModalNovoOrc({ orc, uid, clientes, produtos, servicos, onSave, onClose 
 
           <div className="form-sep"/>
 
-          {/* Itens */}
           <div className="orc-items-hdr">
             <span className="orc-items-label">Itens do Orçamento</span>
             <button className="orc-add-item" onClick={addItem}><Plus size={12}/> Adicionar</button>
@@ -1168,85 +1118,49 @@ function ModalNovoOrc({ orc, uid, clientes, produtos, servicos, onSave, onClose 
                   <option value="livre">Livre</option>
                 </select>
               </div>
-
               <div className="nv-autocomplete">
                 <div className="orc-ifl">Descrição</div>
                 <input className="form-input"
                   placeholder={item.tipo==="livre"?"Descrição livre...":"Buscar..."}
                   value={iSearch[idx]||""}
-                  onChange={e=>{
-                    const s=[...iSearch]; s[idx]=e.target.value; setISearch(s);
-                    updItem(idx,"nome",e.target.value);
-                    if(item.tipo!=="livre") setIAC(idx);
-                  }}
-                  onFocus={()=>{if(item.tipo!=="livre") setIAC(idx);}}
+                  onChange={e=>{const s=[...iSearch];s[idx]=e.target.value;setISearch(s);updItem(idx,"nome",e.target.value);if(item.tipo!=="livre")setIAC(idx);}}
+                  onFocus={()=>{if(item.tipo!=="livre")setIAC(idx);}}
                   onBlur={()=>setTimeout(()=>setIAC(null),180)}
-                  autoComplete="off"
-                  style={{padding:"8px 10px",fontSize:12}}/>
+                  autoComplete="off" style={{padding:"8px 10px",fontSize:12}}/>
                 {iAC===idx&&item.tipo!=="livre"&&(
                   <div className="nv-ac-list">
-                    {catFilt(iSearch[idx]||"",item.tipo).length===0
-                      ?<div className="nv-ac-empty">Nenhum item.</div>
-                      :catFilt(iSearch[idx]||"",item.tipo).map(p=>(
-                        <div key={p.id} className="nv-ac-item" onMouseDown={()=>selecionarCat(idx,p,item.tipo)}>
-                          <span>{p.nome}</span>
-                          <span className="nv-ac-item-sub">{fmtR$(p.preco)}</span>
-                        </div>
-                      ))
-                    }
+                    {catFilt(iSearch[idx]||"",item.tipo).length===0?<div className="nv-ac-empty">Nenhum item.</div>
+                      :catFilt(iSearch[idx]||"",item.tipo).map(p=>(<div key={p.id} className="nv-ac-item" onMouseDown={()=>selecionarCat(idx,p,item.tipo)}><span>{p.nome}</span><span className="nv-ac-item-sub">{fmtR$(p.preco)}</span></div>))}
                   </div>
                 )}
               </div>
-
               <div>
                 <div className="orc-ifl">Qtd</div>
                 <input className="form-input" type="number" min="1" value={item.quantidade}
-                  onChange={e=>updItem(idx,"quantidade",e.target.value)}
-                  style={{padding:"8px 10px",fontSize:12}}/>
+                  onChange={e=>updItem(idx,"quantidade",e.target.value)} style={{padding:"8px 10px",fontSize:12}}/>
               </div>
-
               <div>
                 <div className="orc-ifl">Valor (R$)</div>
                 <input className="form-input" type="number" min="0" step="0.01" value={item.valorUnitario}
-                  onChange={e=>updItem(idx,"valorUnitario",e.target.value)}
-                  style={{padding:"8px 10px",fontSize:12}}/>
+                  onChange={e=>updItem(idx,"valorUnitario",e.target.value)} style={{padding:"8px 10px",fontSize:12}}/>
               </div>
-
-              <button className="orc-item-rm" onClick={()=>rmItem(idx)} disabled={itens.length===1}>
-                <X size={13}/>
-              </button>
+              <button className="orc-item-rm" onClick={()=>rmItem(idx)} disabled={itens.length===1}><X size={13}/></button>
             </div>
           ))}
 
           <div className="orc-totals-bar">
-            <div className="orc-tc">
-              <span className="orc-tc-lbl">Subtotal</span>
-              <span className="orc-tc-val">{fmtR$(calc.subtotal)}</span>
-            </div>
-            <div className="orc-tc">
-              <span className="orc-tc-lbl">Descontos (R$)</span>
-              <input type="number" min="0" step="0.01" className="orc-tc-input"
-                value={descontos} onChange={e=>setDescontos(e.target.value)}/>
-            </div>
-            <div className="orc-tc">
-              <span className="orc-tc-lbl">Acréscimos (R$)</span>
-              <input type="number" min="0" step="0.01" className="orc-tc-input"
-                value={acrescimos} onChange={e=>setAcrescimos(e.target.value)}/>
-            </div>
-            <div className="orc-tc" style={{marginLeft:"auto"}}>
-              <span className="orc-tc-lbl">Total Final</span>
-              <span className="orc-tc-val" style={{color:"var(--green)",fontSize:15}}>{fmtR$(calc.totalFinal)}</span>
-            </div>
+            <div className="orc-tc"><span className="orc-tc-lbl">Subtotal</span><span className="orc-tc-val">{fmtR$(calc.subtotal)}</span></div>
+            <div className="orc-tc"><span className="orc-tc-lbl">Descontos (R$)</span><input type="number" min="0" step="0.01" className="orc-tc-input" value={descontos} onChange={e=>setDescontos(e.target.value)}/></div>
+            <div className="orc-tc"><span className="orc-tc-lbl">Acréscimos (R$)</span><input type="number" min="0" step="0.01" className="orc-tc-input" value={acrescimos} onChange={e=>setAcrescimos(e.target.value)}/></div>
+            <div className="orc-tc" style={{marginLeft:"auto"}}><span className="orc-tc-lbl">Total Final</span><span className="orc-tc-val" style={{color:"var(--green)",fontSize:15}}>{fmtR$(calc.totalFinal)}</span></div>
           </div>
 
           <div className="form-sep"/>
 
           <div className="form-group">
             <label className="form-label">Observações</label>
-            <textarea className="form-input"
-              placeholder="Condições, prazo de entrega, informações adicionais..."
-              value={descLivre} onChange={e=>setDescLivre(e.target.value)}
-              rows={3} style={{resize:"vertical"}}/>
+            <textarea className="form-input" placeholder="Condições, prazo, detalhes..."
+              value={descLivre} onChange={e=>setDescLivre(e.target.value)} rows={3} style={{resize:"vertical"}}/>
           </div>
 
           <div className="form-sep"/>
@@ -1279,20 +1193,16 @@ function ModalNovoOrc({ orc, uid, clientes, produtos, servicos, onSave, onClose 
             <label className="form-label">Cor do Cabeçalho (Impressão)</label>
             <div className="orc-colors">
               {CORES_HEADER.map(c=>(
-                <div key={c.bg}
-                  className={`orc-color-opt ${lCor===c.bg?"sel":""}`}
+                <div key={c.bg} className={`orc-color-opt ${lCor===c.bg?"sel":""}`}
                   style={{background:c.bg,outline:`1.5px solid ${lCor===c.bg?"var(--gold)":c.bg==="var(--border)"?"#ccc":c.bg}`}}
-                  onClick={()=>{setLCor(c.bg);setLCorTxt(c.text);}}
-                  title={c.bg}/>
+                  onClick={()=>{setLCor(c.bg);setLCorTxt(c.text);}} title={c.bg}/>
               ))}
             </div>
             <div style={{marginTop:8,fontSize:11,color:"var(--text-3)"}}>
               Prévia: <span style={{background:lCor,color:lCorTxt,padding:"2px 12px",borderRadius:5,fontSize:11,display:"inline-block",marginTop:4}}>Cabeçalho do documento</span>
             </div>
           </div>
-
         </div>
-
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
@@ -1314,14 +1224,15 @@ export default function Orcamentos() {
   const [clientes,   setClientes]   = useState([]);
   const [produtos,   setProdutos]   = useState([]);
   const [servicos,   setServicos]   = useState([]);
+  const [vendedores, setVendedores] = useState([]);
   const [empresa,    setEmpresa]    = useState({});
   const [loading,    setLoading]    = useState(true);
 
-  const [search,     setSearch]     = useState("");
-  const [filtro,     setFiltro]     = useState("Todos");
-  const [modalNovo,  setModalNovo]  = useState(false);
-  const [editando,   setEditando]   = useState(null);
-  const [detalhe,    setDetalhe]    = useState(null);
+  const [search,    setSearch]    = useState("");
+  const [filtro,    setFiltro]    = useState("Todos");
+  const [modalNovo, setModalNovo] = useState(false);
+  const [editando,  setEditando]  = useState(null);
+  const [detalhe,   setDetalhe]   = useState(null);
 
   useEffect(()=>{ const u=onAuthStateChanged(auth,u=>setUid(u?.uid||null)); return u; },[]);
 
@@ -1333,59 +1244,43 @@ export default function Orcamentos() {
       snap=>{ setOrcamentos(snap.docs.map(d=>({id:d.id,...d.data()}))); setLoading(false); },
       ()=>setLoading(false)
     ));
-    subs.push(onSnapshot(collection(db,"users",uid,"clientes"), snap=>setClientes(snap.docs.map(d=>({id:d.id,...d.data()})))));
-    subs.push(onSnapshot(collection(db,"users",uid,"produtos"),  snap=>setProdutos(snap.docs.map(d=>({id:d.id,...d.data()})))));
-    subs.push(onSnapshot(collection(db,"users",uid,"servicos"),  snap=>setServicos(snap.docs.map(d=>({id:d.id,...d.data()})))));
-
-    /* Lê config/geral → empresa.nomeEmpresa, empresa.logo, empresa.cnpj… */
-    getDoc(doc(db,"users",uid,"config","geral")).then(snap=>{
-      if(snap.exists()) setEmpresa(snap.data()?.empresa||{});
-    });
-
+    subs.push(onSnapshot(collection(db,"users",uid,"clientes"),  snap=>setClientes(snap.docs.map(d=>({id:d.id,...d.data()})))));
+    subs.push(onSnapshot(collection(db,"users",uid,"produtos"),   snap=>setProdutos(snap.docs.map(d=>({id:d.id,...d.data()})))));
+    subs.push(onSnapshot(collection(db,"users",uid,"servicos"),   snap=>setServicos(snap.docs.map(d=>({id:d.id,...d.data()})))));
+    subs.push(onSnapshot(collection(db,"users",uid,"vendedores"), snap=>setVendedores(snap.docs.map(d=>({id:d.id,...d.data()})))));
+    getDoc(doc(db,"users",uid,"config","geral")).then(snap=>{ if(snap.exists()) setEmpresa(snap.data()?.empresa||{}); });
     return ()=>subs.forEach(u=>u());
   },[uid]);
 
-  /* ── Salvar ──
-     REGRA FIRESTORE: dentro de runTransaction, todos os tx.get()
-     ANTES de qualquer tx.set() ou tx.update()                     */
+  /* ── Salvar orçamento ── */
   const handleSave = async (payload, orcExistente) => {
-    if(!uid) return;
-
-    if(orcExistente) {
-      const ref = doc(db,"users",uid,"orcamentos",orcExistente.id);
-      /* Read fora da transação — sem necessidade de consistência aqui */
+    if (!uid) return;
+    if (orcExistente) {
+      const ref  = doc(db,"users",uid,"orcamentos",orcExistente.id);
       const snap = await getDoc(ref);
       const interacoes = snap.data()?.interacoes||[];
       await runTransaction(db, async tx=>{
-        /* Apenas writes dentro da tx (read já foi feito acima) */
-        tx.update(ref, {
-          ...payload,
-          interacoes:[...interacoes,{tipo:"edicao",descricao:"Orçamento editado",data:Timestamp.now()}],
-        });
+        tx.update(ref,{...payload,interacoes:[...interacoes,{tipo:"edicao",descricao:"Orçamento editado",data:Timestamp.now()}]});
       });
       setEditando(null);
-
     } else {
       const cntRef = doc(db,"users",uid);
       await runTransaction(db, async tx=>{
-        /* 1 — READS (todos antes de qualquer write) */
+        /* 1 — READ */
         const cntSnap = await tx.get(cntRef);
-
         /* 2 — Calcular */
-        const cnt      = cntSnap.data()?.orcamentoCnt||0;
-        const novoCnt  = cnt+1;
-        const codigo   = gerarCodigo(cnt);
-        const agora    = Timestamp.now();
-        const validade = Timestamp.fromDate(new Date(Date.now()+7*24*60*60*1000));
-        const orcRef   = doc(collection(db,"users",uid,"orcamentos"));
-
-        /* 3 — WRITES */
-        tx.update(cntRef, {orcamentoCnt:novoCnt});
+        const cnt     = cntSnap.data()?.orcamentoCnt||0;
+        const codigo  = gerarCodigo(cnt);
+        const agora   = Timestamp.now();
+        const val     = Timestamp.fromDate(new Date(Date.now()+7*24*60*60*1000));
+        const orcRef  = doc(collection(db,"users",uid,"orcamentos"));
+        /* 3 — WRITE */
+        tx.update(cntRef,{orcamentoCnt:cnt+1});
         tx.set(orcRef,{
           ...payload, codigo,
           statusSistema:"ativo",
           pipeline:{etapa:payload.statusComercial||"rascunho"},
-          datas:{criacao:agora,validade},
+          datas:{criacao:agora,validade:val},
           interacoes:[{tipo:"criacao",descricao:"Orçamento criado",data:agora}],
           conversao:{convertido:false,vendaId:null,dataConversao:null},
         });
@@ -1394,70 +1289,134 @@ export default function Orcamentos() {
     }
   };
 
-  /* ── Converter em venda ──
-     REGRA CRÍTICA: todos os tx.get() ANTES de qualquer tx.set/update */
-  const handleConverterVenda = async (orc) => {
-    if(!uid||!orc.cliente?.id) throw new Error("Cliente não cadastrado no sistema.");
+  /* ══════════════════════════════════════════════════
+     CONVERTER EM VENDA
+     Correções:
+       1. Busca o custo real de cada produto no Firestore
+          antes de criar a venda (sem custo zero)
+       2. Recebe formaPagamento e vendedor do modal
+       3. Lança no caixa para aparecer no DRE
+       4. REGRA: todos os tx.get() ANTES de qualquer tx.write
+     ══════════════════════════════════════════════════ */
+  const handleConverterVenda = async (orc, { formaPagamento, vendedor }) => {
+    if (!uid || !orc.cliente?.id) throw new Error("Cliente não cadastrado no sistema.");
 
+    /* ── Passo 1: buscar custo real de cada produto/serviço fora da transação ──
+       Fazemos getDoc individual para cada item com idRef catalogado.
+       Items livres ficam com custo 0 (sem referência). */
+    const custoPorId = {};
+    const idsParaBuscar = (orc.itens||[])
+      .filter(i=>i.idRef && (i.tipo==="produto"||i.tipo==="servico"))
+      .map(i=>({ id:i.idRef, tipo:i.tipo }));
+
+    await Promise.all(idsParaBuscar.map(async ({id,tipo})=>{
+      if (custoPorId[id] !== undefined) return; // já buscado
+      const colecao = tipo==="servico" ? "servicos" : "produtos";
+      const snap = await getDoc(doc(db,"users",uid,colecao,id));
+      if (snap.exists()) {
+        const d = snap.data();
+        /* Campo pode ser "custo" ou "precoCusto" dependendo do módulo */
+        custoPorId[id] = parseFloat(d.custo ?? d.precoCusto ?? 0) || 0;
+      }
+    }));
+
+    /* ── Passo 2: montar itens da venda com custo real ── */
+    const itensVenda = (orc.itens||[]).map(item=>({
+      produtoId: item.idRef||null,
+      nome:      item.nome,
+      qtd:       item.quantidade,
+      preco:     item.valorUnitario,
+      custo:     item.idRef ? (custoPorId[item.idRef]||0) : 0,
+      desconto:  0,
+      tipo:      item.tipo==="livre"?"livre":item.tipo,
+    }));
+
+    /* Custo total calculado a partir dos custos reais */
+    const custoTotal = itensVenda.reduce((s,i)=>s+(i.custo*(i.qtd||1)),0);
+    const totalFinal = orc.resumoFinanceiro?.totalFinal||0;
+    const lucroEstimado = totalFinal - custoTotal;
+
+    /* ── Passo 3: transação Firestore (reads ANTES de writes) ── */
     const cntRef = doc(db,"users",uid);
     const orcRef = doc(db,"users",uid,"orcamentos",orc.id);
+    let vendaIdGerado = "";
 
     await runTransaction(db, async tx=>{
-      /* ── 1. READS — obrigatório antes de qualquer write ── */
+      /* 1 — READS */
       const cntSnap = await tx.get(cntRef);
       const orcSnap = await tx.get(orcRef);
 
-      /* ── 2. Calcular ── */
-      const cntV     = cntSnap.data()?.vendaIdCnt||0;
-      const novoCnt  = cntV+1;
-      const vendaId  = `V${String(novoCnt).padStart(4,"0")}`;
-      const agora    = Timestamp.now();
+      /* 2 — Calcular */
+      const cntV    = cntSnap.data()?.vendaIdCnt||0;
+      const novoCnt = cntV+1;
+      vendaIdGerado = `V${String(novoCnt).padStart(4,"0")}`;
+      const agora   = Timestamp.now();
       const interacoes = orcSnap.data()?.interacoes||[];
 
-      const itensVenda = (orc.itens||[]).map(item=>({
-        produtoId: item.idRef||null,
-        nome:      item.nome,
-        qtd:       item.quantidade,
-        preco:     item.valorUnitario,
-        custo:     0,
-        desconto:  0,
-        tipo:      item.tipo==="livre"?"livre":item.tipo,
-      }));
+      /* 3 — WRITES */
+      tx.update(cntRef,{vendaIdCnt:novoCnt});
 
-      /* ── 3. WRITES — após todos os reads ── */
-      tx.update(cntRef, {vendaIdCnt:novoCnt});
-
-      tx.set(doc(db,"users",uid,"vendas",vendaId),{
-        cliente:        orc.cliente.nome,
-        clienteId:      orc.cliente.id,
-        data:           agora,
-        formaPagamento:"Outros",
-        total:          orc.resumoFinanceiro?.totalFinal||0,
-        subtotal:       orc.resumoFinanceiro?.subtotal||0,
-        descontos:      orc.resumoFinanceiro?.descontos||0,
-        lucroEstimado:  orc.resumoFinanceiro?.totalFinal||0,
-        parcelas:       null,
-        taxaPercentual: 0,
-        valorTaxa:      0,
-        valorPago:      null,
-        valorRestante:  null,
-        dataVencSinal:  null,
-        statusPagamento:"recebido",
-        valorRecebido:  orc.resumoFinanceiro?.totalFinal||0,
-        tipo:           "produto",
-        itens:          itensVenda,
-        observacao:     `Convertido do orçamento ${orc.codigo}`,
-        origem:         "orcamento",
-        orcamentoId:    orc.id,
+      /* Cria a venda com todos os campos que o módulo de Vendas espera */
+      tx.set(doc(db,"users",uid,"vendas",vendaIdGerado),{
+        cliente:         orc.cliente.nome,
+        clienteId:       orc.cliente.id,
+        data:            agora,
+        formaPagamento,
+        vendedor:        vendedor||"",
+        observacao:      `Convertido do orçamento ${orc.codigo}`,
+        tipo:            "produto",
+        total:           totalFinal,
+        subtotal:        orc.resumoFinanceiro?.subtotal||totalFinal,
+        descontos:       orc.resumoFinanceiro?.descontos||0,
+        custoTotal,
+        lucroEstimado,
+        /* Taxa: não aplicável na conversão */
+        parcelas:        null,
+        taxaPercentual:  0,
+        valorTaxa:       0,
+        /* Sinal: não aplicável na conversão */
+        valorPago:       null,
+        valorRestante:   null,
+        dataVencSinal:   null,
+        /* Regime de caixa */
+        statusPagamento: "recebido",
+        valorRecebido:   totalFinal,
+        itens:           itensVenda,
+        origem:          "orcamento",
+        orcamentoId:     orc.id,
+        criadoEm:        new Date().toISOString(),
       });
 
+      /* Atualiza orçamento */
       tx.update(orcRef,{
-        statusSistema:  "convertido",
-        statusComercial:"fechado",
-        conversao:{ convertido:true, vendaId, dataConversao:agora },
-        interacoes:[...interacoes,{tipo:"conversao",descricao:`Convertido na venda ${vendaId}`,data:agora}],
+        statusSistema:   "convertido",
+        statusComercial: "fechado",
+        conversao:{convertido:true,vendaId:vendaIdGerado,dataConversao:agora},
+        interacoes:[...interacoes,{tipo:"conversao",descricao:`Convertido na venda ${vendaIdGerado}`,data:agora}],
       });
     });
+
+    /* ── Passo 4: lançar no Caixa (fora da transação — igual ao Vendas.jsx) ──
+       O DRE lê o Caixa como fonte de receita.
+       Sem este lançamento a venda não aparece no DRE. */
+    if (totalFinal > 0) {
+      try {
+        await addDoc(collection(db,"users",uid,"caixa"),{
+          tipo:           "entrada",
+          origem:         "venda",
+          referenciaId:   vendaIdGerado,
+          valor:          totalFinal,
+          descricao:      `Venda ${vendaIdGerado} — ${orc.cliente.nome} (via orçamento ${orc.codigo})`,
+          formaPagamento,
+          data:           new Date().toISOString(),
+          criadoEm:       new Date().toISOString(),
+        });
+      } catch(err) {
+        /* A venda foi criada com sucesso. O caixa falhou isoladamente.
+           Logamos mas não revertemos — a venda é consistente. */
+        console.error("[Orçamentos] Venda criada, mas erro ao lançar no Caixa:", err);
+      }
+    }
   };
 
   /* ── Filtros ── */
@@ -1515,14 +1474,9 @@ export default function Orcamentos() {
               Orçamentos <span className="orc-count-badge">{orcFilt.length}</span>
             </div>
           </div>
-
           <div className="orc-row orc-row-head">
-            <span>Código</span>
-            <span>Cliente</span>
-            <span>Criado em</span>
-            <span>Status Comercial</span>
-            <span>Situação</span>
-            <span>Total</span>
+            <span>Código</span><span>Cliente</span><span>Criado em</span>
+            <span>Status Comercial</span><span>Situação</span><span>Total</span>
             <span style={{textAlign:"right"}}>Ações</span>
           </div>
 
@@ -1538,16 +1492,8 @@ export default function Orcamentos() {
               <span className="orc-codigo">{o.codigo||o.id}</span>
               <span className="orc-cliente">{o.cliente?.nome||"—"}</span>
               <span>{fmtData(o.datas?.criacao)}</span>
-              <span>
-                <span className={`orc-status ${SC_CLASS[o.statusComercial]||"orc-st-rascunho"}`}>
-                  {SC_LABELS[o.statusComercial]||o.statusComercial}
-                </span>
-              </span>
-              <span>
-                <span className={`orc-status ${SS_CLASS[o._ss]||"orc-st-ativo"}`}>
-                  {o._ss?.charAt(0).toUpperCase()+o._ss?.slice(1)}
-                </span>
-              </span>
+              <span><span className={`orc-status ${SC_CLASS[o.statusComercial]||"orc-st-rascunho"}`}>{SC_LABELS[o.statusComercial]||o.statusComercial}</span></span>
+              <span><span className={`orc-status ${SS_CLASS[o._ss]||"orc-st-ativo"}`}>{o._ss?.charAt(0).toUpperCase()+o._ss?.slice(1)}</span></span>
               <span className="orc-total">{fmtR$(o.resumoFinanceiro?.totalFinal)}</span>
               <div className="orc-actions" onClick={e=>e.stopPropagation()}>
                 <button className="btn-icon btn-icon-edit" title="Editar" onClick={()=>setEditando(o)}><Edit2 size={13}/></button>
@@ -1567,7 +1513,7 @@ export default function Orcamentos() {
           onSave={handleSave} onClose={()=>setEditando(null)}/>
       )}
       {detalhe && (
-        <ModalDetalhe orc={detalhe} uid={uid} empresa={empresa}
+        <ModalDetalhe orc={detalhe} uid={uid} empresa={empresa} vendedores={vendedores}
           onClose={()=>setDetalhe(null)}
           onEditar={o=>{setDetalhe(null);setEditando(o);}}
           onConverter={handleConverterVenda}/>
