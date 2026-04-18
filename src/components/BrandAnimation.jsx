@@ -1,20 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Folder, FileText, BarChart, PenTool, Clipboard, Laptop, Book, Presentation, PieChart, Briefcase, Calculator, MonitorSmartphone, Calendar } from 'lucide-react';
+import { Folder, FileText, BarChart2, Pen, Clipboard, Laptop, Book, Monitor, PieChart, Briefcase, Calculator, Smartphone, Calendar } from 'lucide-react';
 
 const iconsGrid = [
-  { Icon: Folder, tx: '-320px', ty: '80px', rotate: '-25deg', delay: '0s' },
-  { Icon: FileText, tx: '-260px', ty: '-20px', rotate: '15deg', delay: '0.2s' },
-  { Icon: BarChart, tx: '-180px', ty: '-100px', rotate: '-30deg', delay: '0.5s' },
-  { Icon: PenTool, tx: '-90px', ty: '-160px', rotate: '45deg', delay: '0.1s' },
-  { Icon: Clipboard, tx: '0px', ty: '-190px', rotate: '-10deg', delay: '0.8s' },
-  { Icon: Laptop, tx: '90px', ty: '-160px', rotate: '20deg', delay: '0.4s' },
-  { Icon: Book, tx: '180px', ty: '-100px', rotate: '-60deg', delay: '0.7s' },
-  { Icon: Presentation, tx: '260px', ty: '-20px', rotate: '15deg', delay: '0.3s' },
-  { Icon: PieChart, tx: '320px', ty: '80px', rotate: '-40deg', delay: '0.6s' },
-  { Icon: Briefcase, tx: '-140px', ty: '20px', rotate: '30deg', delay: '0.9s' },
-  { Icon: Calculator, tx: '140px', ty: '20px', rotate: '-20deg', delay: '1.2s' },
-  { Icon: MonitorSmartphone, tx: '-60px', ty: '-60px', rotate: '-15deg', delay: '1.3s' },
-  { Icon: Calendar, tx: '60px', ty: '-60px', rotate: '35deg', delay: '0.4s' }
+  { Icon: Folder,      tx: '-320px', ty: '80px',   rotate: '-25deg', delay: '0s'   },
+  { Icon: FileText,    tx: '-260px', ty: '-20px',  rotate: '15deg',  delay: '0.2s' },
+  { Icon: BarChart2,   tx: '-180px', ty: '-100px', rotate: '-30deg', delay: '0.5s' },
+  { Icon: Pen,         tx: '-90px',  ty: '-160px', rotate: '45deg',  delay: '0.1s' },
+  { Icon: Clipboard,   tx: '0px',    ty: '-190px', rotate: '-10deg', delay: '0.8s' },
+  { Icon: Laptop,      tx: '90px',   ty: '-160px', rotate: '20deg',  delay: '0.4s' },
+  { Icon: Book,        tx: '180px',  ty: '-100px', rotate: '-60deg', delay: '0.7s' },
+  { Icon: Monitor,     tx: '260px',  ty: '-20px',  rotate: '15deg',  delay: '0.3s' },
+  { Icon: PieChart,    tx: '320px',  ty: '80px',   rotate: '-40deg', delay: '0.6s' },
+  { Icon: Briefcase,   tx: '-140px', ty: '20px',   rotate: '30deg',  delay: '0.9s' },
+  { Icon: Calculator,  tx: '140px',  ty: '20px',   rotate: '-20deg', delay: '1.2s' },
+  { Icon: Smartphone,  tx: '-60px',  ty: '-60px',  rotate: '-15deg', delay: '1.3s' },
+  { Icon: Calendar,    tx: '60px',   ty: '-60px',  rotate: '35deg',  delay: '0.4s' }
 ];
 
 const BrandAnimation = () => {
