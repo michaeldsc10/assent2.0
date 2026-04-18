@@ -485,7 +485,7 @@ const gerarIdVenda = (cnt) => `V${String(cnt + 1).padStart(4, "0")}`;
 const PERIODS = ["Tudo", "Hoje", "7 dias", "30 dias", "Este mês"];
 const FORMAS_PAGAMENTO = [
   "Pix", "Dinheiro", "Cartão de Crédito", "Cartão de Débito",
-  "Boleto", "Transferência", "Sinal", "Outro",
+  "Boleto", "Transferência", "Sinal", "Parcelado", "Outro",
 ];
 
 /* Taxas padrão — usadas como fallback enquanto o Firestore carrega */
@@ -805,6 +805,16 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
       valorPago:      sinalInfo.ativo ? sinalInfo.valorPagoNum    : null,
       valorRestante:  sinalInfo.ativo ? sinalInfo.valorRestante   : null,
       dataVencSinal:  sinalInfo.ativo ? dataVencSinal             : null,
+      /* ── Controle de recebimento — regime de caixa puro ──
+         statusPagamento: "recebido" | "parcial" | "pendente"
+         valorRecebido  : valor que efetivamente entrou no caixa neste momento.
+         Vendas antigas sem este campo são tratadas como "recebido" (fallback). */
+      statusPagamento: sinalInfo.ativo
+        ? (sinalInfo.valorPagoNum > 0 ? "parcial" : "pendente")
+        : "recebido",
+      valorRecebido: sinalInfo.ativo
+        ? sinalInfo.valorPagoNum
+        : calculos.total,
     };
 
     if (tipo === "livre") {
@@ -1637,6 +1647,33 @@ useEffect(() => {
       console.error("[Vendas] Erro ao criar venda:", err);
       alert("Erro ao registrar a venda. Tente novamente.");
       return;
+    }
+
+    /*
+     * ── REGIME DE CAIXA: registrar valor recebido no Caixa ──
+     * Apenas o valor efetivamente recebido entra no caixa agora.
+     *   - Sinal: somente o valorRecebido (sinal parcial)
+     *   - Outros: total da venda (pagamento completo)
+     * O DRE usa SOMENTE dados do Caixa como fonte de receita.
+     */
+    const valorParaCaixa = Number(payload.valorRecebido ?? payload.total ?? 0);
+    if (valorParaCaixa > 0) {
+      try {
+        await addDoc(collection(db, "users", uid, "caixa"), {
+          tipo:           "entrada",
+          origem:         "venda",
+          referenciaId:   novoId,
+          valor:          valorParaCaixa,
+          descricao:      `Venda ${novoId} — ${payload.cliente || "Consumidor Final"}`,
+          formaPagamento: payload.formaPagamento,
+          data:           payload.data || new Date().toISOString(),
+          criadoEm:       new Date().toISOString(),
+        });
+      } catch (err) {
+        console.error("[Vendas] Venda salva, mas erro ao lançar no Caixa:", err);
+        // A venda existe e é consistente — só o lançamento de caixa falhou.
+        // Não exibe alerta aqui para não poluir o fluxo normal.
+      }
     }
 
     /*
