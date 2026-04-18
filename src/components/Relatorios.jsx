@@ -1775,7 +1775,7 @@ export default function Relatorios() {
       onSnapshot(col("despesas"), (s) => { setDespesas(s.docs.map((d) => ({ id: d.id, ...d.data() }))); setLoading(false); }),
       onSnapshot(col("produtos"), (s) => setProdutos(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         /* Ignorar erro se collection não existir */ () => {}),
-      onSnapshot(col("agenda"),   (s) => setAgenda(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      onSnapshot(col("eventos"),   (s) => setAgenda(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => {}),
       onSnapshot(col("caixa"),    (s) => setCaixa(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => {}),
