@@ -18,7 +18,7 @@ import { db, auth } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection, doc, setDoc, deleteDoc,
-  onSnapshot, runTransaction, increment, getDoc,
+  onSnapshot, runTransaction, increment, getDoc, addDoc,
 } from "firebase/firestore";
 
 /* ── CSS ── */
@@ -401,13 +401,25 @@ const CSS = `
   .confirm-icon { font-size: 28px; margin-bottom: 12px; }
 
   /* ── Recibo Print ── */
+  /*
+   * ATENÇÃO: não usar "body > *:not(#recibo-print-root) { display:none }"
+   * porque em React o #recibo-print-root fica dentro do #root (filho do body),
+   * o que faz o #root inteiro sumir levando o recibo junto.
+   * A abordagem correta é visibility: hidden no body e visible no root do recibo,
+   * pois visibility pode ser sobreposta por filhos, diferente de display.
+   */
   @media print {
-    body > *:not(#recibo-print-root) { display: none !important; }
-    #recibo-print-root { display: block !important; }
+    body { visibility: hidden !important; }
+    #recibo-print-root {
+      visibility: visible !important;
+      display: block !important;
+      position: fixed; top: 0; left: 0; width: 100%; z-index: 99999;
+    }
+    #recibo-print-root * { visibility: visible !important; }
     .recibo-print {
       font-family: 'Courier New', monospace;
       width: 80mm; margin: 0 auto; padding: 8mm;
-      font-size: 12px; color: #000;
+      font-size: 12px; color: #000 !important; background: #fff;
     }
     .recibo-print * { color: #000 !important; }
   }
@@ -420,6 +432,40 @@ const CSS = `
     font-size: 12px; color: var(--text-2);
   }
   .nv-livre-info strong { color: var(--gold); }
+
+  /* ── Sinal (pagamento parcial) ── */
+  .nv-sinal-box {
+    background: rgba(91,142,240,.07); border: 1px solid rgba(91,142,240,.2);
+    border-radius: 10px; padding: 12px 14px; margin-top: 10px;
+  }
+  .nv-sinal-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-2); margin-bottom: 4px;
+  }
+  .nv-sinal-row:last-child { margin-bottom: 0; }
+  .nv-sinal-restante {
+    font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 700; color: var(--blue);
+  }
+
+  /* ── Parcelas cartão ── */
+  .nv-parcelas-wrap {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;
+  }
+  .nv-parcela-btn {
+    padding: 5px 11px; border-radius: 7px; font-size: 11px; font-weight: 600;
+    cursor: pointer; border: 1px solid var(--border);
+    background: var(--s2); color: var(--text-2);
+    font-family: 'DM Sans', sans-serif; transition: all .13s;
+    white-space: nowrap;
+  }
+  .nv-parcela-btn:hover { background: var(--s3); color: var(--text); }
+  .nv-parcela-btn.active {
+    background: rgba(200,165,94,0.15); border-color: var(--gold); color: var(--gold);
+  }
+  .nv-taxa-info {
+    font-size: 11px; color: var(--text-3); margin-top: 6px;
+  }
+  .nv-taxa-info strong { color: var(--text-2); }
 `;
 
 /* ── Helpers ── */
@@ -441,6 +487,16 @@ const FORMAS_PAGAMENTO = [
   "Pix", "Dinheiro", "Cartão de Crédito", "Cartão de Débito",
   "Boleto", "Transferência", "Sinal", "Parcelado", "Outro",
 ];
+
+/* Taxas padrão — usadas como fallback enquanto o Firestore carrega */
+const TAXAS_DEFAULT = {
+  debito:     1.99,
+  pix:        0,
+  credito_1:  2.99, credito_2:  3.19, credito_3:  3.39,
+  credito_4:  3.59, credito_5:  3.79, credito_6:  3.99,
+  credito_7:  4.19, credito_8:  4.39, credito_9:  4.59,
+  credito_10: 4.79, credito_11: 4.99, credito_12: 5.19,
+};
 
 function filtrarPorPeriodo(vendas, period) {
   if (period === "Tudo") return vendas;
@@ -465,6 +521,14 @@ function imprimirRecibo(venda) {
   const itens = venda.itens || [];
   const subtotal  = itens.reduce((s, i) => s + (i.preco || 0) * (i.qtd || 1), 0);
   const descontos = itens.reduce((s, i) => s + (i.desconto || 0), 0);
+
+  /* Informações de parcelamento e taxa */
+  const temTaxa   = venda.valorTaxa > 0;
+  const temParc   = venda.parcelas > 1;
+  const pgtoLabel = temParc
+    ? `${venda.formaPagamento} — ${venda.parcelas}x`
+    : (venda.formaPagamento || "—");
+
   el.innerHTML = `
     <div class="recibo-print">
       <div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:8px;">ASSENT</div>
@@ -472,7 +536,7 @@ function imprimirRecibo(venda) {
       <div>ID: ${venda.id}</div>
       <div>Data: ${fmtData(venda.data)}</div>
       <div>Cliente: ${venda.cliente || "—"}</div>
-      <div>Pgto: ${venda.formaPagamento || "—"}</div>
+      <div>Pgto: ${pgtoLabel}</div>
       <div style="border-top:1px dashed #000;margin:8px 0;"></div>
       ${itens.map(i => `
         <div>${i.nome || i.produto || "Item livre"}</div>
@@ -483,9 +547,21 @@ function imprimirRecibo(venda) {
       `).join("")}
       <div style="border-top:1px dashed #000;margin:8px 0;"></div>
       ${descontos > 0 ? `<div style="display:flex;justify-content:space-between;"><span>Descontos</span><span>-${fmtR$(descontos)}</span></div>` : ""}
+      ${temTaxa ? `<div style="display:flex;justify-content:space-between;font-size:11px;color:#555;"><span>Taxa cartão (${venda.taxaPercentual}%)</span><span>${fmtR$(venda.valorTaxa)}</span></div>` : ""}
       <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:14px;">
         <span>TOTAL</span><span>${fmtR$(venda.total)}</span>
       </div>
+      ${temParc ? `<div style="font-size:11px;margin-top:4px;text-align:right;">${venda.parcelas}x de ${fmtR$(venda.total / venda.parcelas)}</div>` : ""}
+      ${venda.formaPagamento === "Sinal" && venda.valorPago != null ? `
+        <div style="border-top:1px dashed #000;margin:8px 0;"></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;">
+          <span>Sinal recebido</span><span>${fmtR$(venda.valorPago)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:bold;">
+          <span>Restante a pagar</span><span>${fmtR$(venda.valorRestante)}</span>
+        </div>
+        ${venda.dataVencSinal ? `<div style="font-size:11px;color:#555;">Vencimento: ${venda.dataVencSinal.split("-").reverse().join("/")}</div>` : ""}
+      ` : ""}
       ${venda.observacao ? `<div style="margin-top:10px;font-size:11px;">Obs: ${venda.observacao}</div>` : ""}
       <div style="text-align:center;font-size:10px;margin-top:12px;">Obrigado!</div>
     </div>
@@ -510,7 +586,7 @@ function exportarCSV(vendas) {
 /* ══════════════════════════════════════════════════
    MODAL: Nova / Editar Venda  ← VERSÃO CORRIGIDA
    ══════════════════════════════════════════════════ */
-function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, onSave, onClose }) {
+function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, taxas, onSave, onClose }) {
   const isEdit = !!venda;
 
   const [tipo, setTipo] = useState(venda?.tipo || "produto");
@@ -528,6 +604,13 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
   const [vendedor, setVendedor] = useState(venda?.vendedor || "");
   const [formaPgto, setFormaPgto] = useState(venda?.formaPagamento || "");
   const [observacao, setObservacao] = useState(venda?.observacao || "");
+
+  /* Parcelas — só relevante quando formaPgto === "Cartão de Crédito" */
+  const [parcelas, setParcelas] = useState(venda?.parcelas || 1);
+
+  /* Sinal — só relevante quando formaPgto === "Sinal" */
+  const [valorSinal, setValorSinal]       = useState(venda?.valorPago != null ? String(venda.valorPago) : "");
+  const [dataVencSinal, setDataVencSinal] = useState(venda?.dataVencSinal || "");
 
   // Itens + Venda livre
   const [itens, setItens] = useState(
@@ -630,6 +713,40 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
     return { subtotal, descontos, custo, total, lucro: total - custo };
   }, [itens, tipo, livreValor, livreDesc]);
 
+  /* ── Taxa de cartão — calculado de forma isolada, não altera lógica de calculos ── */
+  const taxaInfo = useMemo(() => {
+    const isCredito = formaPgto === "Cartão de Crédito";
+    const isDebito  = formaPgto === "Cartão de Débito";
+
+    if (!isCredito && !isDebito) {
+      return { taxaPercentual: 0, valorTaxa: 0, parcelas: null, exibe: false, lucroReal: calculos.lucro };
+    }
+
+    let chave, numParcelas;
+    if (isDebito) {
+      chave = "debito";
+      numParcelas = null;
+    } else {
+      numParcelas = parcelas || 1;
+      chave = `credito_${numParcelas}`;
+    }
+
+    const taxaPercentual = parseFloat(taxas?.[chave] ?? TAXAS_DEFAULT[chave] ?? 0) || 0;
+    const valorTaxa = parseFloat((calculos.total * (taxaPercentual / 100)).toFixed(2));
+    /* Taxa é custo operacional — deduz diretamente do lucro */
+    const lucroReal = parseFloat((calculos.lucro - valorTaxa).toFixed(2));
+
+    return { taxaPercentual, valorTaxa, parcelas: numParcelas, exibe: true, lucroReal };
+  }, [formaPgto, parcelas, taxas, calculos.total, calculos.lucro]);
+
+  /* ── Sinal — cálculo isolado, não toca em calculos ── */
+  const sinalInfo = useMemo(() => {
+    if (formaPgto !== "Sinal") return { ativo: false, valorPagoNum: 0, valorRestante: 0 };
+    const valorPagoNum = parseFloat(String(valorSinal).replace(",", ".")) || 0;
+    const valorRestante = parseFloat((calculos.total - valorPagoNum).toFixed(2));
+    return { ativo: true, valorPagoNum, valorRestante };
+  }, [formaPgto, valorSinal, calculos.total]);
+
   const validar = () => {
     const e = {};
     if (!clienteSearch.trim()) e.cliente = "Informe o cliente.";
@@ -637,6 +754,15 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
     if (tipo === "livre") {
       if (!livreNome.trim()) e.livreNome = "Informe uma descrição.";
       if (!livreValor || parseFloat(livreValor) <= 0) e.livreValor = "Informe o valor.";
+    }
+    /* Validações exclusivas do Sinal */
+    if (formaPgto === "Sinal") {
+      if (!sinalInfo.valorPagoNum || sinalInfo.valorPagoNum <= 0)
+        e.valorSinal = "Informe o valor do sinal (maior que zero).";
+      else if (sinalInfo.valorPagoNum >= calculos.total)
+        e.valorSinal = "O sinal deve ser menor que o total da venda.";
+      if (!dataVencSinal)
+        e.dataVencSinal = "Data de vencimento do restante é obrigatória.";
     }
     setErros(e);
     return Object.keys(e).length === 0;
@@ -657,7 +783,16 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
       subtotal: calculos.subtotal,
       descontos: calculos.descontos,
       custoTotal: calculos.custo,
-      lucroEstimado: calculos.lucro,
+      /* Taxa é custo operacional — lucro já deduz a taxa */
+      lucroEstimado: taxaInfo.lucroReal,
+      /* ── Taxa de cartão (0 quando não é cartão — compatível com dados antigos) ── */
+      parcelas:       taxaInfo.parcelas,
+      taxaPercentual: taxaInfo.taxaPercentual,
+      valorTaxa:      taxaInfo.valorTaxa,
+      /* ── Sinal (null quando não é sinal — compatível com dados antigos) ── */
+      valorPago:      sinalInfo.ativo ? sinalInfo.valorPagoNum    : null,
+      valorRestante:  sinalInfo.ativo ? sinalInfo.valorRestante   : null,
+      dataVencSinal:  sinalInfo.ativo ? dataVencSinal             : null,
     };
 
     if (tipo === "livre") {
@@ -793,12 +928,100 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
               <select 
                 className={`form-input ${erros.formaPgto ? "err" : ""}`} 
                 value={formaPgto} 
-                onChange={e => setFormaPgto(e.target.value)}
+                onChange={e => {
+                  setFormaPgto(e.target.value);
+                  setParcelas(1);
+                  setValorSinal("");
+                  setDataVencSinal("");
+                }}
               >
                 <option value="">— Selecionar —</option>
                 {FORMAS_PAGAMENTO.map(f => <option key={f} value={f}>{f}</option>)}
               </select>
               {erros.formaPgto && <div className="form-error">{erros.formaPgto}</div>}
+
+              {/* Seletor de parcelas — aparece somente para Cartão de Crédito */}
+              {formaPgto === "Cartão de Crédito" && (
+                <div style={{ marginTop: 10 }}>
+                  <div className="form-label" style={{ marginBottom: 6 }}>Parcelas</div>
+                  <div className="nv-parcelas-wrap">
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(n => {
+                      const chave = `credito_${n}`;
+                      const taxa  = parseFloat(taxas?.[chave] ?? TAXAS_DEFAULT[chave] ?? 0);
+                      return (
+                        <button
+                          key={n}
+                          type="button"
+                          className={`nv-parcela-btn ${parcelas === n ? "active" : ""}`}
+                          onClick={() => setParcelas(n)}
+                        >
+                          {n}x <span style={{ opacity: 0.7, fontSize: 10 }}>({taxa}%)</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {taxaInfo.taxaPercentual > 0 && (
+                    <div className="nv-taxa-info">
+                      Taxa de <strong>{taxaInfo.taxaPercentual}%</strong> = <strong>{fmtR$(taxaInfo.valorTaxa)}</strong> sobre o total
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Campos do Sinal — só para pagamento "Sinal" */}
+              {formaPgto === "Sinal" && (
+                <div style={{ marginTop: 12 }}>
+                  <div className="form-row" style={{ marginBottom: 0 }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">
+                        Valor do Sinal (R$) <span className="form-label-req">*</span>
+                      </label>
+                      <input
+                        type="number" min="0.01" step="0.01"
+                        className={`form-input ${erros.valorSinal ? "err" : ""}`}
+                        placeholder="0,00"
+                        value={valorSinal}
+                        onChange={e => { setValorSinal(e.target.value); setErros(ev => ({ ...ev, valorSinal: "" })); }}
+                      />
+                      {erros.valorSinal && <div className="form-error">{erros.valorSinal}</div>}
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">
+                        Vencimento do Restante <span className="form-label-req">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        className={`form-input ${erros.dataVencSinal ? "err" : ""}`}
+                        value={dataVencSinal}
+                        onChange={e => { setDataVencSinal(e.target.value); setErros(ev => ({ ...ev, dataVencSinal: "" })); }}
+                      />
+                      {erros.dataVencSinal && <div className="form-error">{erros.dataVencSinal}</div>}
+                    </div>
+                  </div>
+
+                  {/* Resumo do sinal em tempo real */}
+                  {sinalInfo.valorPagoNum > 0 && sinalInfo.valorPagoNum < calculos.total && (
+                    <div className="nv-sinal-box">
+                      <div className="nv-sinal-row">
+                        <span>Total da venda</span>
+                        <span style={{ fontFamily: "Sora, sans-serif", fontWeight: 600, color: "var(--text)" }}>
+                          {fmtR$(calculos.total)}
+                        </span>
+                      </div>
+                      <div className="nv-sinal-row">
+                        <span>Sinal (recebido agora)</span>
+                        <span style={{ color: "var(--green)", fontFamily: "Sora, sans-serif", fontWeight: 600 }}>
+                          {fmtR$(sinalInfo.valorPagoNum)}
+                        </span>
+                      </div>
+                      <div className="nv-sinal-row">
+                        <span style={{ fontWeight: 600, color: "var(--text)" }}>Restante (A Receber)</span>
+                        <span className="nv-sinal-restante">{fmtR$(sinalInfo.valorRestante)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -965,13 +1188,19 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
                 <div className="nv-total-val" style={{ color: "var(--red)" }}>{fmtR$(calculos.custo)}</div>
               </div>
             )}
+            {taxaInfo.exibe && (
+              <div className="nv-total-cell">
+                <div className="nv-total-label">Taxa Cartão ({taxaInfo.taxaPercentual}%)</div>
+                <div className="nv-total-val" style={{ color: "var(--red)" }}>{fmtR$(taxaInfo.valorTaxa)}</div>
+              </div>
+            )}
             <div className="nv-total-cell">
               <div className="nv-total-label">Total</div>
               <div className="nv-total-val" style={{ color: "var(--green)" }}>{fmtR$(calculos.total)}</div>
             </div>
             <div className="nv-total-cell">
               <div className="nv-total-label">Lucro Est.</div>
-              <div className="nv-total-val" style={{ color: "var(--gold)" }}>{fmtR$(calculos.lucro)}</div>
+              <div className="nv-total-val" style={{ color: "var(--gold)" }}>{fmtR$(taxaInfo.lucroReal)}</div>
             </div>
           </div>
 
@@ -1056,9 +1285,32 @@ function ModalDetalheVenda({ venda, onClose, onEditar, onExcluir }) {
             </div>
             <div className="dv-meta-card">
               <div className="dv-meta-label">Pagamento</div>
-              <div className="dv-meta-val">{venda.formaPagamento || "—"}</div>
+              <div className="dv-meta-val">
+                {venda.formaPagamento || "—"}
+                {venda.parcelas > 1 && (
+                  <span style={{ marginLeft: 6, fontSize: 11, color: "var(--gold)" }}>
+                    {venda.parcelas}x
+                  </span>
+                )}
+              </div>
             </div>
           </div>
+
+          {/* Taxa de cartão — exibe somente se existir */}
+          {venda.valorTaxa > 0 && (
+            <div className="dv-meta" style={{ gridTemplateColumns: "1fr 1fr", marginTop: -6 }}>
+              <div className="dv-meta-card">
+                <div className="dv-meta-label">Taxa Cartão ({venda.taxaPercentual}%)</div>
+                <div className="dv-meta-val" style={{ color: "var(--red)" }}>{fmtR$(venda.valorTaxa)}</div>
+              </div>
+              {venda.parcelas > 1 && (
+                <div className="dv-meta-card">
+                  <div className="dv-meta-label">Valor por Parcela</div>
+                  <div className="dv-meta-val">{fmtR$(venda.total / venda.parcelas)}</div>
+                </div>
+              )}
+            </div>
+          )}
 
           {venda.vendedor && (
             <div className="dv-meta" style={{ gridTemplateColumns: "1fr", marginTop: -6 }}>
@@ -1129,13 +1381,35 @@ function ModalDetalheVenda({ venda, onClose, onEditar, onExcluir }) {
               <div className="dv-total-label">Custo Total</div>
               <div className="dv-total-val" style={{ color: "var(--red)" }}>{fmtR$(custoTotal)}</div>
             </div>
+            {venda.valorTaxa > 0 && (
+              <div className="dv-total-cell">
+                <div className="dv-total-label">Taxa Cartão ({venda.taxaPercentual}%)</div>
+                <div className="dv-total-val" style={{ color: "var(--red)" }}>{fmtR$(venda.valorTaxa)}</div>
+              </div>
+            )}
             <div className="dv-total-cell">
               <div className="dv-total-label">Total</div>
               <div className="dv-total-val" style={{ color: "var(--green)" }}>{fmtR$(total)}</div>
             </div>
+            {/* Sinal: mostrar o que foi recebido e o que falta */}
+            {venda.formaPagamento === "Sinal" && venda.valorPago != null && (
+              <>
+                <div className="dv-total-cell">
+                  <div className="dv-total-label">Sinal Recebido</div>
+                  <div className="dv-total-val" style={{ color: "var(--green)" }}>{fmtR$(venda.valorPago)}</div>
+                </div>
+                <div className="dv-total-cell">
+                  <div className="dv-total-label">A Receber</div>
+                  <div className="dv-total-val" style={{ color: "var(--blue, #5b8ef0)" }}>{fmtR$(venda.valorRestante)}</div>
+                </div>
+              </>
+            )}
             <div className="dv-total-cell">
               <div className="dv-total-label">Lucro Est.</div>
-              <div className="dv-total-val" style={{ color: "var(--gold)" }}>{fmtR$(lucro)}</div>
+              {/* lucroEstimado já tem a taxa deduzida quando salvo pela nova lógica */}
+              <div className="dv-total-val" style={{ color: "var(--gold)" }}>
+                {fmtR$(typeof venda.lucroEstimado === "number" ? venda.lucroEstimado : lucro)}
+              </div>
             </div>
           </div>
 
@@ -1200,6 +1474,8 @@ export default function Vendas() {
   const [servicos, setServicos]   = useState([]);
   const [vendedores, setVendedores] = useState([]);
   const [vendaIdCnt, setVendaIdCnt] = useState(0);
+  /* Taxas de cartão — carregadas uma vez do Firestore, com fallback nos defaults */
+  const [taxas, setTaxas] = useState(TAXAS_DEFAULT);
 
   const [search, setSearch]   = useState("");
   const [period, setPeriod]   = useState("Tudo");
@@ -1253,6 +1529,15 @@ useEffect(() => {
     if (snap.exists()) setVendaIdCnt(snap.data().vendaIdCnt || 0);
   });
 
+  /* Carrega taxas de cartão uma vez (getDoc, não listener — dado estático da sessão) */
+  getDoc(doc(db, "users", uid, "config", "geral"))
+    .then(snap => {
+      if (snap.exists() && snap.data().taxas) {
+        setTaxas(prev => ({ ...TAXAS_DEFAULT, ...snap.data().taxas }));
+      }
+    })
+    .catch(() => { /* mantém os TAXAS_DEFAULT em caso de falha */ });
+
   const unsub2 = onSnapshot(vendasCol, (snap) => {
     const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     arr.sort((a, b) => {
@@ -1287,7 +1572,7 @@ useEffect(() => {
   };
 }, [uid]);
 
-  /* ── Criar venda ── */
+  /* ── Criar / Editar venda ── */
   const handleSave = async (payload, vendaExistente) => {
     if (!uid) return;
 
@@ -1318,19 +1603,61 @@ useEffect(() => {
 
     /* NOVA VENDA */
     const novoId = gerarIdVenda(vendaIdCnt);
-    await runTransaction(db, async (tx) => {
-      /* Descontar estoque */
-      for (const item of (payload.itens || [])) {
-        if (item.produtoId && item.tipo === "produto") {
-          const ref = doc(db, "users", uid, "produtos", item.produtoId);
-          tx.update(ref, { estoque: increment(-(item.qtd || 1)) });
+    try {
+      await runTransaction(db, async (tx) => {
+        /* Descontar estoque */
+        for (const item of (payload.itens || [])) {
+          if (item.produtoId && item.tipo === "produto") {
+            const ref = doc(db, "users", uid, "produtos", item.produtoId);
+            tx.update(ref, { estoque: increment(-(item.qtd || 1)) });
+          }
         }
+        /* Criar venda */
+        tx.set(doc(db, "users", uid, "vendas", novoId), { ...payload, criadoEm: new Date().toISOString() });
+        /* Incrementar contador */
+        tx.set(doc(db, "users", uid), { vendaIdCnt: vendaIdCnt + 1 }, { merge: true });
+      });
+    } catch (err) {
+      console.error("[Vendas] Erro ao criar venda:", err);
+      alert("Erro ao registrar a venda. Tente novamente.");
+      return;
+    }
+
+    /*
+     * ── Sinal: criar lançamento em A Receber APÓS a venda ser salva com sucesso ──
+     * REGRA CRÍTICA: apenas o valorPago entra como receita da venda.
+     * O valorRestante é um direito a receber — não é receita ainda.
+     * Nunca criar A Receber antes da venda (evita inconsistência).
+     */
+    if (payload.formaPagamento === "Sinal" && payload.valorRestante > 0) {
+      try {
+        const now = new Date().toISOString();
+        await addDoc(collection(db, "users", uid, "a_receber"), {
+          descricao:       "Venda - Pagamento pendente",
+          clienteNome:     payload.cliente || "Consumidor Final",
+          valorTotal:      payload.valorRestante,
+          valorPago:       0,
+          valorRestante:   payload.valorRestante,
+          dataVencimento:  payload.dataVencSinal,
+          status:          "pendente",
+          origem:          "venda",
+          referenciaId:    novoId,
+          dataCriacao:     now,
+          dataAtualizacao: now,
+        });
+      } catch (err) {
+        /*
+         * A venda já foi salva. O A Receber falhou — alerta o usuário
+         * mas não desfaz a venda (ela existe e é consistente).
+         */
+        console.error("[Vendas] Venda salva, mas erro ao criar A Receber:", err);
+        alert(
+          `Venda ${novoId} registrada com sucesso!\n\n` +
+          `⚠️ Não foi possível criar o lançamento em "A Receber" automaticamente. ` +
+          `Crie manualmente o valor de R$ ${payload.valorRestante.toFixed(2).replace(".", ",")} para ${payload.cliente}.`
+        );
       }
-      /* Criar venda */
-      tx.set(doc(db, "users", uid, "vendas", novoId), { ...payload, criadoEm: new Date().toISOString() });
-      /* Incrementar contador */
-      tx.set(doc(db, "users", uid), { vendaIdCnt: vendaIdCnt + 1 }, { merge: true });
-    });
+    }
 
     /* Imprimir recibo após criar */
     imprimirRecibo({ ...payload, id: novoId });
@@ -1475,6 +1802,7 @@ useEffect(() => {
           produtos={produtos}
           servicos={servicos}
           vendedores={vendedores}
+          taxas={taxas}
           onSave={handleSave}
           onClose={() => setModalNova(false)}
         />
@@ -1488,6 +1816,7 @@ useEffect(() => {
           produtos={produtos}
           servicos={servicos}
           vendedores={vendedores}
+          taxas={taxas}
           onSave={handleSave}
           onClose={() => setEditando(null)}
         />
