@@ -667,7 +667,7 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
     );
   }, [tipo]);
 
-  /* ── Taxas: busca config uma vez, recalcula quando forma/total muda ── */
+  /* ── Taxas: busca config uma vez ao abrir o modal ── */
   const [taxasConfig, setTaxasConfig] = useState({});
   const [taxaInfo, setTaxaInfo]       = useState({ taxaAplicada: 0, valorTaxa: 0 });
 
@@ -677,20 +677,6 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
       .then(snap => { if (snap.exists()) setTaxasConfig(snap.data()?.taxas || {}); })
       .catch(() => {});
   }, [uid]);
-
-  useEffect(() => {
-    let pct = 0;
-    if      (formaPgto === "Cartão de Crédito") pct = parseFloat(taxasConfig.credito_1) || 0;
-    else if (formaPgto === "Cartão de Débito")  pct = parseFloat(taxasConfig.debito)    || 0;
-    else if (formaPgto === "Pix")               pct = parseFloat(taxasConfig.pix)       || 0;
-
-    const base = calculos.total;
-    const valorTaxa = base > 0 && pct > 0
-      ? parseFloat((base * (pct / 100)).toFixed(2))
-      : 0;
-
-    setTaxaInfo({ taxaAplicada: pct, valorTaxa });
-  }, [formaPgto, calculos.total, taxasConfig]);
 
   /* Autocomplete de produtos/serviços */
   const catalogoFiltrado = (search, idx) => {
@@ -751,6 +737,22 @@ function ModalNovaVenda({ venda, uid, clientes, produtos, servicos, vendedores, 
     // lucro será refinado pelo useEffect de taxa; aqui sem taxa (taxa ainda não calculada no 1º render)
     return { subtotal, descontos, custo, total, lucro: total - custo };
   }, [itens, tipo, livreValor, livreDesc]);
+
+  /* ── Recalcula taxa sempre que forma de pagamento ou total mudam ──
+     DEVE ficar APÓS o useMemo de calculos para que calculos.total exista */
+  useEffect(() => {
+    let pct = 0;
+    if      (formaPgto === "Cartão de Crédito") pct = parseFloat(taxasConfig.credito_1) || 0;
+    else if (formaPgto === "Cartão de Débito")  pct = parseFloat(taxasConfig.debito)    || 0;
+    else if (formaPgto === "Pix")               pct = parseFloat(taxasConfig.pix)       || 0;
+
+    const base = calculos.total;
+    const valorTaxa = base > 0 && pct > 0
+      ? parseFloat((base * (pct / 100)).toFixed(2))
+      : 0;
+
+    setTaxaInfo({ taxaAplicada: pct, valorTaxa });
+  }, [formaPgto, calculos.total, taxasConfig]);
 
   const validar = () => {
     const e = {};
