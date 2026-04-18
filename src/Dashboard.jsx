@@ -647,6 +647,52 @@ const CSS = `
   .ag-despesa-val { font-size: 11px; color: var(--text-2); margin-top: 6px; }
 
   /* ══════════════════════════════════════
+     FILTRO DE PERÍODO PERSONALIZADO
+  ══════════════════════════════════════ */
+  .ag-custom-range {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--s2);
+    border: 1px solid rgba(200,165,94,0.3);
+    border-radius: 10px;
+    padding: 5px 10px;
+    animation: ag-dropdown-in .14s ease;
+  }
+  .ag-custom-range label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    white-space: nowrap;
+  }
+  .ag-date-input {
+    background: var(--s3);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    padding: 5px 8px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color .15s;
+    color-scheme: dark;
+  }
+  .ag-date-input:focus  { border-color: var(--gold); }
+  .ag-date-input::-webkit-calendar-picker-indicator {
+    filter: invert(0.6) sepia(1) saturate(2) hue-rotate(5deg);
+    cursor: pointer;
+    opacity: 0.7;
+  }
+  .ag-date-sep {
+    color: var(--text-3);
+    font-size: 12px;
+    user-select: none;
+  }
+
+  /* ══════════════════════════════════════
      LOADING SKELETON
   ══════════════════════════════════════ */
   @keyframes ag-shimmer {
@@ -721,6 +767,7 @@ function Val({ v, loading, prefix = "", suffix = "" }) {
 ═══════════════════════════════════════════════════════ */
 export default function Dashboard() {
   const [period,      setPeriod]     = useState("Este mês");
+  const [customRange, setCustomRange]= useState({ from: "", to: "" });
   const [module,      setModule]     = useState("Dashboard");
   const [uid,         setUid]        = useState(null);
   const [authUser,    setAuthUser]   = useState(null);
@@ -797,7 +844,11 @@ export default function Dashboard() {
 
   /* ── Hooks de dados ───────────────────────────── */
   const empresa  = useEmpresa(uid);
-  const dash     = useDashboardData(uid, period);
+  const dash     = useDashboardData(
+    uid,
+    period,
+    period === "Personalizado" && customRange.from && customRange.to ? customRange : null
+  );
 
   /* ── Dados dinâmicos da logo ──────────────────── */
   const logoUrl      = empresa?.logo || null;
@@ -929,6 +980,32 @@ export default function Dashboard() {
             </button>
           ))}
         </div>
+        {/* Seletor de intervalo personalizado */}
+        {period === "Personalizado" && (
+          <div className="ag-custom-range">
+            <label>De</label>
+            <input
+              type="date"
+              className="ag-date-input"
+              value={customRange.from}
+              max={customRange.to || undefined}
+              onChange={(e) =>
+                setCustomRange((r) => ({ ...r, from: e.target.value }))
+              }
+            />
+            <span className="ag-date-sep">→</span>
+            <label>Até</label>
+            <input
+              type="date"
+              className="ag-date-input"
+              value={customRange.to}
+              min={customRange.from || undefined}
+              onChange={(e) =>
+                setCustomRange((r) => ({ ...r, to: e.target.value }))
+              }
+            />
+          </div>
+        )}
       </header>
 
       <div className="ag-content">
@@ -1015,7 +1092,12 @@ export default function Dashboard() {
                 color: "var(--gold)", background: "var(--gold-d)", padding: "3px 9px",
                 borderRadius: 20, border: "1px solid rgba(200,165,94,0.2)",
               }}>
-                {period}
+                {period === "Personalizado" && customRange.from && customRange.to
+                  ? `${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")}`
+                  : period === "Personalizado"
+                    ? "Selecione o intervalo"
+                    : period
+                }
               </span>
             </div>
             <ResponsiveContainer width="100%" height={180}>
