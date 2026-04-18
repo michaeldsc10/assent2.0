@@ -474,6 +474,28 @@ const CSS = `
     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+
+/* ── Títulos globais de módulos ── */
+[class$="-topbar-title"] h1,
+[class*="-topbar-title"] h1 {
+  font-family: var(--font-display) !important;
+  font-size: 28px !important;
+  font-weight: 700 !important;
+  background: linear-gradient(135deg, #D4AF37 10%, #e8ca60 55%, #c8a55e 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  line-height: 1.15 !important;
+  letter-spacing: 0.01em !important;
+}
+
+[class$="-topbar-title"] p,
+[class*="-topbar-title"] p {
+  font-size: 12px !important;
+  color: var(--text-3) !important;
+  margin-top: 4px !important;
+}
+  
   .ag-topbar-title p {
     font-size: 11px; color: var(--text-3); margin-top: 3px; letter-spacing: 0.02em;
   }
