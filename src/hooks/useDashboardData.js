@@ -207,26 +207,48 @@ export function useDashboardData(uid, period = "Este mês") {
         0
       );
 
-    /* ── Faturamento por dia (últimos 14 dias) ── */
-    const faturamentoPorDia = Array.from({ length: 14 }, (_, i) => {
-      const d = new Date(now);
-      d.setDate(d.getDate() - (13 - i));
-      d.setHours(0, 0, 0, 0);
-      const next = new Date(d);
-      next.setDate(next.getDate() + 1);
+    /* ── Faturamento por período (respeita o filtro ativo) ── */
+    let faturamentoPorDia = [];
 
-      const totalDia = vendas
-        .filter((v) => {
-          const dt = toDate(v.data);
-          return dt && dt >= d && dt < next;
-        })
-        .reduce((s, v) => s + (Number(v.total) || 0), 0);
-
-      return {
-        d: `${String(d.getDate()).padStart(2, "0")}/${d.getMonth() + 1}`,
-        v: totalDia,
-      };
-    });
+    if (period === "Hoje") {
+      /* Agrupa por hora (00h–23h) */
+      faturamentoPorDia = Array.from({ length: 24 }, (_, h) => {
+        const inicio = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, 0, 0, 0);
+        const fim    = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, 59, 59, 999);
+        const total  = vendas
+          .filter((v) => { const dt = toDate(v.data); return dt && dt >= inicio && dt <= fim; })
+          .reduce((s, v) => s + (Number(v.total) || 0), 0);
+        return { d: `${String(h).padStart(2, "0")}h`, v: total };
+      });
+    } else if (period === "Todos") {
+      /* Agrupa por mês (últimos 12 meses) */
+      faturamentoPorDia = Array.from({ length: 12 }, (_, i) => {
+        const ref   = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+        const inicio = new Date(ref.getFullYear(), ref.getMonth(), 1);
+        const fim    = new Date(ref.getFullYear(), ref.getMonth() + 1, 0, 23, 59, 59, 999);
+        const total  = vendas
+          .filter((v) => { const dt = toDate(v.data); return dt && dt >= inicio && dt <= fim; })
+          .reduce((s, v) => s + (Number(v.total) || 0), 0);
+        const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+        return { d: `${meses[ref.getMonth()]}/${String(ref.getFullYear()).slice(2)}`, v: total };
+      });
+    } else {
+      /* Agrupa por dia — usa o periodStart calculado */
+      const start = periodStart ?? new Date(now.getFullYear(), now.getMonth(), 1);
+      const totalDias = Math.round((now - start) / 86_400_000) + 1;
+      const dias = Math.min(totalDias, 60); /* máximo 60 pontos */
+      faturamentoPorDia = Array.from({ length: dias }, (_, i) => {
+        const d    = new Date(start.getTime() + i * 86_400_000);
+        const next = new Date(d.getTime() + 86_400_000);
+        const total = vendas
+          .filter((v) => { const dt = toDate(v.data); return dt && dt >= d && dt < next; })
+          .reduce((s, v) => s + (Number(v.total) || 0), 0);
+        return {
+          d: `${String(d.getDate()).padStart(2, "0")}/${d.getMonth() + 1}`,
+          v: total,
+        };
+      });
+    }
 
     /* ── Mix de Receita (Produtos vs Serviços) ── */
     let totalProd = 0;
