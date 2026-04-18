@@ -466,6 +466,15 @@ const CSS = `
     display: flex; align-items: center; gap: 16px;
     flex-shrink: 0;
   }
+  
+/* ── Botão de ação principal do topbar — sempre cola na direita ── */
+[class$="-topbar"] > button:last-child,
+[class*="-topbar"] > button:last-child,
+[class$="-topbar"] > div:last-child,
+[class*="-topbar"] > div:last-child {
+  margin-left: auto !important;
+}
+  
   .ag-topbar-title { }
   .ag-topbar-title h1 {
     font-family: var(--font-display); font-size: 26px; font-weight: 600;
