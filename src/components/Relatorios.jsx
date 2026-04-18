@@ -1122,8 +1122,16 @@ function RelatorioVendas({ vendas, intervalo }) {
     filtradas.forEach((v) => {
       (v.itens || []).forEach((it) => {
         const nome = it.produto || it.nome || "Produto";
-        const qtd  = Number(it.quantidade || 1);
-        const val  = Number(it.total || it.valorUnitario || 0) * qtd;
+        const qtd  = Number(it.quantidade || it.qtd || 1);
+
+        /* CORREÇÃO: it.total/it.subtotal já é o subtotal da linha (preço × qtd).
+           Não multiplicar por qtd de novo. Fallback: preco/valorUnitario × qtd. */
+        const subtotalLinha = Number(it.total ?? it.subtotal ?? NaN);
+        const precoUnit     = Number(it.valorUnitario ?? it.preco ?? it.valor ?? 0);
+        const val = !isNaN(subtotalLinha) && subtotalLinha > 0
+          ? subtotalLinha
+          : precoUnit * qtd;
+
         if (!prodContagem[nome]) prodContagem[nome] = { qtd: 0, total: 0 };
         prodContagem[nome].qtd   += qtd;
         prodContagem[nome].total += val;
@@ -1584,7 +1592,9 @@ function RelatorioAgenda({ agenda, intervalo }) {
 
     const futuros = filtrada.filter((a) => {
       const dt = parseDate(getDataAgenda(a));
-      return dt && dt >= hoje;
+      /* CORREÇÃO: itens sem data parseável ficavam fora de futuros E passados,
+         causando Total > Futuros + Passados. Sem data → inclui em futuros. */
+      return !dt || dt >= hoje;
     });
     const passados = filtrada.filter((a) => {
       const dt = parseDate(getDataAgenda(a));
