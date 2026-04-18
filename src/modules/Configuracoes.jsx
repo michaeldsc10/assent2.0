@@ -66,7 +66,7 @@ const MENU_SECTIONS = [
   { key: "fornecedores",    label: "Fornecedores",       sub: "Cadastro de fornecedores", icon: "🏭", locked: false },
   { key: "relatorios",      label: "Relatórios",         sub: "Análises e exportações",   icon: "📈", locked: false },
   { key: "agenda",          label: "Agenda",             sub: "Compromissos e tarefas",   icon: "📅", locked: false },
-  { key: "atalhos",         label: "Atalhos",            sub: "Acesso rápido",            icon: "⚡", locked: false },
+  { key: "orcamentos",         label: "Orçamentos",      sub: "Orçamentos",            icon: "⚡", locked: false },
   { key: "vendedores",      label: "Vendedores",         sub: "Equipe de vendas",         icon: "👔", locked: false },
   { key: "config",          label: "Configurações",      sub: "Esta tela",                icon: "⚙️", locked: true  },
 ];
