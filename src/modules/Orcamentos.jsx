@@ -459,6 +459,34 @@ const FORMAS_PAGAMENTO = [
   "Boleto","Transferência","Sinal","Parcelado","Outro",
 ];
 
+/* Taxas padrão — fallback enquanto o Firestore carrega (espelho de Vendas.jsx) */
+const TAXAS_DEFAULT = {
+  debito:     1.99,
+  pix:        0,
+  credito_1:  2.99, credito_2:  3.19, credito_3:  3.39,
+  credito_4:  3.59, credito_5:  3.79, credito_6:  3.99,
+  credito_7:  4.19, credito_8:  4.39, credito_9:  4.59,
+  credito_10: 4.79, credito_11: 4.99, credito_12: 5.19,
+};
+
+/* Calcula taxa de cartão/pix para um total e forma de pagamento dados */
+function calcularTaxa(total, formaPagamento, parcelas, taxas) {
+  const isCredito = formaPagamento === "Cartão de Crédito";
+  const isDebito  = formaPagamento === "Cartão de Débito";
+  const isPix     = formaPagamento === "Pix";
+
+  if (isPix) {
+    const pct = parseFloat(taxas?.pix ?? TAXAS_DEFAULT.pix ?? 0) || 0;
+    if (pct === 0) return { taxaPercentual: 0, valorTaxa: 0 };
+    return { taxaPercentual: pct, valorTaxa: parseFloat((total * pct / 100).toFixed(2)) };
+  }
+  if (!isCredito && !isDebito) return { taxaPercentual: 0, valorTaxa: 0 };
+
+  const chave = isDebito ? "debito" : `credito_${parcelas || 1}`;
+  const pct   = parseFloat(taxas?.[chave] ?? TAXAS_DEFAULT[chave] ?? 0) || 0;
+  return { taxaPercentual: pct, valorTaxa: parseFloat((total * pct / 100).toFixed(2)) };
+}
+
 const SC_LABELS = {
   rascunho:"Rascunho", enviado:"Enviado",
   aguardando_resposta:"Aguardando", negociacao:"Negociação",
@@ -712,12 +740,20 @@ function ModalToast({ tipo="info", titulo, mensagem, okLabel="OK", cancelLabel="
    Permite escolher forma de pagamento e vendedor
    antes de converter o orçamento em venda.
    ══════════════════════════════════════════════════ */
-function ModalFinalizarConversao({ orc, uid, vendedores, onConfirmar, onClose }) {
+function ModalFinalizarConversao({ orc, uid, vendedores, taxas, onConfirmar, onClose }) {
   const [formaPgto, setFormaPgto] = useState("Pix");
   const [vendedor,  setVendedor]  = useState("");
+  const [parcelas,  setParcelas]  = useState(1);
   const [erros,     setErros]     = useState({});
 
   const total = orc.resumoFinanceiro?.totalFinal || 0;
+
+  /* Calcula taxa em tempo real conforme forma de pagamento muda */
+  const taxaInfo = useMemo(() => {
+    return calcularTaxa(total, formaPgto, parcelas, taxas);
+  }, [total, formaPgto, parcelas, taxas]);
+
+  const isCredito = formaPgto === "Cartão de Crédito";
 
   const validar = () => {
     const e = {};
@@ -728,7 +764,7 @@ function ModalFinalizarConversao({ orc, uid, vendedores, onConfirmar, onClose })
 
   const handleConfirmar = () => {
     if (!validar()) return;
-    onConfirmar({ formaPagamento: formaPgto, vendedor });
+    onConfirmar({ formaPagamento: formaPgto, vendedor, parcelas: isCredito ? parcelas : null });
   };
 
   return (
@@ -755,11 +791,50 @@ function ModalFinalizarConversao({ orc, uid, vendedores, onConfirmar, onClose })
 
           <div className="form-group">
             <label className="form-label">Forma de Pagamento <span className="form-label-req">*</span></label>
-            <select className={`orc-sel ${erros.forma?"err":""}`} value={formaPgto} onChange={e=>setFormaPgto(e.target.value)}>
+            <select className={`orc-sel ${erros.forma?"err":""}`} value={formaPgto}
+              onChange={e=>{ setFormaPgto(e.target.value); setParcelas(1); }}>
               {FORMAS_PAGAMENTO.map(f=><option key={f} value={f}>{f}</option>)}
             </select>
             {erros.forma && <div className="form-error">{erros.forma}</div>}
           </div>
+
+          {/* Parcelas — só exibe para Cartão de Crédito */}
+          {isCredito && (
+            <div className="form-group">
+              <label className="form-label">Parcelas</label>
+              <div className="nv-parcelas-wrap" style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:4}}>
+                {[1,2,3,4,5,6,7,8,9,10,11,12].map(n=>(
+                  <button
+                    key={n}
+                    onClick={()=>setParcelas(n)}
+                    style={{
+                      padding:"5px 11px",borderRadius:7,fontSize:11,fontWeight:600,
+                      cursor:"pointer",fontFamily:"'DM Sans',sans-serif",transition:"all .13s",
+                      border: parcelas===n ? "1px solid var(--gold)" : "1px solid var(--border)",
+                      background: parcelas===n ? "rgba(200,165,94,0.15)" : "var(--s2)",
+                      color: parcelas===n ? "var(--gold)" : "var(--text-2)",
+                    }}
+                  >
+                    {n}x
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Exibe taxa calculada em tempo real */}
+          {taxaInfo.taxaPercentual > 0 && (
+            <div style={{
+              background:"rgba(91,142,240,.07)",border:"1px solid rgba(91,142,240,.2)",
+              borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:12,color:"var(--text-2)",
+              display:"flex",justifyContent:"space-between",alignItems:"center"
+            }}>
+              <span>Taxa operacional ({taxaInfo.taxaPercentual}%)</span>
+              <strong style={{color:"var(--blue)",fontFamily:"'Sora',sans-serif"}}>
+                {fmtR$(taxaInfo.valorTaxa)}
+              </strong>
+            </div>
+          )}
 
           <div className="form-group">
             <label className="form-label">Vendedor <span style={{color:"var(--text-3)",fontWeight:400}}>(opcional)</span></label>
@@ -843,7 +918,7 @@ function ModalPipeline({ orc, uid, onClose, onUpdated }) {
 /* ══════════════════════════════════════════════════
    MODAL DETALHE
    ══════════════════════════════════════════════════ */
-function ModalDetalhe({ orc:orcInicial, uid, empresa, vendedores, onClose, onEditar, onConverter }) {
+function ModalDetalhe({ orc:orcInicial, uid, empresa, vendedores, taxas, onClose, onEditar, onConverter }) {
   const [orc,        setOrc]        = useState(orcInicial);
   const [showPM,     setShowPM]     = useState(false);
   const [showFin,    setShowFin]    = useState(false);
@@ -866,11 +941,11 @@ function ModalDetalhe({ orc:orcInicial, uid, empresa, vendedores, onClose, onEdi
   };
 
   /* Executado após o usuário confirmar forma de pagamento + vendedor */
-  const handleConfirmarConversao = async ({ formaPagamento, vendedor }) => {
+  const handleConfirmarConversao = async ({ formaPagamento, vendedor, parcelas }) => {
     setShowFin(false);
     setConv(true);
     try {
-      await onConverter(orc, { formaPagamento, vendedor });
+      await onConverter(orc, { formaPagamento, vendedor, parcelas });
       onClose();
     } catch(err) {
       setToast({tipo:"error",titulo:"Erro na conversão",mensagem:err.message,onOk:()=>setToast(null)});
@@ -1000,6 +1075,7 @@ function ModalDetalhe({ orc:orcInicial, uid, empresa, vendedores, onClose, onEdi
           orc={orc}
           uid={uid}
           vendedores={vendedores}
+          taxas={taxas}
           onConfirmar={handleConfirmarConversao}
           onClose={()=>setShowFin(false)}
         />
@@ -1359,6 +1435,7 @@ export default function Orcamentos() {
   const [servicos,   setServicos]   = useState([]);
   const [vendedores, setVendedores] = useState([]);
   const [empresa,    setEmpresa]    = useState({});
+  const [taxas,      setTaxas]      = useState(TAXAS_DEFAULT);
   const [loading,    setLoading]    = useState(true);
 
   const [search,    setSearch]    = useState("");
@@ -1381,7 +1458,12 @@ export default function Orcamentos() {
     subs.push(onSnapshot(collection(db,"users",uid,"produtos"),   snap=>setProdutos(snap.docs.map(d=>({id:d.id,...d.data()})))));
     subs.push(onSnapshot(collection(db,"users",uid,"servicos"),   snap=>setServicos(snap.docs.map(d=>({id:d.id,...d.data()})))));
     subs.push(onSnapshot(collection(db,"users",uid,"vendedores"), snap=>setVendedores(snap.docs.map(d=>({id:d.id,...d.data()})))));
-    getDoc(doc(db,"users",uid,"config","geral")).then(snap=>{ if(snap.exists()) setEmpresa(snap.data()?.empresa||{}); });
+    getDoc(doc(db,"users",uid,"config","geral")).then(snap=>{
+      if(snap.exists()){
+        setEmpresa(snap.data()?.empresa||{});
+        if(snap.data()?.taxas) setTaxas(prev=>({...TAXAS_DEFAULT,...snap.data().taxas}));
+      }
+    });
     return ()=>subs.forEach(u=>u());
   },[uid]);
 
@@ -1431,7 +1513,7 @@ export default function Orcamentos() {
        3. Lança no caixa para aparecer no DRE
        4. REGRA: todos os tx.get() ANTES de qualquer tx.write
      ══════════════════════════════════════════════════ */
-  const handleConverterVenda = async (orc, { formaPagamento, vendedor }) => {
+  const handleConverterVenda = async (orc, { formaPagamento, vendedor, parcelas }) => {
     if (!uid || !orc.cliente?.id) throw new Error("Cliente não cadastrado no sistema.");
 
     /* ── Passo 1: buscar custo real de cada produto/serviço fora da transação ──
@@ -1467,7 +1549,10 @@ export default function Orcamentos() {
     /* Custo total calculado a partir dos custos reais */
     const custoTotal = itensVenda.reduce((s,i)=>s+(i.custo*(i.qtd||1)),0);
     const totalFinal = orc.resumoFinanceiro?.totalFinal||0;
-    const lucroEstimado = totalFinal - custoTotal;
+
+    /* ── Calcular taxa de cartão/pix com base na forma de pagamento escolhida ── */
+    const { taxaPercentual, valorTaxa } = calcularTaxa(totalFinal, formaPagamento, parcelas || 1, taxas);
+    const lucroEstimado = parseFloat((totalFinal - custoTotal - valorTaxa).toFixed(2));
 
     /* ── Passo 3: transação Firestore (reads ANTES de writes) ── */
     const cntRef = doc(db,"users",uid);
@@ -1503,10 +1588,10 @@ export default function Orcamentos() {
         descontos:       orc.resumoFinanceiro?.descontos||0,
         custoTotal,
         lucroEstimado,
-        /* Taxa: não aplicável na conversão */
-        parcelas:        null,
-        taxaPercentual:  0,
-        valorTaxa:       0,
+        /* Taxa calculada com base na forma de pagamento */
+        parcelas:        formaPagamento === "Cartão de Crédito" ? (parcelas || 1) : null,
+        taxaPercentual,
+        valorTaxa,
         /* Sinal: não aplicável na conversão */
         valorPago:       null,
         valorRestante:   null,
@@ -1646,7 +1731,7 @@ export default function Orcamentos() {
           onSave={handleSave} onClose={()=>setEditando(null)}/>
       )}
       {detalhe && (
-        <ModalDetalhe orc={detalhe} uid={uid} empresa={empresa} vendedores={vendedores}
+        <ModalDetalhe orc={detalhe} uid={uid} empresa={empresa} vendedores={vendedores} taxas={taxas}
           onClose={()=>setDetalhe(null)}
           onEditar={o=>{setDetalhe(null);setEditando(o);}}
           onConverter={handleConverterVenda}/>
