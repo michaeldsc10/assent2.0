@@ -26,6 +26,7 @@ import {
 
 import { db, auth } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { TelaBloqueada } from "../hooks/useLicenca";
 import {
   collection, doc, onSnapshot,
   runTransaction, getDoc, addDoc, Timestamp,
@@ -1427,7 +1428,7 @@ function ModalNovoOrc({ orc, uid, clientes, produtos, servicos, onSave, onClose 
 /* ══════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════ */
-export default function Orcamentos() {
+export default function Orcamentos({ isPro = false }) {
   const [uid,        setUid]        = useState(null);
   const [orcamentos, setOrcamentos] = useState([]);
   const [clientes,   setClientes]   = useState([]);
@@ -1653,6 +1654,7 @@ export default function Orcamentos() {
   },[orcamentos,filtro,search]);
 
   if(!uid) return <div className="orc-loading">Carregando autenticação...</div>;
+  if(!isPro) return <TelaBloqueada modulo="Orçamentos" />;
 
   return (
     <>
