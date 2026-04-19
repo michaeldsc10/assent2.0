@@ -9,7 +9,8 @@ import {
 } from "lucide-react";
 
 import { db, auth, onAuthStateChanged } from "../lib/firebase";
-import { BannerLimite, LIMITES_FREE } from "../hooks/useLicenca";
+import { LIMITES_FREE } from "../hooks/useLicenca";
+import {BannerLimite} from "../hooks/LicencaUI.jsx";
 import {
   collection,
   doc,
