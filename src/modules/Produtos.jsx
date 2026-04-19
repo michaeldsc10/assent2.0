@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { db, auth, onAuthStateChanged } from "../lib/firebase";
+import { BannerLimite, LIMITES_FREE } from "../hooks/useLicenca";
 import {
   collection,
   doc,
@@ -745,7 +746,7 @@ function ModalConfirmDelete({ produto, vendasComProduto, onConfirm, onClose }) {
 /* ══════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════ */
-export default function Produtos() {
+export default function Produtos({ isPro = false }) {
   const [uid,      setUid]      = useState(null);
   const [produtos, setProdutos] = useState([]);
   const [vendas,   setVendas]   = useState([]);
@@ -879,13 +880,19 @@ export default function Produtos() {
           />
         </div>
 
-        <button className="btn-novo-pd" onClick={() => setModalNovo(true)}>
+        <button
+          className="btn-novo-pd"
+          onClick={() => setModalNovo(true)}
+          disabled={!isPro && produtos.length >= LIMITES_FREE.produtos}
+          title={!isPro && produtos.length >= LIMITES_FREE.produtos ? `Limite de ${LIMITES_FREE.produtos} produtos atingido no plano Free` : undefined}
+        >
           <Package size={14} /> + Novo Produto
         </button>
       </header>
 
       {/* ── Conteúdo ── */}
       <div className="ag-content">
+        <BannerLimite total={produtos.length} limite={LIMITES_FREE.produtos} tipo="produtos" isPro={isPro} />
         <div className="pd-table-wrap">
           <div className="pd-table-header">
             <span className="pd-table-title">Produtos cadastrados</span>
