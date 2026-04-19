@@ -220,12 +220,27 @@ const RESPONSIVE_CSS = `
   .cx-topbar-right,
   .fn-topbar-right,
   .sv-topbar-actions,
-  .orc-topbar-right {
+  .orc-topbar-right,
+  .cl-topbar-right,
+  .ar-topbar-right,
+  .desp-topbar-right,
+  .ee-topbar-right,
+  .pd-topbar-right {
     margin-left: 0 !important;
     flex-wrap: wrap !important;
     width: 100%;
     justify-content: flex-end;
     order: 6;
+  }
+
+  /* Fallback: botão "Novo" direto na topbar (sem wrapper div) */
+  .cl-topbar > button:last-child,
+  .ar-topbar > button:last-child,
+  .desp-topbar > button:last-child,
+  .ee-topbar > button:last-child,
+  .pd-topbar > button:last-child {
+    margin-left: auto !important;
+    order: 6 !important;
   }
 }
 
