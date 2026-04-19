@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════
    ASSENT v2.0 — Auth.jsx
    AuthProvider + useAuth + PrivateRoute
+   v2.1: verifica licencas/{uid}.ativo antes de liberar
    ═══════════════════════════════════════════════════ */
 
 import { createContext, useContext, useState, useEffect } from "react";
@@ -10,12 +11,13 @@ import {
   signOut,
   sendPasswordResetEmail,
 } from "firebase/auth";
-import { auth } from "../lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../lib/firebase";
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser]       = useState(null);
+  const [user,    setUser]    = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -33,8 +35,22 @@ export function AuthProvider({ children }) {
     }
     try {
       const credential = await signInWithEmailAndPassword(auth, trimmedEmail, senha);
+
+      /* ── Verificação de licença ativo=true ── */
+      const uid         = credential.user.uid;
+      const licencaSnap = await getDoc(doc(db, "licencas", uid));
+
+      if (!licencaSnap.exists() || licencaSnap.data().ativo !== true) {
+        await signOut(auth);
+        throw new AuthError(
+          "licenca-inativa",
+          "Sua licença está inativa. Entre em contato com o suporte."
+        );
+      }
+
       return credential.user;
     } catch (err) {
+      if (err instanceof AuthError) throw err;
       throw mapFirebaseError(err);
     }
   }
@@ -44,9 +60,6 @@ export function AuthProvider({ children }) {
     setUser(null);
   }
 
-  // ── resetPassword ───────────────────────────────────
-  // Firebase dispara o e-mail de recuperação automaticamente.
-  // Nenhuma configuração extra além do Firebase Console.
   async function resetPassword(email) {
     const trimmedEmail = email.trim().toLowerCase();
     if (!trimmedEmail) {
