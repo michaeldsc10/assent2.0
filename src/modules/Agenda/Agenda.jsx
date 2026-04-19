@@ -7,7 +7,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { CalendarDays, List, Plus, X, CheckCircle2, Edit2, Trash2 } from "lucide-react";
 import { db, auth, onAuthStateChanged } from "../../lib/firebase";
 import {  LIMITES_FREE } from "../../hooks/useLicenca";
-import {BannerLimite} from "../../hooks/LicencaUI";
+import { BannerLimite } from "../../hooks/LicencaUI";
 import {
   collection, doc, setDoc, deleteDoc, onSnapshot, updateDoc,
 } from "firebase/firestore";
