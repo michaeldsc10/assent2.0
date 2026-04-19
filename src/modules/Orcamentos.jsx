@@ -26,7 +26,7 @@ import {
 
 import { db, auth } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { TelaBloqueada } from "../hooks/useLicenca";
+import { TelaBloqueada } from "../hooks/LicencaUI.jsx";
 import {
   collection, doc, onSnapshot,
   runTransaction, getDoc, addDoc, Timestamp,
