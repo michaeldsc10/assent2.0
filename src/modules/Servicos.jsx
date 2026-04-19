@@ -9,6 +9,8 @@ import { useState, useEffect, useMemo } from "react";
 import { Search, Plus, Edit2, Trash2, X, Tag, Settings, AlertTriangle } from "lucide-react";
 
 import { db, auth, onAuthStateChanged } from "../lib/firebase";
+import {LIMITES_FREE } from "../hooks/useLicenca";
+import {  BannerLimite  } from  "../hooks/LicencaUI.jsx";
 import {
   collection,
   doc,
@@ -791,7 +793,7 @@ function ModalConfirmDelete({ servico, vendas, onConfirm, onClose }) {
 /* ════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ════════════════════════════════════════════════════ */
-export default function Servicos() {
+export default function Servicos({ isPro = false }) {
   const [uid, setUid]               = useState(null);
   const [servicos, setServicos]     = useState([]);
   const [categorias, setCategorias] = useState([]);
@@ -932,7 +934,12 @@ export default function Servicos() {
           <button className="btn-cat-manage" onClick={() => setModalCats(true)}>
             <Tag size={13} /> Categorias
           </button>
-          <button className="btn-novo-sv" onClick={() => setModalNovo(true)}>
+          <button
+            className="btn-novo-sv"
+            onClick={() => setModalNovo(true)}
+            disabled={!isPro && servicos.length >= LIMITES_FREE.servicos}
+            title={!isPro && servicos.length >= LIMITES_FREE.servicos ? `Limite de ${LIMITES_FREE.servicos} serviços atingido no plano Free` : undefined}
+          >
             <Plus size={14} /> Novo Serviço
           </button>
         </div>
@@ -940,6 +947,7 @@ export default function Servicos() {
 
       {/* Conteúdo */}
       <div className="ag-content">
+        <BannerLimite total={servicos.length} limite={LIMITES_FREE.servicos} tipo="serviços" isPro={isPro} />
         <div className="sv-table-wrap">
           <div className="sv-table-header">
             <span className="sv-table-title">Serviços cadastrados</span>
