@@ -21,7 +21,7 @@ import {
   ShoppingCart, Clock, Wallet, TrendingDown, Truck, BarChart3,
   Calendar, Settings, Zap, UserCheck, Search, ArrowUpRight,
   ArrowDownRight, ChevronRight, Bell, LogOut, ChevronDown,
-  PanelLeftClose, PanelLeftOpen, Menu, X,
+  PanelLeftClose, PanelLeftOpen, Menu, X, Sun, Moon,
 } from "lucide-react";
 
 /* ── Módulos ───────────────────────────────────── */
@@ -48,6 +48,7 @@ import { doc, onSnapshot }       from "firebase/firestore";
 /* ── Hooks de dados ────────────────────────────── */
 import { useDashboardData, fmtR$, fmtData } from "./hooks/useDashboardData";
 import { useEmpresa }                        from "./hooks/useEmpresa";
+import { useLicenca }                        from "./hooks/useLicenca";
 
 /* ═══════════════════════════════════════════════
    CONSTANTES
@@ -957,6 +958,57 @@ const CSS = `
     .ag-header-logo { padding: 0 10px; }
     .ag-notif       { display: none; }
   }
+
+  /* ══ BOTÃO DE TEMA ══ */
+  .ag-theme-btn {
+    width: 34px; height: 34px; border-radius: 8px;
+    background: var(--s2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: border-color .15s, color .15s, transform .25s;
+    color: var(--text-2); flex-shrink: 0; margin-left: 8px;
+  }
+  .ag-theme-btn:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    transform: rotate(20deg);
+  }
+
+  /* ══ TEMA LIGHT ══ */
+  .ag-app.light {
+    --bg:       #f4f3f0;
+    --s1:       #ffffff;
+    --s2:       #f0efe9;
+    --s3:       #e8e7e0;
+    --border:   rgba(0,0,0,0.08);
+    --border-h: rgba(0,0,0,0.15);
+    --gold:         #a07c1a;
+    --gold-l:       #c09a30;
+    --gold-d:       rgba(160,124,26,0.1);
+    --gold-brand:   #a07c1a;
+    --text:     #1a1a1a;
+    --text-2:   #555050;
+    --text-3:   #999490;
+    --green:    #1a9e6a;
+    --green-d:  rgba(26,158,106,0.1);
+    --red:      #c03030;
+    --red-d:    rgba(192,48,48,0.1);
+    --blue:     #2a5ec0;
+    --blue-d:   rgba(42,94,192,0.1);
+    --purple:   #6b4fc8;
+    --purple-d: rgba(107,79,200,0.1);
+    --amber:    #c07800;
+    --amber-d:  rgba(192,120,0,0.1);
+    color-scheme: light;
+  }
+  .ag-app.light .ag-date-input { color-scheme: light; }
+  .ag-app.light .ag-user-dropdown { box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
+  .ag-app.light .ag-avatar {
+    background: linear-gradient(135deg, rgba(160,124,26,0.15), rgba(160,124,26,0.05));
+    border-color: rgba(160,124,26,0.25);
+  }
+  .ag-app.light .ag-header-logo-icon {
+    background: linear-gradient(135deg, #b8952e, #d4af37);
+  }
 `;
 
 /* ══════════════════════════════════════════════════════
@@ -997,6 +1049,17 @@ export default function Dashboard() {
   );
   const [dropdownOpen,  setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [theme, setTheme] = useState(
+    () => localStorage.getItem("ag_theme") || "dark"
+  );
+
+  const toggleTheme = () => {
+    setTheme(prev => {
+      const next = prev === "dark" ? "light" : "dark";
+      localStorage.setItem("ag_theme", next);
+      return next;
+    });
+  };
   const dropdownRef = useRef(null);
 
   /* ── Injeta CSS responsivo global após todos os estilos ── */
@@ -1089,6 +1152,7 @@ export default function Dashboard() {
 
   /* ── Hooks de dados ── */
   const empresa = useEmpresa(uid);
+  const { isPro } = useLicenca(uid);
   const dash    = useDashboardData(
     uid, period,
     period === "Personalizado" && customRange.from && customRange.to ? customRange : null
@@ -1148,20 +1212,20 @@ export default function Dashboard() {
   /* ══ RENDER MÓDULOS ══ */
   const renderModulo = () => {
     switch (module) {
-      case "Clientes":            return <Clientes />;
-      case "Produtos":            return <Produtos />;
-      case "Serviços":            return <Servicos />;
+      case "Clientes":            return <Clientes isPro={isPro} />;
+      case "Produtos":            return <Produtos isPro={isPro} />;
+      case "Serviços":            return <Servicos isPro={isPro} />;
       case "Vendedores":          return <Vendedores />;
-      case "Vendas":              return <Vendas />;
+      case "Vendas":              return <Vendas isPro={isPro} />;
       case "Configurações":       return <Configuracoes menuVisivel={menuVisivel} />;
-      case "Despesas":            return <Despesas />;
+      case "Despesas":            return <Despesas isPro={isPro} />;
       case "Entrada de Estoque":  return <EntradaEstoque />;
-      case "Agenda":              return <Agenda />;
+      case "Agenda":              return <Agenda isPro={isPro} />;
       case "Fornecedores":        return <Fornecedores />;
       case "A Receber":           return <AReceber />;
       case "Relatórios":          return <Relatorios />;
       case "Caixa Diário":        return <CaixaDiario />;
-      case "Orçamentos":          return <Orcamentos />;
+      case "Orçamentos":          return <Orcamentos isPro={isPro} />;
       default:                    return renderDashboard();
     }
   };
@@ -1435,7 +1499,7 @@ export default function Dashboard() {
     <>
       <style>{CSS}</style>
 
-      <div className="ag-app">
+      <div className={`ag-app${theme === "light" ? " light" : ""}`}>
 
         {/* ── HEADER GLOBAL ── */}
         <header className="ag-global-header">
@@ -1455,11 +1519,30 @@ export default function Dashboard() {
               <div className="ag-header-logo-icon">{logoInitials}</div>
             )}
             <span className="ag-header-logo-name">{nomeEmpresa}</span>
+            {isPro && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                background: "linear-gradient(135deg,#D4AF37,#e8ca60)",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                border: "1px solid rgba(200,165,94,0.4)",
+                borderRadius: 20, padding: "2px 7px", flexShrink: 0,
+              }}>PRO</span>
+            )}
           </div>
 
           <div className="ag-header-spacer" />
 
           <div className="ag-notif" title="Notificações"><Bell size={15} /></div>
+
+          <button
+            className="ag-theme-btn"
+            onClick={toggleTheme}
+            title={theme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
+            aria-label="Alternar tema"
+          >
+            {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
 
           <div className="ag-user-area" ref={dropdownRef}>
             <div
@@ -1572,6 +1655,16 @@ export default function Dashboard() {
                     <div className="ag-header-logo-icon">{logoInitials}</div>
                   )}
                   <span className="ag-header-logo-name">{nomeEmpresa}</span>
+                  {isPro && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      background: "linear-gradient(135deg,#D4AF37,#e8ca60)",
+                      WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                      border: "1px solid rgba(200,165,94,0.4)",
+                      borderRadius: 20, padding: "2px 7px", flexShrink: 0,
+                    }}>PRO</span>
+                  )}
                 </div>
                 <button
                   className="ag-sidebar-mobile-close"
