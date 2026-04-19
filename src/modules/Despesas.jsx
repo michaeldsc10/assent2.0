@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo } from "react";
 import {
   Search, Plus, Edit2, Trash2, X, CheckCircle, RefreshCw,
   AlertCircle, Clock, AlertTriangle, RotateCcw, TrendingUp,
-  CreditCard, Wallet, Smartphone, ChevronDown, ChevronUp,
+  CreditCard, Wallet, Smartphone, ChevronDown, ChevronUp, Settings,
 } from "lucide-react";
 
 import { db, auth, onAuthStateChanged } from "../lib/firebase";
@@ -372,6 +372,32 @@ const CSS = `
 
   .desp-empty, .desp-loading { padding: 56px 20px; text-align: center; color: var(--text-3); font-size: 13px; }
 
+  /* Btn engrenagem categorias */
+  .btn-gear-cat {
+    display: flex; align-items: center; gap: 5px;
+    padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 500;
+    border: 1px solid var(--border); background: var(--s2); color: var(--text-3);
+    cursor: pointer; transition: all .13s; white-space: nowrap;
+  }
+  .btn-gear-cat:hover { border-color: var(--border-h); color: var(--text-2); background: var(--s3); }
+  .btn-gear-cat.active { border-color: var(--gold); color: var(--gold); }
+
+  /* Modal categorias standalone */
+  .cat-modal-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  .cat-modal-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 12px; border-radius: 8px;
+    background: var(--s2); border: 1px solid var(--border);
+  }
+  .cat-modal-item-name { font-size: 13px; color: var(--text); font-weight: 500; }
+  .cat-modal-item-actions { display: flex; gap: 4px; align-items: center; }
+  .cat-modal-edit-input {
+    flex: 1; padding: 6px 10px; border-radius: 7px; font-size: 12px;
+    border: 1px solid var(--gold); background: var(--s1); color: var(--text);
+    outline: none; font-family: 'DM Sans', sans-serif;
+  }
+  .cat-modal-empty { font-size: 13px; color: var(--text-3); text-align: center; padding: 24px 0; }
+
   /* Confirm */
   .confirm-body { padding: 24px 22px; text-align: center; }
   .confirm-body p { font-size: 13px; color: var(--text-2); line-height: 1.6; }
@@ -424,7 +450,13 @@ const calcularStatus = (vencimento, statusAtual) => {
   return venc < hoje() ? "vencido" : "pendente";
 };
 
-const gerarIdDespesa = (cnt) => `D${String(cnt + 1).padStart(4, "0")}`;
+const gerarIdBase = (cnt) => `D${String(cnt + 1).padStart(4, "0")}`;
+// idShow: para parcelas = "D0002-1" / "D0002-2" etc. Para simples = "D0001"
+const gerarIdShow = (cnt, parcelaAtual = null, totalParcelas = null) => {
+  const base = gerarIdBase(cnt);
+  if (parcelaAtual && totalParcelas && totalParcelas > 1) return `${base}-${parcelaAtual}`;
+  return base;
+};
 
 const proximaData = (dataBase, tipo, intervalo = 1) => {
   const d = parseDate(dataBase);
@@ -479,7 +511,12 @@ function useCategorias(uid) {
     await setDoc(doc(db, "users", uid, "categorias_despesas", id), { ativa: false }, { merge: true });
   };
 
-  return { categorias, criarCategoria, desativarCategoria };
+  const renomearCategoria = async (id, novoNome) => {
+    if (!uid || !novoNome.trim()) return;
+    await setDoc(doc(db, "users", uid, "categorias_despesas", id), { nome: novoNome.trim() }, { merge: true });
+  };
+
+  return { categorias, criarCategoria, desativarCategoria, renomearCategoria };
 }
 
 /* ════════════════════════════════════════
@@ -599,7 +636,7 @@ function ModalNovaDespesa({ despesa, despesas, categorias, onCriarCategoria, onD
           <div>
             <div className="modal-title">{isEdit ? "Editar Despesa" : "Nova Despesa"}</div>
             <div className="modal-sub">
-              {isEdit ? `Editando ${despesa.id} — ${despesa.descricao}` : "Preencha os dados da despesa"}
+              {isEdit ? `Editando ${despesa.idShow || despesa.id} — ${despesa.descricao}` : "Preencha os dados da despesa"}
             </div>
           </div>
           <button className="modal-close" onClick={onClose}>
@@ -945,6 +982,151 @@ function StatusBadge({ status }) {
 }
 
 /* ════════════════════════════════════════
+   MODAL: Gerenciar Categorias (standalone)
+   ════════════════════════════════════════ */
+function ModalCategorias({ categorias, onCriar, onRenomear, onDesativar, onClose }) {
+  const [novaCategoria, setNovaCategoria] = useState("");
+  const [salvando, setSalvando]           = useState(false);
+  const [editandoId, setEditandoId]       = useState(null);
+  const [editandoNome, setEditandoNome]   = useState("");
+  const [confirmDelId, setConfirmDelId]   = useState(null);
+
+  const handleCriar = async () => {
+    if (!novaCategoria.trim()) return;
+    setSalvando(true);
+    await onCriar(novaCategoria);
+    setNovaCategoria("");
+    setSalvando(false);
+  };
+
+  const handleIniciarEdit = (cat) => {
+    setEditandoId(cat.id);
+    setEditandoNome(cat.nome);
+    setConfirmDelId(null);
+  };
+
+  const handleSalvarEdit = async () => {
+    if (!editandoNome.trim()) return;
+    await onRenomear(editandoId, editandoNome);
+    setEditandoId(null);
+    setEditandoNome("");
+  };
+
+  const handleExcluir = async (id) => {
+    await onDesativar(id);
+    setConfirmDelId(null);
+  };
+
+  return (
+    <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box modal-box-md">
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">Gerenciar Categorias</div>
+            <div className="modal-sub">Crie, edite ou exclua categorias de despesas</div>
+          </div>
+          <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)" /></button>
+        </div>
+
+        <div className="modal-body">
+          {/* Lista de categorias */}
+          {categorias.length === 0 ? (
+            <div className="cat-modal-empty">Nenhuma categoria cadastrada ainda.</div>
+          ) : (
+            <div className="cat-modal-list">
+              {categorias.map(c => (
+                <div key={c.id} className="cat-modal-item">
+                  {editandoId === c.id ? (
+                    /* Modo edição */
+                    <div style={{ display: "flex", gap: 6, flex: 1, alignItems: "center" }}>
+                      <input
+                        className="cat-modal-edit-input"
+                        value={editandoNome}
+                        onChange={e => setEditandoNome(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === "Enter") handleSalvarEdit();
+                          if (e.key === "Escape") setEditandoId(null);
+                        }}
+                        autoFocus
+                      />
+                      <button className="btn-success" style={{ padding: "5px 12px", fontSize: 12 }} onClick={handleSalvarEdit}>
+                        Salvar
+                      </button>
+                      <button className="btn-secondary" style={{ padding: "5px 10px", fontSize: 12 }} onClick={() => setEditandoId(null)}>
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ) : confirmDelId === c.id ? (
+                    /* Confirmar exclusão inline */
+                    <div style={{ display: "flex", gap: 6, flex: 1, alignItems: "center" }}>
+                      <span style={{ fontSize: 12, color: "var(--red)", flex: 1 }}>
+                        Excluir <strong style={{ color: "var(--text)" }}>{c.nome}</strong>?
+                      </span>
+                      <button className="btn-danger" style={{ padding: "5px 12px", fontSize: 12 }} onClick={() => handleExcluir(c.id)}>
+                        Confirmar
+                      </button>
+                      <button className="btn-secondary" style={{ padding: "5px 10px", fontSize: 12 }} onClick={() => setConfirmDelId(null)}>
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    /* Visualização normal */
+                    <>
+                      <span className="cat-modal-item-name">{c.nome}</span>
+                      <div className="cat-modal-item-actions">
+                        <button
+                          className="btn-icon btn-icon-edit"
+                          title="Renomear"
+                          onClick={() => handleIniciarEdit(c)}
+                        >
+                          <Edit2 size={12} />
+                        </button>
+                        <button
+                          className="btn-icon btn-icon-del"
+                          title="Excluir"
+                          onClick={() => { setConfirmDelId(c.id); setEditandoId(null); }}
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Criar nova */}
+          <hr className="form-divider" />
+          <div className="form-section-title">Nova Categoria</div>
+          <div className="cat-add-row">
+            <input
+              className="cat-modal-edit-input"
+              style={{ borderColor: "var(--border)" }}
+              value={novaCategoria}
+              onChange={e => setNovaCategoria(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && handleCriar()}
+              placeholder="Nome da nova categoria..."
+            />
+            <button
+              className="cat-add-btn"
+              onClick={handleCriar}
+              disabled={salvando || !novaCategoria.trim()}
+            >
+              {salvando ? "..." : "+ Adicionar"}
+            </button>
+          </div>
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Fechar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ════════════════════════════════════════ */
 export default function Despesas() {
@@ -961,13 +1143,14 @@ export default function Despesas() {
   const [periodoCustom, setPeriodoCustom] = useState({ inicio: "", fim: "" });
 
   // Categorias dinâmicas
-  const { categorias, criarCategoria, desativarCategoria } = useCategorias(uid);
+  const { categorias, criarCategoria, desativarCategoria, renomearCategoria } = useCategorias(uid);
 
   // Modais
-  const [modalNovo, setModalNovo]     = useState(false);
-  const [editando, setEditando]       = useState(null);
-  const [pagando, setPagando]         = useState(null);
-  const [deletando, setDeletando]     = useState(null);
+  const [modalNovo, setModalNovo]             = useState(false);
+  const [editando, setEditando]               = useState(null);
+  const [pagando, setPagando]                 = useState(null);
+  const [deletando, setDeletando]             = useState(null);
+  const [modalCategorias, setModalCategorias] = useState(false);
 
   /* ── Auth ── */
   useEffect(() => {
@@ -1015,12 +1198,15 @@ export default function Despesas() {
     let cnt = despesaIdCnt;
 
     if (form.parcelado && form.totalParcelas > 1) {
-      // Parcelamento: cria múltiplas despesas com IDs sequenciais
+      // Parcelamento: todas as parcelas compartilham o mesmo número base (cnt atual)
+      // e recebem idShow = "D000X-N"
       const grupoId = `G${Date.now()}`;
       const batch = writeBatch(db);
+      const baseNum = cnt; // número sequencial desse grupo
 
       for (let i = 0; i < form.totalParcelas; i++) {
-        const newId = gerarIdDespesa(cnt);
+        const newDocId = `${gerarIdBase(baseNum)}-${i + 1}-${Date.now()}-${i}`;
+        const idShow = gerarIdShow(baseNum, i + 1, form.totalParcelas);
         const dataVenc = (() => {
           const d = new Date(form.vencimento + "T12:00:00");
           d.setMonth(d.getMonth() + i);
@@ -1028,24 +1214,26 @@ export default function Despesas() {
         })();
         const status = calcularStatus(dataVenc, "pendente");
 
-        batch.set(doc(db, "users", uid, "despesas", newId), {
+        batch.set(doc(db, "users", uid, "despesas", newDocId), {
           ...form, parcelado: true, grupoId,
           parcelaAtual: i + 1,
+          idShow,
           vencimento: dataVenc, status,
           dataCriacao: new Date().toISOString(),
         });
-        cnt++;
       }
+      cnt++; // grupo inteiro consome apenas 1 número sequencial
 
       batch.set(doc(db, "users", uid), { despesaIdCnt: cnt }, { merge: true });
       await batch.commit();
     } else {
       // Despesa única
-      const newId = gerarIdDespesa(cnt);
+      const newDocId = `${gerarIdBase(cnt)}-${Date.now()}`;
+      const idShow = gerarIdShow(cnt);
       const status = calcularStatus(form.vencimento, "pendente");
 
-      await setDoc(doc(db, "users", uid, "despesas", newId), {
-        ...form, status, dataCriacao: new Date().toISOString(),
+      await setDoc(doc(db, "users", uid, "despesas", newDocId), {
+        ...form, status, idShow, dataCriacao: new Date().toISOString(),
       });
       await setDoc(doc(db, "users", uid), { despesaIdCnt: cnt + 1 }, { merge: true });
     }
@@ -1079,9 +1267,10 @@ export default function Despesas() {
         const novaData = proximaData(pagando.vencimento, pagando.tipoRecorrencia, pagando.intervalo || 1);
         if (novaData) {
           const cnt = despesaIdCnt;
-          const newId = gerarIdDespesa(cnt);
+          const newDocId = `${gerarIdBase(cnt)}-${Date.now()}`;
+          const idShow = gerarIdShow(cnt);
           const novoStatus = calcularStatus(novaData, "pendente");
-          await setDoc(doc(db, "users", uid, "despesas", newId), {
+          await setDoc(doc(db, "users", uid, "despesas", newDocId), {
             descricao:      pagando.descricao,
             valor:          pagando.valor,
             vencimento:     novaData,
@@ -1094,6 +1283,7 @@ export default function Despesas() {
             intervalo:      pagando.intervalo,
             dataFim:        pagando.dataFim || null,
             recorrenciaOrigemId: pagando.id,
+            idShow,
             status:         novoStatus,
             dataCriacao:    new Date().toISOString(),
           });
@@ -1309,6 +1499,15 @@ export default function Despesas() {
           <option value="todas">Todas categorias</option>
           {categoriasFiltro.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
+
+        <button
+          className={`btn-gear-cat ${modalCategorias ? "active" : ""}`}
+          onClick={() => setModalCategorias(true)}
+          title="Gerenciar categorias"
+        >
+          <Settings size={12} />
+          Categorias
+        </button>
       </div>
 
       {/* Tabela */}
@@ -1338,8 +1537,8 @@ export default function Despesas() {
         ) : despesasFiltradas.map(d => (
           <div key={d.id} className="desp-row">
             {/* ID */}
-            <span className="desp-id">
-              {d.id}
+            <span className="desp-id" title={`doc.id: ${d.id}`}>
+              {d.idShow || d.id}
               {d.recorrente && (
                 <RefreshCw size={9} className="recorr-icon" style={{ marginLeft: 5, verticalAlign: "middle" }} />
               )}
@@ -1410,6 +1609,15 @@ export default function Despesas() {
       </div>
 
       {/* Modais */}
+      {modalCategorias && (
+        <ModalCategorias
+          categorias={categorias}
+          onCriar={criarCategoria}
+          onRenomear={renomearCategoria}
+          onDesativar={desativarCategoria}
+          onClose={() => setModalCategorias(false)}
+        />
+      )}
       {modalNovo && (
         <ModalNovaDespesa
           despesas={despesas}
