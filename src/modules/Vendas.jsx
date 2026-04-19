@@ -16,6 +16,7 @@ import {
 
 import { db, auth } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { BannerLimite, LIMITES_FREE } from "../hooks/useLicenca";
 import {
   collection, doc, setDoc, deleteDoc,
   onSnapshot, runTransaction, increment, getDoc, addDoc,
@@ -1521,7 +1522,7 @@ function ModalConfirmDeleteVenda({ venda, onConfirm, onClose }) {
 /* ═══════════════════════════════════════
    COMPONENTE PRINCIPAL
    ═══════════════════════════════════════ */
-export default function Vendas() {
+export default function Vendas({ isPro = false }) {
   const [uid, setUid]       = useState(null);
   const [vendas, setVendas] = useState([]);
   const [clientes, setClientes]   = useState([]);
@@ -1636,30 +1637,35 @@ useEffect(() => {
          IMPORTANTE: verificamos a existência do doc antes de fazer update
          para evitar crash em itens oriundos de orçamento cujo tipo real
          é "servico" mas foi salvo com tipo "produto" na conversão. */
+       
       await runTransaction(db, async (tx) => {
-        /* Restaurar estoque dos itens antigos */
-        for (const oldItem of (vendaExistente.itens || [])) {
-          if (oldItem.produtoId && oldItem.tipo === "produto") {
-            const ref = doc(db, "users", uid, "produtos", oldItem.produtoId);
-            const snap = await tx.get(ref);
-            if (snap.exists()) {
-              tx.update(ref, { estoque: increment(oldItem.qtd || 1) });
-            }
-          }
-        }
-        /* Descontar estoque dos itens novos */
-        for (const newItem of (payload.itens || [])) {
-          if (newItem.produtoId && newItem.tipo === "produto") {
-            const ref = doc(db, "users", uid, "produtos", newItem.produtoId);
-            const snap = await tx.get(ref);
-            if (snap.exists()) {
-              tx.update(ref, { estoque: increment(-(newItem.qtd || 1)) });
-            }
-          }
-        }
-        /* Salvar venda */
-        tx.set(doc(db, "users", uid, "vendas", vendaExistente.id), payload, { merge: true });
-      });
+  // ── FASE 1: todos os reads ──
+  const oldRefs = (vendaExistente.itens || [])
+    .filter(i => i.produtoId && i.tipo === "produto")
+    .map(i => ({ ref: doc(db, "users", uid, "produtos", i.produtoId), item: i }));
+
+  const newRefs = (payload.itens || [])
+    .filter(i => i.produtoId && i.tipo === "produto")
+    .map(i => ({ ref: doc(db, "users", uid, "produtos", i.produtoId), item: i }));
+
+  const oldSnaps = await Promise.all(oldRefs.map(({ ref }) => tx.get(ref)));
+  const newSnaps = await Promise.all(newRefs.map(({ ref }) => tx.get(ref)));
+
+  // ── FASE 2: todos os writes ──
+  oldRefs.forEach(({ ref, item }, i) => {
+    if (oldSnaps[i].exists()) {
+      tx.update(ref, { estoque: increment(item.qtd || 1) });
+    }
+  });
+
+  newRefs.forEach(({ ref, item }, i) => {
+    if (newSnaps[i].exists()) {
+      tx.update(ref, { estoque: increment(-(item.qtd || 1)) });
+    }
+  });
+
+  tx.set(doc(db, "users", uid, "vendas", vendaExistente.id), payload, { merge: true });
+});
 
       /* ── RESET FINANCEIRO ──────────────────────────────────────────────────
          A venda foi alterada (forma de pagamento, valor, etc.).
@@ -1861,6 +1867,16 @@ useEffect(() => {
     return lista;
   }, [vendas, period, search]);
 
+  /* Vendas do mês corrente — limite Free */
+  const vendasMesAtual = useMemo(() => {
+    const now = new Date();
+    return vendas.filter(v => {
+      if (!v.data) return false;
+      const d = new Date(v.data + "T00:00:00");
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+  }, [vendas]);
+
   if (!uid) return <div className="vd-loading">Carregando autenticação...</div>;
 
   return (
@@ -1886,7 +1902,9 @@ useEffect(() => {
 
         <div className="vd-topbar-right">
           <button className="btn-novo-cl" onClick={() => setModalNova(true)}
-            style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: 9, background: "var(--gold)", color: "#0a0808", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", transition: "opacity .13s" }}
+            disabled={!isPro && vendasMesAtual.length >= LIMITES_FREE.vendas}
+            title={!isPro && vendasMesAtual.length >= LIMITES_FREE.vendas ? `Limite de ${LIMITES_FREE.vendas} vendas por mês atingido no plano Free` : undefined}
+            style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: 9, background: "var(--gold)", color: "#0a0808", border: "none", cursor: !isPro && vendasMesAtual.length >= LIMITES_FREE.vendas ? "not-allowed" : "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", transition: "opacity .13s", opacity: !isPro && vendasMesAtual.length >= LIMITES_FREE.vendas ? 0.5 : 1 }}
           >
             <Plus size={14} /> Nova Venda
           </button>
@@ -1906,6 +1924,7 @@ useEffect(() => {
 
       {/* Tabela */}
       <div className="ag-content">
+        <BannerLimite total={vendasMesAtual.length} limite={LIMITES_FREE.vendas} tipo="vendas neste mês" isPro={isPro} />
         <div className="vd-table-wrap">
           <div className="vd-table-header">
             <div className="vd-table-title">
