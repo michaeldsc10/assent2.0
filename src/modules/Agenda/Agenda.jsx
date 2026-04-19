@@ -6,6 +6,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { CalendarDays, List, Plus, X, CheckCircle2, Edit2, Trash2 } from "lucide-react";
 import { db, auth, onAuthStateChanged } from "../../lib/firebase";
+import {  LIMITES_FREE } from "../../hooks/useLicenca";
+import {BannerLimite} from "../../hooks/LicencaUI;
 import {
   collection, doc, setDoc, deleteDoc, onSnapshot, updateDoc,
 } from "firebase/firestore";
@@ -638,7 +640,7 @@ function ModalConfirmDelete({ evento, onConfirm, onClose }) {
    ══════════════════════════════════════════════════════ */
 const FILTROS = ["Próximos", "Hoje", "Esta semana", "Todos"];
 
-export default function Agenda() {
+export default function Agenda({ isPro = false }) {
   const [uid,      setUid]      = useState(null);
   const [eventos,  setEventos]  = useState([]);
   const [loading,  setLoading]  = useState(true);
@@ -753,13 +755,19 @@ export default function Agenda() {
               </button>
             </div>
 
-            <button className="btn-novo-evento" onClick={() => setFormEvt("novo")}>
+            <button
+              className="btn-novo-evento"
+              onClick={() => setFormEvt("novo")}
+              disabled={!isPro && eventos.length >= LIMITES_FREE.eventos}
+              title={!isPro && eventos.length >= LIMITES_FREE.eventos ? `Limite de ${LIMITES_FREE.eventos} eventos atingido no plano Free` : undefined}
+            >
               <Plus size={14} /> Novo Evento
             </button>
           </div>
         </header>
 
         <div className="ag-content">
+          <BannerLimite total={eventos.length} limite={LIMITES_FREE.eventos} tipo="eventos na Agenda" isPro={isPro} />
 
           {/* KPIs */}
           <div className="ag-resumo">
