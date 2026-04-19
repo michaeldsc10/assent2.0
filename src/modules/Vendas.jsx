@@ -16,7 +16,8 @@ import {
 
 import { db, auth } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import { BannerLimite, LIMITES_FREE } from "../hooks/useLicenca";
+import { LIMITES_FREE } from "../hooks/useLicenca";
+import { BannerLimite } from "../hooks/LicencaUI.jsx";
 import {
   collection, doc, setDoc, deleteDoc,
   onSnapshot, runTransaction, increment, getDoc, addDoc,
