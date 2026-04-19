@@ -1632,20 +1632,29 @@ useEffect(() => {
     if (!uid) return;
 
     if (vendaExistente) {
-      /* EDITAR: se produto mudou, restaura estoque antigo e desconta novo */
+      /* EDITAR: se produto mudou, restaura estoque antigo e desconta novo.
+         IMPORTANTE: verificamos a existência do doc antes de fazer update
+         para evitar crash em itens oriundos de orçamento cujo tipo real
+         é "servico" mas foi salvo com tipo "produto" na conversão. */
       await runTransaction(db, async (tx) => {
         /* Restaurar estoque dos itens antigos */
         for (const oldItem of (vendaExistente.itens || [])) {
           if (oldItem.produtoId && oldItem.tipo === "produto") {
             const ref = doc(db, "users", uid, "produtos", oldItem.produtoId);
-            tx.update(ref, { estoque: increment(oldItem.qtd || 1) });
+            const snap = await tx.get(ref);
+            if (snap.exists()) {
+              tx.update(ref, { estoque: increment(oldItem.qtd || 1) });
+            }
           }
         }
         /* Descontar estoque dos itens novos */
         for (const newItem of (payload.itens || [])) {
           if (newItem.produtoId && newItem.tipo === "produto") {
             const ref = doc(db, "users", uid, "produtos", newItem.produtoId);
-            tx.update(ref, { estoque: increment(-(newItem.qtd || 1)) });
+            const snap = await tx.get(ref);
+            if (snap.exists()) {
+              tx.update(ref, { estoque: increment(-(newItem.qtd || 1)) });
+            }
           }
         }
         /* Salvar venda */
