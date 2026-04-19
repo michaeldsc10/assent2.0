@@ -965,17 +965,13 @@ const CSS = `
     background: var(--s2); border: 1px solid var(--border);
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; transition: border-color .15s, color .15s, transform .25s;
-    color: var(--text-2) !important; flex-shrink: 0; margin-left: 8px;
-    appearance: none; -webkit-appearance: none;
+    color: var(--text-2); flex-shrink: 0; margin-left: 8px;
+    user-select: none;
   }
   .ag-theme-btn:hover {
     border-color: var(--gold);
-    color: var(--gold) !important;
+    color: var(--gold);
     transform: rotate(20deg);
-  }
-  .ag-theme-btn svg {
-    color: inherit;
-    display: block;
   }
 
   /* ══ TEMA LIGHT ══ */
@@ -1540,16 +1536,17 @@ export default function Dashboard() {
 
           <div className="ag-notif" title="Notificações"><Bell size={15} /></div>
 
-          <button
+          <div
             className="ag-theme-btn"
             onClick={toggleTheme}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && toggleTheme()}
             title={theme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
             aria-label="Alternar tema"
           >
-            {theme === "dark"
-              ? <Sun  size={15} style={{ color: "var(--text-2)", display: "block" }} />
-              : <Moon size={15} style={{ color: "var(--text-2)", display: "block" }} />}
-          </button>
+            {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+          </div>
 
           <div className="ag-user-area" ref={dropdownRef}>
             <div
