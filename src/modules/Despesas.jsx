@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 
 import { db, auth, onAuthStateChanged } from "../lib/firebase";
+import {  LIMITES_FREE } from "../hooks/useLicenca";
+import { BannerLimite } from "../hooks/LicencaUI";
 import {
   collection, doc, setDoc, deleteDoc, onSnapshot,
   query, orderBy, writeBatch, addDoc,
@@ -1129,7 +1131,7 @@ function ModalCategorias({ categorias, onCriar, onRenomear, onDesativar, onClose
 /* ════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ════════════════════════════════════════ */
-export default function Despesas() {
+export default function Despesas({ isPro = false }) {
   const [uid, setUid] = useState(null);
   const [despesas, setDespesas] = useState([]);
   const [despesaIdCnt, setDespesaIdCnt] = useState(0);
@@ -1407,13 +1409,19 @@ export default function Despesas() {
         </div>
 
         <div style={{ marginLeft: "auto" }}>
-          <button className="btn-nova-desp" onClick={() => setModalNovo(true)}>
+          <button
+            className="btn-nova-desp"
+            onClick={() => setModalNovo(true)}
+            disabled={!isPro && despesas.length >= LIMITES_FREE.despesas}
+            title={!isPro && despesas.length >= LIMITES_FREE.despesas ? `Limite de ${LIMITES_FREE.despesas} despesas atingido no plano Free` : undefined}
+          >
             <Plus size={14} /> Nova Despesa
           </button>
         </div>
       </header>
 
       {/* Cards de métricas */}
+      <BannerLimite total={despesas.length} limite={LIMITES_FREE.despesas} tipo="despesas" isPro={isPro} />
       <div className="desp-metrics">
         <div className="metric-card metric-card-red">
           <div className="metric-icon metric-icon-red">
