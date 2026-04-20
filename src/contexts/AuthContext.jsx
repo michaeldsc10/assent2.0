@@ -126,7 +126,8 @@ console.log("[AuthContext] indexDoc existe?", indexDoc.exists());
         return;
       }
 
-      const { tenantUid: tUid } = indexDoc.data();
+      const data = indexDoc.data();
+const tUid = data.tenantUid ?? data.tenantUID;
 console.log("[AuthContext] tenantUid encontrado:", tUid);
       // ── Passo 3: lê o perfil em /users/{tenantUid}/usuarios/{uid} ──
       console.log("[AuthContext] buscando perfil convidado..."); 
