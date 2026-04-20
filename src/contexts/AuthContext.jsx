@@ -1,234 +1,106 @@
-// AuthContext.jsx — ASSENT v2.0
-// Expõe: { user, cargo, tenantUid, vendedorId, vendedorNome, loadingAuth, signIn, signOut, permissoes }
-// Integrado com Firebase Auth + Firestore (estrutura multi-tenant)
+/* ═══════════════════════════════════════════════════
+   ASSENT v2.0 — Auth.jsx
+   AuthProvider + useAuth + PrivateRoute
+   v2.2: convidados usam a licença do tenant (Admin)
+   ═══════════════════════════════════════════════════ */
 
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
-  signOut as firebaseSignOut,
+  signOut,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "../lib/firebase"; // ajuste o caminho conforme seu projeto
+import { auth, db } from "../lib/firebase";
 
-// ─────────────────────────────────────────────
-// Constantes de cargo
-// ─────────────────────────────────────────────
-export const CARGOS = {
-  ADMIN:       "admin",
-  FINANCEIRO:  "financeiro",
-  COMERCIAL:   "comercial",
-  COMPRAS:     "compras",
-  OPERACIONAL: "operacional",
-  VENDEDOR:    "vendedor",
-  SUPORTE:     "suporte",
-};
-
-// ─────────────────────────────────────────────
-// Matriz de permissões por módulo e cargo
-// Níveis: "vcex" | "vce" | "vc" | "ve" | "v" | ""
-// v = ver · c = criar · e = editar · x = excluir
-// ─────────────────────────────────────────────
-export const PERMISSOES = {
-  dashboard:      { admin: "v",    financeiro: "v",   comercial: "",    compras: "",    operacional: "",    vendedor: "",    suporte: ""   },
-  agenda:         { admin: "vcex", financeiro: "v",   comercial: "vcex",compras: "vc",  operacional: "vce", vendedor: "vc",  suporte: "vc" },
-  clientes:       { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "vce", vendedor: "vce", suporte: "ve" },
-  produtos:       { admin: "vcex", financeiro: "v",   comercial: "v",   compras: "vce", operacional: "vce", vendedor: "v",   suporte: "v"  },
-  servicos:       { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "vce", vendedor: "v",   suporte: "v"  },
-  fornecedores:   { admin: "vcex", financeiro: "v",   comercial: "",    compras: "vce", operacional: "v",   vendedor: "",    suporte: ""   },
-  vendedores:     { admin: "vcex", financeiro: "",    comercial: "v",   compras: "",    operacional: "",    vendedor: "",    suporte: ""   },
-  entradaEstoque: { admin: "vcex", financeiro: "v",   comercial: "",    compras: "vce", operacional: "vce", vendedor: "",    suporte: ""   },
-  compras:        { admin: "vcex", financeiro: "ve",  comercial: "",    compras: "vce", operacional: "v",   vendedor: "",    suporte: ""   },
-  orcamentos:     { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "v",   vendedor: "vce", suporte: "v"  },
-  vendas:         { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "v",   vendedor: "vc",  suporte: ""   },
-  aReceber:       { admin: "vcex", financeiro: "vce", comercial: "v",   compras: "",    operacional: "",    vendedor: "",    suporte: ""   },
-  caixaDiario:    { admin: "vcex", financeiro: "vce", comercial: "",    compras: "",    operacional: "vc",  vendedor: "",    suporte: ""   },
-  despesas:       { admin: "vcex", financeiro: "vce", comercial: "",    compras: "vc",  operacional: "",    vendedor: "",    suporte: ""   },
-  // Todos veem o menu Relatórios; sub-relatórios são bloqueados internamente com cadeado
-  relatorios:     { admin: "v",    financeiro: "v",   comercial: "v",   compras: "v",   operacional: "v",   vendedor: "v",   suporte: "v"  },
-usuarios:   { admin: "vcex", financeiro: "",  comercial: "",  compras: "",   operacional: "",   vendedor: "",   suporte: ""   },
-  configuracoes: { admin: "vcex", financeiro: "", comercial: "", compras: "",  operacional: "",   vendedor: "",   suporte: ""   },
-  
-};
-
-// ─────────────────────────────────────────────
-// Sub-relatórios — quem pode ver cada um
-// ─────────────────────────────────────────────
-export const PERMISSOES_RELATORIOS = {
-  dre:        { admin: true, financeiro: true,  comercial: false, compras: false, operacional: false, vendedor: false, suporte: false },
-  financeiro: { admin: true, financeiro: true,  comercial: false, compras: false, operacional: false, vendedor: false, suporte: false },
-  despesas:   { admin: true, financeiro: true,  comercial: false, compras: false, operacional: false, vendedor: false, suporte: false },
-  compras:    { admin: true, financeiro: true,  comercial: false, compras: true,  operacional: false, vendedor: false, suporte: false },
-  estoque:    { admin: true, financeiro: true,  comercial: true,  compras: true,  operacional: true,  vendedor: true,  suporte: false },
-  vendas:     { admin: true, financeiro: true,  comercial: true,  compras: false, operacional: false, vendedor: true,  suporte: true  },
-  clientes:   { admin: true, financeiro: false, comercial: true,  compras: false, operacional: false, vendedor: true,  suporte: true  },
-  agenda:     { admin: true, financeiro: false, comercial: true,  compras: false, operacional: false, vendedor: true,  suporte: true  },
-};
-
-// ─────────────────────────────────────────────
-// Helpers de permissão (uso standalone fora do hook)
-// ─────────────────────────────────────────────
-export const podeVer          = (cargo, modulo)      => !!(PERMISSOES[modulo]?.[cargo]?.includes("v"));
-export const podeCriar        = (cargo, modulo)      => !!(PERMISSOES[modulo]?.[cargo]?.includes("c"));
-export const podeEditar       = (cargo, modulo)      => !!(PERMISSOES[modulo]?.[cargo]?.includes("e"));
-export const podeExcluir      = (cargo, modulo)      => !!(PERMISSOES[modulo]?.[cargo]?.includes("x"));
-export const podeVerRelatorio = (cargo, subRelatorio) => !!(PERMISSOES_RELATORIOS[subRelatorio]?.[cargo]);
-
-// ─────────────────────────────────────────────
-// Context
-// ─────────────────────────────────────────────
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser]                   = useState(null);  // Firebase Auth user
-  const [tenantUid, setTenantUid]         = useState(null);  // uid do dono/Admin do tenant
-  const [cargo, setCargo]                 = useState(null);  // string do cargo
-  const [vendedorId, setVendedorId]       = useState(null);  // id em /vendedores
-  const [vendedorNome, setVendedorNome]   = useState(null);  // nome para exibição
-  const [loadingAuth, setLoadingAuth]     = useState(true);
+  const [user,    setUser]    = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // ── Limpa todo o estado de sessão ──
-  const limparSessao = useCallback(() => {
-    setUser(null);
-    setTenantUid(null);
-    setCargo(null);
-    setVendedorId(null);
-    setVendedorNome(null);
-  }, []);
-
-  // ── Carrega o perfil do usuário no Firestore após autenticação ──
-  const carregarPerfil = useCallback(async (firebaseUser) => {
-    try {
-      const uid = firebaseUser.uid;
-console.log("[AuthContext] carregando perfil para uid:", uid); 
-      // ── Passo 1: verifica se é o Admin/dono do tenant ──
-      // O Admin é identificado por ter um documento em /users/{uid} na raiz
-      const adminDoc = await getDoc(doc(db, "users", uid));
-console.log("[AuthContext] adminDoc existe?", adminDoc.exists());
-      if (adminDoc.exists()) {
-        setUser(firebaseUser);
-        setTenantUid(uid);
-        setCargo(CARGOS.ADMIN);
-        setVendedorId(null);
-        setVendedorNome(null);
-        return;
-      }
-
-      // ── Passo 2: usuário convidado — busca o tenant via índice ──
-      // Ao convidar um usuário, o Admin grava /userIndex/{uid} → { tenantUid }
-      // Isso evita varrer todos os tenants para localizar o usuário.
-      console.log("[AuthContext] buscando userIndex..."); 
-      const indexDoc = await getDoc(doc(db, "userIndex", uid));
-console.log("[AuthContext] indexDoc existe?", indexDoc.exists());
-      if (!indexDoc.exists()) {
-         console.error("[AuthContext] userIndex não encontrado");
-        await firebaseSignOut(auth);
-        return;
-      }
-
-      const { tenantUid: tUid } = indexDoc.data();
-console.log("[AuthContext] tenantUid encontrado:", tUid);
-      // ── Passo 3: lê o perfil em /users/{tenantUid}/usuarios/{uid} ──
-      console.log("[AuthContext] buscando perfil convidado..."); 
-      const perfilDoc = await getDoc(doc(db, "users", tUid, "usuarios", uid));
-console.log("[AuthContext] perfilDoc existe?", perfilDoc.exists());
-      if (!perfilDoc.exists()) {
-        console.error("[AuthContext] Documento de usuário convidado não encontrado.");
-        await firebaseSignOut(auth);
-        return;
-      }
-
-      const perfil = perfilDoc.data();
-
-      // Bloqueia usuário desativado
-      if (!perfil.ativo) {
-        console.warn("[AuthContext] Usuário desativado. Acesso negado.");
-        await firebaseSignOut(auth);
-        return;
-      }
-
-      setUser(firebaseUser);
-      setTenantUid(tUid);
-      setCargo(perfil.cargo);
-
-      // ── Passo 4: se cargo === "vendedor", carrega dados do cadastro vinculado ──
-      if (perfil.cargo === CARGOS.VENDEDOR && perfil.vendedorId) {
-        const vendedorDoc = await getDoc(
-          doc(db, "users", tUid, "vendedores", perfil.vendedorId)
-        );
-        setVendedorId(perfil.vendedorId);
-        setVendedorNome(vendedorDoc.exists() ? (vendedorDoc.data().nome ?? null) : null);
-      } else {
-        setVendedorId(null);
-        setVendedorNome(null);
-      }
-    } catch (err) {
-      console.error("[AuthContext] Erro ao carregar perfil:", err);
-      limparSessao();
-    }
-  }, [limparSessao]);
-
-  // ── Listener do Firebase Auth ──
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        await carregarPerfil(firebaseUser);
-      } else {
-        limparSessao();
-      }
-      setLoadingAuth(false);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser ?? null);
+      setLoading(false);
     });
     return () => unsubscribe();
-  }, [carregarPerfil, limparSessao]);
+  }, []);
 
-  // ── signIn ──
-  const signIn = useCallback(async (email, password) => {
-    setLoadingAuth(true);
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      // carregarPerfil é disparado pelo onAuthStateChanged
-    } catch (err) {
-      setLoadingAuth(false);
-      throw err; // repassa para o componente de login exibir o erro
+  async function login(email, senha) {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail || !senha) {
+      throw new AuthError("empty-fields", "Preencha e-mail e senha.");
     }
-  }, []);
+    try {
+      const credential = await signInWithEmailAndPassword(auth, trimmedEmail, senha);
+      const uid = credential.user.uid;
 
-  // ── signOut ──
-  const signOut = useCallback(async () => {
-    await firebaseSignOut(auth);
-    // o listener limpa o estado automaticamente
-  }, []);
+      // ── 1. Tenta licença direta (Admin/dono da conta) ──
+      const licencaSnap = await getDoc(doc(db, "licencas", uid));
 
-  // ── Helpers de permissão prontos para uso nos componentes ──
-  const perm = {
-    podeVer:          (modulo) => podeVer(cargo, modulo),
-    podeCriar:        (modulo) => podeCriar(cargo, modulo),
-    podeEditar:       (modulo) => podeEditar(cargo, modulo),
-    podeExcluir:      (modulo) => podeExcluir(cargo, modulo),
-    podeVerRelatorio: (sub)    => podeVerRelatorio(cargo, sub),
-    isAdmin:    cargo === CARGOS.ADMIN,
-    isVendedor: cargo === CARGOS.VENDEDOR,
-  };
+      if (licencaSnap.exists()) {
+        // É o Admin — verifica se a licença está ativa
+        if (licencaSnap.data().ativo !== true) {
+          await signOut(auth);
+          throw new AuthError(
+            "licenca-inativa",
+            "Sua licença está inativa. Entre em contato com o suporte."
+          );
+        }
+        return credential.user;
+      }
 
-  // ─────────────────────────────────────────────
-  // Value exposto para toda a aplicação
-  // ─────────────────────────────────────────────
-  const value = {
-    // ── Identidade ──
-    user,           // Firebase Auth user (uid, email, displayName…)
-    cargo,          // "admin" | "financeiro" | "comercial" | "compras" | "operacional" | "vendedor" | "suporte"
-    tenantUid,      // uid do dono do tenant — raiz das queries Firestore: /users/{tenantUid}/...
-    vendedorId,     // id em /vendedores — null se cargo !== "vendedor" ou sem vínculo
-    vendedorNome,   // nome para exibição no select travado em Vendas.jsx
-    loadingAuth,    // true enquanto o perfil ainda está sendo carregado
+      // ── 2. Sem licença própria — verifica se é convidado ──
+      const indexSnap = await getDoc(doc(db, "userIndex", uid));
 
-    // ── Ações ──
-    signIn,
-    signOut,
+      if (indexSnap.exists()) {
+        // É convidado — verifica a licença do tenant (Admin)
+        const { tenantUid } = indexSnap.data();
+        const licencaTenantSnap = await getDoc(doc(db, "licencas", tenantUid));
 
-    // ── Permissões (shortcuts) ──
-    ...perm,
-  };
+        if (!licencaTenantSnap.exists() || licencaTenantSnap.data().ativo !== true) {
+          await signOut(auth);
+          throw new AuthError(
+            "licenca-inativa",
+            "A licença da empresa está inativa. Entre em contato com o administrador."
+          );
+        }
+        return credential.user;
+      }
+
+      // ── 3. Nem Admin nem convidado reconhecido ──
+      await signOut(auth);
+      throw new AuthError(
+        "usuario-nao-encontrado",
+        "Usuário não encontrado no sistema. Entre em contato com o administrador."
+      );
+
+    } catch (err) {
+      if (err instanceof AuthError) throw err;
+      throw mapFirebaseError(err);
+    }
+  }
+
+  async function logout() {
+    await signOut(auth);
+    setUser(null);
+  }
+
+  async function resetPassword(email) {
+    const trimmedEmail = email.trim().toLowerCase();
+    if (!trimmedEmail) {
+      throw new AuthError("empty-email", "Digite seu e-mail para recuperar a senha.");
+    }
+    try {
+      await sendPasswordResetEmail(auth, trimmedEmail);
+    } catch (err) {
+      throw mapFirebaseError(err);
+    }
+  }
+
+  const value = { user, loading, login, logout, resetPassword };
 
   return (
     <AuthContext.Provider value={value}>
@@ -237,13 +109,55 @@ console.log("[AuthContext] perfilDoc existe?", perfilDoc.exists());
   );
 }
 
-// ─────────────────────────────────────────────
-// Hook de consumo
-// ─────────────────────────────────────────────
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth deve ser usado dentro de <AuthProvider>");
   return ctx;
 }
 
-export default AuthContext;
+export function PrivateRoute({ children, onRedirect, fallback = null }) {
+  const { user, loading } = useAuth();
+  if (loading) return fallback ?? <LoadingScreen />;
+  if (!user) { onRedirect?.(); return null; }
+  return children;
+}
+
+function LoadingScreen() {
+  return (
+    <div style={{
+      minHeight: "100vh", background: "#050505",
+      display: "flex", flexDirection: "column",
+      alignItems: "center", justifyContent: "center", gap: 16,
+    }}>
+      <div style={{
+        width: 48, height: 48,
+        border: "2px solid rgba(212,175,55,0.2)",
+        borderTop: "2px solid #D4AF37",
+        borderRadius: "50%",
+        animation: "spin 0.8s linear infinite",
+      }} />
+      <p style={{ color: "rgba(212,175,55,0.6)", fontFamily: "sans-serif", fontSize: 13, letterSpacing: "0.1em", textTransform: "uppercase" }}>
+        Verificando sessão...
+      </p>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
+class AuthError extends Error {
+  constructor(code, message) { super(message); this.code = code; }
+}
+
+function mapFirebaseError(err) {
+  const map = {
+    "auth/user-not-found":         "E-mail não encontrado.",
+    "auth/wrong-password":         "Senha incorreta.",
+    "auth/invalid-credential":     "E-mail ou senha incorretos.",
+    "auth/invalid-email":          "E-mail inválido.",
+    "auth/user-disabled":          "Conta desativada. Contate o suporte.",
+    "auth/too-many-requests":      "Muitas tentativas. Aguarde e tente novamente.",
+    "auth/network-request-failed": "Sem conexão. Verifique sua internet.",
+  };
+  const message = map[err.code] ?? "Ocorreu um erro inesperado. Tente novamente.";
+  return new AuthError(err.code ?? "unknown", message);
+}
