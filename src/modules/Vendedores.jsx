@@ -1,9 +1,8 @@
 // Vendedores.jsx — ASSENT v2.0
-// Correções aplicadas:
-//   [FIX-1] Campo `usuarioId` adicionado ao cadastro de vendedor
-//   [FIX-4] vendasPorVendedor usa apenas vendedorId (sem fallback por nome)
+// Multi-tenant: queries em /users/{tenantUid}/...
+// Permissões via useAuth() — módulo "vendedores" (admin: vcex | comercial: v)
 
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect } from "react";
 import {
   collection,
   doc,
@@ -11,25 +10,24 @@ import {
   updateDoc,
   deleteDoc,
   onSnapshot,
-  query,
-  where,
   orderBy,
+  query,
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import AuthContext from "../contexts/AuthContext"; // contexto com { user, cargo, vendedorId }
+import { useAuth } from "../contexts/AuthContext";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 const CARGO_LABELS = {
-  admin: "Admin",
-  financeiro: "Financeiro",
-  comercial: "Comercial",
-  compras: "Compras",
+  admin:       "Admin",
+  financeiro:  "Financeiro",
+  comercial:   "Comercial",
+  compras:     "Compras",
   operacional: "Operacional",
-  vendedor: "Vendedor",
-  suporte: "Suporte / Atendimento",
+  vendedor:    "Vendedor",
+  suporte:     "Suporte / Atendimento",
 };
 
 function formatarMoeda(valor) {
@@ -46,14 +44,13 @@ function ModalVendedor({ vendedor, usuariosSistema, onSalvar, onFechar }) {
   const isEdicao = Boolean(vendedor?.id);
 
   const [form, setForm] = useState({
-    nome: vendedor?.nome || "",
-    telefone: vendedor?.telefone || "",
-    email: vendedor?.email || "",
-    comissao: vendedor?.comissao ?? "",
-    observacao: vendedor?.observacao || "",
-    // [FIX-1] vínculo com usuário do sistema
-    usuarioId: vendedor?.usuarioId || "",
-    ativo: vendedor?.ativo ?? true,
+    nome:        vendedor?.nome        || "",
+    telefone:    vendedor?.telefone    || "",
+    email:       vendedor?.email       || "",
+    comissao:    vendedor?.comissao    ?? "",
+    observacao:  vendedor?.observacao  || "",
+    usuarioId:   vendedor?.usuarioId   || "",
+    ativo:       vendedor?.ativo       ?? true,
   });
 
   const [erro, setErro] = useState("");
@@ -72,9 +69,7 @@ function ModalVendedor({ vendedor, usuariosSistema, onSalvar, onFechar }) {
       setErro("O nome do vendedor é obrigatório.");
       return;
     }
-    const comissaoNum = parseFloat(
-      String(form.comissao).replace(",", ".")
-    );
+    const comissaoNum = parseFloat(String(form.comissao).replace(",", "."));
     if (form.comissao !== "" && (isNaN(comissaoNum) || comissaoNum < 0)) {
       setErro("Comissão inválida.");
       return;
@@ -82,9 +77,8 @@ function ModalVendedor({ vendedor, usuariosSistema, onSalvar, onFechar }) {
     setErro("");
     onSalvar({
       ...form,
-      nome: form.nome.trim(),
-      comissao: form.comissao === "" ? null : comissaoNum,
-      // [FIX-1] garante que usuarioId seja string vazia (não undefined) quando não preenchido
+      nome:      form.nome.trim(),
+      comissao:  form.comissao === "" ? null : comissaoNum,
       usuarioId: form.usuarioId || "",
     });
   }
@@ -154,7 +148,7 @@ function ModalVendedor({ vendedor, usuariosSistema, onSalvar, onFechar }) {
             />
           </label>
 
-          {/* [FIX-1] Vínculo com usuário do sistema */}
+          {/* Vínculo com usuário do sistema */}
           <label className="campo-label">
             Usuário do sistema vinculado
             <select
@@ -173,8 +167,7 @@ function ModalVendedor({ vendedor, usuariosSistema, onSalvar, onFechar }) {
                 ))}
             </select>
             <small className="campo-hint">
-              Vincule ao usuário de login para que ele veja apenas suas próprias
-              vendas.
+              Vincule ao usuário de login para que ele veja apenas suas próprias vendas.
             </small>
           </label>
 
@@ -190,7 +183,7 @@ function ModalVendedor({ vendedor, usuariosSistema, onSalvar, onFechar }) {
             />
           </label>
 
-          {/* Ativo */}
+          {/* Ativo — só em edição */}
           {isEdicao && (
             <label className="campo-label campo-checkbox">
               <input
@@ -221,51 +214,70 @@ function ModalVendedor({ vendedor, usuariosSistema, onSalvar, onFechar }) {
 // Componente principal
 // ---------------------------------------------------------------------------
 export default function Vendedores() {
-  const { user } = useContext(AuthContext);
+  // ── Multi-tenant: usa tenantUid (não user.uid) nas queries ──
+  const {
+    tenantUid,
+    podeCriar,
+    podeEditar,
+    podeExcluir,
+  } = useAuth();
 
-  const [vendedores, setVendedores] = useState([]);
+  const [vendedores,      setVendedores]      = useState([]);
   const [usuariosSistema, setUsuariosSistema] = useState([]);
-  const [vendas, setVendas] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [modalAberto, setModalAberto] = useState(false);
+  const [vendas,          setVendas]          = useState([]);
+  const [loading,         setLoading]         = useState(true);
+  const [modalAberto,     setModalAberto]     = useState(false);
   const [vendedorEditando, setVendedorEditando] = useState(null);
-  const [expandido, setExpandido] = useState(null);
-  const [busca, setBusca] = useState("");
+  const [expandido,       setExpandido]       = useState(null);
+  const [busca,           setBusca]           = useState("");
 
-  // Caminhos Firestore
-  const colVendedores = collection(db, "users", user.uid, "vendedores");
-  const colUsuarios = collection(db, "users", user.uid, "usuarios");
-  const colVendas = collection(db, "users", user.uid, "vendas");
+  // ── Flags de permissão para o módulo ──
+  const podeCriarVendedor  = podeCriar("vendedores");
+  const podeEditarVendedor = podeEditar("vendedores");
+  const podeExcluirVendedor = podeExcluir("vendedores");
 
-  // Escuta vendedores
+  // ── Listener: vendedores ──
   useEffect(() => {
+    if (!tenantUid) return; // guard multi-tenant
+
+    const q = query(
+      collection(db, "users", tenantUid, "vendedores"),
+      orderBy("nome")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setVendedores(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [tenantUid]);
+
+  // ── Listener: usuários do sistema (para o select de vínculo) ──
+  useEffect(() => {
+    if (!tenantUid) return; // guard multi-tenant
+
     const unsub = onSnapshot(
-      query(colVendedores, orderBy("nome")),
+      collection(db, "users", tenantUid, "usuarios"),
       (snap) => {
-        setVendedores(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-        setLoading(false);
+        setUsuariosSistema(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       }
     );
-    return unsub;
-  }, [user.uid]);
+    return () => unsub();
+  }, [tenantUid]);
 
-  // Escuta usuários do sistema (para o select do modal)
+  // ── Listener: vendas (para o painel expandido) ──
   useEffect(() => {
-    const unsub = onSnapshot(colUsuarios, (snap) => {
-      setUsuariosSistema(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-    return unsub;
-  }, [user.uid]);
+    if (!tenantUid) return; // guard multi-tenant
 
-  // Escuta vendas (para o painel de detalhes)
-  useEffect(() => {
-    const unsub = onSnapshot(colVendas, (snap) => {
-      setVendas(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-    return unsub;
-  }, [user.uid]);
+    const unsub = onSnapshot(
+      collection(db, "users", tenantUid, "vendas"),
+      (snap) => {
+        setVendas(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      }
+    );
+    return () => unsub();
+  }, [tenantUid]);
 
-  // [FIX-4] Filtra vendas SOMENTE por vendedorId — sem fallback por nome
+  // ── Helpers de vendas ──
   function vendasPorVendedor(vendedorId) {
     return vendas.filter((v) => v.vendedorId === vendedorId);
   }
@@ -277,18 +289,16 @@ export default function Vendedores() {
     );
   }
 
-  // CRUD
+  // ── CRUD ──
   async function handleSalvar(dados) {
+    const colVendedores = collection(db, "users", tenantUid, "vendedores");
+
     if (vendedorEditando) {
       await updateDoc(doc(colVendedores, vendedorEditando.id), {
         ...dados,
         atualizadoEm: serverTimestamp(),
       });
     } else {
-      // Gera o próximo vendedorId numérico sequencial
-      const docEmpresa = doc(db, "users", user.uid);
-      // Aqui você pode usar uma transaction para garantir atomicidade do contador.
-      // Por simplicidade mantemos a lógica existente do seu projeto.
       await addDoc(colVendedores, {
         ...dados,
         criadoEm: serverTimestamp(),
@@ -299,7 +309,7 @@ export default function Vendedores() {
 
   async function handleExcluir(id) {
     if (!window.confirm("Excluir este vendedor? Esta ação é irreversível.")) return;
-    await deleteDoc(doc(colVendedores, id));
+    await deleteDoc(doc(db, "users", tenantUid, "vendedores", id));
   }
 
   function abrirModal(vendedor = null) {
@@ -312,7 +322,7 @@ export default function Vendedores() {
     setModalAberto(false);
   }
 
-  // Filtro de busca
+  // ── Filtro de busca ──
   const vendedoresFiltrados = vendedores.filter((v) =>
     v.nome?.toLowerCase().includes(busca.toLowerCase())
   );
@@ -326,9 +336,13 @@ export default function Vendedores() {
     <div className="pagina-container">
       <div className="pagina-header">
         <h1 className="pagina-titulo">Vendedores</h1>
-        <button className="btn-primario" onClick={() => abrirModal()}>
-          + Novo Vendedor
-        </button>
+
+        {/* Botão só aparece para quem pode criar */}
+        {podeCriarVendedor && (
+          <button className="btn-primario" onClick={() => abrirModal()}>
+            + Novo Vendedor
+          </button>
+        )}
       </div>
 
       {/* Busca */}
@@ -350,13 +364,17 @@ export default function Vendedores() {
               <th>Comissão</th>
               <th>Usuário vinculado</th>
               <th>Status</th>
-              <th>Ações</th>
+              {/* Coluna Ações só se tiver pelo menos editar ou excluir */}
+              {(podeEditarVendedor || podeExcluirVendedor) && <th>Ações</th>}
             </tr>
           </thead>
           <tbody>
             {vendedoresFiltrados.length === 0 ? (
               <tr>
-                <td colSpan={7} className="tabela-vazia">
+                <td
+                  colSpan={(podeEditarVendedor || podeExcluirVendedor) ? 7 : 6}
+                  className="tabela-vazia"
+                >
                   Nenhum vendedor encontrado.
                 </td>
               </tr>
@@ -376,10 +394,9 @@ export default function Vendedores() {
                       <td className="negrito">{v.nome}</td>
                       <td>{v.telefone || "—"}</td>
                       <td>{v.email || "—"}</td>
-                      <td>
-                        {v.comissao != null ? `${v.comissao}%` : "—"}
-                      </td>
-                      {/* [FIX-1] exibe usuário vinculado */}
+                      <td>{v.comissao != null ? `${v.comissao}%` : "—"}</td>
+
+                      {/* Usuário vinculado */}
                       <td>
                         {usuarioVinculado ? (
                           <span className="badge badge-vinculado">
@@ -391,48 +408,63 @@ export default function Vendedores() {
                           </span>
                         )}
                       </td>
+
+                      {/* Status */}
                       <td>
                         <span
-                          className={`badge ${v.ativo !== false ? "badge-ativo" : "badge-inativo"}`}
+                          className={`badge ${
+                            v.ativo !== false ? "badge-ativo" : "badge-inativo"
+                          }`}
                         >
                           {v.ativo !== false ? "Ativo" : "Inativo"}
                         </span>
                       </td>
-                      <td className="acoes-celula">
-                        <button
-                          className="btn-acao editar"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            abrirModal(v);
-                          }}
-                        >
-                          Editar
-                        </button>
-                        <button
-                          className="btn-acao excluir"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleExcluir(v.id);
-                          }}
-                        >
-                          Excluir
-                        </button>
-                      </td>
+
+                      {/* Ações — respeita permissões */}
+                      {(podeEditarVendedor || podeExcluirVendedor) && (
+                        <td className="acoes-celula">
+                          {podeEditarVendedor && (
+                            <button
+                              className="btn-acao editar"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                abrirModal(v);
+                              }}
+                            >
+                              Editar
+                            </button>
+                          )}
+                          {podeExcluirVendedor && (
+                            <button
+                              className="btn-acao excluir"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleExcluir(v.id);
+                              }}
+                            >
+                              Excluir
+                            </button>
+                          )}
+                        </td>
+                      )}
                     </tr>
 
                     {/* Painel expandido — vendas do vendedor */}
                     {expandido === v.id && (
                       <tr className="linha-expandida">
-                        <td colSpan={7}>
+                        <td
+                          colSpan={
+                            (podeEditarVendedor || podeExcluirVendedor) ? 7 : 6
+                          }
+                        >
                           <div className="painel-vendas">
                             <strong>Vendas registradas</strong>
-                            {/* [FIX-4] usa apenas vendedorId */}
+
                             {vendasPorVendedor(v.id).length === 0 ? (
                               <p className="sem-vendas">
                                 Nenhuma venda vinculada a este vendedor.
-                                {v.usuarioId
-                                  ? ""
-                                  : " Vincule um usuário do sistema para ativar o filtro."}
+                                {!v.usuarioId &&
+                                  " Vincule um usuário do sistema para ativar o filtro."}
                               </p>
                             ) : (
                               <>
@@ -482,8 +514,8 @@ export default function Vendedores() {
         </table>
       </div>
 
-      {/* Modal */}
-      {modalAberto && (
+      {/* Modal — só abre se tiver permissão */}
+      {modalAberto && (podeCriarVendedor || podeEditarVendedor) && (
         <ModalVendedor
           vendedor={vendedorEditando}
           usuariosSistema={usuariosSistema}
