@@ -115,7 +115,7 @@ const NAV = [
     { label: "Entrada Estoque", modulo: "entradaEstoque",   icone: ArrowDownToLine,  secao: "ESTOQUE"   },
     { label: "Vendas",          modulo: "vendas",           icone: TrendingUp,       secao: "COMERCIAL" },
     { label: "A Receber",       modulo: "aReceber",         icone: Coins,            secao: "FINANCEIRO"},
-   { label: "Compras",         modulo: "compras",          icone: ShoppingCart,     secao: "COMERCIAL" }
+   { label: "Compras",         modulo: "compras",          icone: ShoppingCart,     secao: "COMERCIAL" },
     { label: "Caixa Diário",    modulo: "caixaDiario",      icone: Wallet,           secao: "FINANCEIRO"},
     { label: "Despesas",        modulo: "despesas",         icone: Receipt,          secao: "FINANCEIRO"},
    { label: "Fornecedores",    modulo: "fornecedores",     icone: Truck,            secao: "ESTOQUE"   },
