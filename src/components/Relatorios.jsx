@@ -633,19 +633,6 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
       porCategoria[cat] = (porCategoria[cat] || 0) + Number(d.valor || 0);
     });
 
-    /* Diagnóstico */
-    console.log(
-      "[DRE — Caixa] entradas de venda no período:", caixaVendas.length,
-      "| vendas legadas (fallback):", vendasLegadas.length,
-      "\n[DRE] receitaBruta:", receitaBruta,
-      "| descontos:", descontosTotais,
-      "| taxasCartao:", taxasCartao,
-      "| receitaLiquida:", receitaLiquida,
-      "| custoTotal:", custoTotal,
-      "| totalDespesas:", totalDespesas,
-      "| lucroLiquido:", lucroLiquido,
-    );
-
     return {
       receitaBruta, receitaLiquida, descontosTotais,
       taxasCartao, custoTotal, lucroBruto,
