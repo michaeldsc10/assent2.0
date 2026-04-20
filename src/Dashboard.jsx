@@ -18,10 +18,11 @@ import {
 } from "recharts";
 import {
   LayoutDashboard, Users, Package, Wrench, ArrowDownToLine,
-  ShoppingCart, Clock, Wallet, TrendingDown, Truck, BarChart3,
-  Calendar, Settings, Zap, UserCheck, UserPlus, Search, ArrowUpRight,
-  ArrowDownRight, ChevronRight, Bell, LogOut, ChevronDown,
-  PanelLeftClose, PanelLeftOpen, Menu, X, Sun, Moon,
+  ShoppingCart, Wallet, Truck, Calendar, Settings,
+  UserCheck, UserPlus, Search, ArrowUpRight, ArrowDownRight,
+  ChevronRight, Bell, LogOut, ChevronDown, PanelLeftClose,
+  PanelLeftOpen, Menu, X, Sun, Moon,
+  TrendingUp, Coins, Receipt, FileText, BarChart2,
 } from "lucide-react";
 
 /* ── Módulos ───────────────────────────────────── */
@@ -125,7 +126,7 @@ const NAV = [
   ]},
   { section: "SISTEMA", items: [
     { label: "Orçamentos",      modulo: "orcamentos",       icone: FileText,         secao: "COMERCIAL" },
-    { label: "Vendedores",      modulo: "vendedores",       icone: UserTie,          secao: "COMERCIAL" },
+    { label: "Vendedores",      modulo: "vendedores",       icone: UserCheck,          secao: "COMERCIAL" },
     { label: "Usuários",        modulo: "usuarios",         icone: UserPlus,         secao: "SISTEMA"   },
     { icon: Settings,  label: "Configurações" },
   ]},
@@ -1228,22 +1229,98 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   /* ══ RENDER MÓDULOS ══ */
   const renderModulo = () => {
     switch (module) {
-      case "Clientes":            return <Clientes isPro={isPro} />;
-      case "Produtos":            return <Produtos isPro={isPro} />;
-      case "Serviços":            return <Servicos isPro={isPro} />;
-      case "Vendedores":          return <Vendedores />;
-      case "Usuários":            return <Usuarios />;
-      case "Vendas":              return <Vendas isPro={isPro} />;
-      case "Configurações":       return <Configuracoes menuVisivel={menuVisivel} />;
-      case "Despesas":            return <Despesas isPro={isPro} />;
-      case "Entrada de Estoque":  return <EntradaEstoque />;
-      case "Agenda":              return <Agenda isPro={isPro} />;
-      case "Fornecedores":        return <Fornecedores />;
-      case "A Receber":           return <AReceber />;
-      case "Relatórios":          return <Relatorios />;
-      case "Caixa Diário":        return <CaixaDiario />;
-      case "Orçamentos":          return <Orcamentos isPro={isPro} />;
-      default:                    return renderDashboard();
+      case "Agenda":
+        return (
+          <RotaProtegida modulo="agenda" label="Agenda">
+            <Agenda isPro={isPro} />
+          </RotaProtegida>
+        );
+      case "Clientes":
+        return (
+          <RotaProtegida modulo="clientes" label="Clientes">
+            <Clientes isPro={isPro} />
+          </RotaProtegida>
+        );
+      case "Produtos":
+        return (
+          <RotaProtegida modulo="produtos" label="Produtos">
+            <Produtos isPro={isPro} />
+          </RotaProtegida>
+        );
+      case "Serviços":
+        return (
+          <RotaProtegida modulo="servicos" label="Serviços">
+            <Servicos isPro={isPro} />
+          </RotaProtegida>
+        );
+      case "Fornecedores":
+        return (
+          <RotaProtegida modulo="fornecedores" label="Fornecedores">
+            <Fornecedores />
+          </RotaProtegida>
+        );
+      case "Vendedores":
+        return (
+          <RotaProtegida modulo="vendedores" label="Vendedores">
+            <Vendedores />
+          </RotaProtegida>
+        );
+      case "Entrada de Estoque":
+        return (
+          <RotaProtegida modulo="entradaEstoque" label="Entrada de Estoque">
+            <EntradaEstoque />
+          </RotaProtegida>
+        );
+      case "Compras":
+        return (
+          <RotaProtegida modulo="compras" label="Compras">
+            <Compras />
+          </RotaProtegida>
+        );
+      case "Orçamentos":
+        return (
+          <RotaProtegida modulo="orcamentos" label="Orçamentos">
+            <Orcamentos isPro={isPro} />
+          </RotaProtegida>
+        );
+      case "Vendas":
+        return (
+          <RotaProtegida modulo="vendas" label="Vendas">
+            <Vendas isPro={isPro} />
+          </RotaProtegida>
+        );
+      case "A Receber":
+        return (
+          <RotaProtegida modulo="aReceber" label="A Receber">
+            <AReceber />
+          </RotaProtegida>
+        );
+      case "Caixa Diário":
+        return (
+          <RotaProtegida modulo="caixaDiario" label="Caixa Diário">
+            <CaixaDiario />
+          </RotaProtegida>
+        );
+      case "Despesas":
+        return (
+          <RotaProtegida modulo="despesas" label="Despesas">
+            <Despesas isPro={isPro} />
+          </RotaProtegida>
+        );
+      case "Relatórios":
+        // Todos veem o menu; bloqueio por sub-relatório é feito dentro do componente
+        return <Relatorios />;
+      case "Usuários":
+        return (
+          <RotaProtegida modulo="usuarios" label="Usuários">
+            <Usuarios />
+          </RotaProtegida>
+        );
+      case "Configurações":
+        // Configurações não precisa de RotaProtegida (acesso controlado pelo cargo admin)
+        return <Configuracoes menuVisivel={menuVisivel} />;
+      default:
+        return renderDashboard();
     }
   };
 
@@ -1627,7 +1704,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
           {/* Conteúdo principal */}
          <main className="ag-main">
-  {renderModulo(module)}
+  {renderModulo()}
 </main>
 
         </div>
