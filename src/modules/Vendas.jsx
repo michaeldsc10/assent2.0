@@ -1831,19 +1831,51 @@ useEffect(() => {
     setModalNova(false);
   };
 
-  /* ── Excluir venda — restaura estoque ── */
+  /* ── Excluir venda — restaura estoque e remove lançamentos financeiros ── */
   const handleDelete = async () => {
     if (!tenantUid || !deletando) return;
+    const vendaId = deletando.id;
+
+    /* 1. Deletar venda + restaurar estoque (atômico) */
     await runTransaction(db, async (tx) => {
-      /* Restaurar estoque */
       for (const item of (deletando.itens || [])) {
         if (item.produtoId && item.tipo === "produto") {
           const ref = doc(db, "users", tenantUid, "produtos", item.produtoId);
           tx.update(ref, { estoque: increment(item.qtd || 1) });
         }
       }
-      tx.delete(doc(db, "users", tenantUid, "vendas", deletando.id));
+      tx.delete(doc(db, "users", tenantUid, "vendas", vendaId));
     });
+
+    /* 2. Remover entradas do Caixa vinculadas a esta venda
+          (é o que alimenta a Receita Bruta no DRE — sem isso o saldo fica inconsistente) */
+    try {
+      const caixaSnap = await getDocs(
+        query(
+          collection(db, "users", tenantUid, "caixa"),
+          where("referenciaId", "==", vendaId),
+          where("origem", "==", "venda")
+        )
+      );
+      await Promise.all(caixaSnap.docs.map((d) => deleteDoc(d.ref)));
+    } catch (err) {
+      console.error("[Vendas] Venda excluída, mas erro ao remover lançamentos do Caixa:", err);
+    }
+
+    /* 3. Remover A Receber vinculado a esta venda (evita cobranças fantasmas) */
+    try {
+      const arSnap = await getDocs(
+        query(
+          collection(db, "users", tenantUid, "a_receber"),
+          where("referenciaId", "==", vendaId),
+          where("origem", "==", "venda")
+        )
+      );
+      await Promise.all(arSnap.docs.map((d) => deleteDoc(d.ref)));
+    } catch (err) {
+      console.error("[Vendas] Venda excluída, mas erro ao remover A Receber:", err);
+    }
+
     setDeletando(null);
     setDetalhe(null);
   };
