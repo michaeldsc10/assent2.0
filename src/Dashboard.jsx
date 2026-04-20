@@ -305,6 +305,7 @@ const RESPONSIVE_CSS = `
 
 /* ── AGENDA ── */
 @media (max-width: 640px) {
+  .ag-main { overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
   .ag-page { overflow: auto !important; }
 
   /* Topbar da Agenda */
@@ -473,7 +474,8 @@ const RESPONSIVE_CSS = `
 
 /* ── MOBILE BOTTOM NAV ── */
 @media (max-width: 720px) {
-  .ag-app { padding-bottom: 60px !important; }
+  .ag-app { padding-bottom: 0 !important; }
+  .ag-content { padding-bottom: 76px !important; }
   .ag-mobile-nav { display: flex !important; }
 }
 `;
@@ -525,6 +527,7 @@ const CSS = `
     display: flex;
     flex-direction: column;
     height: 100vh;
+    height: 100dvh; /* mobile: exclui barra do browser */
     background: var(--bg);
     color: var(--text);
     overflow: hidden;
@@ -749,7 +752,7 @@ const CSS = `
   .ag-period-btn.active { background: var(--gold-d); border-color: rgba(200,165,94,.3); color: var(--gold); }
 
   /* ══ CONTENT ══ */
-  .ag-content { flex: 1; overflow-y: auto; padding: 20px 24px 36px; }
+  .ag-content { flex: 1; overflow-y: auto; padding: 20px 24px 36px; -webkit-overflow-scrolling: touch; }
   .ag-content::-webkit-scrollbar { width: 4px; }
   .ag-content::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
 
