@@ -18,11 +18,10 @@ import {
 } from "recharts";
 import {
   LayoutDashboard, Users, Package, Wrench, ArrowDownToLine,
-  ShoppingCart, Wallet, Truck, Calendar, Settings,
-  UserCheck, UserPlus, Search, ArrowUpRight, ArrowDownRight,
-  ChevronRight, Bell, LogOut, ChevronDown, PanelLeftClose,
-  PanelLeftOpen, Menu, X, Sun, Moon,
-  TrendingUp, Coins, Receipt, FileText, BarChart2,
+  ShoppingCart, Clock, Wallet, TrendingDown, Truck, BarChart3,
+  Calendar, Settings, Zap, UserCheck, UserPlus, Search, ArrowUpRight,
+  ArrowDownRight, ChevronRight, Bell, LogOut, ChevronDown,
+  PanelLeftClose, PanelLeftOpen, Menu, X, Sun, Moon,
 } from "lucide-react";
 
 /* ── Módulos ───────────────────────────────────── */
@@ -113,19 +112,19 @@ const NAV = [
   ]},
   { section: "OPERAÇÕES", items: [
     { label: "Entrada Estoque", modulo: "entradaEstoque",   icone: ArrowDownToLine,  secao: "ESTOQUE"   },
-    { label: "Vendas",          modulo: "vendas",           icone: TrendingUp,       secao: "COMERCIAL" },
-    { label: "A Receber",       modulo: "aReceber",         icone: Coins,            secao: "FINANCEIRO"},
+    { label: "Vendas",          modulo: "vendas",           icone: TrendingDown,       secao: "COMERCIAL" },
+    { label: "A Receber",       modulo: "aReceber",         icone: Clock,            secao: "FINANCEIRO"},
    { label: "Compras",         modulo: "compras",          icone: ShoppingCart,     secao: "COMERCIAL" },
     { label: "Caixa Diário",    modulo: "caixaDiario",      icone: Wallet,           secao: "FINANCEIRO"},
-    { label: "Despesas",        modulo: "despesas",         icone: Receipt,          secao: "FINANCEIRO"},
+    { label: "Despesas",        modulo: "despesas",         icone: ArrowDownRight,          secao: "FINANCEIRO"},
    { label: "Fornecedores",    modulo: "fornecedores",     icone: Truck,            secao: "ESTOQUE"   },
   ]},
   { section: "ANÁLISE", items: [
-    { label: "Relatórios",      modulo: "relatorios",       icone: BarChart2,        secao: "FINANCEIRO"},
+    { label: "Relatórios",      modulo: "relatorios",       icone: BarChart3,        secao: "FINANCEIRO"},
     { label: "Agenda",          modulo: "agenda",           icone: Calendar,         secao: "PRINCIPAL" },
   ]},
   { section: "SISTEMA", items: [
-    { label: "Orçamentos",      modulo: "orcamentos",       icone: FileText,         secao: "COMERCIAL" },
+    { label: "Orçamentos",      modulo: "orcamentos",       icone: Zap,         secao: "COMERCIAL" },
     { label: "Vendedores",      modulo: "vendedores",       icone: UserCheck,          secao: "COMERCIAL" },
     { label: "Usuários",        modulo: "usuarios",         icone: UserPlus,         secao: "SISTEMA"   },
     { icon: Settings,  label: "Configurações" },
