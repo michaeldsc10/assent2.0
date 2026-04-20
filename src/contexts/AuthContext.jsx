@@ -9,7 +9,7 @@ import {
   signOut as firebaseSignOut,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "./firebase"; // ajuste o caminho conforme seu projeto
+import { auth, db } from "../lib/firebase"; // ajuste o caminho conforme seu projeto
 
 // ─────────────────────────────────────────────
 // Constantes de cargo
