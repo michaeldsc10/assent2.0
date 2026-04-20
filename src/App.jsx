@@ -1,20 +1,21 @@
 /* ═══════════════════════════════════════════════════
    ASSENT v2.0 — App.jsx
-   Usa apenas AuthContext.jsx (contexts/) como fonte única de auth.
-   Remove dependência de ./components/Auth para evitar conflito de contextos.
+   Dois providers empilhados:
+   - AuthProviderCargo (contexts/AuthContext) → RotaProtegida + usePermissao
+   - AuthProvider (components/Auth)           → LoginForm + AppShell
    ═══════════════════════════════════════════════════ */
 
 import "./App.css";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import LoginForm from "./components/LoginForm";
+import { AuthProvider, useAuth }              from "./components/Auth";
+import { AuthProvider as AuthProviderCargo }  from "./contexts/AuthContext";
+import LoginForm     from "./components/LoginForm";
 import BrandAnimation from "./components/BrandAnimation";
-import Dashboard from "./Dashboard";
+import Dashboard     from "./Dashboard";
 
-// ─── Shell: decide o que renderizar com base no auth ─────────────────────────
 function AppShell() {
-  const { user, loadingAuth } = useAuth(); // loadingAuth vem do AuthContext novo
+  const { user, loading } = useAuth(); // vem do components/Auth
 
-  if (loadingAuth) {
+  if (loading) {
     return (
       <div style={{
         minHeight: "100vh",
@@ -30,12 +31,10 @@ function AppShell() {
     );
   }
 
-  // Autenticado → Dashboard (RotaProtegida cuida do controle por módulo)
   if (user) {
     return <Dashboard />;
   }
 
-  // Não autenticado → tela de login
   return (
     <div className="login-container">
       <div className="login-left">
@@ -48,12 +47,13 @@ function AppShell() {
   );
 }
 
-// ─── Root ─────────────────────────────────────────────────────────────────────
 function App() {
   return (
-    <AuthProvider>
-      <AppShell />
-    </AuthProvider>
+    <AuthProviderCargo>   {/* fornece cargo/podeVer → RotaProtegida + usePermissao */}
+      <AuthProvider>      {/* fornece user/login/logout → LoginForm + AppShell */}
+        <AppShell />
+      </AuthProvider>
+    </AuthProviderCargo>
   );
 }
 
