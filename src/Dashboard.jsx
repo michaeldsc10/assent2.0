@@ -111,7 +111,7 @@ const NAV = [
     { label: "Serviços",        modulo: "servicos",         icone: Wrench,           secao: "ESTOQUE"   },
   ]},
   { section: "OPERAÇÕES", items: [
-    { label: "Entrada Estoque", modulo: "entradaEstoque",   icone: ArrowDownToLine,  secao: "ESTOQUE"   },
+    { label: "Entrada de Estoque", modulo: "entradaEstoque",   icone: ArrowDownToLine,  secao: "ESTOQUE"   },
     { label: "Vendas",          modulo: "vendas",           icone: TrendingDown,       secao: "COMERCIAL" },
     { label: "A Receber",       modulo: "aReceber",         icone: Clock,            secao: "FINANCEIRO"},
    { label: "Compras",         modulo: "compras",          icone: ShoppingCart,     secao: "COMERCIAL" },
@@ -723,6 +723,14 @@ const CSS = `
 
   /* ══ MAIN ══ */
   .ag-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ── Acesso Negado (RotaProtegida) ── */
+  .acesso-negado { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; text-align: center; padding: 2rem; color: var(--text-3); }
+  .acesso-negado__icone  { font-size: 3rem; line-height: 1; }
+  .acesso-negado__titulo { font-size: 1.25rem; font-weight: 600; color: var(--text); margin: 0; }
+  .acesso-negado__texto  { margin: 0; font-size: 0.95rem; }
+  .acesso-negado__sub    { margin: 0; font-size: 0.85rem; opacity: 0.7; }
+  .acesso-negado__spinner { width: 2rem; height: 2rem; border: 3px solid var(--border); border-top-color: var(--gold-brand); border-radius: 50%; animation: spin 0.7s linear infinite; }
 
   .ag-topbar {
     padding: 14px 24px; background: var(--s1);
