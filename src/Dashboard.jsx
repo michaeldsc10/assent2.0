@@ -19,7 +19,7 @@ import {
 import {
   LayoutDashboard, Users, Package, Wrench, ArrowDownToLine,
   ShoppingCart, Clock, Wallet, TrendingDown, Truck, BarChart3,
-  Calendar, Settings, Zap, UserCheck, Search, ArrowUpRight,
+  Calendar, Settings, Zap, UserCheck, UserPlus, Search, ArrowUpRight,
   ArrowDownRight, ChevronRight, Bell, LogOut, ChevronDown,
   PanelLeftClose, PanelLeftOpen, Menu, X, Sun, Moon,
 } from "lucide-react";
@@ -39,9 +39,8 @@ import AReceber      from "./modules/AReceber.jsx";
 import Relatorios    from "./components/Relatorios.jsx";
 import CaixaDiario   from "./modules/CaixaDiario.jsx";
 import Orcamentos    from "./modules/Orcamentos.jsx";
-import Usuarios from "./modules/Usuarios.jsx";
- 
-   
+import Usuarios      from "./modules/Usuarios.jsx";
+
 /* ── Firebase ──────────────────────────────────── */
 import { db, auth, logout } from "./lib/firebase";
 import { onAuthStateChanged }    from "firebase/auth";
@@ -73,6 +72,7 @@ const KEY_MAP = {
   "Agenda":             "agenda",
   "Orçamentos":         "orcamentos",
   "Vendedores":         "vendedores",
+  "Usuários":           "usuarios",
   "Configurações":      "config",
 };
 
@@ -91,6 +91,7 @@ const ATALHOS_TECLADO = [
   { code: "KeyA", label: "Agenda",              dbKey: "agenda"          },
   { code: "KeyO", label: "Orçamentos",          dbKey: "orcamentos"      },
   { code: "KeyM", label: "Vendedores",          dbKey: "vendedores"      },
+  { code: "KeyU", label: "Usuários",            dbKey: "usuarios"        },
   { code: "KeyG", label: "Configurações",       dbKey: "config"          },
 ];
 
@@ -119,6 +120,7 @@ const NAV = [
   { section: "SISTEMA", items: [
     { icon: Zap,       label: "Orçamentos"    },
     { icon: UserCheck, label: "Vendedores"    },
+    { icon: UserPlus,  label: "Usuários"      },
     { icon: Settings,  label: "Configurações" },
   ]},
 ];
@@ -1222,6 +1224,7 @@ export default function Dashboard() {
       case "Produtos":            return <Produtos isPro={isPro} />;
       case "Serviços":            return <Servicos isPro={isPro} />;
       case "Vendedores":          return <Vendedores />;
+      case "Usuários":            return <Usuarios />;
       case "Vendas":              return <Vendas isPro={isPro} />;
       case "Configurações":       return <Configuracoes menuVisivel={menuVisivel} />;
       case "Despesas":            return <Despesas isPro={isPro} />;
@@ -1232,8 +1235,6 @@ export default function Dashboard() {
       case "Relatórios":          return <Relatorios />;
       case "Caixa Diário":        return <CaixaDiario />;
       case "Orçamentos":          return <Orcamentos isPro={isPro} />;
-      case "Usuários": return <Usuarios />;
-
       default:                    return renderDashboard();
     }
   };
