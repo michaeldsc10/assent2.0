@@ -33,7 +33,7 @@ const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const db   = getFirestore(app);
-export const firebaseConfig = { apiKey: "...", authDomain: "...", ... };
+export const firebaseConfig = { apiKey: "...", authDomain: "...", projectId: " ...", storageBucket: "...", messagingSenderId: "...", appId: "...", measurementId: "..." };
 
 /* ── Funções de Autenticação ── */
 export const login = (email, password) => 
