@@ -1511,132 +1511,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       </div>
     </>
   );
-
-  /* ══ RENDER PRINCIPAL ══ */
-  return (
-    <>
-      <style>{CSS}</style>
-
-      <div className={`ag-app${theme === "light" ? " light" : ""}`}>
-
-        {/* ── HEADER GLOBAL ── */}
-        <header className="ag-global-header">
-          <button
-            className="ag-toggle-btn"
-            onClick={toggleSidebar}
-            title={collapsed ? "Expandir menu" : "Recolher menu"}
-            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-          >
-            {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
-          </button>
-
-          <div className="ag-header-logo">
-            {logoUrl ? (
-              <img src={logoUrl} alt={nomeEmpresa} className="ag-header-logo-img" />
-            ) : (
-              <div className="ag-header-logo-icon">{logoInitials}</div>
-            )}
-            <span className="ag-header-logo-name">{nomeEmpresa}</span>
-            {isPro && (
-              <span style={{
-                fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                background: "linear-gradient(135deg,#D4AF37,#e8ca60)",
-                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                border: "1px solid rgba(200,165,94,0.4)",
-                borderRadius: 20, padding: "2px 7px", flexShrink: 0,
-              }}>PRO</span>
-            )}
-          </div>
-
-          <div className="ag-header-spacer" />
-
-          <div className="ag-notif" title="Notificações"><Bell size={15} /></div>
-
-          <div
-            className="ag-theme-btn"
-            onClick={toggleTheme}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && toggleTheme()}
-            title={theme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
-            aria-label="Alternar tema"
-          >
-            {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
-          </div>
-
-          <div className="ag-user-area" ref={dropdownRef}>
-            <div
-              className="ag-user-trigger"
-              onClick={() => setDropdownOpen((v) => !v)}
-              role="button" aria-haspopup="true" aria-expanded={dropdownOpen}
-            >
-              <div className="ag-avatar">{userInitial}</div>
-              <span className="ag-user-name">{userName}</span>
-              <ChevronDown size={13} className={`ag-user-chevron ${dropdownOpen ? "open" : ""}`} />
-            </div>
-
-            {dropdownOpen && (
-              <div className="ag-user-dropdown" role="menu">
-                <button
-                  className="ag-dropdown-item"
-                  onClick={() => { setModule("Configurações"); setDropdownOpen(false); }}
-                >
-                  <Settings size={13} /> Configurações
-                </button>
-                <div className="ag-dropdown-divider" />
-                <button
-                  className="ag-dropdown-item danger"
-                  onClick={() => { logout(); window.location.reload(); }}
-                >
-                  <LogOut size={13} /> Sair da conta
-                </button>
-              </div>
-            )}
-          </div>
-        </header>
-
-        {/* ── CORPO: sidebar + main ── */}
-        <div className="ag-body">
-
-          {/* Sidebar desktop recolhível */}
-          <aside className={`ag-sidebar ${collapsed ? "collapsed" : ""}`}>
-            <nav className="ag-nav">
-              {NAV.map((sec) => (
-                <div key={sec.section}>
-                  <div className="ag-sec-label">{sec.section}</div>
-                  {sec.items.map((item) => {
-                    const dbKey = KEY_MAP[item.label];
-                    if (dbKey && menuVisivel[dbKey] === false) return null;
-                    return (
-                      <div
-                        key={item.label}
-                        className={`ag-nav-item ${module === item.label ? "active" : ""}`}
-                        onClick={() => setModule(item.label)}
-                        data-label={item.label}
-                        title={collapsed ? item.label : undefined}
-                      >
-                        <item.icon size={15} />
-                        <span>{item.label}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
-            </nav>
-          </aside>
-
-          {/* Conteúdo principal */}
-          <main className="ag-main">
-            {renderModulo()}
-          </main>
-
-        </div>
-
-//Render Modulo rota protegida *-*-*-*-*-*-*-*-*-*
-
-         function renderModulo(modulo) {
-  switch (modulo) {
+         function renderModulo(modulo) { switch (modulo)} {
     // ── Dashboard restrito (Admin + Financeiro) ──────────────────────────────
     case "Dashboard":
       return (
@@ -1757,6 +1632,126 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   }
 }
 
+  /* ══ RENDER PRINCIPAL ══ */
+  return (
+    <>
+      <style>{CSS}</style>
+
+      <div className={`ag-app${theme === "light" ? " light" : ""}`}>
+
+        {/* ── HEADER GLOBAL ── */}
+        <header className="ag-global-header">
+          <button
+            className="ag-toggle-btn"
+            onClick={toggleSidebar}
+            title={collapsed ? "Expandir menu" : "Recolher menu"}
+            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+          >
+            {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+          </button>
+
+          <div className="ag-header-logo">
+            {logoUrl ? (
+              <img src={logoUrl} alt={nomeEmpresa} className="ag-header-logo-img" />
+            ) : (
+              <div className="ag-header-logo-icon">{logoInitials}</div>
+            )}
+            <span className="ag-header-logo-name">{nomeEmpresa}</span>
+            {isPro && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                background: "linear-gradient(135deg,#D4AF37,#e8ca60)",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                border: "1px solid rgba(200,165,94,0.4)",
+                borderRadius: 20, padding: "2px 7px", flexShrink: 0,
+              }}>PRO</span>
+            )}
+          </div>
+
+          <div className="ag-header-spacer" />
+
+          <div className="ag-notif" title="Notificações"><Bell size={15} /></div>
+
+          <div
+            className="ag-theme-btn"
+            onClick={toggleTheme}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && toggleTheme()}
+            title={theme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
+            aria-label="Alternar tema"
+          >
+            {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+          </div>
+
+          <div className="ag-user-area" ref={dropdownRef}>
+            <div
+              className="ag-user-trigger"
+              onClick={() => setDropdownOpen((v) => !v)}
+              role="button" aria-haspopup="true" aria-expanded={dropdownOpen}
+            >
+              <div className="ag-avatar">{userInitial}</div>
+              <span className="ag-user-name">{userName}</span>
+              <ChevronDown size={13} className={`ag-user-chevron ${dropdownOpen ? "open" : ""}`} />
+            </div>
+
+            {dropdownOpen && (
+              <div className="ag-user-dropdown" role="menu">
+                <button
+                  className="ag-dropdown-item"
+                  onClick={() => { setModule("Configurações"); setDropdownOpen(false); }}
+                >
+                  <Settings size={13} /> Configurações
+                </button>
+                <div className="ag-dropdown-divider" />
+                <button
+                  className="ag-dropdown-item danger"
+                  onClick={() => { logout(); window.location.reload(); }}
+                >
+                  <LogOut size={13} /> Sair da conta
+                </button>
+              </div>
+            )}
+          </div>
+        </header>
+
+        {/* ── CORPO: sidebar + main ── */}
+        <div className="ag-body">
+
+          {/* Sidebar desktop recolhível */}
+          <aside className={`ag-sidebar ${collapsed ? "collapsed" : ""}`}>
+            <nav className="ag-nav">
+              {NAV.map((sec) => (
+                <div key={sec.section}>
+                  <div className="ag-sec-label">{sec.section}</div>
+                  {sec.items.map((item) => {
+                    const dbKey = KEY_MAP[item.label];
+                    if (dbKey && menuVisivel[dbKey] === false) return null;
+                    return (
+                      <div
+                        key={item.label}
+                        className={`ag-nav-item ${module === item.label ? "active" : ""}`}
+                        onClick={() => setModule(item.label)}
+                        data-label={item.label}
+                        title={collapsed ? item.label : undefined}
+                      >
+                        <item.icon size={15} />
+                        <span>{item.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </nav>
+          </aside>
+
+          {/* Conteúdo principal */}
+         <main className="ag-main">
+  {renderModulo(module)}
+</main>
+
+        </div>
 
          
         {/* ── BOTTOM NAV MOBILE ── */}
