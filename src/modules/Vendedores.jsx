@@ -17,7 +17,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { AuthContext } from "../contexts/AuthContext"; // contexto com { user, cargo, vendedorId }
+import AuthContext from "../contexts/AuthContext"; // contexto com { user, cargo, vendedorId }
 
 // ---------------------------------------------------------------------------
 // Helpers
