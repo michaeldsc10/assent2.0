@@ -40,6 +40,11 @@ import Relatorios    from "./components/Relatorios.jsx";
 import CaixaDiario   from "./modules/CaixaDiario.jsx";
 import Orcamentos    from "./modules/Orcamentos.jsx";
 import Usuarios      from "./modules/Usuarios.jsx";
+import Compras       from "./modules/Compras.jsx";
+
+import RotaProtegida from "./RotaProtegida";
+import Relatorios from "./Relatorios";
+import { usePermissao } from "./hooks/usePermissao";
 
 /* ── Firebase ──────────────────────────────────── */
 import { db, auth, logout } from "./lib/firebase";
@@ -74,6 +79,7 @@ const KEY_MAP = {
   "Vendedores":         "vendedores",
   "Usuários":           "usuarios",
   "Configurações":      "config",
+   "Compras":           "compras",
 };
 
 const ATALHOS_TECLADO = [
@@ -100,27 +106,28 @@ const ATALHO_LOOKUP = Object.fromEntries(ATALHOS_TECLADO.map(a => [a.code, a]));
 
 const NAV = [
   { section: "BÁSICO", items: [
-    { icon: LayoutDashboard, label: "Dashboard"  },
-    { icon: Users,           label: "Clientes"   },
-    { icon: Package,         label: "Produtos"   },
-    { icon: Wrench,          label: "Serviços"   },
+    { label: "Dashboard",       modulo: "dashboard",       icone: LayoutDashboard,  secao: "PRINCIPAL" },
+    { label: "Clientes",        modulo: "clientes",         icone: Users,            secao: "PRINCIPAL" },
+   { label: "Produtos",        modulo: "produtos",         icone: Package,          secao: "ESTOQUE"   },
+    { label: "Serviços",        modulo: "servicos",         icone: Wrench,           secao: "ESTOQUE"   },
   ]},
   { section: "OPERAÇÕES", items: [
-    { icon: ArrowDownToLine, label: "Entrada de Estoque" },
-    { icon: ShoppingCart,    label: "Vendas"             },
-    { icon: Clock,           label: "A Receber"          },
-    { icon: Wallet,          label: "Caixa Diário"       },
-    { icon: TrendingDown,    label: "Despesas"           },
-    { icon: Truck,           label: "Fornecedores"       },
+    { label: "Entrada Estoque", modulo: "entradaEstoque",   icone: ArrowDownToLine,  secao: "ESTOQUE"   },
+    { label: "Vendas",          modulo: "vendas",           icone: TrendingUp,       secao: "COMERCIAL" },
+    { label: "A Receber",       modulo: "aReceber",         icone: Coins,            secao: "FINANCEIRO"},
+   { label: "Compras",         modulo: "compras",          icone: ShoppingCart,     secao: "COMERCIAL" }
+    { label: "Caixa Diário",    modulo: "caixaDiario",      icone: Wallet,           secao: "FINANCEIRO"},
+    { label: "Despesas",        modulo: "despesas",         icone: Receipt,          secao: "FINANCEIRO"},
+   { label: "Fornecedores",    modulo: "fornecedores",     icone: Truck,            secao: "ESTOQUE"   },
   ]},
   { section: "ANÁLISE", items: [
-    { icon: BarChart3, label: "Relatórios" },
-    { icon: Calendar,  label: "Agenda"     },
+    { label: "Relatórios",      modulo: "relatorios",       icone: BarChart2,        secao: "FINANCEIRO"},
+    { label: "Agenda",          modulo: "agenda",           icone: Calendar,         secao: "PRINCIPAL" },
   ]},
   { section: "SISTEMA", items: [
-    { icon: Zap,       label: "Orçamentos"    },
-    { icon: UserCheck, label: "Vendedores"    },
-    { icon: UserPlus,  label: "Usuários"      },
+    { label: "Orçamentos",      modulo: "orcamentos",       icone: FileText,         secao: "COMERCIAL" },
+    { label: "Vendedores",      modulo: "vendedores",       icone: UserTie,          secao: "COMERCIAL" },
+    { label: "Usuários",        modulo: "usuarios",         icone: UserPlus,         secao: "SISTEMA"   },
     { icon: Settings,  label: "Configurações" },
   ]},
 ];
@@ -1060,7 +1067,9 @@ export default function Dashboard() {
   const [theme, setTheme] = useState(
     () => localStorage.getItem("ag_theme") || "dark"
   );
-
+   
+const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin } = usePermissao();
+   
   const toggleTheme = () => {
     setTheme(prev => {
       const next = prev === "dark" ? "light" : "dark";
@@ -1624,6 +1633,132 @@ export default function Dashboard() {
 
         </div>
 
+//Render Modulo rota protegida *-*-*-*-*-*-*-*-*-*
+
+         function renderModulo(modulo) {
+  switch (modulo) {
+    // ── Dashboard restrito (Admin + Financeiro) ──────────────────────────────
+    case "Dashboard":
+      return (
+        <RotaProtegida modulo="dashboard" label="Dashboard">
+          {/* <DashboardHome /> — seu componente de dashboard */}
+          <PlaceholderModulo nome="Dashboard" />
+        </RotaProtegida>
+      );
+
+    case "Agenda":
+      return (
+        <RotaProtegida modulo="agenda" label="Agenda">
+          <PlaceholderModulo nome="Agenda" />
+        </RotaProtegida>
+      );
+
+    case "Clientes":
+      return (
+        <RotaProtegida modulo="clientes" label="Clientes">
+          <PlaceholderModulo nome="Clientes" />
+        </RotaProtegida>
+      );
+
+    case "Produtos":
+      return (
+        <RotaProtegida modulo="produtos" label="Produtos">
+          <PlaceholderModulo nome="Produtos" />
+        </RotaProtegida>
+      );
+
+    case "Serviços":
+      return (
+        <RotaProtegida modulo="servicos" label="Serviços">
+          <PlaceholderModulo nome="Serviços" />
+        </RotaProtegida>
+      );
+
+    case "Fornecedores":
+      return (
+        <RotaProtegida modulo="fornecedores" label="Fornecedores">
+          <PlaceholderModulo nome="Fornecedores" />
+        </RotaProtegida>
+      );
+
+    case "Vendedores":
+      return (
+        <RotaProtegida modulo="vendedores" label="Vendedores">
+          {/* <Vendedores /> */}
+          <PlaceholderModulo nome="Vendedores" />
+        </RotaProtegida>
+      );
+
+    case "Entrada Estoque":
+      return (
+        <RotaProtegida modulo="entradaEstoque" label="Entrada de Estoque">
+          <PlaceholderModulo nome="Entrada Estoque" />
+        </RotaProtegida>
+      );
+
+    case "Compras":
+      return (
+        <RotaProtegida modulo="compras" label="Compras">
+          <PlaceholderModulo nome="Compras" />
+        </RotaProtegida>
+      );
+
+    case "Orçamentos":
+      return (
+        <RotaProtegida modulo="orcamentos" label="Orçamentos">
+          <PlaceholderModulo nome="Orçamentos" />
+        </RotaProtegida>
+      );
+
+    case "Vendas":
+      return (
+        <RotaProtegida modulo="vendas" label="Vendas">
+          {/* <Vendas isPro={isPro} /> */}
+          <PlaceholderModulo nome="Vendas" />
+        </RotaProtegida>
+      );
+
+    case "A Receber":
+      return (
+        <RotaProtegida modulo="aReceber" label="A Receber">
+          <PlaceholderModulo nome="A Receber" />
+        </RotaProtegida>
+      );
+
+    case "Caixa Diário":
+      return (
+        <RotaProtegida modulo="caixaDiario" label="Caixa Diário">
+          <PlaceholderModulo nome="Caixa Diário" />
+        </RotaProtegida>
+      );
+
+    case "Despesas":
+      return (
+        <RotaProtegida modulo="despesas" label="Despesas">
+          <PlaceholderModulo nome="Despesas" />
+        </RotaProtegida>
+      );
+
+    // ── Relatórios — sem RotaProtegida aqui (todos veem o menu)
+    //    O bloqueio por sub-relatório é feito dentro do Relatorios.jsx
+    case "Relatórios":
+      return <Relatorios />;
+
+    case "Usuários":
+      return (
+        <RotaProtegida modulo="usuarios" label="Usuários">
+          {/* <Usuarios /> */}
+          <PlaceholderModulo nome="Usuários" />
+        </RotaProtegida>
+      );
+
+    default:
+      return null;
+  }
+}
+
+
+         
         {/* ── BOTTOM NAV MOBILE ── */}
         <nav className="ag-mobile-nav" aria-label="Navegação mobile">
           {BOTTOM_NAV.map((item) => (
