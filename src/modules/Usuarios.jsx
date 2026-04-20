@@ -29,7 +29,7 @@ import {
 } from "firebase/firestore";
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import { db, firebaseConfig } from "../firebase";
+import { db, firebaseConfig } from "../lib/firebase";
 import { AuthContext } from "../contexts/AuthContext";
 
 /* ─────────────────────────────────────────────
