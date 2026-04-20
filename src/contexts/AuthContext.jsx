@@ -100,11 +100,11 @@ export function AuthProvider({ children }) {
   const carregarPerfil = useCallback(async (firebaseUser) => {
     try {
       const uid = firebaseUser.uid;
-
+console.log("[AuthContext] carregando perfil para uid:", uid); 
       // ── Passo 1: verifica se é o Admin/dono do tenant ──
       // O Admin é identificado por ter um documento em /users/{uid} na raiz
       const adminDoc = await getDoc(doc(db, "users", uid));
-
+console.log("[AuthContext] adminDoc existe?", adminDoc.exists());
       if (adminDoc.exists()) {
         setUser(firebaseUser);
         setTenantUid(uid);
@@ -117,19 +117,21 @@ export function AuthProvider({ children }) {
       // ── Passo 2: usuário convidado — busca o tenant via índice ──
       // Ao convidar um usuário, o Admin grava /userIndex/{uid} → { tenantUid }
       // Isso evita varrer todos os tenants para localizar o usuário.
+      console.log("[AuthContext] buscando userIndex..."); 
       const indexDoc = await getDoc(doc(db, "userIndex", uid));
-
+console.log("[AuthContext] indexDoc existe?", indexDoc.exists());
       if (!indexDoc.exists()) {
-        console.error("[AuthContext] userIndex não encontrado para uid:", uid);
+         console.error("[AuthContext] userIndex não encontrado");
         await firebaseSignOut(auth);
         return;
       }
 
       const { tenantUid: tUid } = indexDoc.data();
-
+console.log("[AuthContext] tenantUid encontrado:", tUid);
       // ── Passo 3: lê o perfil em /users/{tenantUid}/usuarios/{uid} ──
+      console.log("[AuthContext] buscando perfil convidado..."); 
       const perfilDoc = await getDoc(doc(db, "users", tUid, "usuarios", uid));
-
+console.log("[AuthContext] perfilDoc existe?", perfilDoc.exists());
       if (!perfilDoc.exists()) {
         console.error("[AuthContext] Documento de usuário convidado não encontrado.");
         await firebaseSignOut(auth);
