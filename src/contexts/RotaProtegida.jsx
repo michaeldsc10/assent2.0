@@ -5,7 +5,7 @@
 // Se ainda estiver carregando auth → exibe spinner.
 
 import { useContext } from "react";
-import { AuthContext } from "./AuthContext";
+import  AuthContext  from "./AuthContext";
 
 // ─── Tela de Acesso Negado ────────────────────────────────────────────────────
 function AcessoNegado({ modulo }) {
