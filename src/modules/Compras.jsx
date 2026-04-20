@@ -17,7 +17,7 @@ import {
   collection, doc, onSnapshot, writeBatch, updateDoc, deleteDoc,
 } from "firebase/firestore";
 
-import useLicenca            from "../hooks/useLicenca";   // ajuste o path se necessário
+import  { useLicenca  }         from "../hooks/useLicenca";   // ajuste o path se necessário
 import { BannerLimite }          from "../hooks/LicencaUI.jsx";           // ajuste o path se necessário
 import { useComprasData }        from "../hooks/useComprasData";
 
