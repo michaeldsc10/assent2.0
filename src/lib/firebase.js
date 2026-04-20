@@ -19,7 +19,7 @@ import {
   setDoc 
 } from "firebase/firestore";
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey:            "AIzaSyB9HEWiHFc8YEuj_Ab-7TxGKqdQkSRQAio",
   authDomain:        "assent-2b945.firebaseapp.com",
   projectId:         "assent-2b945",
@@ -33,7 +33,7 @@ const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const db   = getFirestore(app);
-export const firebaseConfig = { apiKey: "...", authDomain: "...", projectId: " ...", storageBucket: "...", messagingSenderId: "...", appId: "...", measurementId: "..." };
+
 
 /* ── Funções de Autenticação ── */
 export const login = (email, password) => 
