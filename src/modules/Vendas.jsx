@@ -1837,9 +1837,20 @@ useEffect(() => {
     setModalNova(false);
   };
 
-  /* ── Excluir venda — restaura estoque ── */
+  /* ── Excluir venda — restaura estoque e remove entradas de caixa ── */
   const handleDelete = async () => {
     if (!uid || !deletando) return;
+
+    /* 1. Apagar entradas de caixa vinculadas a esta venda */
+    const caixaSnap = await getDocs(
+      query(
+        collection(db, "users", uid, "caixa"),
+        where("referenciaId", "==", deletando.id)
+      )
+    );
+    await Promise.all(caixaSnap.docs.map((d) => deleteDoc(d.ref)));
+
+    /* 2. Apagar a venda e restaurar estoque em transação */
     await runTransaction(db, async (tx) => {
       /* Restaurar estoque */
       for (const item of (deletando.itens || [])) {
@@ -1850,6 +1861,7 @@ useEffect(() => {
       }
       tx.delete(doc(db, "users", uid, "vendas", deletando.id));
     });
+
     setDeletando(null);
     setDetalhe(null);
   };
