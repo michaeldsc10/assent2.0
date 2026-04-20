@@ -4,7 +4,7 @@
 // Todos os cargos enxergam o menu Relatórios (o bloqueio é por sub-relatório).
 
 import { useState, useContext } from "react";
-import { AuthContext } from "./AuthContext";
+import  AuthContext  from "../contexts/AuthContext";
 import {
   Lock,
   BarChart2,
