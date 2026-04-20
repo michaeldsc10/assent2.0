@@ -3,7 +3,7 @@
 // na sidebar, nos botões de ação e nos guards de rota.
 
 import { useContext } from "react";
-import { AuthContext } from "../AuthContext";
+import  AuthContext  from "../contexts/AuthContext";
 
 /**
  * Retorna as funções de permissão + helper para filtrar itens de menu.
