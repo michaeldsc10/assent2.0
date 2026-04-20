@@ -520,7 +520,7 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
         if (snap.exists()) setConfigTaxas(snap.data()?.taxas || {});
       })
       .catch(() => {}); // não bloqueia se config não existir
-  }, [tenantUid]);
+  }, [uid]);
 
   /* ── Helper de fallback: calcula taxa com base em config/geral ──
      Só chamado quando v.valorTaxa não existe no documento da venda.
