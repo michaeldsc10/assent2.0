@@ -520,7 +520,7 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
         if (snap.exists()) setConfigTaxas(snap.data()?.taxas || {});
       })
       .catch(() => {}); // não bloqueia se config não existir
-  }, [uid]);
+  }, [tenantUid]);
 
   /* ── Helper de fallback: calcula taxa com base em config/geral ──
      Só chamado quando v.valorTaxa não existe no documento da venda.
@@ -1726,7 +1726,6 @@ const PERMISSOES_RELATORIO = {
   agenda:     ["comercial", "vendedor", "suporte"],
 };
 
-
 const MENU = [
   { key: "dre",        label: "DRE",        icon: <LayoutDashboard size={15} /> },
   { key: "financeiro", label: "Financeiro", icon: <Wallet size={15} />         },
@@ -1870,9 +1869,9 @@ export default function Relatorios() {
               return (
                 <button
                   key={item.key}
-                  className={`rel-nav-btn ${ativo === item.key && liberado ? "active" : ""} ${!liberado ? "rel-nav-btn--bloqueado" : ""}`}
+                  className={`rel-nav-btn ${ativo === item.key && liberado ? "active" : ""}`}
                   onClick={() => liberado && setAtivo(item.key)}
-                  title={!liberado ? "Sem permissão para este relatório" : item.key}
+                  title={!liberado ? "Sem permissão para este relatório" : ""}
                   style={!liberado ? { opacity: 0.45, cursor: "not-allowed" } : {}}
                 >
                   {liberado ? item.icon : <Lock size={15} />}
