@@ -30,7 +30,7 @@ import {
 import { initializeApp, getApps } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { db, firebaseConfig } from "../lib/firebase";
-import { AuthContext } from "../contexts/AuthContext";
+import AuthContext from "../contexts/AuthContext";
 
 /* ─────────────────────────────────────────────
    CONSTANTES
