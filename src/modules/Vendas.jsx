@@ -17,7 +17,7 @@ import {
   serverTimestamp,
   runTransaction,
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { db } from "../lib/firebase";
 import { AuthContext } from "../contexts/AuthContext";
 // AuthContext expõe: { user, cargo, vendedorId, vendedorNome }
 // - user        → Firebase Auth user (uid, email)
