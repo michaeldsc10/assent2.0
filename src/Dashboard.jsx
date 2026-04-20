@@ -127,16 +127,16 @@ const NAV = [
     { label: "Orçamentos",      modulo: "orcamentos",       icone: Zap,         secao: "COMERCIAL" },
     { label: "Vendedores",      modulo: "vendedores",       icone: UserCheck,          secao: "COMERCIAL" },
     { label: "Usuários",        modulo: "usuarios",         icone: UserPlus,         secao: "SISTEMA"   },
-    { icon: Settings,  label: "Configurações" },
+    { icone: Settings, label: "Configurações" },
   ]},
 ];
 
 /* Itens do bottom nav mobile */
 const BOTTOM_NAV = [
-  { icon: LayoutDashboard, label: "Dashboard" },
-  { icon: Users,           label: "Clientes"  },
-  { icon: ShoppingCart,    label: "Vendas"    },
-  { icon: Calendar,        label: "Agenda"    },
+  { icone: LayoutDashboard, label: "Dashboard" },
+  { icone: Users,           label: "Clientes"  },
+  { icone: ShoppingCart,    label: "Vendas"    },
+  { icone: Calendar,        label: "Agenda"    },
 ];
 
 /* ═══════════════════════════════════════════════
@@ -1691,7 +1691,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                         data-label={item.label}
                         title={collapsed ? item.label : undefined}
                       >
-                        <item.icon size={15} />
+                        <item.icone size={15} />
                         <span>{item.label}</span>
                       </div>
                     );
@@ -1717,7 +1717,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               className={`ag-mobile-nav-btn ${module === item.label ? "active" : ""}`}
               onClick={() => navigateTo(item.label)}
             >
-              <item.icon size={20} />
+              <item.icone size={20} />
               <span>{item.label}</span>
             </button>
           ))}
@@ -1786,7 +1786,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                           onClick={() => navigateTo(item.label)}
                           data-label={item.label}
                         >
-                          <item.icon size={15} />
+                          <item.icone size={15} />
                           <span>{item.label}</span>
                         </div>
                       );
