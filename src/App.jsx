@@ -1,19 +1,20 @@
 /* ═══════════════════════════════════════════════════
-   ASSENT v2.0 — App.jsx (merged)
+   ASSENT v2.0 — App.jsx
+   Usa apenas AuthContext.jsx (contexts/) como fonte única de auth.
+   Remove dependência de ./components/Auth para evitar conflito de contextos.
    ═══════════════════════════════════════════════════ */
 
 import "./App.css";
-import { AuthProvider, PrivateRoute, useAuth } from "./components/Auth";
-import { AuthProvider as AuthProviderCargo } from "./contexts/AuthContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import LoginForm from "./components/LoginForm";
 import BrandAnimation from "./components/BrandAnimation";
 import Dashboard from "./Dashboard";
 
-// ─── Shell: decide o que renderizar com base no auth ─
+// ─── Shell: decide o que renderizar com base no auth ─────────────────────────
 function AppShell() {
-  const { user, loading } = useAuth();
+  const { user, loadingAuth } = useAuth(); // loadingAuth vem do AuthContext novo
 
-  if (loading) {
+  if (loadingAuth) {
     return (
       <div style={{
         minHeight: "100vh",
@@ -29,14 +30,12 @@ function AppShell() {
     );
   }
 
+  // Autenticado → Dashboard (RotaProtegida cuida do controle por módulo)
   if (user) {
-    return (
-      <PrivateRoute>
-        <Dashboard />
-      </PrivateRoute>
-    );
+    return <Dashboard />;
   }
 
+  // Não autenticado → tela de login
   return (
     <div className="login-container">
       <div className="login-left">
@@ -49,14 +48,12 @@ function AppShell() {
   );
 }
 
-// ─── Root ─────────────────────────────────────────────
+// ─── Root ─────────────────────────────────────────────────────────────────────
 function App() {
   return (
-    <AuthProviderCargo>   {/* fornece cargo/permissões para RotaProtegida */}
-      <AuthProvider>      {/* fornece user/loading para AppShell */}
-        <AppShell />
-      </AuthProvider>
-    </AuthProviderCargo>
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
   );
 }
 
