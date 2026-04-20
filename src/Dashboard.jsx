@@ -43,7 +43,6 @@ import Usuarios      from "./modules/Usuarios.jsx";
 import Compras       from "./modules/Compras.jsx";
 
 import RotaProtegida from "./RotaProtegida";
-import Relatorios from "./Relatorios";
 import { usePermissao } from "./hooks/usePermissao";
 
 /* ── Firebase ──────────────────────────────────── */
