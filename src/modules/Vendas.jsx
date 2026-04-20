@@ -18,7 +18,7 @@ import {
   runTransaction,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { AuthContext } from "../contexts/AuthContext";
+import AuthContext from "../contexts/AuthContext";
 // AuthContext expõe: { user, cargo, vendedorId, vendedorNome }
 // - user        → Firebase Auth user (uid, email)
 // - cargo       → string: "admin" | "financeiro" | "comercial" | ... | "vendedor"
