@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════
    ASSENT v2.0 — Auth.jsx
    AuthProvider + useAuth + PrivateRoute
-   v2.1: verifica licencas/{uid}.ativo antes de liberar
+   v2.2: convidados usam a licença do tenant (Admin)
    ═══════════════════════════════════════════════════ */
 
 import { createContext, useContext, useState, useEffect } from "react";
@@ -35,20 +35,48 @@ export function AuthProvider({ children }) {
     }
     try {
       const credential = await signInWithEmailAndPassword(auth, trimmedEmail, senha);
+      const uid = credential.user.uid;
 
-      /* ── Verificação de licença ativo=true ── */
-      const uid         = credential.user.uid;
+      // ── 1. Tenta licença direta (Admin/dono da conta) ──
       const licencaSnap = await getDoc(doc(db, "licencas", uid));
 
-      if (!licencaSnap.exists() || licencaSnap.data().ativo !== true) {
-        await signOut(auth);
-        throw new AuthError(
-          "licenca-inativa",
-          "Sua licença está inativa. Entre em contato com o suporte."
-        );
+      if (licencaSnap.exists()) {
+        // É o Admin — verifica se a licença está ativa
+        if (licencaSnap.data().ativo !== true) {
+          await signOut(auth);
+          throw new AuthError(
+            "licenca-inativa",
+            "Sua licença está inativa. Entre em contato com o suporte."
+          );
+        }
+        return credential.user;
       }
 
-      return credential.user;
+      // ── 2. Sem licença própria — verifica se é convidado ──
+      const indexSnap = await getDoc(doc(db, "userIndex", uid));
+
+      if (indexSnap.exists()) {
+        // É convidado — verifica a licença do tenant (Admin)
+        const { tenantUid } = indexSnap.data();
+        const licencaTenantSnap = await getDoc(doc(db, "licencas", tenantUid));
+
+        if (!licencaTenantSnap.exists() || licencaTenantSnap.data().ativo !== true) {
+          await signOut(auth);
+          throw new AuthError(
+            "licenca-inativa",
+            "A licença da empresa está inativa. Entre em contato com o administrador."
+          );
+        }
+        return credential.user;
+      }
+
+      // ── 3. Nem Admin nem convidado reconhecido ──
+      await signOut(auth);
+      throw new AuthError(
+        "usuario-nao-encontrado",
+        "Usuário não encontrado no sistema. Entre em contato com o administrador."
+      );
+
     } catch (err) {
       if (err instanceof AuthError) throw err;
       throw mapFirebaseError(err);
