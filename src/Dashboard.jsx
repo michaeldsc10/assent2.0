@@ -39,7 +39,9 @@ import AReceber      from "./modules/AReceber.jsx";
 import Relatorios    from "./components/Relatorios.jsx";
 import CaixaDiario   from "./modules/CaixaDiario.jsx";
 import Orcamentos    from "./modules/Orcamentos.jsx";
-
+import Usuarios from "./modules/Usuarios.jsx";
+ 
+   
 /* ── Firebase ──────────────────────────────────── */
 import { db, auth, logout } from "./lib/firebase";
 import { onAuthStateChanged }    from "firebase/auth";
@@ -1230,6 +1232,8 @@ export default function Dashboard() {
       case "Relatórios":          return <Relatorios />;
       case "Caixa Diário":        return <CaixaDiario />;
       case "Orçamentos":          return <Orcamentos isPro={isPro} />;
+      case "Usuários": return <Usuarios />;
+
       default:                    return renderDashboard();
     }
   };
