@@ -17,7 +17,7 @@ import {  LIMITES_FREE } from "../hooks/useLicenca";
 import { BannerLimite } from "../hooks/LicencaUI";
 import {
   collection, doc, setDoc, deleteDoc, onSnapshot,
-  query, orderBy, writeBatch, addDoc,
+  query, orderBy, writeBatch, addDoc, serverTimestamp,
 } from "firebase/firestore";
 
 /* ── CSS ── */
@@ -1184,7 +1184,10 @@ export default function Despesas({ isPro = false }) {
       docs.forEach(d => {
         const novoStatus = calcularStatus(d.vencimento, d.status);
         if (novoStatus !== d.status) {
-          batch.update(doc(db, "users", tenantUid, "despesas", d.id), { status: novoStatus });
+          batch.update(doc(db, "users", tenantUid, "despesas", d.id), {
+            status: novoStatus,
+            ...(novoStatus === "pago" ? { pagoEm: serverTimestamp() } : {}),
+          });
           mudou = true;
         }
       });
