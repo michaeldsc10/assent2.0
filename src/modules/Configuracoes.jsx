@@ -1034,17 +1034,40 @@ export default function Usuarios() {
      RENDER: acesso negado
   ───────────────────────────────────────── */
   if (!isAdmin) {
+    /* CFG-04: Convidados veem "Meu Perfil" em vez de tela bloqueada */
     return (
       <>
         <style>{CSS}</style>
         <div className="usr-root">
-          <div className="usr-acesso-negado">
-            <div className="usr-acesso-negado-icon">🔒</div>
-            <h3>Acesso restrito</h3>
-            <p>
-              O módulo de Usuários é exclusivo para o <strong>Administrador</strong> da conta.
-              Entre em contato com o responsável caso precise de alterações.
-            </p>
+          <div className="usr-topbar">
+            <div className="usr-topbar-title">
+              <h2>Meu Perfil</h2>
+              <p>Informações da sua conta de acesso</p>
+            </div>
+          </div>
+          <div className="usr-table-wrap" style={{ padding: 28 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 480 }}>
+              <div className="usr-detalhe-item">
+                <span className="usr-detalhe-label">E-mail</span>
+                <span className="usr-detalhe-val">{user?.email}</span>
+              </div>
+              <div className="usr-detalhe-item">
+                <span className="usr-detalhe-label">Cargo</span>
+                <BadgeCargo cargo={cargo} />
+              </div>
+              {vendedorNome && (
+                <div className="usr-detalhe-item">
+                  <span className="usr-detalhe-label">Vendedor vinculado</span>
+                  <span className="usr-detalhe-val">{vendedorNome}</span>
+                </div>
+              )}
+              <div className="usr-detalhe-item">
+                <span className="usr-detalhe-label">UID</span>
+                <span className="usr-detalhe-val" style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "monospace" }}>
+                  {user?.uid}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </>
