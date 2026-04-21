@@ -873,7 +873,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
                 </div>
                 <div className="cp-item-subtotal">{fmtR$(calcSubtotal(it))}</div>
                 <button className="cp-btn-rem-item" onClick={() => remItem(idx)}>
-                 <X size={14} color="#ff6b6b"/>
+                 <X size={24} color="#f5f53d"/>
 </button>
                
               </div>
