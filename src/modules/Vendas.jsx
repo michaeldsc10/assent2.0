@@ -1638,27 +1638,29 @@ useEffect(() => {
          para evitar crash em itens oriundos de orçamento cujo tipo real
          é "servico" mas foi salvo com tipo "produto" na conversão. */
       await runTransaction(db, async (tx) => {
-        /* Restaurar estoque dos itens antigos */
-        for (const oldItem of (vendaExistente.itens || [])) {
-          if (oldItem.produtoId && oldItem.tipo === "produto") {
-            const ref = doc(db, "users", tenantUid, "produtos", oldItem.produtoId);
-            const snap = await tx.get(ref);
-            if (snap.exists()) {
-              tx.update(ref, { estoque: increment(oldItem.qtd || 1) });
-            }
-          }
-        }
-        /* Descontar estoque dos itens novos */
-        for (const newItem of (payload.itens || [])) {
-          if (newItem.produtoId && newItem.tipo === "produto") {
-            const ref = doc(db, "users", tenantUid, "produtos", newItem.produtoId);
-            const snap = await tx.get(ref);
-            if (snap.exists()) {
-              tx.update(ref, { estoque: increment(-(newItem.qtd || 1)) });
-            }
-          }
-        }
-        /* Salvar venda */
+        /* ── Coleta todas as refs que precisam de leitura ── */
+        const oldEntries = (vendaExistente.itens || [])
+          .filter(i => i.produtoId && i.tipo === "produto")
+          .map(i => ({ ref: doc(db, "users", tenantUid, "produtos", i.produtoId), qtd: i.qtd || 1 }));
+
+        const newEntries = (payload.itens || [])
+          .filter(i => i.produtoId && i.tipo === "produto")
+          .map(i => ({ ref: doc(db, "users", tenantUid, "produtos", i.produtoId), qtd: i.qtd || 1 }));
+
+        /* ── TODOS OS READS PRIMEIRO ── */
+        const allEntries  = [...oldEntries, ...newEntries];
+        const snaps       = await Promise.all(allEntries.map(e => tx.get(e.ref)));
+
+        /* ── TODOS OS WRITES DEPOIS ── */
+        /* Restaura estoque dos itens antigos */
+        oldEntries.forEach((e, i) => {
+          if (snaps[i].exists()) tx.update(e.ref, { estoque: increment(e.qtd) });
+        });
+        /* Desconta estoque dos itens novos */
+        newEntries.forEach((e, i) => {
+          if (snaps[oldEntries.length + i].exists()) tx.update(e.ref, { estoque: increment(-e.qtd) });
+        });
+        /* Salva a venda */
         tx.set(doc(db, "users", tenantUid, "vendas", vendaExistente.id), payload, { merge: true });
       });
 
