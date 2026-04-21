@@ -15,6 +15,7 @@ import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
 import {
   collection, doc, onSnapshot, writeBatch, updateDoc, deleteDoc,
+  runTransaction, getDoc, serverTimestamp,
 } from "firebase/firestore";
 
 import  { useLicenca  }         from "../hooks/useLicenca";
@@ -645,7 +646,18 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
           });
         });
 
-        /* ─────────────────────────────────────────────────────
+          /* ── ID Sequencial para despesas (COM-05) ── */
+          const configRef   = doc(db, "users", uid, "config", "geral");
+          const qtdDespesas = isParcelado ? (parseInt(form.parcelas) || 1) : 1;
+          let idSeqInicial  = 0;
+          await runTransaction(db, async (tx) => {
+            const snap = await tx.get(configRef);
+            const atual = snap.exists() ? (snap.data().despesaIdCnt || 0) : 0;
+            idSeqInicial = atual + 1;
+            tx.update(configRef, { despesaIdCnt: atual + qtdDespesas });
+          });
+
+                  /* ─────────────────────────────────────────────────────
            3 — DESPESAS (lançamento financeiro para DRE)
 
            Regra:
@@ -658,6 +670,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
           fornecedorNome:  forn?.nome || "Fornecedor",
           metodoPagamento: form.metodoPagamento,
           categoria:       "Compras",
+          idSequencial:    idSeqInicial,
           origem:          "compra",
           referenciaId:    compraId,
           observacoes:     form.observacao.trim(),
@@ -674,6 +687,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
             const despRef = doc(collection(db, "users", uid, "despesas"));
             batch.set(despRef, {
               ...despesaBase,
+            idSequencial:   idSeqInicial + i,
               descricao:      `Compra ${forn?.nome || ""} — parcela ${i + 1}/${nParc}`,
               valor:          vlParcela,
               valorTotal:     vlParcela,
