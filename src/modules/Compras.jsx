@@ -376,12 +376,12 @@ const CSS = `
     color:var(--gold); padding:9px 0 9px 4px; white-space:nowrap;
   }
   .cp-btn-rem-item {
-    width:28px; height:36px; border-radius:7px; margin-top:0;
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer; background:color: var(--red);
-    border:1px solid rgba(224,82,82,.25); color:rgba(255,255,255,0.85);
-    transition:background .13s; flex-shrink:0;
-  }
+  width:32px; height:36px; border-radius:7px; margin-top:0;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; background:rgba(224,82,82,.15);
+  border:1px solid rgba(224,82,82,.3);
+  transition:background .13s; flex-shrink:0;
+}
   .cp-btn-rem-item:hover { background:rgba(224,82,82,.2); }
   .cp-total-row {
     display:flex; justify-content:flex-end; align-items:center;
@@ -873,7 +873,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
                 </div>
                 <div className="cp-item-subtotal">{fmtR$(calcSubtotal(it))}</div>
                 <button className="cp-btn-rem-item" onClick={() => remItem(idx)}>
-                 <X size={11} color="rgba(255,255,255,0.8)" strokeWidth={2.5}/>
+                 <X size={14} color="#ff6b6b"/>
 </button>
                
               </div>
