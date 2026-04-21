@@ -8,7 +8,8 @@ import {
   Search, Package, Edit2, Trash2, X, AlertTriangle, ImageOff,
 } from "lucide-react";
 
-import { db, auth, onAuthStateChanged } from "../lib/firebase";
+import { db } from "../lib/firebase";
+import { useAuth } from "../contexts/AuthContext";
 import { LIMITES_FREE } from "../hooks/useLicenca";
 import {BannerLimite} from "../hooks/LicencaUI.jsx";
 import {
@@ -748,9 +749,16 @@ function ModalConfirmDelete({ produto, vendasComProduto, onConfirm, onClose }) {
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════ */
 export default function Produtos({ isPro = false }) {
-  const [uid,      setUid]      = useState(null);
   const [produtos, setProdutos] = useState([]);
   const [vendas,   setVendas]   = useState([]);
+  // ── Multi-tenant ──
+  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+
+  // ── Flags de permissão ──
+  const podeCriarV  = podeCriar("produtos");
+  const podeEditarV = podeEditar("produtos");
+  const podeExcluirV = podeExcluir("produtos");
+
   const [produtoIdCnt, setProdutoIdCnt] = useState(0);
   const [search,   setSearch]   = useState("");
   const [loading,  setLoading]  = useState(true);
@@ -759,19 +767,14 @@ export default function Produtos({ isPro = false }) {
   const [editando,  setEditando]  = useState(null);
   const [deletando, setDeletando] = useState(null);
 
-  /* Auth */
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => setUid(user?.uid || null));
-    return unsub;
-  }, []);
 
   /* Firestore */
   useEffect(() => {
-    if (!uid) { setLoading(false); return; }
+    if (!tenantUid) { setLoading(false); return; }
 
-    const userRef    = doc(db, "users", uid);
-    const produtosCol = collection(db, "users", uid, "produtos");
-    const vendasCol  = collection(db, "users", uid, "vendas");
+    const userRef    = doc(db, "users", tenantUid);
+    const produtosCol = collection(db, "users", tenantUid, "produtos");
+    const vendasCol  = collection(db, "users", tenantUid, "vendas");
 
     const unsubUser = onSnapshot(userRef, (snap) => {
       if (snap.exists()) setProdutoIdCnt(snap.data().produtoIdCnt || 0);
@@ -787,7 +790,7 @@ export default function Produtos({ isPro = false }) {
     });
 
     return () => { unsubUser(); unsubProdutos(); unsubVendas(); };
-  }, [uid]);
+  }, [tenantUid]);
 
   /* Conta quantas vendas referenciam um produto pelo nome */
   const vendasDoProduto = (nomeProduto) =>
@@ -801,14 +804,14 @@ export default function Produtos({ isPro = false }) {
 
   /* Handlers */
   const handleAdd = async (formData) => {
-    if (!uid) return;
+    if (!tenantUid) return;
     const newId = gerarIdProduto(produtoIdCnt);
-    await setDoc(doc(db, "users", uid, "produtos", newId), {
+    await setDoc(doc(db, "users", tenantUid, "produtos", newId), {
       ...formData,
       criadoEm: new Date().toISOString(),
     });
     await setDoc(
-      doc(db, "users", uid),
+      doc(db, "users", tenantUid),
       { produtoIdCnt: produtoIdCnt + 1 },
       { merge: true }
     );
@@ -816,9 +819,9 @@ export default function Produtos({ isPro = false }) {
   };
 
   const handleEdit = async (formData) => {
-    if (!uid || !editando) return;
+    if (!tenantUid || !editando) return;
     await setDoc(
-      doc(db, "users", uid, "produtos", editando.id),
+      doc(db, "users", tenantUid, "produtos", editando.id),
       formData,
       { merge: true }
     );
@@ -826,8 +829,8 @@ export default function Produtos({ isPro = false }) {
   };
 
   const handleDelete = async () => {
-    if (!uid || !deletando) return;
-    await deleteDoc(doc(db, "users", uid, "produtos", deletando.id));
+    if (!tenantUid || !deletando) return;
+    await deleteDoc(doc(db, "users", tenantUid, "produtos", deletando.id));
     setDeletando(null);
   };
 
@@ -859,7 +862,7 @@ export default function Produtos({ isPro = false }) {
     return <span className="badge badge-red">0</span>;
   };
 
-  if (!uid) return <div className="pd-loading">Carregando autenticação...</div>;
+  // App.jsx bloqueia render enquanto loadingAuth||!tenantUid, então esse guard é redundante mas seguro
 
   return (
     <>
@@ -881,6 +884,7 @@ export default function Produtos({ isPro = false }) {
           />
         </div>
 
+        {podeCriarV && (
         <button
           className="btn-novo-pd"
           onClick={() => setModalNovo(true)}
@@ -889,6 +893,7 @@ export default function Produtos({ isPro = false }) {
         >
           <Package size={14} /> + Novo Produto
         </button>
+        )}
       </header>
 
       {/* ── Conteúdo ── */}
@@ -955,6 +960,7 @@ export default function Produtos({ isPro = false }) {
 
                 {/* Ações */}
                 <div className="pd-actions">
+                  {podeEditarV && (
                   <button
                     className="btn-icon btn-icon-edit"
                     title="Editar"
@@ -962,6 +968,8 @@ export default function Produtos({ isPro = false }) {
                   >
                     <Edit2 size={13} />
                   </button>
+                  )}
+                  {podeExcluirV && (
                   <button
                     className="btn-icon btn-icon-del"
                     title="Excluir"
@@ -969,6 +977,7 @@ export default function Produtos({ isPro = false }) {
                   >
                     <Trash2 size={13} />
                   </button>
+                  )}
                 </div>
               </div>
             ))
@@ -977,14 +986,14 @@ export default function Produtos({ isPro = false }) {
       </div>
 
       {/* ── Modais ── */}
-      {modalNovo && (
+      {modalNovo && podeCriarV && (
         <ModalNovoProduto
           produtos={produtos}
           onSave={handleAdd}
           onClose={() => setModalNovo(false)}
         />
       )}
-      {editando && (
+      {editando && podeEditarV && (
         <ModalNovoProduto
           produto={editando}
           produtos={produtos}
@@ -992,7 +1001,7 @@ export default function Produtos({ isPro = false }) {
           onClose={() => setEditando(null)}
         />
       )}
-      {deletando && (
+      {deletando && podeExcluirV && (
         <ModalConfirmDelete
           produto={deletando}
           vendasComProduto={vendasDoProduto(deletando.nome)}
