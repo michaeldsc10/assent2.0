@@ -23,12 +23,10 @@ export const toDate = (v) => {
   if (v?.toDate) return v.toDate();          // Firestore Timestamp
   if (v instanceof Date) return v;
   if (typeof v === "string") {
-    // YYYY-MM-DD → interpreta como data LOCAL (não UTC) para evitar off-by-one de timezone
     if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
       const [y, m, d] = v.split("-");
       return new Date(+y, +m - 1, +d);
     }
-    // DD/MM/YYYY → formato brasileiro
     if (/^\d{2}\/\d{2}\/\d{4}$/.test(v)) {
       const [d, m, y] = v.split("/");
       return new Date(+y, +m - 1, +d);
@@ -146,10 +144,16 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
         collection(db, "users", uid, col),
         (snap) => {
           const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+          if (col === "vendas") {
+            console.log(`[useDashboardData] vendas carregadas: ${docs.length} doc(s)`, docs.map(d => ({ id: d.id, data: d.data, total: d.total })));
+          }
           setRaw((prev) => ({ ...prev, [key]: docs }));
           markDone();
         },
-        () => markDone() // silencia erros de permissão e avança loading
+        (err) => {
+          console.error(`[useDashboardData] ERRO na coleção "${col}":`, err.code, err.message);
+          markDone();
+        }
       )
     );
 
