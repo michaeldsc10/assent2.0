@@ -8,7 +8,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { Search, Plus, Edit2, Trash2, X, Tag, Settings, AlertTriangle } from "lucide-react";
 
-import { db, auth, onAuthStateChanged } from "../lib/firebase";
+import { db } from "../lib/firebase";
+import { useAuth } from "../contexts/AuthContext";
 import {LIMITES_FREE } from "../hooks/useLicenca";
 import {  BannerLimite  } from  "../hooks/LicencaUI.jsx";
 import {
@@ -794,7 +795,14 @@ function ModalConfirmDelete({ servico, vendas, onConfirm, onClose }) {
    COMPONENTE PRINCIPAL
    ════════════════════════════════════════════════════ */
 export default function Servicos({ isPro = false }) {
-  const [uid, setUid]               = useState(null);
+  // ── Multi-tenant ──
+  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+
+  // ── Flags de permissão ──
+  const podeCriarV  = podeCriar("servicos");
+  const podeEditarV = podeEditar("servicos");
+  const podeExcluirV = podeExcluir("servicos");
+
   const [servicos, setServicos]     = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [vendas, setVendas]         = useState([]);
@@ -808,20 +816,15 @@ export default function Servicos({ isPro = false }) {
   const [deletando, setDeletando]     = useState(null);
   const [modalCats, setModalCats]     = useState(false);
 
-  /* Auth */
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => setUid(user?.uid || null));
-    return unsub;
-  }, []);
 
   /* Firestore: escuta em tempo real */
   useEffect(() => {
-    if (!uid) { setLoading(false); return; }
+    if (!tenantUid) { setLoading(false); return; }
 
-    const userRef      = doc(db, "users", uid);
-    const servicosCol  = collection(db, "users", uid, "servicos");
-    const categoriasCol = collection(db, "users", uid, "categoriasServico");
-    const vendasCol    = collection(db, "users", uid, "vendas");
+    const userRef      = doc(db, "users", tenantUid);
+    const servicosCol  = collection(db, "users", tenantUid, "servicos");
+    const categoriasCol = collection(db, "users", tenantUid, "categoriasServico");
+    const vendasCol    = collection(db, "users", tenantUid, "vendas");
 
     const unsubUser = onSnapshot(userRef, snap => {
       if (snap.exists()) {
@@ -844,23 +847,23 @@ export default function Servicos({ isPro = false }) {
     });
 
     return () => { unsubUser(); unsubServicos(); unsubCats(); unsubVendas(); };
-  }, [uid]);
+  }, [tenantUid]);
 
   /* ── CRUD Serviços ── */
   const handleAdd = async (form) => {
-    if (!uid) return;
+    if (!tenantUid) return;
     const newId = gerarIdServico(servicoIdCnt);
-    await setDoc(doc(db, "users", uid, "servicos", newId), {
+    await setDoc(doc(db, "users", tenantUid, "servicos", newId), {
       ...form,
       criadoEm: new Date().toISOString(),
     });
-    await setDoc(doc(db, "users", uid), { servicoIdCnt: servicoIdCnt + 1 }, { merge: true });
+    await setDoc(doc(db, "users", tenantUid), { servicoIdCnt: servicoIdCnt + 1 }, { merge: true });
     setModalNovo(false);
   };
 
   const handleEdit = async (form) => {
-    if (!uid || !editando) return;
-    await setDoc(doc(db, "users", uid, "servicos", editando.id), {
+    if (!tenantUid || !editando) return;
+    await setDoc(doc(db, "users", tenantUid, "servicos", editando.id), {
       ...form,
       atualizadoEm: new Date().toISOString(),
     }, { merge: true });
@@ -868,30 +871,30 @@ export default function Servicos({ isPro = false }) {
   };
 
   const handleDelete = async () => {
-    if (!uid || !deletando) return;
-    await deleteDoc(doc(db, "users", uid, "servicos", deletando.id));
+    if (!tenantUid || !deletando) return;
+    await deleteDoc(doc(db, "users", tenantUid, "servicos", deletando.id));
     setDeletando(null);
   };
 
   /* ── CRUD Categorias ── */
   const handleAddCat = async (form) => {
-    if (!uid) return;
+    if (!tenantUid) return;
     const newId = `CAT${String(catIdCnt + 1).padStart(3, "0")}`;
-    await setDoc(doc(db, "users", uid, "categoriasServico", newId), {
+    await setDoc(doc(db, "users", tenantUid, "categoriasServico", newId), {
       ...form,
       criadoEm: new Date().toISOString(),
     });
-    await setDoc(doc(db, "users", uid), { catServicoIdCnt: catIdCnt + 1 }, { merge: true });
+    await setDoc(doc(db, "users", tenantUid), { catServicoIdCnt: catIdCnt + 1 }, { merge: true });
   };
 
   const handleEditCat = async (catId, form) => {
-    if (!uid) return;
-    await setDoc(doc(db, "users", uid, "categoriasServico", catId), form, { merge: true });
+    if (!tenantUid) return;
+    await setDoc(doc(db, "users", tenantUid, "categoriasServico", catId), form, { merge: true });
   };
 
   const handleDeleteCat = async (catId) => {
-    if (!uid) return;
-    await deleteDoc(doc(db, "users", uid, "categoriasServico", catId));
+    if (!tenantUid) return;
+    await deleteDoc(doc(db, "users", tenantUid, "categoriasServico", catId));
   };
 
   /* ── Filtro de busca ── */
@@ -908,7 +911,7 @@ export default function Servicos({ isPro = false }) {
     });
   }, [servicos, categorias, search]);
 
-  if (!uid) return <div className="sv-loading">Carregando autenticação...</div>;
+  // App.jsx bloqueia render enquanto loadingAuth||!tenantUid
 
   return (
     <>
@@ -937,7 +940,7 @@ export default function Servicos({ isPro = false }) {
           <button
             className="btn-novo-sv"
             onClick={() => setModalNovo(true)}
-            disabled={!isPro && servicos.length >= LIMITES_FREE.servicos}
+            disabled={!podeCriarV || (!isPro && servicos.length >= LIMITES_FREE.servicos)}
             title={!isPro && servicos.length >= LIMITES_FREE.servicos ? `Limite de ${LIMITES_FREE.servicos} serviços atingido no plano Free` : undefined}
           >
             <Plus size={14} /> Novo Serviço
@@ -990,10 +993,10 @@ export default function Servicos({ isPro = false }) {
                 <MargemBadge preco={s.preco} custo={s.custo} />
                 <span className="sv-desc">{s.descricao || "—"}</span>
                 <div className="sv-actions">
-                  <button className="btn-icon btn-icon-edit" onClick={() => setEditando(s)}>
+                  {podeEditarV && <button className="btn-icon btn-icon-edit" onClick={() => setEditando(s)}>
                     <Edit2 size={13} />
-                  </button>
-                  <button className="btn-icon btn-icon-del" onClick={() => setDeletando(s)}>
+                  </button>}
+                  {podeExcluirV && <button className="btn-icon btn-icon-del" onClick={() => setDeletando(s)}>
                     <Trash2 size={13} />
                   </button>
                 </div>
@@ -1004,7 +1007,7 @@ export default function Servicos({ isPro = false }) {
       </div>
 
       {/* Modais */}
-      {modalNovo && (
+      {modalNovo && podeCriarV && (
         <ModalNovoServico
           servicos={servicos}
           categorias={categorias}
@@ -1013,7 +1016,7 @@ export default function Servicos({ isPro = false }) {
           onAbrirCategorias={() => setModalCats(true)}
         />
       )}
-      {editando && (
+      {editando && podeEditarV && (
         <ModalNovoServico
           servico={editando}
           servicos={servicos}
@@ -1023,7 +1026,7 @@ export default function Servicos({ isPro = false }) {
           onAbrirCategorias={() => setModalCats(true)}
         />
       )}
-      {deletando && (
+      {deletando && podeExcluirV && (
         <ModalConfirmDelete
           servico={deletando}
           vendas={vendas}
