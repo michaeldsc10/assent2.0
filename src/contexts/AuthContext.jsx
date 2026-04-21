@@ -85,6 +85,7 @@ export function AuthProvider({ children }) {
   const [cargo, setCargo]                 = useState(null);  // string do cargo
   const [vendedorId, setVendedorId]       = useState(null);  // id em /vendedores
   const [vendedorNome, setVendedorNome]   = useState(null);  // nome para exibição
+  const [nomeUsuario, setNomeUsuario] = useState(null);
   const [loadingAuth, setLoadingAuth]     = useState(true);
 
   // ── Limpa todo o estado de sessão ──
@@ -94,6 +95,7 @@ export function AuthProvider({ children }) {
     setCargo(null);
     setVendedorId(null);
     setVendedorNome(null);
+    setNomeUsuario(null);
   }, []);
 
   // ── Carrega o perfil do usuário no Firestore após autenticação ──
@@ -109,6 +111,7 @@ export function AuthProvider({ children }) {
         setCargo(CARGOS.ADMIN);
         setVendedorId(null);
         setVendedorNome(null);
+        setNomeUsuario(firebaseUser.displayName || firebaseUser.email);
         return;
       }
 
@@ -144,6 +147,7 @@ const tUid = data.tenantUid ?? data.tenantUID;
       setUser(firebaseUser);
       setTenantUid(tUid);
       setCargo(perfil.cargo);
+      setNomeUsuario(perfil.nome || firebaseUser.email);
 
       // ── Passo 4: se cargo === "vendedor", carrega dados do cadastro vinculado ──
       if (perfil.cargo === CARGOS.VENDEDOR && perfil.vendedorId) {
