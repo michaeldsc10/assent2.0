@@ -7,7 +7,8 @@ import { useState, useEffect, useMemo } from "react";
 import {
   PackagePlus, Search, X, AlertCircle, CheckCircle2, Edit2, Trash2,
 } from "lucide-react";
-import { db, auth, onAuthStateChanged } from "../lib/firebase";
+import { db } from "../lib/firebase";
+import { useAuth } from "../contexts/AuthContext";
 import {
   collection, doc, onSnapshot,
   serverTimestamp, runTransaction,
@@ -754,7 +755,6 @@ function ModalConfirmDelete({ uid, movimentacao, produtos, onSalvo, onClose }) {
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════ */
 export default function EntradaEstoque() {
-  const [uid, setUid]                     = useState(null);
   const [produtos, setProdutos]           = useState([]);
   const [fornecedores, setFornecedores]   = useState([]);
   const [movimentacoes, setMovimentacoes] = useState([]);
@@ -762,6 +762,14 @@ export default function EntradaEstoque() {
   const [search, setSearch]               = useState("");
 
   /* Modais */
+  // ── Multi-tenant ──
+  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+
+  // ── Flags de permissão ──
+  const podeCriarV   = podeCriar("entradaEstoque");
+  const podeEditarV  = podeEditar("entradaEstoque");
+  const podeExcluirV = podeExcluir("entradaEstoque");
+
   const [modalNovo, setModalNovo] = useState(false);
   const [editando, setEditando]   = useState(null);
   const [deletando, setDeletando] = useState(null);
@@ -773,28 +781,22 @@ export default function EntradaEstoque() {
     setTimeout(() => setToast({ msg: "", tipo: "sucesso" }), 3500);
   };
 
-  /* ── Auth ── */
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => setUid(user?.uid || null));
-    return unsub;
-  }, []);
-
   /* ── Firestore: escuta em tempo real ── */
   useEffect(() => {
-    if (!uid) { setLoading(false); return; }
+    if (!tenantUid) { setLoading(false); return; }
 
     const unsubP = onSnapshot(
-      collection(db, "users", uid, "produtos"),
+      collection(db, "users", tenantUid, "produtos"),
       (snap) => setProdutos(snap.docs.map((d) => ({ ...d.data(), id: d.id, _docId: d.id })))
     );
 
     const unsubF = onSnapshot(
-      collection(db, "users", uid, "fornecedores"),
+      collection(db, "users", tenantUid, "fornecedores"),
       (snap) => setFornecedores(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
 
     const unsubM = onSnapshot(
-      collection(db, "users", uid, "movimentacoes_estoque"),
+      collection(db, "users", tenantUid, "movimentacoes_estoque"),
       (snap) => {
         const entradas = snap.docs
           .map((d) => ({ id: d.id, ...d.data() }))
@@ -810,7 +812,7 @@ export default function EntradaEstoque() {
     );
 
     return () => { unsubP(); unsubF(); unsubM(); };
-  }, [uid]);
+  }, [tenantUid]);
 
   /* ── Filtro ── */
   const movFiltradas = useMemo(() => {
@@ -824,7 +826,7 @@ export default function EntradaEstoque() {
     );
   }, [movimentacoes, search]);
 
-  if (!uid) return <div className="ee-loading">Carregando autenticação...</div>;
+  // App.jsx bloqueia render enquanto loadingAuth||!tenantUid
 
   return (
     <>
@@ -846,7 +848,7 @@ export default function EntradaEstoque() {
           />
         </div>
 
-        <button className="btn-entrada" onClick={() => setModalNovo(true)}>
+        {podeCriarV && <button className="btn-entrada" onClick={() => setModalNovo(true)}>
           <PackagePlus size={14} /> Registrar Entrada
         </button>
       </header>
@@ -886,7 +888,7 @@ export default function EntradaEstoque() {
                   <button
                     className="btn-icon btn-icon-edit"
                     title="Editar entrada"
-                    onClick={() => setEditando(m)}
+                    onClick={() => podeEditarV && setEditando(m)}
                   >
                     <Edit2 size={13} />
                   </button>
@@ -905,9 +907,9 @@ export default function EntradaEstoque() {
       </div>
 
       {/* Modal: Nova entrada */}
-      {modalNovo && (
+      {modalNovo && podeCriarV && (
         <ModalEntrada
-          uid={uid}
+          uid={tenantUid}
           produtos={produtos}
           fornecedores={fornecedores}
           movimentacao={null}
@@ -917,9 +919,9 @@ export default function EntradaEstoque() {
       )}
 
       {/* Modal: Editar entrada */}
-      {editando && (
+      {editando && podeEditarV && (
         <ModalEntrada
-          uid={uid}
+          uid={tenantUid}
           produtos={produtos}
           fornecedores={fornecedores}
           movimentacao={editando}
@@ -929,9 +931,9 @@ export default function EntradaEstoque() {
       )}
 
       {/* Modal: Confirmar exclusão */}
-      {deletando && (
+      {deletando && podeExcluirV && (
         <ModalConfirmDelete
-          uid={uid}
+          uid={tenantUid}
           movimentacao={deletando}
           produtos={produtos}
           onSalvo={(msg) => { showToast(msg, "sucesso"); setDeletando(null); }}
