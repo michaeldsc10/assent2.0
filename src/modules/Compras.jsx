@@ -875,7 +875,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
                 <button className="cp-btn-rem-item" onClick={() => remItem(idx)}>
   <X size={11} color="#e05252" strokeWidth={2.5}/>
 </button>
-                </button>
+               
               </div>
             ))}
 
