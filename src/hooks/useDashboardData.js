@@ -72,6 +72,8 @@ export const fmtData = (v) => {
 function getPeriodBounds(period, customRange) {
   const now   = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  // Fim do dia de hoje — evita excluir vendas com hora futura no mesmo dia
+  const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
 
   if (period === "Personalizado" && customRange?.from && customRange?.to) {
     const [fy, fm, fd] = customRange.from.split("-").map(Number);
@@ -83,12 +85,12 @@ function getPeriodBounds(period, customRange) {
   }
 
   switch (period) {
-    case "Hoje":     return { start: today, end: now };
-    case "7 dias":   return { start: new Date(today.getTime() - 6  * 86_400_000), end: now };
-    case "30 dias":  return { start: new Date(today.getTime() - 29 * 86_400_000), end: now };
-    case "Este mês": return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: now };
-    case "Todos":    return { start: null, end: now };
-    default:         return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: now };
+    case "Hoje":     return { start: today, end: endOfToday };
+    case "7 dias":   return { start: new Date(today.getTime() - 6  * 86_400_000), end: endOfToday };
+    case "30 dias":  return { start: new Date(today.getTime() - 29 * 86_400_000), end: endOfToday };
+    case "Este mês": return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: endOfToday };
+    case "Todos":    return { start: null, end: endOfToday };
+    default:         return { start: new Date(now.getFullYear(), now.getMonth(), 1), end: endOfToday };
   }
 }
 
