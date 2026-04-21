@@ -4,29 +4,32 @@
    ═══════════════════════════════════════════════════ */
 
 import { initializeApp } from "firebase/app";
-import { 
-  getAuth, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
+import {
+  getAuth,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut,
-  onAuthStateChanged   // ← Adicionado aqui!
+  onAuthStateChanged,
 } from "firebase/auth";
 
-import { 
-  getFirestore, 
-  doc, 
-  getDoc, 
-  setDoc 
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
 } from "firebase/firestore";
 
-export const firebaseConfig = {
-  apiKey:            "AIzaSyB9HEWiHFc8YEuj_Ab-7TxGKqdQkSRQAio",
-  authDomain:        "assent-2b945.firebaseapp.com",
-  projectId:         "assent-2b945",
-  storageBucket:     "assent-2b945.firebasestorage.app",
-  messagingSenderId: "851051401705",
-  appId:             "1:851051401705:web:fa6ebb1cc6ee5d3a737b78",
-  measurementId:     "G-K7F0F7PZ8M",
+// ⚠️ Todas as chaves são lidas de variáveis de ambiente (.env)
+// Nunca commite valores reais neste arquivo.
+// Copie .env.example para .env e preencha com suas credenciais.
+const firebaseConfig = {
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId:     import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
 const app = initializeApp(firebaseConfig);
@@ -36,10 +39,10 @@ export const db   = getFirestore(app);
 
 
 /* ── Funções de Autenticação ── */
-export const login = (email, password) => 
+export const login    = (email, password) =>
   signInWithEmailAndPassword(auth, email, password);
 
-export const register = (email, password) => 
+export const register = (email, password) =>
   createUserWithEmailAndPassword(auth, email, password);
 
 export const logout = () => signOut(auth);
@@ -52,7 +55,7 @@ export const verificarLicencaPro = async (uid) => {
   if (!uid) return false;
 
   try {
-    const licencaRef = doc(db, "licencas", uid);
+    const licencaRef  = doc(db, "licencas", uid);
     const licencaSnap = await getDoc(licencaRef);
 
     if (!licencaSnap.exists()) return false;
