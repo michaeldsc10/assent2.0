@@ -24,8 +24,8 @@ import {
   TrendingUp, RefreshCw, User, List, Edit2, ShoppingCart,
 } from "lucide-react";
 
-import { db, auth } from "../lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { db } from "../lib/firebase";
+import { useAuth } from "../contexts/AuthContext";
 import { TelaBloqueada } from "../hooks/LicencaUI.jsx";
 import {
   collection, doc, onSnapshot,
@@ -1429,7 +1429,6 @@ function ModalNovoOrc({ orc, uid, clientes, produtos, servicos, onSave, onClose 
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════ */
 export default function Orcamentos({ isPro = false }) {
-  const [uid,        setUid]        = useState(null);
   const [orcamentos, setOrcamentos] = useState([]);
   const [clientes,   setClientes]   = useState([]);
   const [produtos,   setProdutos]   = useState([]);
@@ -1445,7 +1444,15 @@ export default function Orcamentos({ isPro = false }) {
   const [editando,  setEditando]  = useState(null);
   const [detalhe,   setDetalhe]   = useState(null);
 
-  useEffect(()=>{ const u=onAuthStateChanged(auth,u=>setUid(u?.uid||null)); return u; },[]);
+
+  // ── Multi-tenant ──
+  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+  const uid = tenantUid; // alias — uid é passado como prop a vários sub-componentes
+
+  // ── Flags de permissão ──
+  const podeCriarV   = podeCriar("orcamentos");
+  const podeEditarV  = podeEditar("orcamentos");
+  const podeExcluirV = podeExcluir("orcamentos");
 
   useEffect(()=>{
     if(!uid) return;
@@ -1724,11 +1731,11 @@ export default function Orcamentos({ isPro = false }) {
         </div>
       </div>
 
-      {modalNovo && (
+      {modalNovo && podeCriarV && (
         <ModalNovoOrc uid={uid} clientes={clientes} produtos={produtos} servicos={servicos}
           onSave={handleSave} onClose={()=>setModalNovo(false)}/>
       )}
-      {editando && (
+      {editando && podeEditarV && (
         <ModalNovoOrc orc={editando} uid={uid} clientes={clientes} produtos={produtos} servicos={servicos}
           onSave={handleSave} onClose={()=>setEditando(null)}/>
       )}
