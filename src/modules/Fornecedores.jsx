@@ -15,8 +15,8 @@ import {
   ToggleLeft, ToggleRight, Filter, Download,
 } from "lucide-react";
 
-import { db, auth } from "../lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { db } from "../lib/firebase";
+import { useAuth } from "../contexts/AuthContext";
 import {
   collection,
   doc,
@@ -578,11 +578,19 @@ function ModalConfirmToggle({ fornecedor, onConfirm, onClose }) {
    COMPONENTE PRINCIPAL — Fornecedores
    ══════════════════════════════════════════════════ */
 export default function Fornecedores() {
-  const [uid,          setUid]          = useState(null);
   const [fornecedores, setFornecedores] = useState([]);
   const [loading,      setLoading]      = useState(true);
 
   /* Modais */
+  // ── Multi-tenant ──
+  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+
+  // ── Flags de permissão ──
+  const podeCriarV   = podeCriar("fornecedores");
+  const podeEditarV  = podeEditar("fornecedores");
+  const podeExcluirV = podeExcluir("fornecedores");
+  const uid = tenantUid; // alias para prop uid={uid} do ModalFornecedor
+
   const [modalNovo,     setModalNovo]     = useState(false);
   const [editando,      setEditando]      = useState(null);
   const [toggleAlvo,    setToggleAlvo]    = useState(null);
@@ -591,19 +599,11 @@ export default function Fornecedores() {
   const [search,        setSearch]        = useState("");
   const [filtroStatus,  setFiltroStatus]  = useState("todos");
 
-  /* ── Auth ── */
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, user => {
-      setUid(user?.uid || null);
-    });
-    return unsub;
-  }, []);
-
   /* ── Listener Firestore ── */
   useEffect(() => {
-    if (!uid) return;
+    if (!tenantUid) return;
 
-    const col = collection(db, "users", uid, "fornecedores");
+    const col = collection(db, "users", tenantUid, "fornecedores");
     const unsub = onSnapshot(
       col,
       (snap) => {
@@ -620,21 +620,21 @@ export default function Fornecedores() {
     );
 
     return unsub;
-  }, [uid]);
+  }, [tenantUid]);
 
   /* ── Salvar (Criar / Editar) ── */
   const handleSave = useCallback(async (payload, fornecedorExistente) => {
-    if (!uid) return;
+    if (!tenantUid) return;
 
     try {
       if (fornecedorExistente) {
         /* EDITAR: atualizar documento existente via doc.id interno */
-        const ref = doc(db, "users", uid, "fornecedores", fornecedorExistente.id);
+        const ref = doc(db, "users", tenantUid, "fornecedores", fornecedorExistente.id);
         await updateDoc(ref, payload);
         setEditando(null);
       } else {
         /* CRIAR: Firestore gera doc.id automaticamente */
-        const col = collection(db, "users", uid, "fornecedores");
+        const col = collection(db, "users", tenantUid, "fornecedores");
         await addDoc(col, payload);
         setModalNovo(false);
       }
@@ -643,16 +643,16 @@ export default function Fornecedores() {
       /* Re-lança para o modal tratar e exibir para o usuário */
       throw new Error("Falha ao salvar no banco de dados. Tente novamente.");
     }
-  }, [uid]);
+  }, [tenantUid]);
 
   /* ── Toggle de Status ── */
   const handleToggleStatus = useCallback(async () => {
-    if (!uid || !toggleAlvo) return;
+    if (!tenantUid || !toggleAlvo) return;
 
     const novoStatus = toggleAlvo.status === "ativo" ? "inativo" : "ativo";
 
     try {
-      const ref = doc(db, "users", uid, "fornecedores", toggleAlvo.id);
+      const ref = doc(db, "users", tenantUid, "fornecedores", toggleAlvo.id);
       await updateDoc(ref, {
         status:          novoStatus,
         dataAtualizacao: new Date().toISOString(),
@@ -662,7 +662,7 @@ export default function Fornecedores() {
     } finally {
       setToggleAlvo(null);
     }
-  }, [uid, toggleAlvo]);
+  }, [tenantUid, toggleAlvo]);
 
   /* ── Filtros com useMemo ── */
   const fornecedoresFiltrados = useMemo(() => {
@@ -694,7 +694,7 @@ export default function Fornecedores() {
     inativos: fornecedores.filter(f => f.status === "inativo").length,
   }), [fornecedores]);
 
-  if (!uid) return <div className="fn-loading">Carregando autenticação...</div>;
+  // App.jsx bloqueia render enquanto loadingAuth||!tenantUid
 
   return (
     <>
@@ -726,6 +726,7 @@ export default function Fornecedores() {
               whiteSpace: "nowrap", transition: "opacity .13s",
             }}
             onClick={() => setModalNovo(true)}
+            disabled={!podeCriarV}
           >
             <Plus size={14} /> Novo Fornecedor
           </button>
@@ -834,7 +835,7 @@ export default function Fornecedores() {
                 <button
                   className="btn-icon btn-icon-edit"
                   title="Editar"
-                  onClick={() => setEditando(f)}
+                  onClick={() => podeEditarV && setEditando(f)}
                 >
                   <Edit2 size={13} />
                 </button>
@@ -856,7 +857,7 @@ export default function Fornecedores() {
       </div>
 
       {/* Modal: Novo Fornecedor */}
-      {modalNovo && (
+      {modalNovo && podeCriarV && (
         <ModalFornecedor
           uid={uid}
           onSave={handleSave}
@@ -865,7 +866,7 @@ export default function Fornecedores() {
       )}
 
       {/* Modal: Editar Fornecedor */}
-      {editando && (
+      {editando && podeEditarV && (
         <ModalFornecedor
           fornecedor={editando}
           uid={uid}
