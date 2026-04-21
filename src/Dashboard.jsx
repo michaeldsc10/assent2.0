@@ -1,4 +1,4 @@
-/* ═══════════════════════════════════════════════════
+              /* ═══════════════════════════════════════════════════
    ASSENT v2.0 — Dashboard.jsx  (responsivo)
    ─────────────────────────────────────────────────
    ✓ Sidebar recolhível (ícones + tooltip no modo colapsado)
@@ -1075,7 +1075,15 @@ export default function Dashboard() {
    
 const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin } = usePermissao();
   const { user: authUser, tenantUid } = useAuth();
-  const uid = tenantUid; // alias — mantém compatibilidade com hooks (useEmpresa, useLicenca, useDashboardData)
+
+  // uid como estado local derivado de tenantUid.
+  // Necessário para que os data hooks (useEmpresa, useLicenca, useDashboardData)
+  // disparem seus useEffect([uid]) corretamente quando o auth resolve.
+  // Usa tenantUid (não user.uid) para que colaboradores vejam dados do tenant certo.
+  const [uid, setUid] = useState(tenantUid ?? null);
+  useEffect(() => {
+    if (tenantUid) setUid(tenantUid);
+  }, [tenantUid]);
    
   const toggleTheme = () => {
     setTheme(prev => {
