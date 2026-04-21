@@ -10,7 +10,8 @@ import {
   ChevronRight, Camera, Shield, Keyboard,
 } from "lucide-react";
 
-import { db, auth, onAuthStateChanged } from "../lib/firebase";
+import { db } from "../lib/firebase";
+import { useAuth } from "../contexts/AuthContext";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import {
   reauthenticateWithCredential,
@@ -933,17 +934,32 @@ function SecaoAtalhos({ menuVisivel = {} }) {
 /* ══════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════ */
+/* ─────────────────────────────────────────────
+   Seções visíveis por cargo
+───────────────────────────────────────────── */
+const SECOES_POR_CARGO = {
+  admin:       ["empresa", "seguranca", "financeiro", "menu", "estoque", "atalhos"],
+  financeiro:  ["seguranca", "financeiro", "atalhos"],
+  comercial:   ["seguranca", "atalhos"],
+  compras:     ["seguranca", "estoque", "atalhos"],
+  operacional: ["seguranca", "estoque", "atalhos"],
+  vendedor:    ["seguranca", "atalhos"],
+  suporte:     ["seguranca", "atalhos"],
+};
+
 export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
-  const [uid, setUid]         = useState(null);
+  // ── Multi-tenant ──
+  const { tenantUid, cargo, isAdmin } = useAuth();
+  const uid = tenantUid;
+
   const [config, setConfig]   = useState(null);
   const [loading, setLoading] = useState(true);
-  const [secao, setSecao]     = useState("empresa");
+  const [secao, setSecao]     = useState(isAdmin ? "empresa" : "seguranca");
   const [toast, setToast]     = useState(null);
 
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, user => setUid(user?.uid || null));
-    return unsub;
-  }, []);
+  // Seções que este cargo pode ver
+  const secoesVisiveis = SECOES_POR_CARGO[cargo] ?? ["seguranca", "atalhos"];
+  const navFiltrado    = NAV.filter(n => secoesVisiveis.includes(n.id));
 
   useEffect(() => {
     if (!uid) { setLoading(false); return; }
@@ -987,7 +1003,7 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
         <div className="cfg-body">
           <nav className="cfg-nav">
             <span className="cfg-nav-group-label">Configurações</span>
-            {NAV.map(({ id, label, icon: Icon }) => (
+            {navFiltrado.map(({ id, label, icon: Icon }) => (
               <button key={id} className={`cfg-nav-item ${secao === id ? "active" : ""}`} onClick={() => setSecao(id)}>
                 <Icon size={15} className="cfg-nav-icon" />
                 <span className="cfg-nav-label">{label}</span>
