@@ -781,7 +781,7 @@ export default function AReceber() {
 
   /* ── Handler: Editar conta ── */
   const handleEditar = useCallback(async (dados) => {
-    if (!uid || !editando) return;
+    if (!tenantUid || !editando) return;
     try {
       const ref = doc(db, "users", tenantUid, "a_receber", editando.id);
       await updateDoc(ref, {
@@ -793,11 +793,11 @@ export default function AReceber() {
       console.error("[AReceber] Erro ao editar conta:", err);
       alert("Erro ao salvar alterações. Tente novamente.");
     }
-  }, [uid, editando]);
+  }, [tenantUid, editando]);
 
   /* ── Handler: Registrar pagamento ── */
   const handlePagamento = useCallback(async (valorRecebido) => {
-    if (!uid || !pagamento) return;
+    if (!tenantUid || !pagamento) return;
     try {
       const conta = pagamento;
       const novoValorPago     = Number((conta.valorPago + valorRecebido).toFixed(2));
@@ -846,11 +846,11 @@ export default function AReceber() {
       console.error("[AReceber] Erro ao registrar pagamento:", err);
       alert("Erro ao registrar pagamento. Tente novamente.");
     }
-  }, [uid, pagamento]);
+  }, [tenantUid, pagamento]);
 
   /* ── Handler: Excluir conta ── */
   const handleDeletar = useCallback(async () => {
-    if (!uid || !deletando) return;
+    if (!tenantUid || !deletando) return;
     try {
       await deleteDoc(doc(db, "users", tenantUid, "a_receber", deletando.id));
       setDeletando(null);
@@ -858,7 +858,7 @@ export default function AReceber() {
       console.error("[AReceber] Erro ao excluir conta:", err);
       alert("Erro ao excluir conta. Tente novamente.");
     }
-  }, [uid, deletando]);
+  }, [tenantUid, deletando]);
 
   /* ── Filtragem + busca (memoizado) ── */
   const contasFiltradas = useMemo(() => {
