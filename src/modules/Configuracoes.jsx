@@ -1,1039 +1,1289 @@
-/* ═══════════════════════════════════════════════════
-   ASSENT v2.0 — Configuracoes.jsx
-   Estrutura: users/{uid}/config/geral (doc único, merge)
-   ═══════════════════════════════════════════════════ */
+// Usuarios.jsx — ASSENT v2.0
+// Módulo de gerenciamento de usuários — exclusivo para Admin
+//
+// O que este arquivo implementa:
+//   ✓ Listagem de usuários com badge de cargo e status ativo/inativo
+//   ✓ Convite de novo usuário via Firebase Auth (secondary app) + Firestore
+//   ✓ Criação de /userIndex/{uid} → { tenantUid } para o AuthContext funcionar
+//   ✓ Edição de cargo e vínculo de vendedor
+//   ✓ Toggle ativo/inativo com confirmação
+//   ✓ Limite de 10 usuários adicionais (11 total com o Admin)
+//   ✓ Tela de acesso negado para cargos não-Admin
+//
+// Dependência: firebase.js deve exportar `firebaseConfig` além de `db` e `auth`
+// Exemplo: export const firebaseConfig = { apiKey: "...", ... };
+//
+// Estrutura Firestore gerada:
+//   users/{tenantUid}/usuarios/{newUid}  → perfil do usuário
+//   userIndex/{newUid}                   → { tenantUid } (índice reverso)
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useContext, useMemo } from "react";
 import {
-  Building2, Lock, CreditCard, LayoutDashboard, Package,
-  Eye, EyeOff, Check, AlertCircle, Save,
-  ChevronRight, Camera, Shield, Keyboard,
-} from "lucide-react";
+  collection,
+  doc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  onSnapshot,
+  serverTimestamp,
+  getDocs,
+} from "firebase/firestore";
+import { initializeApp, getApps } from "firebase/app";
+import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { db, firebaseConfig } from "../lib/firebase";
+import AuthContext from "../contexts/AuthContext";
 
-import { db } from "../lib/firebase";
-import { useAuth } from "../contexts/AuthContext";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import {
-  reauthenticateWithCredential,
-  EmailAuthProvider,
-  updatePassword,
-} from "firebase/auth";
-
-/* ── Validadores CPF / CNPJ ── */
-const validarCPF = (cpf) => {
-  cpf = cpf.replace(/\D/g, "");
-  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
-  let soma = 0;
-  for (let i = 0; i < 9; i++) soma += parseInt(cpf[i]) * (10 - i);
-  let resto = soma % 11;
-  const d1 = resto < 2 ? 0 : 11 - resto;
-  if (d1 !== parseInt(cpf[9])) return false;
-  soma = 0;
-  for (let i = 0; i < 10; i++) soma += parseInt(cpf[i]) * (11 - i);
-  resto = soma % 11;
-  const d2 = resto < 2 ? 0 : 11 - resto;
-  return d2 === parseInt(cpf[10]);
-};
-
-const validarCNPJ = (cnpj) => {
-  cnpj = cnpj.replace(/\D/g, "");
-  if (cnpj.length !== 14 || /^(\d)\1+$/.test(cnpj)) return false;
-  let t = cnpj.length - 2;
-  let n = cnpj.substring(0, t);
-  let d = cnpj.substring(t);
-  let s = 0, p = t - 7;
-  for (let i = t; i >= 1; i--) { s += parseInt(n.charAt(t - i)) * p--; if (p < 2) p = 9; }
-  let r = s % 11 < 2 ? 0 : 11 - (s % 11);
-  if (r !== parseInt(d.charAt(0))) return false;
-  t++; n = cnpj.substring(0, t); s = 0; p = t - 7;
-  for (let i = t; i >= 1; i--) { s += parseInt(n.charAt(t - i)) * p--; if (p < 2) p = 9; }
-  r = s % 11 < 2 ? 0 : 11 - (s % 11);
-  return r === parseInt(d.charAt(1));
-};
-
-/* ══════════════════════════════════════════════════════
+/* ─────────────────────────────────────────────
    CONSTANTES
-   ══════════════════════════════════════════════════════ */
-const MENU_SECTIONS = [
-  { key: "dashboard",       label: "Dashboard",         sub: "Visão geral e KPIs",       icon: "📊", locked: true  },
-  { key: "clientes",        label: "Clientes",           sub: "Cadastro e histórico",     icon: "👥", locked: false },
-  { key: "produtos",        label: "Produtos",           sub: "Catálogo de produtos",     icon: "📦", locked: false },
-  { key: "servicos",        label: "Serviços",           sub: "Catálogo de serviços",     icon: "🔧", locked: false },
-  { key: "entrada_estoque", label: "Entrada de Estoque", sub: "Movimentação de entrada",  icon: "📥", locked: false },
-  { key: "vendas",          label: "Vendas",             sub: "PDV e registro de vendas", icon: "🛒", locked: false },
-  { key: "fiado",           label: "Fiado / A Receber",  sub: "Contas a receber",         icon: "💳", locked: false },
-  { key: "caixa",           label: "Caixa Diário",       sub: "Abertura e fechamento",    icon: "💰", locked: false },
-  { key: "despesas",        label: "Despesas",           sub: "Controle de saídas",       icon: "📉", locked: false },
-  { key: "fornecedores",    label: "Fornecedores",       sub: "Cadastro de fornecedores", icon: "🏭", locked: false },
-  { key: "relatorios",      label: "Relatórios",         sub: "Análises e exportações",   icon: "📈", locked: false },
-  { key: "agenda",          label: "Agenda",             sub: "Compromissos e tarefas",   icon: "📅", locked: false },
-  { key: "orcamentos",         label: "Orçamentos",      sub: "Orçamentos",            icon: "⚡", locked: false },
-  { key: "vendedores",      label: "Vendedores",         sub: "Equipe de vendas",         icon: "👔", locked: false },
-  { key: "config",          label: "Configurações",      sub: "Esta tela",                icon: "⚙️", locked: true  },
+───────────────────────────────────────────── */
+const MAX_USUARIOS = 10; // máximo de usuários adicionais (exceto o Admin)
+
+const CARGOS = [
+  { value: "financeiro",  label: "Financeiro",          cor: "#5b8ef0", bg: "rgba(91,142,240,0.12)"  },
+  { value: "comercial",   label: "Comercial",           cor: "#3ecf8e", bg: "rgba(62,207,142,0.12)"  },
+  { value: "compras",     label: "Compras",             cor: "#f59e0b", bg: "rgba(245,158,11,0.12)"  },
+  { value: "operacional", label: "Operacional",         cor: "#a78bfa", bg: "rgba(167,139,250,0.12)" },
+  { value: "vendedor",    label: "Vendedor",            cor: "#c8a55e", bg: "rgba(200,165,94,0.12)"  },
+  { value: "suporte",     label: "Suporte / Atendimento", cor: "#6b7280", bg: "rgba(107,114,128,0.12)" },
 ];
 
-const TAXAS_DEFAULT = {
-  debito:     "1.99",
-  pix:        "0.00",
-  credito_1:  "2.99",
-  credito_2:  "3.19",
-  credito_3:  "3.39",
-  credito_4:  "3.59",
-  credito_5:  "3.79",
-  credito_6:  "3.99",
-  credito_7:  "4.19",
-  credito_8:  "4.39",
-  credito_9:  "4.59",
-  credito_10: "4.79",
-  credito_11: "4.99",
-  credito_12: "5.19",
-};
+const CARGO_MAP = Object.fromEntries(CARGOS.map((c) => [c.value, c]));
 
-const NAV = [
-  { id: "empresa",    label: "Empresa",         icon: Building2      },
-  { id: "seguranca",  label: "Segurança",        icon: Shield         },
-  { id: "financeiro", label: "Financeiro",       icon: CreditCard     },
-  { id: "menu",       label: "Menu do Sistema",  icon: LayoutDashboard},
-  { id: "estoque",    label: "Estoque",          icon: Package        },
-  { id: "atalhos",    label: "Atalhos",          icon: Keyboard       },
-];
-
-/* ══════════════════════════════════════════════════════
-   MAPEAMENTO DE ATALHOS DE TECLADO
-   Combinação: Alt + tecla → navega para o módulo
-   ══════════════════════════════════════════════════════ */
-export const ATALHOS_MAP = [
-  { code: "KeyD", display: "Alt + D", key: "dashboard",       hint: "Dashboard"           },
-  { code: "KeyC", display: "Alt + C", key: "clientes",        hint: "Clientes"             },
-  { code: "KeyP", display: "Alt + P", key: "produtos",        hint: "Produtos"             },
-  { code: "KeyS", display: "Alt + S", key: "servicos",        hint: "Serviços"             },
-  { code: "KeyE", display: "Alt + E", key: "entrada_estoque", hint: "Entrada"              },
-  { code: "KeyV", display: "Alt + V", key: "vendas",          hint: "Vendas"               },
-  { code: "KeyF", display: "Alt + F", key: "fiado",           hint: "Fiado (F de Fiado)"   },
-  { code: "KeyX", display: "Alt + X", key: "caixa",           hint: "Caixa (Cx)"           },
-  { code: "KeyZ", display: "Alt + Z", key: "despesas",        hint: "Despesas"             },
-  { code: "KeyN", display: "Alt + N", key: "fornecedores",    hint: "forNecedores"         },
-  { code: "KeyR", display: "Alt + R", key: "relatorios",      hint: "Relatórios"           },
-  { code: "KeyA", display: "Alt + A", key: "agenda",          hint: "Agenda"               },
-  { code: "KeyO", display: "Alt + O", key: "orcamentos",      hint: "Orçamentos"           },
-  { code: "KeyM", display: "Alt + M", key: "vendedores",      hint: "equipe (Membros)"     },
-  { code: "KeyG", display: "Alt + G", key: "config",          hint: "confiGurações"        },
-];
-
-/* Lookup rápido: code → key do módulo */
-const ATALHO_LOOKUP = Object.fromEntries(ATALHOS_MAP.map(a => [a.code, a.key]));
-
-/* ══════════════════════════════════════════════════════
-   HOOK: useAtalhosTeclado
-   Deve ser chamado no App.jsx (raiz), onde setModule e
-   menuVisivel já existem. Zero dependência de Configuracoes.
-   ══════════════════════════════════════════════════════ */
-export function useAtalhosTeclado(setModule, menuVisivel = {}) {
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      /* 1. Apenas combinações Alt + tecla */
-      if (!e.altKey) return;
-
-      /* 2. Ignorar se foco está em campo de texto */
-      const tag = document.activeElement?.tagName;
-      if (
-        tag === "INPUT"    ||
-        tag === "TEXTAREA" ||
-        document.activeElement?.isContentEditable
-      ) return;
-
-      /* 3. Verificar se o código tem atalho mapeado */
-      const moduleKey = ATALHO_LOOKUP[e.code];
-      if (!moduleKey) return;
-
-      /* 4. Verificar visibilidade do módulo */
-      const section = MENU_SECTIONS.find(s => s.key === moduleKey);
-      if (!section) return;
-      /* Módulos locked são sempre visíveis; os outros precisam estar ativos */
-      if (!section.locked && menuVisivel[moduleKey] === false) return;
-
-      /* 5. Navegar — previne ação padrão do navegador (ex: Alt+F abre menu) */
-      e.preventDefault();
-      setModule(moduleKey);
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [setModule, menuVisivel]);
-}
-
-/* ══════════════════════════════════════════════════════
+/* ─────────────────────────────────────────────
    CSS
-   ══════════════════════════════════════════════════════ */
+───────────────────────────────────────────── */
 const CSS = `
-  @keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
-  @keyframes slideUp {
-    from { opacity: 0; transform: translateY(14px) }
-    to   { opacity: 1; transform: translateY(0) }
-  }
-  @keyframes spin { to { transform: rotate(360deg) } }
-
-  .cfg-root {
-    display: flex; flex-direction: column;
-    height: 100vh; width: 100%; overflow: hidden;
-  }
-  .cfg-topbar {
-    padding: 14px 22px;
-    background: var(--s1); border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 14px; flex-shrink: 0;
-  }
-  .cfg-topbar-title h1 {
-    font-family: 'Sora', sans-serif; font-size: 17px; font-weight: 600; color: var(--text);
-  }
-  .cfg-topbar-title p { font-size: 11px; color: var(--text-2); margin-top: 2px; }
-
-  .cfg-body {
-    display: flex; flex: 1;
-    overflow: hidden; min-height: 0;
-  }
-  .cfg-nav {
-    width: 220px; flex-shrink: 0;
-    background: var(--s1); border-right: 1px solid var(--border);
-    padding: 16px 10px; display: flex; flex-direction: column; gap: 2px;
-    overflow-y: auto;
-  }
-  .cfg-panel {
-    flex: 1; overflow-y: auto; padding: 24px;
-    display: flex; flex-direction: column; gap: 20px;
-    animation: fadeIn .18s ease; 
+  .usr-root {
+    display: flex;
+    flex-direction: column;
     height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
   }
-  .cfg-panel::-webkit-scrollbar { width: 3px; }
-  .cfg-panel::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
 
-  .cfg-nav-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 12px; border-radius: 9px; cursor: pointer;
-    font-family: 'DM Sans', sans-serif; font-size: 13px;
-    color: var(--text-2); border: 1px solid transparent;
-    transition: all .13s; background: transparent;
-    text-align: left; width: 100%;
+  /* ── Topbar ── */
+  .usr-topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--s1);
+    flex-shrink: 0;
   }
-  .cfg-nav-item:hover { background: var(--s2); color: var(--text); }
-  .cfg-nav-item.active { background: var(--s2); color: var(--text); border-color: var(--border-h); }
-  .cfg-nav-item.active .cfg-nav-icon { color: var(--gold); }
-  .cfg-nav-label { flex: 1; }
-  .cfg-nav-icon  { flex-shrink: 0; }
-  .cfg-nav-group-label {
+  .usr-topbar-title h2 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0;
+  }
+  .usr-topbar-title p {
+    font-size: 11px;
+    color: var(--text-3);
+    margin: 2px 0 0;
+  }
+  .usr-topbar-spacer { flex: 1; }
+  .usr-counter {
+    font-size: 12px;
+    color: var(--text-3);
+    background: var(--s2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 10px;
+  }
+  .usr-counter span { color: var(--gold); font-weight: 600; }
+
+  /* ── Botão Convidar ── */
+  .usr-btn-convidar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #c8a55e, #dfc07c);
+    color: #0a0808;
+    font-weight: 700;
+    font-size: 12px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: opacity .15s;
+    white-space: nowrap;
+  }
+  .usr-btn-convidar:hover { opacity: 0.88; }
+  .usr-btn-convidar:disabled { opacity: 0.45; cursor: not-allowed; }
+
+  /* ── Tabela ── */
+  .usr-table-wrap {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+  }
+  .usr-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .usr-table thead tr {
+    border-bottom: 1px solid var(--border);
+  }
+  .usr-table th {
+    padding: 9px 12px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .usr-table tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background .12s;
+  }
+  .usr-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+  .usr-table td {
+    padding: 11px 12px;
+    vertical-align: middle;
+  }
+
+  /* ── Avatar + nome ── */
+  .usr-user-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .usr-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #b8952e, #e0c060);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 13px;
+    color: #0a0808;
+    flex-shrink: 0;
+  }
+  .usr-avatar.inativo {
+    background: var(--s3);
+    color: var(--text-3);
+  }
+  .usr-user-name {
+    font-weight: 500;
+    color: var(--text);
+  }
+  .usr-user-name.inativo { color: var(--text-3); text-decoration: line-through; }
+  .usr-user-email {
+    font-size: 11px;
+    color: var(--text-3);
+    margin-top: 1px;
+  }
+
+  /* ── Badge cargo ── */
+  .usr-badge-cargo {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+  .usr-badge-admin {
+    background: rgba(200,165,94,0.15);
+    color: var(--gold);
+    border: 1px solid rgba(200,165,94,0.25);
+  }
+
+  /* ── Badge status ── */
+  .usr-badge-ativo {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .usr-badge-ativo.ativo {
+    background: rgba(62,207,142,0.1);
+    color: var(--green);
+  }
+  .usr-badge-ativo.inativo {
+    background: rgba(255,255,255,0.04);
+    color: var(--text-3);
+  }
+  .usr-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .usr-dot.ativo  { background: var(--green); }
+  .usr-dot.inativo { background: var(--text-3); }
+
+  /* ── Ações ── */
+  .usr-acoes {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .usr-btn-acao {
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background .12s, border-color .12s;
+  }
+  .usr-btn-acao.editar {
+    background: rgba(91,142,240,0.1);
+    color: var(--blue);
+    border-color: rgba(91,142,240,0.2);
+  }
+  .usr-btn-acao.editar:hover { background: rgba(91,142,240,0.18); }
+  .usr-btn-acao.ativar {
+    background: rgba(62,207,142,0.08);
+    color: var(--green);
+    border-color: rgba(62,207,142,0.2);
+  }
+  .usr-btn-acao.ativar:hover { background: rgba(62,207,142,0.16); }
+  .usr-btn-acao.desativar {
+    background: rgba(224,82,82,0.08);
+    color: var(--red);
+    border-color: rgba(224,82,82,0.18);
+  }
+  .usr-btn-acao.desativar:hover { background: rgba(224,82,82,0.15); }
+  .usr-btn-acao.excluir {
+    background: rgba(224,82,82,0.08);
+    color: var(--red);
+    border-color: rgba(224,82,82,0.18);
+  }
+  .usr-btn-acao.excluir:hover { background: rgba(224,82,82,0.18); }
+  .usr-btn-acao.detalhes {
+    background: rgba(200,165,94,0.08);
+    color: var(--gold);
+    border-color: rgba(200,165,94,0.18);
+  }
+  .usr-btn-acao.detalhes:hover { background: rgba(200,165,94,0.15); }
+
+  /* ── Modal Detalhes ── */
+  .usr-detalhe-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    margin-bottom: 16px;
+  }
+  .usr-detalhe-item { display: flex; flex-direction: column; gap: 3px; }
+  .usr-detalhe-label {
     font-size: 10px; font-weight: 600; letter-spacing: .07em;
     text-transform: uppercase; color: var(--text-3);
-    padding: 0 12px; margin-bottom: 4px; margin-top: 8px;
+  }
+  .usr-detalhe-val { font-size: 13px; color: var(--text); }
+  .usr-detalhe-sep {
+    border: none; border-top: 1px solid var(--border); margin: 4px 0 16px;
+  }
+  .usr-reset-box {
+    background: rgba(200,165,94,0.06); border: 1px solid rgba(200,165,94,0.18);
+    border-radius: 10px; padding: 14px 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .usr-reset-info { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+  .usr-reset-info strong { color: var(--text); display: block; margin-bottom: 2px; }
+  .usr-btn-reset {
+    padding: 7px 14px; border-radius: 8px; white-space: nowrap; flex-shrink: 0;
+    background: linear-gradient(135deg, #c8a55e, #dfc07c);
+    color: #0a0808; border: none; cursor: pointer;
+    font-size: 12px; font-weight: 700; transition: opacity .15s;
+  }
+  .usr-btn-reset:hover { opacity: .88; }
+  .usr-btn-reset:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* ── Linha Admin (destacada) ── */
+  .usr-row-admin td:first-child { border-left: 2px solid var(--gold); }
+
+  /* ── Empty state ── */
+  .usr-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-3);
+  }
+  .usr-empty-icon { font-size: 36px; margin-bottom: 12px; }
+  .usr-empty h3 { font-size: 14px; color: var(--text-2); margin-bottom: 6px; }
+  .usr-empty p { font-size: 12px; }
+
+  /* ── Acesso negado ── */
+  .usr-acesso-negado {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 12px;
+    color: var(--text-3);
+    text-align: center;
+    padding: 40px;
+  }
+  .usr-acesso-negado-icon { font-size: 40px; }
+  .usr-acesso-negado h3 { font-size: 15px; color: var(--text-2); margin: 0; }
+  .usr-acesso-negado p  { font-size: 12px; max-width: 320px; line-height: 1.6; }
+
+  /* ─────────────────────────────────
+     MODAL
+  ───────────────────────────────── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    padding: 20px;
+  }
+  .modal-box {
+    background: var(--s1);
+    border: 1px solid var(--border-h);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 480px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0;
+  }
+  .modal-header p {
+    font-size: 11px;
+    color: var(--text-3);
+    margin: 3px 0 0;
+  }
+  .modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-3);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+    transition: color .12s;
+  }
+  .modal-close:hover { color: var(--text); }
+  .modal-body {
+    padding: 18px 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex: 1;
+  }
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 14px 20px;
+    border-top: 1px solid var(--border);
   }
 
-  .cfg-card {
-    background: var(--s1); border: 1px solid var(--border);
-    border-radius: 14px; overflow: hidden; animation: slideUp .18s ease;
-    flex-shrink: 0;
+  /* ── Campos do modal ── */
+  .usr-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
   }
-  .cfg-card-header {
-    padding: 16px 20px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 10px;
+  .usr-field label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-3);
   }
-  .cfg-card-header-icon {
-    width: 32px; height: 32px; border-radius: 8px;
-    background: var(--s3); border: 1px solid var(--border-h);
-    display: flex; align-items: center; justify-content: center; color: var(--gold);
-  }
-  .cfg-card-title {
-    font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; color: var(--text);
-  }
-  .cfg-card-sub { font-size: 11px; color: var(--text-2); margin-top: 1px; }
-  .cfg-card-body { padding: 20px; }
-  .cfg-card-footer {
-    padding: 13px 20px; border-top: 1px solid var(--border);
-    display: flex; justify-content: flex-end; gap: 10px; background: var(--s2);
-  }
-
-  .form-group  { margin-bottom: 16px; }
-  .form-group:last-child { margin-bottom: 0; }
-  .form-label {
-    display: block; font-size: 10px; font-weight: 600;
-    letter-spacing: .07em; text-transform: uppercase;
-    color: var(--text-2); margin-bottom: 7px;
-  }
-  .form-label-req { color: var(--gold); margin-left: 2px; }
-  .form-input {
-    width: 100%; background: var(--s2);
-    border: 1px solid var(--border); border-radius: 9px;
-    padding: 10px 13px; color: var(--text); font-size: 13px;
-    font-family: 'DM Sans', sans-serif;
-    outline: none; transition: border-color .15s, box-shadow .15s;
-    box-sizing: border-box;
-  }
-  .form-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(200,165,94,0.1); }
-  .form-input.err   { border-color: var(--red); }
-  .form-input.err:focus { box-shadow: 0 0 0 3px rgba(224,82,82,0.1); }
-  .form-error { font-size: 11px; color: var(--red); margin-top: 5px; }
-  .form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-
-  .input-pass-wrap { position: relative; }
-  .input-pass-wrap .form-input { padding-right: 40px; }
-  .input-pass-toggle {
-    position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
-    background: none; border: none; cursor: pointer;
-    color: var(--text-3); padding: 0; line-height: 1;
-    display: flex; align-items: center; transition: color .13s;
-  }
-  .input-pass-toggle:hover { color: var(--text-2); }
-
-  .btn-primary {
-    padding: 9px 20px; border-radius: 9px;
-    background: var(--gold); color: #0a0808; border: none; cursor: pointer;
-    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
-    display: flex; align-items: center; gap: 6px;
-    transition: opacity .13s, transform .1s;
-  }
-  .btn-primary:hover  { opacity: .88; }
-  .btn-primary:active { transform: scale(.97); }
-  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-
-  .btn-secondary {
-    padding: 9px 20px; border-radius: 9px;
-    background: var(--s3); color: var(--text-2);
-    border: 1px solid var(--border); cursor: pointer;
-    font-family: 'DM Sans', sans-serif; font-size: 13px;
-    transition: background .13s, color .13s;
-  }
-  .btn-secondary:hover { background: var(--s2); color: var(--text); }
-
-  .cfg-toast {
-    position: fixed; bottom: 24px; right: 24px;
-    padding: 11px 16px; border-radius: 10px;
-    display: flex; align-items: center; gap: 8px;
-    font-family: 'DM Sans', sans-serif; font-size: 13px;
-    z-index: 9999; animation: slideUp .18s ease;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-  }
-  .cfg-toast.success {
-    background: rgba(72,187,120,0.12); border: 1px solid rgba(72,187,120,0.3); color: #48bb78;
-  }
-  .cfg-toast.error {
-    background: rgba(224,82,82,0.12); border: 1px solid rgba(224,82,82,0.3); color: var(--red);
-  }
-
-  .logo-upload-area {
-    border: 1.5px dashed var(--border-h); border-radius: 12px; padding: 24px 16px;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 10px; cursor: pointer; transition: border-color .15s, background .15s;
+  .usr-field input,
+  .usr-field select {
     background: var(--s2);
-  }
-  .logo-upload-area:hover { border-color: var(--gold); background: rgba(200,165,94,0.04); }
-  .logo-upload-area.has-logo { padding: 12px; }
-  .logo-preview { max-height: 80px; max-width: 200px; object-fit: contain; border-radius: 6px; }
-  .logo-upload-hint { font-size: 11px; color: var(--text-3); text-align: center; line-height: 1.5; }
-  .logo-upload-btn-row { display: flex; gap: 8px; margin-top: 6px; }
-  .btn-logo-remove {
-    padding: 5px 12px; border-radius: 7px; background: var(--red-d); color: var(--red);
-    border: 1px solid rgba(224,82,82,.25); cursor: pointer;
-    font-size: 11px; font-family: 'DM Sans', sans-serif; transition: background .13s;
-  }
-  .btn-logo-remove:hover { background: rgba(224,82,82,.18); }
-
-  .taxa-table { width: 100%; border-collapse: collapse; }
-  .taxa-table thead tr { background: var(--s2); }
-  .taxa-table th {
-    font-size: 10px; font-weight: 600; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--text-3);
-    padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border);
-  }
-  .taxa-table td {
-    padding: 8px 14px; border-bottom: 1px solid var(--border);
-    font-size: 13px; color: var(--text-2); vertical-align: middle;
-  }
-  .taxa-table tr:last-child td { border-bottom: none; }
-  .taxa-table tr:hover td { background: rgba(255,255,255,0.01); }
-  .taxa-bandeira {
-    font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 600; color: var(--text);
-  }
-  .taxa-tipo-badge {
-    display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px;
-    font-size: 10px; font-weight: 600; background: var(--s3); color: var(--text-3);
     border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 13px;
+    color: var(--text);
+    outline: none;
+    transition: border-color .15s;
+    width: 100%;
+    font-family: 'DM Sans', sans-serif;
   }
-  .taxa-input {
-    width: 80px; background: var(--s2); border: 1px solid var(--border); border-radius: 7px;
-    padding: 5px 10px; color: var(--text); font-size: 13px;
-    font-family: 'DM Sans', sans-serif; outline: none;
-    transition: border-color .15s, box-shadow .15s; text-align: right;
+  .usr-field input:focus,
+  .usr-field select:focus { border-color: var(--gold); }
+  .usr-field input::placeholder { color: var(--text-3); }
+  .usr-field input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
-  .taxa-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(200,165,94,0.1); }
-  .taxa-pct { font-size: 12px; color: var(--text-3); margin-left: 5px; }
-  .taxa-section-divider td {
-    padding: 5px 14px; font-size: 9px; font-weight: 700; letter-spacing: .08em;
-    text-transform: uppercase; color: var(--text-3);
-    background: var(--s3); border-bottom: 1px solid var(--border);
+  .usr-field-hint {
+    font-size: 11px;
+    color: var(--text-3);
+    line-height: 1.5;
   }
-
-  .menu-toggle-list { display: flex; flex-direction: column; gap: 6px; }
-  .menu-toggle-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 11px 14px; border-radius: 9px;
-    border: 1px solid var(--border); background: var(--s2); transition: border-color .13s;
-  }
-  .menu-toggle-item:hover { border-color: var(--border-h); }
-  .menu-toggle-icon {
-    width: 28px; height: 28px; border-radius: 7px;
-    background: var(--s3); border: 1px solid var(--border-h);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; font-size: 14px;
-  }
-  .menu-toggle-label { font-size: 13px; color: var(--text); font-family: 'DM Sans', sans-serif; }
-  .menu-toggle-sub   { font-size: 11px; color: var(--text-3); margin-top: 1px; }
-  .menu-toggle-locked {
-    font-size: 10px; color: var(--text-3); background: var(--s3);
-    border: 1px solid var(--border); border-radius: 20px; padding: 2px 8px; white-space: nowrap;
+  .usr-field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
   }
 
-  .toggle-switch { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
-  .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
-  .toggle-track {
-    position: absolute; inset: 0; border-radius: 22px;
-    background: var(--s3); border: 1px solid var(--border);
-    cursor: pointer; transition: background .2s, border-color .2s;
-  }
-  .toggle-switch input:checked + .toggle-track {
-    background: rgba(200,165,94,0.25); border-color: var(--gold);
-  }
-  .toggle-track::after {
-    content: ''; position: absolute; width: 16px; height: 16px; border-radius: 50%;
-    background: var(--text-3); top: 2px; left: 2px; transition: transform .2s, background .2s;
-  }
-  .toggle-switch input:checked + .toggle-track::after {
-    transform: translateX(16px); background: var(--gold);
+  /* ── Aviso de cargo ── */
+  .usr-cargo-info {
+    background: rgba(200,165,94,0.07);
+    border: 1px solid rgba(200,165,94,0.18);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 11px;
+    color: var(--text-2);
+    line-height: 1.6;
   }
 
-  .estoque-hint {
-    font-size: 12px; color: var(--text-3); background: var(--s3); border: 1px solid var(--border);
-    border-radius: 8px; padding: 10px 14px; margin-top: 12px; line-height: 1.6;
-  }
-  .cfg-spinner {
-    width: 14px; height: 14px; border-radius: 50%;
-    border: 2px solid rgba(0,0,0,0.15); border-top-color: #0a0808;
-    animation: spin .6s linear infinite; flex-shrink: 0;
-  }
-  .cfg-alert {
-    display: flex; align-items: flex-start; gap: 10px;
-    padding: 12px 14px; border-radius: 9px; font-size: 12px; line-height: 1.6;
-  }
-  .cfg-loading {
-    padding: 56px 20px; text-align: center; color: var(--text-3); font-size: 13px;
+  /* ── Erro ── */
+  .usr-erro {
+    background: var(--red-d);
+    border: 1px solid rgba(224,82,82,0.25);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+    color: var(--red);
   }
 
-  /* ── Seção Atalhos ── */
-  .atalhos-intro {
-    font-size: 12px; color: var(--text-3); line-height: 1.7;
-    background: var(--s2); border: 1px solid var(--border);
-    border-radius: 9px; padding: 12px 14px; margin-bottom: 4px;
+  /* ── Botões modal ── */
+  .usr-btn-cancelar {
+    padding: 8px 16px;
+    background: transparent;
+    border: 1px solid var(--border-h);
+    border-radius: 8px;
+    color: var(--text-2);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .12s;
   }
-  .atalhos-intro strong { color: var(--gold); font-weight: 600; }
-  .atalhos-list { display: flex; flex-direction: column; gap: 6px; }
-  .atalho-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 10px 14px; border-radius: 9px;
-    border: 1px solid var(--border); background: var(--s2);
-    transition: border-color .13s, opacity .13s;
+  .usr-btn-cancelar:hover { background: rgba(255,255,255,0.04); }
+  .usr-btn-salvar {
+    padding: 8px 20px;
+    background: linear-gradient(135deg, #c8a55e, #dfc07c);
+    border: none;
+    border-radius: 8px;
+    color: #0a0808;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity .15s;
   }
-  .atalho-item:not(.atalho-disabled):hover { border-color: var(--border-h); }
-  .atalho-disabled { opacity: .38; }
-  .atalho-icon {
-    width: 28px; height: 28px; border-radius: 7px;
-    background: var(--s3); border: 1px solid var(--border-h);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; font-size: 14px;
+  .usr-btn-salvar:hover  { opacity: 0.88; }
+  .usr-btn-salvar:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ── Loading spinner ── */
+  .usr-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-3);
+    font-size: 13px;
+    gap: 10px;
   }
-  .atalho-info { flex: 1; min-width: 0; }
-  .atalho-label { font-size: 13px; color: var(--text); font-family: 'DM Sans', sans-serif; }
-  .atalho-sub   { font-size: 11px; color: var(--text-3); margin-top: 1px; }
-  .atalho-key {
-    font-family: 'DM Mono', 'Courier New', monospace;
-    font-size: 11px; font-weight: 700; white-space: nowrap;
-    background: var(--s3); border: 1px solid var(--border-h);
-    border-bottom-width: 2px; border-radius: 6px;
-    padding: 3px 10px; color: var(--gold); letter-spacing: .04em;
-    flex-shrink: 0;
+
+  /* ── Divisor ── */
+  .usr-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2px 0;
   }
-  .atalho-hidden-badge {
-    font-size: 10px; color: var(--text-3); background: var(--s3);
-    border: 1px solid var(--border); border-radius: 20px;
-    padding: 2px 8px; white-space: nowrap; flex-shrink: 0;
+
+  /* ── Toast feedback ── */
+  .usr-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--s2);
+    border: 1px solid var(--border-h);
+    border-radius: 10px;
+    padding: 11px 16px;
+    font-size: 13px;
+    color: var(--text);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    z-index: 300;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: usr-toast-in 0.2s ease;
+  }
+  .usr-toast.sucesso { border-color: rgba(62,207,142,0.3); }
+  .usr-toast.erro    { border-color: rgba(224,82,82,0.3); }
+  @keyframes usr-toast-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (max-width: 640px) {
+    .usr-table-wrap { padding: 12px; }
+    .usr-topbar { flex-wrap: wrap; gap: 8px; }
+    .usr-field-row { grid-template-columns: 1fr; }
+    .usr-table th:nth-child(3),
+    .usr-table td:nth-child(3) { display: none; } /* esconde col vendedor no mobile */
   }
 `;
 
-/* ══════════════════════════════════════════════════════
-   UTILITÁRIOS
-   ══════════════════════════════════════════════════════ */
-function Toast({ msg, type, onClose }) {
-  useEffect(() => {
-    const t = setTimeout(onClose, 3500);
-    return () => clearTimeout(t);
-  }, [onClose]);
-  return (
-    <div className={`cfg-toast ${type}`}>
-      {type === "success" ? <Check size={14} /> : <AlertCircle size={14} />}
-      {msg}
-    </div>
-  );
-}
-
-function Toggle({ checked, onChange, disabled }) {
-  return (
-    <label className="toggle-switch" onClick={e => e.stopPropagation()}>
-      <input
-        type="checkbox" checked={checked}
-        onChange={e => !disabled && onChange(e.target.checked)}
-        disabled={disabled}
-      />
-      <span className="toggle-track" />
-    </label>
-  );
-}
-
-function PassInput({ value, onChange, placeholder, className }) {
-  const [show, setShow] = useState(false);
-  return (
-    <div className="input-pass-wrap">
-      <input
-        type={show ? "text" : "password"}
-        className={`form-input ${className || ""}`}
-        value={value} onChange={onChange} placeholder={placeholder}
-      />
-      <button className="input-pass-toggle" onClick={() => setShow(s => !s)} type="button">
-        {show ? <EyeOff size={14} /> : <Eye size={14} />}
-      </button>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════
-   SEÇÕES
-   ══════════════════════════════════════════════════════ */
-function SecaoEmpresa({ config, onSave }) {
-  const [form, setForm] = useState({
-    nomeEmpresa: config?.empresa?.nomeEmpresa || config?.nomeEmpresa || "",
-    cnpj:        config?.empresa?.cnpj        || config?.cnpj        || "",
-    telefone:    config?.empresa?.telefone    || config?.telefone    || "",
-    endereco:    config?.empresa?.endereco    || config?.endereco    || "",
-    logo:        config?.empresa?.logo        || config?.logo        || "",
-  });
-  const [erros, setErros]       = useState({});
-  const [salvando, setSalvando] = useState(false);
-  const fileRef = useRef();
-
-  useEffect(() => {
-    if (!config) return;
-    setForm({
-      nomeEmpresa: config?.empresa?.nomeEmpresa || "",
-      cnpj:        config?.empresa?.cnpj        || "",
-      telefone:    config?.empresa?.telefone    || "",
-      endereco:    config?.empresa?.endereco    || "",
-      logo:        config?.empresa?.logo        || "",
-    });
-  }, [config]);
-
-  const set = (k, v) => {
-    setForm(f => ({ ...f, [k]: v }));
-    if (erros[k]) setErros(e => ({ ...e, [k]: "" }));
-  };
-
-  const validarEmpresa = () => {
-    const e = {};
-    if (form.cnpj?.trim()) {
-      const clean = form.cnpj.replace(/\D/g, "");
-      if      (clean.length === 11 && !validarCPF(clean))  e.cnpj = "CPF inválido.";
-      else if (clean.length === 14 && !validarCNPJ(clean)) e.cnpj = "CNPJ inválido.";
-      else if (clean.length !== 11 && clean.length !== 14) e.cnpj = "CPF (11) ou CNPJ (14 dígitos).";
-    }
-    setErros(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleLogo = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 300 * 1024) { alert("Imagem muito grande. Máx. 300KB."); return; }
-    const reader = new FileReader();
-    reader.onload = (ev) => set("logo", ev.target.result);
-    reader.readAsDataURL(file);
-  };
-
-  const handleSalvar = async () => {
-    if (!validarEmpresa()) return;
-    setSalvando(true);
-    try {
-      await onSave({ empresa: form });
-    } finally {
-      setSalvando(false);
-    }
-  };
-  return (
-    <div className="cfg-card">
-      <div className="cfg-card-header">
-        <div className="cfg-card-header-icon"><Building2 size={15} /></div>
-        <div>
-          <div className="cfg-card-title">Dados da Empresa</div>
-          <div className="cfg-card-sub">Informações exibidas em documentos e recibos</div>
-        </div>
-      </div>
-      <div className="cfg-card-body">
-        <div className="form-group">
-          <label className="form-label">Logo da Empresa</label>
-          <div
-            className={`logo-upload-area ${form.logo ? "has-logo" : ""}`}
-            onClick={() => !form.logo && fileRef.current?.click()}
-          >
-            {form.logo ? (
-              <>
-                <img src={form.logo} alt="Logo" className="logo-preview" />
-                <div className="logo-upload-btn-row">
-                  <button className="btn-secondary" style={{ fontSize: 11, padding: "4px 10px" }}
-                    onClick={e => { e.stopPropagation(); fileRef.current?.click(); }}>Trocar</button>
-                  <button className="btn-logo-remove"
-                    onClick={e => { e.stopPropagation(); set("logo", ""); }}>Remover</button>
-                </div>
-              </>
-            ) : (
-              <>
-                <Camera size={22} color="var(--text-3)" />
-                <span className="logo-upload-hint">Clique para enviar a logo<br />PNG ou JPEG · Máx. 300KB</span>
-              </>
-            )}
-          </div>
-          <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp"
-            style={{ display: "none" }} onChange={handleLogo} />
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">Nome da Empresa</label>
-            <input className="form-input" value={form.nomeEmpresa}
-              onChange={e => set("nomeEmpresa", e.target.value)} placeholder="Nome ou razão social" />
-          </div>
-          <div className="form-group">
-            <label className="form-label">CNPJ / CPF</label>
-            <input className={`form-input ${erros.cnpj ? "err" : ""}`} value={form.cnpj}
-              onChange={e => set("cnpj", e.target.value)} placeholder="00.000.000/0001-00" />
-            {erros.cnpj && <div className="form-error">{erros.cnpj}</div>}
-          </div>
-        </div>
-        <div className="form-row">
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Telefone</label>
-            <input className="form-input" value={form.telefone}
-              onChange={e => set("telefone", e.target.value)} placeholder="(62) 99999-9999" />
-          </div>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Endereço</label>
-            <input className="form-input" value={form.endereco}
-              onChange={e => set("endereco", e.target.value)} placeholder="Rua, número, bairro, cidade" />
-          </div>
-        </div>
-      </div>
-      <div className="cfg-card-footer">
-        <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
-          {salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Empresa</>}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function SecaoSeguranca() {
-  const [form, setForm]         = useState({ senhaAtual: "", novaSenha: "", confirmar: "" });
-  const [erros, setErros]       = useState({});
-  const [salvando, setSalvando] = useState(false);
-  const [sucesso, setSucesso]   = useState(false);
-
-  const set = (k, v) => {
-    setForm(f => ({ ...f, [k]: v }));
-    if (erros[k]) setErros(e => ({ ...e, [k]: "" }));
-  };
-
-  const validar = () => {
-    const e = {};
-    if (!form.senhaAtual)                e.senhaAtual = "Informe a senha atual.";
-    if (form.novaSenha.length < 6)       e.novaSenha  = "Mínimo 6 caracteres.";
-    if (form.novaSenha !== form.confirmar) e.confirmar = "As senhas não conferem.";
-    setErros(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSalvar = async () => {
-    if (!validar()) return;
-    setSalvando(true); setSucesso(false);
-    try {
-      const user = auth.currentUser;
-      const credential = EmailAuthProvider.credential(user.email, form.senhaAtual);
-      await reauthenticateWithCredential(user, credential);
-      await updatePassword(user, form.novaSenha);
-      setForm({ senhaAtual: "", novaSenha: "", confirmar: "" });
-      setSucesso(true);
-      setTimeout(() => setSucesso(false), 4000);
-    } catch (err) {
-      const isWrongPass = err.code === "auth/wrong-password" || err.code === "auth/invalid-credential";
-      setErros({ senhaAtual: isWrongPass ? "Senha atual incorreta." : `Erro: ${err.message}` });
-    } finally {
-      setSalvando(false);
-    }
-  };
-
-  return (
-    <div className="cfg-card">
-      <div className="cfg-card-header">
-        <div className="cfg-card-header-icon"><Lock size={15} /></div>
-        <div>
-          <div className="cfg-card-title">Trocar Senha</div>
-          <div className="cfg-card-sub">Autenticação via Firebase — confirme a senha atual</div>
-        </div>
-      </div>
-      <div className="cfg-card-body">
-        {sucesso && (
-          <div className="cfg-alert" style={{ background: "rgba(72,187,120,0.08)", border: "1px solid rgba(72,187,120,0.3)", color: "#48bb78", marginBottom: 16 }}>
-            <Check size={14} style={{ flexShrink: 0 }} />Senha alterada com sucesso!
-          </div>
-        )}
-        <div className="form-group">
-          <label className="form-label">Senha Atual <span className="form-label-req">*</span></label>
-          <PassInput value={form.senhaAtual} onChange={e => set("senhaAtual", e.target.value)}
-            placeholder="Digite sua senha atual" className={erros.senhaAtual ? "err" : ""} />
-          {erros.senhaAtual && <div className="form-error">{erros.senhaAtual}</div>}
-        </div>
-        <div className="form-row">
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Nova Senha <span className="form-label-req">*</span></label>
-            <PassInput value={form.novaSenha} onChange={e => set("novaSenha", e.target.value)}
-              placeholder="Mínimo 6 caracteres" className={erros.novaSenha ? "err" : ""} />
-            {erros.novaSenha && <div className="form-error">{erros.novaSenha}</div>}
-          </div>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Confirmar Nova Senha <span className="form-label-req">*</span></label>
-            <PassInput value={form.confirmar} onChange={e => set("confirmar", e.target.value)}
-              placeholder="Repita a nova senha" className={erros.confirmar ? "err" : ""} />
-            {erros.confirmar && <div className="form-error">{erros.confirmar}</div>}
-          </div>
-        </div>
-      </div>
-      <div className="cfg-card-footer">
-        <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
-          {salvando ? <><span className="cfg-spinner" />Alterando...</> : <><Lock size={13} />Alterar Senha</>}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-const normalizaTaxa = (raw) => {
-  let v = String(raw).replace(",", ".").replace(/[^0-9.]/g, "");
-  const parts = v.split(".");
-  if (parts.length > 2) v = parts[0] + "." + parts.slice(1).join("");
-  if (v.includes(".")) {
-    const [int, dec] = v.split(".");
-    v = int + "." + dec.slice(0, 2);
-  }
-  return v;
-};
-
-const taxaValida = (v) => {
-  const n = parseFloat(v);
-  return v !== "" && !isNaN(n) && n >= 0;
-};
-
-function SecaoFinanceiro({ config, onSave }) {
-  const [taxas, setTaxas]       = useState(() => ({ ...TAXAS_DEFAULT, ...(config?.taxas || {}) }));
-  const [erros, setErros]       = useState({});
-  const [salvando, setSalvando] = useState(false);
-
-  useEffect(() => {
-    if (config?.taxas) setTaxas(prev => ({ ...TAXAS_DEFAULT, ...config.taxas }));
-  }, [config]);
-
-  const setTaxa = (k, raw) => {
-    const v = normalizaTaxa(raw);
-    setTaxas(t => ({ ...t, [k]: v }));
-    if (erros[k]) setErros(e => ({ ...e, [k]: "" }));
-  };
-
-  const validar = () => {
-    const e = {};
-    Object.keys(taxas).forEach(k => { if (!taxaValida(taxas[k])) e[k] = "Inválido"; });
-    setErros(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSalvar = async () => {
-    if (!validar()) return;
-    const taxasFinais = {};
-    Object.keys(taxas).forEach(k => { taxasFinais[k] = parseFloat(parseFloat(taxas[k]).toFixed(2)); });
-    setSalvando(true);
-    await onSave({ taxas: taxasFinais });
-    setSalvando(false);
-  };
-
-  const TaxaRow = ({ chave, label, tipo }) => (
-    <tr>
-      <td><span className="taxa-bandeira">{label}</span></td>
-      <td><span className="taxa-tipo-badge">{tipo}</span></td>
-      <td style={{ textAlign: "right" }}>
-        <span style={{ display: "inline-flex", alignItems: "center" }}>
-          <input className={`taxa-input ${erros[chave] ? "err" : ""}`} value={taxas[chave] ?? ""} onChange={e => setTaxa(chave, e.target.value)} inputMode="decimal" />
-          <span className="taxa-pct">%</span>
-        </span>
-      </td>
-    </tr>
-  );
-
-  return (
-    <div className="cfg-card">
-      <div className="cfg-card-header">
-        <div className="cfg-card-header-icon"><CreditCard size={15} /></div>
-        <div>
-          <div className="cfg-card-title">Taxa de Máquina de Cartão</div>
-          <div className="cfg-card-sub">Usada para calcular lucro líquido nas vendas</div>
-        </div>
-      </div>
-      <div className="cfg-card-body" style={{ padding: 0 }}>
-        <table className="taxa-table">
-          <thead><tr><th>Modalidade</th><th>Tipo</th><th style={{ textAlign: "right" }}>Taxa (%)</th></tr></thead>
-          <tbody>
-            <tr className="taxa-section-divider"><td colSpan={3}>Outros</td></tr>
-            <TaxaRow chave="debito" label="Débito" tipo="Débito" />
-            <TaxaRow chave="pix"    label="PIX"    tipo="PIX"    />
-            <tr className="taxa-section-divider"><td colSpan={3}>Crédito</td></tr>
-            {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
-              <TaxaRow key={n} chave={`credito_${n}`} label={`Crédito ${n}x`} tipo="Crédito" />
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="cfg-card-footer">
-        <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
-          {salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Taxas</>}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-const buildVisivel = (cfg) => {
-  const base = {};
-  MENU_SECTIONS.forEach(s => {
-    base[s.key] = s.locked ? true : (cfg?.menuVisivel?.[s.key] !== undefined ? cfg.menuVisivel[s.key] : true);
-  });
-  return base;
-};
-
-function SecaoMenu({ config, onSave }) {
-  const [visivel, setVisivel]   = useState(() => buildVisivel(config));
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro]         = useState("");
-
-  useEffect(() => { if (config !== null) setVisivel(buildVisivel(config)); }, [config]);
-
-  const toggle = useCallback((key, val) => {
-    setVisivel(prev => ({ ...prev, [key]: val }));
-    setErro("");
-  }, []);
-
-  const handleSalvar = async () => {
-    setSalvando(true); setErro("");
-    try {
-      const menuVisivel = {};
-      MENU_SECTIONS.forEach(s => { if (!s.locked) menuVisivel[s.key] = visivel[s.key]; });
-      await onSave({ menuVisivel });
-    } catch { setErro("Falha ao salvar. Verifique sua conexão."); }
-    finally { setSalvando(false); }
-  };
-
-  return (
-    <div className="cfg-card">
-      <div className="cfg-card-header">
-        <div className="cfg-card-header-icon"><LayoutDashboard size={15} /></div>
-        <div><div className="cfg-card-title">Visibilidade do Menu</div><div className="cfg-card-sub">Oculte seções que não utiliza</div></div>
-      </div>
-      <div className="cfg-card-body">
-        <div className="menu-toggle-list">
-          {MENU_SECTIONS.map(s => (
-            <div key={s.key} className="menu-toggle-item">
-              <div className="menu-toggle-icon">{s.icon}</div>
-              <div style={{ flex: 1 }}><div className="menu-toggle-label">{s.label}</div><div className="menu-toggle-sub">{s.sub}</div></div>
-              {s.locked ? <span className="menu-toggle-locked">Sempre visível</span> : <Toggle checked={!!visivel[s.key]} onChange={val => toggle(s.key, val)} />}
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="cfg-card-footer"><button className="btn-primary" onClick={handleSalvar} disabled={salvando}>{salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Menu</>}</button></div>
-    </div>
-  );
-}
-
-function SecaoEstoque({ config, onSave }) {
-  const [minimo, setMinimo]     = useState(config?.estoqueMinimo ?? 5);
-  const [salvando, setSalvando] = useState(false);
-  useEffect(() => { if (config?.estoqueMinimo !== undefined) setMinimo(config.estoqueMinimo); }, [config]);
-  const handleSalvar = async () => { setSalvando(true); await onSave({ estoqueMinimo: Number(minimo) }); setSalvando(false); };
-  return (
-    <div className="cfg-card">
-      <div className="cfg-card-header">
-        <div className="cfg-card-header-icon"><Package size={15} /></div>
-        <div><div className="cfg-card-title">Estoque Mínimo Padrão</div><div className="cfg-card-sub">Alertas quando o limite for atingido</div></div>
-      </div>
-      <div className="cfg-card-body">
-        <div className="form-group"><label className="form-label">Quantidade mínima padrão</label><div style={{ display: "flex", alignItems: "center", gap: 10 }}><input type="number" min="0" className="form-input" style={{ maxWidth: 160 }} value={minimo} onChange={e => setMinimo(e.target.value)} /><span style={{ fontSize: 12, color: "var(--text-3)" }}>unidades</span></div></div>
-      </div>
-      <div className="cfg-card-footer"><button className="btn-primary" onClick={handleSalvar} disabled={salvando}>{salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Estoque</>}</button></div>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════
-   SEÇÃO ATALHOS — informativa, preparada para expansão
-   ══════════════════════════════════════════════════════ */
-function SecaoAtalhos({ menuVisivel = {} }) {
-  return (
-    <div className="cfg-card">
-      <div className="cfg-card-header">
-        <div className="cfg-card-header-icon"><Keyboard size={15} /></div>
-        <div>
-          <div className="cfg-card-title">Atalhos de Teclado</div>
-          <div className="cfg-card-sub">Navegue rapidamente usando o teclado</div>
-        </div>
-      </div>
-      <div className="cfg-card-body">
-        <div className="atalhos-intro">
-          Use <strong>Alt + tecla</strong> para saltar diretamente para qualquer módulo.{" "}
-          Atalhos são desativados automaticamente quando você está digitando em um campo.
-          Módulos ocultos no menu não respondem ao atalho.
-        </div>
-        <div className="atalhos-list">
-          {ATALHOS_MAP.map(({ code, display, key, hint }) => {
-            const section = MENU_SECTIONS.find(s => s.key === key);
-            if (!section) return null;
-            const ativo = section.locked || menuVisivel[key] !== false;
-            return (
-              <div key={code} className={`atalho-item${ativo ? "" : " atalho-disabled"}`}>
-                <div className="atalho-icon">{section.icon}</div>
-                <div className="atalho-info">
-                  <div className="atalho-label">{section.label}</div>
-                  <div className="atalho-sub">{hint}</div>
-                </div>
-                <kbd className="atalho-key">{display}</kbd>
-                {!ativo && <span className="atalho-hidden-badge">Oculto no menu</span>}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════
-   COMPONENTE PRINCIPAL
-   ══════════════════════════════════════════════════════ */
 /* ─────────────────────────────────────────────
-   Seções visíveis por cargo
+   HELPERS
 ───────────────────────────────────────────── */
-const SECOES_POR_CARGO = {
-  admin:       ["empresa", "seguranca", "financeiro", "menu", "estoque", "atalhos"],
-  financeiro:  ["seguranca", "financeiro", "atalhos"],
-  comercial:   ["seguranca", "atalhos"],
-  compras:     ["seguranca", "estoque", "atalhos"],
-  operacional: ["seguranca", "estoque", "atalhos"],
-  vendedor:    ["seguranca", "atalhos"],
-  suporte:     ["seguranca", "atalhos"],
-};
+function inicialNome(nome) {
+  if (!nome) return "?";
+  const partes = nome.trim().split(" ");
+  return partes.length >= 2
+    ? (partes[0][0] + partes[partes.length - 1][0]).toUpperCase()
+    : partes[0][0].toUpperCase();
+}
 
-export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
-  // ── Multi-tenant ──
-  const { tenantUid, cargo, isAdmin } = useAuth();
-  const uid = tenantUid;
+function BadgeCargo({ cargo }) {
+  if (cargo === "admin") {
+    return <span className="usr-badge-cargo usr-badge-admin">Admin</span>;
+  }
+  const c = CARGO_MAP[cargo];
+  if (!c) return <span className="usr-badge-cargo" style={{ color: "var(--text-3)" }}>{cargo}</span>;
+  return (
+    <span
+      className="usr-badge-cargo"
+      style={{ background: c.bg, color: c.cor, border: `1px solid ${c.cor}33` }}
+    >
+      {c.label}
+    </span>
+  );
+}
 
-  const [config, setConfig]   = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [secao, setSecao]     = useState(isAdmin ? "empresa" : "seguranca");
-  const [toast, setToast]     = useState(null);
+/* ─────────────────────────────────────────────
+   MODAL CONVIDAR / EDITAR USUÁRIO
+───────────────────────────────────────────── */
+function ModalUsuario({ usuario, vendedores, onSalvar, onFechar, salvando }) {
+  const isEdicao = Boolean(usuario?.uid);
 
-  // Seções que este cargo pode ver
-  const secoesVisiveis = SECOES_POR_CARGO[cargo] ?? ["seguranca", "atalhos"];
-  const navFiltrado    = NAV.filter(n => secoesVisiveis.includes(n.id));
+  const [nome,       setNome]       = useState(usuario?.nome  || "");
+  const [email,      setEmail]      = useState(usuario?.email || "");
+  const [senha,      setSenha]      = useState("");
+  const [cargo,      setCargo]      = useState(usuario?.cargo || "operacional");
+  const [vendedorId, setVendedorId] = useState(usuario?.vendedorId || "");
+  const [erro,       setErro]       = useState("");
 
+  // Quando muda de cargo e não é mais "vendedor", limpa o vínculo
   useEffect(() => {
-    if (!uid) { setLoading(false); return; }
-    const ref = doc(db, "users", uid, "config", "geral");
-    getDoc(ref).then(snap => setConfig(snap.exists() ? snap.data() : {})).catch(() => setConfig({})).finally(() => setLoading(false));
-  }, [uid]);
+    if (cargo !== "vendedor") setVendedorId("");
+  }, [cargo]);
 
-  const handleSave = useCallback(async (partial) => {
-    if (!uid) return;
-    try {
-      await setDoc(doc(db, "users", uid, "config", "geral"), partial, { merge: true });
-      setConfig(prev => ({ ...prev, ...partial }));
-      setToast({ msg: "Configurações salvas!", type: "success" });
-    } catch (err) { setToast({ msg: "Erro ao salvar.", type: "error" }); throw err; }
-  }, [uid]);
-
-  const renderSecao = () => {
-    if (loading) return <div className="cfg-loading">Carregando configurações...</div>;
-    switch (secao) {
-      case "empresa":    return <SecaoEmpresa    config={config} onSave={handleSave} />;
-      case "seguranca":  return <SecaoSeguranca />;
-      case "financeiro": return <SecaoFinanceiro config={config} onSave={handleSave} />;
-      case "menu":       return <SecaoMenu       config={config} onSave={handleSave} />;
-      case "estoque":    return <SecaoEstoque    config={config} onSave={handleSave} />;
-      case "atalhos":    return <SecaoAtalhos    menuVisivel={menuVisivelProp ?? config?.menuVisivel ?? {}} />;
-      default:           return null;
-    }
+  const cargoInfo = {
+    financeiro:  "Acesso completo ao módulo financeiro. Visão estratégica dos números.",
+    comercial:   "Gestão de vendas, clientes e orçamentos. Sem acesso a dados financeiros sensíveis.",
+    compras:     "Gestão de fornecedores, compras e entrada de estoque.",
+    operacional: "Dia a dia: estoque, caixa, cadastros. Sem visão financeira estratégica.",
+    vendedor:    "Foco no funil de vendas. Enxerga apenas as próprias vendas e agenda.",
+    suporte:     "Visualiza clientes e agenda. Sem acesso a dados financeiros.",
   };
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    setErro("");
+
+    if (!nome.trim())  { setErro("Nome é obrigatório."); return; }
+    if (!isEdicao) {
+      if (!email.trim()) { setErro("E-mail é obrigatório."); return; }
+      if (senha.length < 6) { setErro("A senha deve ter no mínimo 6 caracteres."); return; }
+    }
+    if (cargo === "vendedor" && !vendedorId) {
+      setErro("Selecione o cadastro de vendedor vinculado a este usuário."); return;
+    }
+
+    onSalvar({ nome: nome.trim(), email: email.trim(), senha, cargo, vendedorId }, setErro);
+  }
+
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onFechar()}>
+      <div className="modal-box">
+        <div className="modal-header">
+          <div>
+            <h3>{isEdicao ? "Editar usuário" : "Convidar novo usuário"}</h3>
+            <p>
+              {isEdicao
+                ? "Altere o cargo ou o vínculo de vendedor"
+                : "Cria uma conta e define o cargo de acesso"}
+            </p>
+          </div>
+          <button className="modal-close" onClick={onFechar} aria-label="Fechar">✕</button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
+
+            {/* Nome */}
+            <div className="usr-field">
+              <label>Nome completo</label>
+              <input
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                placeholder="Ex: Maria Silva"
+                required
+              />
+            </div>
+
+            {/* E-mail e Senha — só no convite */}
+            {!isEdicao && (
+              <div className="usr-field-row">
+                <div className="usr-field">
+                  <label>E-mail</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="usuario@email.com"
+                    required
+                  />
+                </div>
+                <div className="usr-field">
+                  <label>Senha inicial</label>
+                  <input
+                    type="password"
+                    value={senha}
+                    onChange={(e) => setSenha(e.target.value)}
+                    placeholder="Mín. 6 caracteres"
+                    required
+                    minLength={6}
+                  />
+                  <span className="usr-field-hint">O usuário pode alterar depois.</span>
+                </div>
+              </div>
+            )}
+
+            {/* E-mail só leitura na edição */}
+            {isEdicao && (
+              <div className="usr-field">
+                <label>E-mail</label>
+                <input value={usuario.email} disabled />
+                <span className="usr-field-hint">O e-mail não pode ser alterado após a criação.</span>
+              </div>
+            )}
+
+            <hr className="usr-divider" />
+
+            {/* Cargo */}
+            <div className="usr-field">
+              <label>Cargo</label>
+              <select value={cargo} onChange={(e) => setCargo(e.target.value)}>
+                {CARGOS.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Info do cargo */}
+            {cargoInfo[cargo] && (
+              <div className="usr-cargo-info">
+                💡 <strong>{CARGO_MAP[cargo]?.label}:</strong> {cargoInfo[cargo]}
+              </div>
+            )}
+
+            {/* Vínculo de vendedor — só aparece quando cargo = "vendedor" */}
+            {cargo === "vendedor" && (
+              <div className="usr-field">
+                <label>Cadastro de vendedor vinculado</label>
+                {vendedores.length === 0 ? (
+                  <p className="usr-field-hint" style={{ color: "var(--amber)" }}>
+                    ⚠️ Nenhum vendedor cadastrado ainda. Acesse o módulo Vendedores e crie o cadastro primeiro.
+                  </p>
+                ) : (
+                  <select value={vendedorId} onChange={(e) => setVendedorId(e.target.value)}>
+                    <option value="">— Selecione o vendedor —</option>
+                    {vendedores
+                      .filter((v) => v.ativo !== false)
+                      .map((v) => (
+                        <option key={v.id} value={v.id}>
+                          {v.nome}{v.comissao ? ` (${v.comissao}% comissão)` : ""}
+                        </option>
+                      ))}
+                  </select>
+                )}
+                <span className="usr-field-hint">
+                  Este é o cadastro que filtra as vendas e a agenda deste usuário.
+                </span>
+              </div>
+            )}
+
+            {/* Erro */}
+            {erro && <div className="usr-erro">⚠️ {erro}</div>}
+
+          </div>
+
+          <div className="modal-footer">
+            <button type="button" className="usr-btn-cancelar" onClick={onFechar} disabled={salvando}>
+              Cancelar
+            </button>
+            <button type="submit" className="usr-btn-salvar" disabled={salvando}>
+              {salvando
+                ? "Aguarde…"
+                : isEdicao
+                ? "Salvar alterações"
+                : "Criar usuário"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+
+/* ─────────────────────────────────────────────
+   MODAL: Detalhes do colaborador
+───────────────────────────────────────────── */
+function ModalDetalhes({ usr, vendedores, onFechar, onResetSenha, resetando }) {
+  const cargo    = CARGO_MAP[usr.cargo];
+  const vendedor = vendedores.find(v => v.id === usr.vendedorId);
+  const criado   = usr.criadoEm?.toDate?.()?.toLocaleDateString("pt-BR") ?? "—";
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onFechar()}>
+      <div className="modal-box" style={{ maxWidth: 480 }}>
+        <div className="modal-header">
+          <div>
+            <h3>{usr.nome}</h3>
+            <p>{usr.email}</p>
+          </div>
+          <button className="modal-close" onClick={onFechar}>✕</button>
+        </div>
+
+        <div className="modal-body">
+          <div className="usr-detalhe-grid">
+            <div className="usr-detalhe-item">
+              <span className="usr-detalhe-label">Cargo</span>
+              <BadgeCargo cargo={usr.cargo} />
+            </div>
+            <div className="usr-detalhe-item">
+              <span className="usr-detalhe-label">Status</span>
+              <span className={`usr-badge-ativo ${usr.ativo !== false ? "ativo" : "inativo"}`}>
+                <span className={`usr-dot ${usr.ativo !== false ? "ativo" : "inativo"}`} />
+                {usr.ativo !== false ? "Ativo" : "Inativo"}
+              </span>
+            </div>
+            <div className="usr-detalhe-item">
+              <span className="usr-detalhe-label">Convidado em</span>
+              <span className="usr-detalhe-val">{criado}</span>
+            </div>
+            <div className="usr-detalhe-item">
+              <span className="usr-detalhe-label">Vendedor vinculado</span>
+              <span className="usr-detalhe-val">{vendedor?.nome ?? "—"}</span>
+            </div>
+            <div className="usr-detalhe-item" style={{ gridColumn: "1 / -1" }}>
+              <span className="usr-detalhe-label">UID</span>
+              <span className="usr-detalhe-val" style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "monospace" }}>
+                {usr.uid}
+              </span>
+            </div>
+          </div>
+
+          <hr className="usr-detalhe-sep" />
+
+          {/* Redefinir senha */}
+          <div className="usr-reset-box">
+            <div className="usr-reset-info">
+              <strong>Redefinir senha de acesso</strong>
+              Um e-mail de redefinição será enviado para <strong>{usr.email}</strong>.
+              O usuário poderá definir uma nova senha pelo link recebido.
+            </div>
+            <button
+              className="usr-btn-reset"
+              onClick={onResetSenha}
+              disabled={resetando}
+            >
+              {resetando ? "Enviando…" : "Enviar link"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   COMPONENTE PRINCIPAL
+───────────────────────────────────────────── */
+export default function Usuarios() {
+  const { user, cargo, tenantUid, isAdmin } = useContext(AuthContext);
+
+  const [usuarios,   setUsuarios]   = useState([]);
+  const [vendedores, setVendedores] = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [modalAberto, setModalAberto] = useState(false);
+  const [usuarioEditando, setUsuarioEditando] = useState(null);
+  const [salvando,   setSalvando]   = useState(false);
+  const [toast,      setToast]      = useState(null); // { msg, tipo }
+  const [detalhe,    setDetalhe]    = useState(null); // usr sendo visualizado
+  const [resetando,  setResetando]  = useState(false);
+
+  // tenantUid = uid do Admin dono da conta (raiz do Firestore)
+  const raiz = tenantUid || user?.uid;
+
+  /* ── Firestore: ouvir usuários ── */
+  useEffect(() => {
+    if (!raiz) return;
+    const colRef = collection(db, "users", raiz, "usuarios");
+    const unsub = onSnapshot(colRef, (snap) => {
+      const lista = snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
+      // Ordena: ativos primeiro, depois pelo nome
+      lista.sort((a, b) => {
+        if (a.ativo === b.ativo) return (a.nome || "").localeCompare(b.nome || "");
+        return a.ativo === false ? 1 : -1;
+      });
+      setUsuarios(lista);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, [raiz]);
+
+  /* ── Firestore: ouvir vendedores (para o select no modal) ── */
+  useEffect(() => {
+    if (!raiz) return;
+    const colRef = collection(db, "users", raiz, "vendedores");
+    const unsub = onSnapshot(colRef, (snap) => {
+      setVendedores(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [raiz]);
+
+  /* ── Notificação toast ── */
+  function mostrarToast(msg, tipo = "sucesso") {
+    setToast({ msg, tipo });
+    setTimeout(() => setToast(null), 3500);
+  }
+
+  /* ── Abrir modal de edição ── */
+  function abrirEditar(usr) {
+    setUsuarioEditando(usr);
+    setModalAberto(true);
+  }
+
+  /* ── Fechar modal ── */
+  function fecharModal() {
+    setModalAberto(false);
+    setUsuarioEditando(null);
+  }
+
+  /* ── Contar usuários não-admin ativos ── */
+  const totalAtivos = usuarios.filter((u) => u.ativo !== false).length;
+
+  /* ── Criar usuário via Firebase Auth (secondary app) + Firestore ── */
+  async function criarUsuario({ nome, email, senha, cargo: novoCargo, vendedorId }, setErro) {
+    setSalvando(true);
+    try {
+      // 1. Cria ou reutiliza a secondary app para não deslogar o Admin
+      const secondaryAppName = "assent-secondary";
+      let secondaryApp = getApps().find((a) => a.name === secondaryAppName);
+      if (!secondaryApp) {
+        secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
+      }
+      const secondaryAuth = getAuth(secondaryApp);
+
+      // 2. Cria o usuário no Firebase Auth
+      const { user: novoUser } = await createUserWithEmailAndPassword(
+        secondaryAuth, email, senha
+      );
+      const novoUid = novoUser.uid;
+
+      // 3. Sign out da secondary app (não afeta o Admin logado na primary)
+      await secondaryAuth.signOut();
+
+      // 4. Escreve o perfil na subcoleção de usuários do tenant
+      await setDoc(doc(db, "users", raiz, "usuarios", novoUid), {
+        nome,
+        email,
+        cargo:      novoCargo,
+        vendedorId: novoCargo === "vendedor" ? vendedorId : null,
+        ativo:      true,
+        criadoEm:   serverTimestamp(),
+        criadoPor:  user.uid,
+      });
+
+      // 5. Cria o índice reverso — AuthContext usa isso para identificar o tenant
+      await setDoc(doc(db, "userIndex", novoUid), {
+        tenantUid: raiz,
+        criadoEm:  serverTimestamp(),
+      });
+
+      fecharModal();
+      mostrarToast(`Usuário "${nome}" criado com sucesso.`);
+    } catch (err) {
+      console.error("[Usuarios] Erro ao criar usuário:", err);
+      if (err.code === "auth/email-already-in-use") {
+        setErro("Este e-mail já está em uso em outra conta.");
+      } else if (err.code === "auth/invalid-email") {
+        setErro("E-mail inválido.");
+      } else if (err.code === "auth/weak-password") {
+        setErro("Senha muito fraca. Use pelo menos 6 caracteres.");
+      } else {
+        setErro("Erro ao criar usuário. Tente novamente.");
+      }
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  /* ── Editar usuário (cargo e vendedorId) ── */
+  async function editarUsuario({ nome, cargo: novoCargo, vendedorId }, setErro) {
+    setSalvando(true);
+    try {
+      const docRef = doc(db, "users", raiz, "usuarios", usuarioEditando.uid);
+      await updateDoc(docRef, {
+        nome,
+        cargo: novoCargo,
+        vendedorId: novoCargo === "vendedor" ? vendedorId : null,
+        atualizadoEm: serverTimestamp(),
+      });
+      fecharModal();
+      mostrarToast(`Usuário "${nome}" atualizado.`);
+    } catch (err) {
+      console.error("[Usuarios] Erro ao editar:", err);
+      setErro("Não foi possível salvar as alterações.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  /* ── Roteador: criar ou editar ── */
+  function handleSalvar(dados, setErro) {
+    if (usuarioEditando) {
+      editarUsuario(dados, setErro);
+    } else {
+      criarUsuario(dados, setErro);
+    }
+  }
+
+  /* ── Toggle ativo/inativo ── */
+  async function toggleAtivo(usr) {
+    const novoStatus = !usr.ativo;
+    const acao = novoStatus ? "ativar" : "desativar";
+    if (!window.confirm(
+      `Deseja ${acao} o acesso de "${usr.nome}"?\n` +
+      (novoStatus
+        ? "O usuário voltará a conseguir logar no sistema."
+        : "O usuário perderá o acesso, mas seus dados históricos serão preservados.")
+    )) return;
+
+    try {
+      await updateDoc(doc(db, "users", raiz, "usuarios", usr.uid), {
+        ativo: novoStatus,
+        atualizadoEm: serverTimestamp(),
+      });
+      mostrarToast(
+        novoStatus ? `"${usr.nome}" reativado.` : `"${usr.nome}" desativado.`
+      );
+    } catch (err) {
+      console.error("[Usuarios] Erro ao alterar status:", err);
+      mostrarToast("Erro ao alterar status.", "erro");
+    }
+  }
+
+  /* ── Redefinir senha do colaborador ── */
+  async function resetarSenha(usr) {
+    setResetando(true);
+    try {
+      const { getAuth } = await import("firebase/auth");
+      await sendPasswordResetEmail(getAuth(), usr.email);
+      mostrarToast(`Link de redefinição enviado para "${usr.email}".`);
+    } catch (err) {
+      console.error("[Usuarios] Erro ao redefinir senha:", err);
+      mostrarToast("Erro ao enviar e-mail de redefinição.", "erro");
+    } finally {
+      setResetando(false);
+    }
+  }
+
+  /* ── Excluir usuário (remove perfil + índice reverso) ── */
+  async function excluirUsuario(usr) {
+    if (!window.confirm(
+      `Excluir permanentemente "${usr.nome}"?\n\n` +
+      `Esta ação remove o acesso e todos os dados de perfil. ` +
+      `Registros históricos (vendas, pedidos, etc.) são preservados.\n\n` +
+      `Esta ação não pode ser desfeita.`
+    )) return;
+    try {
+      await deleteDoc(doc(db, "users", raiz, "usuarios", usr.uid));
+      await deleteDoc(doc(db, "userIndex", usr.uid));
+      mostrarToast(`"${usr.nome}" removido permanentemente.`);
+    } catch (err) {
+      console.error("[Usuarios] Erro ao excluir:", err);
+      mostrarToast("Erro ao excluir usuário.", "erro");
+    }
+  }
+
+  /* ─────────────────────────────────────────
+     RENDER: acesso negado
+  ───────────────────────────────────────── */
+  if (!isAdmin) {
+    return (
+      <>
+        <style>{CSS}</style>
+        <div className="usr-root">
+          <div className="usr-acesso-negado">
+            <div className="usr-acesso-negado-icon">🔒</div>
+            <h3>Acesso restrito</h3>
+            <p>
+              O módulo de Usuários é exclusivo para o <strong>Administrador</strong> da conta.
+              Entre em contato com o responsável caso precise de alterações.
+            </p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  /* ─────────────────────────────────────────
+     RENDER: loading
+  ───────────────────────────────────────── */
+  if (loading) {
+    return (
+      <>
+        <style>{CSS}</style>
+        <div className="usr-root">
+          <div className="usr-loading">Carregando usuários…</div>
+        </div>
+      </>
+    );
+  }
+
+  /* ─────────────────────────────────────────
+     RENDER PRINCIPAL
+  ───────────────────────────────────────── */
+  const limiteAtingido = totalAtivos >= MAX_USUARIOS;
 
   return (
     <>
       <style>{CSS}</style>
-      <div className="cfg-root">
-        <header className="cfg-topbar">
-          <div className="cfg-topbar-title">
-            <h1>Configurações</h1>
-            <p>Personalize o comportamento e os dados do sistema</p>
+
+      <div className="usr-root">
+
+        {/* ── Topbar ── */}
+        <div className="usr-topbar">
+          <div className="usr-topbar-title">
+            <h2>Usuários</h2>
+            <p>Gerencie os acessos da sua equipe</p>
           </div>
-        </header>
 
-        <div className="cfg-body">
-          <nav className="cfg-nav">
-            <span className="cfg-nav-group-label">Configurações</span>
-            {navFiltrado.map(({ id, label, icon: Icon }) => (
-              <button key={id} className={`cfg-nav-item ${secao === id ? "active" : ""}`} onClick={() => setSecao(id)}>
-                <Icon size={15} className="cfg-nav-icon" />
-                <span className="cfg-nav-label">{label}</span>
-                {secao === id && <ChevronRight size={13} color="var(--text-3)" />}
-              </button>
-            ))}
-          </nav>
+          <div className="usr-topbar-spacer" />
 
-          <main className="cfg-panel" key={secao}>
-            {renderSecao()}
-          </main>
+          <div className="usr-counter">
+            <span>{totalAtivos}</span>/{MAX_USUARIOS} usuários ativos
+          </div>
+
+          <button
+            className="usr-btn-convidar"
+            onClick={() => { setUsuarioEditando(null); setModalAberto(true); }}
+            disabled={limiteAtingido}
+            title={limiteAtingido ? `Limite de ${MAX_USUARIOS} usuários atingido` : "Convidar novo usuário"}
+          >
+            + Convidar usuário
+          </button>
         </div>
+
+        {/* ── Aviso de limite ── */}
+        {limiteAtingido && (
+          <div style={{
+            padding: "10px 20px",
+            background: "rgba(245,158,11,0.08)",
+            borderBottom: "1px solid rgba(245,158,11,0.2)",
+            fontSize: 12,
+            color: "var(--amber)",
+          }}>
+            ⚠️ Limite de {MAX_USUARIOS} usuários adicionais atingido. Desative um usuário para liberar uma vaga.
+          </div>
+        )}
+
+        {/* ── Tabela ── */}
+        <div className="usr-table-wrap">
+          {usuarios.length === 0 ? (
+            <div className="usr-empty">
+              <div className="usr-empty-icon">👥</div>
+              <h3>Nenhum usuário adicionado ainda</h3>
+              <p>Clique em "Convidar usuário" para dar acesso à sua equipe.</p>
+            </div>
+          ) : (
+            <table className="usr-table">
+              <thead>
+                <tr>
+                  <th>Usuário</th>
+                  <th>Cargo</th>
+                  <th>Vendedor vinculado</th>
+                  <th>Status</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* ── Linha do Admin (sempre no topo) ── */}
+                <tr className="usr-row-admin">
+                  <td>
+                    <div className="usr-user-cell">
+                      <div className="usr-avatar">
+                        {inicialNome(user.displayName || user.email)}
+                      </div>
+                      <div>
+                        <div className="usr-user-name">
+                          {user.displayName || "Administrador"}
+                        </div>
+                        <div className="usr-user-email">{user.email}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td><BadgeCargo cargo="admin" /></td>
+                  <td><span style={{ color: "var(--text-3)", fontSize: 12 }}>—</span></td>
+                  <td>
+                    <span className="usr-badge-ativo ativo">
+                      <span className="usr-dot ativo" />Ativo
+                    </span>
+                  </td>
+                  <td>
+                    <span style={{ fontSize: 11, color: "var(--text-3)" }}>Proprietário da conta</span>
+                  </td>
+                </tr>
+
+                {/* ── Usuários adicionais ── */}
+                {usuarios.map((usr) => {
+                  const isAtivo = usr.ativo !== false;
+                  const vendedorNome = usr.vendedorId
+                    ? vendedores.find((v) => v.id === usr.vendedorId)?.nome
+                    : null;
+
+                  return (
+                    <tr key={usr.uid}>
+                      <td>
+                        <div className="usr-user-cell">
+                          <div className={`usr-avatar${isAtivo ? "" : " inativo"}`}>
+                            {inicialNome(usr.nome)}
+                          </div>
+                          <div>
+                            <div className={`usr-user-name${isAtivo ? "" : " inativo"}`}>
+                              {usr.nome}
+                            </div>
+                            <div className="usr-user-email">{usr.email}</div>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td><BadgeCargo cargo={usr.cargo} /></td>
+
+                      <td>
+                        {vendedorNome ? (
+                          <span style={{
+                            fontSize: 12,
+                            background: "rgba(62,207,142,0.1)",
+                            color: "var(--green)",
+                            padding: "2px 8px",
+                            borderRadius: 12,
+                          }}>
+                            ✓ {vendedorNome}
+                          </span>
+                        ) : usr.cargo === "vendedor" ? (
+                          <span style={{
+                            fontSize: 12,
+                            background: "rgba(224,82,82,0.08)",
+                            color: "var(--red)",
+                            padding: "2px 8px",
+                            borderRadius: 12,
+                          }}>
+                            ⚠ Sem vínculo
+                          </span>
+                        ) : (
+                          <span style={{ color: "var(--text-3)", fontSize: 12 }}>—</span>
+                        )}
+                      </td>
+
+                      <td>
+                        <span className={`usr-badge-ativo ${isAtivo ? "ativo" : "inativo"}`}>
+                          <span className={`usr-dot ${isAtivo ? "ativo" : "inativo"}`} />
+                          {isAtivo ? "Ativo" : "Inativo"}
+                        </span>
+                      </td>
+
+                      <td>
+                        <div className="usr-acoes">
+                          <button
+                            className="usr-btn-acao detalhes"
+                            onClick={() => setDetalhe(usr)}
+                          >
+                            Detalhes
+                          </button>
+                          <button
+                            className="usr-btn-acao editar"
+                            onClick={() => abrirEditar(usr)}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            className={`usr-btn-acao ${isAtivo ? "desativar" : "ativar"}`}
+                            onClick={() => toggleAtivo(usr)}
+                          >
+                            {isAtivo ? "Desativar" : "Reativar"}
+                          </button>
+                          <button
+                            className="usr-btn-acao excluir"
+                            onClick={() => excluirUsuario(usr)}
+                            title="Remover permanentemente"
+                          >
+                            Excluir
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* ── Modal ── */}
+        {modalAberto && (
+          <ModalUsuario
+            usuario={usuarioEditando}
+            vendedores={vendedores}
+            onSalvar={handleSalvar}
+            onFechar={fecharModal}
+            salvando={salvando}
+          />
+        )}
+
+        {/* ── Modal Detalhes ── */}
+        {detalhe && (
+          <ModalDetalhes
+            usr={detalhe}
+            vendedores={vendedores}
+            onFechar={() => setDetalhe(null)}
+            onResetSenha={() => resetarSenha(detalhe)}
+            resetando={resetando}
+          />
+        )}
+
+        {/* ── Toast ── */}
+        {toast && (
+          <div className={`usr-toast ${toast.tipo}`}>
+            {toast.tipo === "sucesso" ? "✓" : "⚠️"} {toast.msg}
+          </div>
+        )}
+
       </div>
-      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </>
   );
-}
-
-export function useConfiguracoes(uid) {
-  const [config, setConfig]   = useState(null);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    if (!uid) { setLoading(false); return; }
-    getDoc(doc(db, "users", uid, "config", "geral")).then(snap => setConfig(snap.exists() ? snap.data() : {})).catch(() => setConfig({})).finally(() => setLoading(false));
-  }, [uid]);
-  return {
-    config, loading,
-    taxas: { ...TAXAS_DEFAULT, ...(config?.taxas || {}) },
-    estoqueMinimo: config?.estoqueMinimo ?? 5,
-    menuVisivel: config?.menuVisivel || {},
-    empresa: config?.empresa || { nomeEmpresa: config?.nomeEmpresa || "", cnpj: config?.cnpj || "", telefone: config?.telefone || "", endereco: config?.endereco || "", logo: config?.logo || "" },
-  };
 }
