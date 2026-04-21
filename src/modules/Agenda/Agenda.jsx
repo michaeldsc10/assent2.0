@@ -5,7 +5,8 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { CalendarDays, List, Plus, X, CheckCircle2, Edit2, Trash2 } from "lucide-react";
-import { db, auth, onAuthStateChanged } from "../../lib/firebase";
+import { db } from "../../lib/firebase";
+import { useAuth } from "../../contexts/AuthContext";
 import {  LIMITES_FREE } from "../../hooks/useLicenca";
 import { BannerLimite } from "../../hooks/LicencaUI";
 import {
@@ -641,7 +642,14 @@ function ModalConfirmDelete({ evento, onConfirm, onClose }) {
 const FILTROS = ["Próximos", "Hoje", "Esta semana", "Todos"];
 
 export default function Agenda({ isPro = false }) {
-  const [uid,      setUid]      = useState(null);
+  // ── Multi-tenant ──
+  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+
+  // ── Flags de permissão ──
+  const podeCriarV   = podeCriar("agenda");
+  const podeEditarV  = podeEditar("agenda");
+  const podeExcluirV = podeExcluir("agenda");
+
   const [eventos,  setEventos]  = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [modo,     setModo]     = useState("lista");   // "lista" | "calendario"
@@ -653,16 +661,12 @@ export default function Agenda({ isPro = false }) {
   const [deletando, setDeletando] = useState(null);
 
   /* ── Auth ── */
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, u => setUid(u?.uid || null));
-    return unsub;
-  }, []);
 
   /* ── Snapshot Firebase ── */
   useEffect(() => {
-    if (!uid) { setLoading(false); return; }
+    if (!tenantUid) { setLoading(false); return; }
 
-    const col = collection(db, "users", uid, "eventos");
+    const col = collection(db, "users", tenantUid, "eventos");
     const unsub = onSnapshot(col, snap => {
       const lista = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setEventos(sortEventos(lista));
@@ -670,7 +674,7 @@ export default function Agenda({ isPro = false }) {
     }, () => setLoading(false));
 
     return unsub;
-  }, [uid]);
+  }, [tenantUid]);
 
   /* ── Resumo (KPIs) ── */
   const hoje       = todayISO();
@@ -692,40 +696,40 @@ export default function Agenda({ isPro = false }) {
 
   /* ── Handlers Firebase ── */
   const handleAdd = useCallback(async (dados) => {
-    if (!uid) return;
+    if (!tenantUid) return;
     const id = crypto.randomUUID();
-    await setDoc(doc(db, "users", uid, "eventos", id), {
+    await setDoc(doc(db, "users", tenantUid, "eventos", id), {
       ...dados,
       id,
       status: "pendente",
       dataCriacao: new Date().toISOString(),
     });
     setFormEvt(null);
-  }, [uid]);
+  }, [tenantUid]);
 
   const handleEdit = useCallback(async (dados) => {
-    if (!uid || !formEvt || formEvt === "novo") return;
-    await updateDoc(doc(db, "users", uid, "eventos", formEvt.id), dados);
+    if (!tenantUid || !formEvt || formEvt === "novo") return;
+    await updateDoc(doc(db, "users", tenantUid, "eventos", formEvt.id), dados);
     setFormEvt(null);
     if (detalhes?.id === formEvt.id) setDetalhes(prev => ({ ...prev, ...dados }));
-  }, [uid, formEvt, detalhes]);
+  }, [tenantUid, formEvt, detalhes]);
 
   const handleConcluir = useCallback(async (evento) => {
-    if (!uid) return;
+    if (!tenantUid) return;
     const novoStatus = evento.status === "concluido" ? "pendente" : "concluido";
-    await updateDoc(doc(db, "users", uid, "eventos", evento.id), { status: novoStatus });
+    await updateDoc(doc(db, "users", tenantUid, "eventos", evento.id), { status: novoStatus });
     if (detalhes?.id === evento.id) setDetalhes(prev => ({ ...prev, status: novoStatus }));
-  }, [uid, detalhes]);
+  }, [tenantUid, detalhes]);
 
   const handleExcluir = useCallback(async () => {
-    if (!uid || !deletando) return;
-    await deleteDoc(doc(db, "users", uid, "eventos", deletando.id));
+    if (!tenantUid || !deletando) return;
+    await deleteDoc(doc(db, "users", tenantUid, "eventos", deletando.id));
     if (detalhes?.id === deletando.id) setDetalhes(null);
     setDeletando(null);
-  }, [uid, deletando, detalhes]);
+  }, [tenantUid, deletando, detalhes]);
 
   /* ── Render ── */
-  if (!uid) return <div className="ag-loading">Carregando autenticação...</div>;
+  if (!tenantUid) return <div className="ag-loading">Carregando autenticação...</div>;
 
   return (
     <>
@@ -758,7 +762,7 @@ export default function Agenda({ isPro = false }) {
             <button
               className="btn-novo-evento"
               onClick={() => setFormEvt("novo")}
-              disabled={!isPro && eventos.length >= LIMITES_FREE.eventos}
+              disabled={!podeCriarV || (!isPro && eventos.length >= LIMITES_FREE.eventos)}
               title={!isPro && eventos.length >= LIMITES_FREE.eventos ? `Limite de ${LIMITES_FREE.eventos} eventos atingido no plano Free` : undefined}
             >
               <Plus size={14} /> Novo Evento
@@ -841,7 +845,7 @@ export default function Agenda({ isPro = false }) {
         />
       )}
 
-      {deletando && (
+      {deletando && podeExcluirV && (
         <ModalConfirmDelete
           evento={deletando}
           onConfirm={handleExcluir}
