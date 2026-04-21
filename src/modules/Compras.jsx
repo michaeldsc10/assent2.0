@@ -368,21 +368,22 @@ const CSS = `
   }
   .cp-btn-add-item:hover { background:var(--s2); color:var(--text); border-color:var(--border-h); }
   .cp-item-row {
-    display:grid; grid-template-columns:1fr 70px 70px 90px 28px;
-    gap:8px; align-items:start; margin-bottom:8px;
+    display:grid; grid-template-columns:1fr 70px 70px 90px 36px;
+    gap:8px; align-items:center; margin-bottom:8px;
   }
   .cp-item-subtotal {
     font-family:'Sora',sans-serif; font-size:12px; font-weight:600;
     color:var(--gold); padding:9px 0 9px 4px; white-space:nowrap;
   }
   .cp-btn-rem-item {
-  width:32px; height:36px; border-radius:7px; margin-top:0;
-  display:flex; align-items:center; justify-content:center;
-  cursor:pointer; background:rgba(224,82,82,.15);
-  border:1px solid rgba(224,82,82,.3);
-  transition:background .13s; flex-shrink:0;
-}
-  .cp-btn-rem-item:hover { background:rgba(224,82,82,.2); }
+    width:36px; height:36px; border-radius:7px; margin-top:0;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer; background:rgba(224,82,82,.15);
+    border:1px solid rgba(224,82,82,.3);
+    transition:background .13s; flex-shrink:0;
+    overflow:visible;
+  }
+  .cp-btn-rem-item:hover { background:rgba(224,82,82,.28); }
   .cp-total-row {
     display:flex; justify-content:flex-end; align-items:center;
     gap:10px; padding:10px 0 0; border-top:1px solid var(--border); margin-top:4px;
@@ -873,8 +874,11 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
                 </div>
                 <div className="cp-item-subtotal">{fmtR$(calcSubtotal(it))}</div>
                 <button className="cp-btn-rem-item" onClick={() => remItem(idx)}>
-                 <X size={24} color="#f5f53d"/>
-</button>
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <line x1="1" y1="1" x2="13" y2="13" stroke="#ff6b6b" strokeWidth="2.5" strokeLinecap="round"/>
+                    <line x1="13" y1="1" x2="1" y2="13" stroke="#ff6b6b" strokeWidth="2.5" strokeLinecap="round"/>
+                  </svg>
+                </button>
                
               </div>
             ))}
