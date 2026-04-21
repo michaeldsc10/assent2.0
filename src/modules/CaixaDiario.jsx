@@ -15,8 +15,8 @@ import {
   ChevronDown, RefreshCw,
 } from "lucide-react";
 
-import { db, auth } from "../lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { db } from "../lib/firebase";
+import { useAuth } from "../contexts/AuthContext";
 import {
   collection,
   doc,
@@ -1517,8 +1517,6 @@ function ModalDetalheCaixaHistorico({ caixa, onClose }) {
    ═══════════════════════════════════════════════════ */
 
 export default function CaixaDiario({ empresaId: empresaIdProp }) {
-  const [uid,         setUid]         = useState(null);
-  const [empresaId,   setEmpresaId]   = useState(empresaIdProp || null);
   const [lancamentos, setLancamentos] = useState([]);
   const [resumo,      setResumo]      = useState({ saldoAtual: 0 });
   const [taxas,       setTaxas]       = useState(TAXAS_DEFAULT);
@@ -1535,14 +1533,13 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
   const [modalCaixaDet, setModalCaixaDet] = useState(null);   // caixa selecionado no histórico
   const [loadingCaixa, setLoadingCaixa] = useState(true);
 
-  /* ── Auth ── */
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      setUid(user?.uid || null);
-      if (!empresaIdProp && user?.uid) setEmpresaId(user.uid); // fallback
-    });
-    return unsub;
-  }, [empresaIdProp]);
+  // ── Multi-tenant ──
+  const { user, tenantUid, podeCriar, podeEditar } = useAuth();
+  const uid       = user?.uid || null;   // usuário logado (audit trail)
+  const empresaId = tenantUid;           // tenant = empresa
+
+  // ── Flags de permissão ──
+  const podeCriarV = podeCriar("caixaDiario");
 
   /* ── Snapshot lançamentos ── */
   useEffect(() => {
@@ -1555,7 +1552,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
       setLoading(false);
     });
     return unsub;
-  }, [empresaId]);
+  }, [tenantUid]);
 
   /* ── Snapshot resumo ── */
   useEffect(() => {
@@ -1566,7 +1563,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
       else               setResumo({ saldoAtual: 0 });
     });
     return unsub;
-  }, [empresaId]);
+  }, [tenantUid]);
 
   /* ── Snapshot taxas de cartão (configuradas em configuracoes/taxas_cartao) ── */
   useEffect(() => {
@@ -1577,7 +1574,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
       else               setTaxas(TAXAS_DEFAULT);
     });
     return unsub;
-  }, [empresaId]);
+  }, [tenantUid]);
 
   /* ── Snapshot caixa de hoje ── */
   useEffect(() => {
@@ -1590,7 +1587,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
       setLoadingCaixa(false);
     });
     return unsub;
-  }, [empresaId]);
+  }, [tenantUid]);
 
   /* ── Snapshot histórico de caixas (últimos 30) ── */
   useEffect(() => {
@@ -1601,7 +1598,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
       setCaixasHist(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return unsub;
-  }, [empresaId]);
+  }, [tenantUid]);
 
   /* ── Fechamento automático às 23:59 ── */
   useEffect(() => {
@@ -1621,7 +1618,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
     checar(); // checa imediatamente ao montar
     const intervalo = setInterval(checar, 30_000); // checa a cada 30s
     return () => clearInterval(intervalo);
-  }, [empresaId, uid, lancamentos, resumo.saldoAtual]);
+  }, [tenantUid, uid, lancamentos, resumo.saldoAtual]);
 
   /* ── Toast helper ── */
   const showToast = (msg, type = "success") => {
@@ -1701,7 +1698,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
     return { totalEntradas, totalSaidas };
   }, [lancamentosFiltrados]);
 
-  if (!uid) return <div className="cx-loading">Carregando autenticação...</div>;
+  if (!tenantUid) return <div className="cx-loading">Carregando autenticação...</div>;
   if (loadingCaixa) return <div className="cx-loading">Carregando caixa...</div>;
 
   /* ── Tela de abertura quando caixa está fechado ou nunca foi aberto ── */
@@ -1826,6 +1823,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
           </button>
           <button
             onClick={() => setModalNovo(true)}
+            disabled={!podeCriarV}
             style={{
               display: "flex", alignItems: "center", gap: 7,
               padding: "8px 16px", borderRadius: 9,
@@ -1983,7 +1981,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
       )}
 
       {/* Modais */}
-      {modalNovo && (
+      {modalNovo && podeCriarV && (
         <ModalNovoLancamento
           empresaId={empresaId}
           usuarioId={uid}
