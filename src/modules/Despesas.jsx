@@ -11,7 +11,8 @@ import {
   CreditCard, Wallet, Smartphone, ChevronDown, ChevronUp, Settings,
 } from "lucide-react";
 
-import { db, auth, onAuthStateChanged } from "../lib/firebase";
+import { db } from "../lib/firebase";
+import { useAuth } from "../contexts/AuthContext";
 import {  LIMITES_FREE } from "../hooks/useLicenca";
 import { BannerLimite } from "../hooks/LicencaUI";
 import {
@@ -480,12 +481,12 @@ const FORMAS_PAG = [
    HOOK: Categorias dinâmicas
    Estrutura: categorias_despesas/{categoriaId}
    ════════════════════════════════════════ */
-function useCategorias(uid) {
+function useCategorias(tenantUid) {
   const [categorias, setCategorias] = useState([]);
 
   useEffect(() => {
-    if (!uid) return;
-    const col = collection(db, "users", uid, "categorias_despesas");
+    if (!tenantUid) return;
+    const col = collection(db, "users", tenantUid, "categorias_despesas");
     const q = query(col, orderBy("nome", "asc"));
     const unsub = onSnapshot(q, (snap) => {
       setCategorias(
@@ -495,13 +496,13 @@ function useCategorias(uid) {
       );
     });
     return unsub;
-  }, [uid]);
+  }, [tenantUid]);
 
   const criarCategoria = async (nome) => {
-    if (!uid) return;
+    if (!tenantUid) return;
     const nomeTrimmed = nome.trim();
     if (!nomeTrimmed) return;
-    await addDoc(collection(db, "users", uid, "categorias_despesas"), {
+    await addDoc(collection(db, "users", tenantUid, "categorias_despesas"), {
       nome: nomeTrimmed,
       ativa: true,
       criadoEm: new Date().toISOString(),
@@ -509,13 +510,13 @@ function useCategorias(uid) {
   };
 
   const desativarCategoria = async (id) => {
-    if (!uid) return;
-    await setDoc(doc(db, "users", uid, "categorias_despesas", id), { ativa: false }, { merge: true });
+    if (!tenantUid) return;
+    await setDoc(doc(db, "users", tenantUid, "categorias_despesas", id), { ativa: false }, { merge: true });
   };
 
   const renomearCategoria = async (id, novoNome) => {
-    if (!uid || !novoNome.trim()) return;
-    await setDoc(doc(db, "users", uid, "categorias_despesas", id), { nome: novoNome.trim() }, { merge: true });
+    if (!tenantUid || !novoNome.trim()) return;
+    await setDoc(doc(db, "users", tenantUid, "categorias_despesas", id), { nome: novoNome.trim() }, { merge: true });
   };
 
   return { categorias, criarCategoria, desativarCategoria, renomearCategoria };
@@ -1132,7 +1133,6 @@ function ModalCategorias({ categorias, onCriar, onRenomear, onDesativar, onClose
    COMPONENTE PRINCIPAL
    ════════════════════════════════════════ */
 export default function Despesas({ isPro = false }) {
-  const [uid, setUid] = useState(null);
   const [despesas, setDespesas] = useState([]);
   const [despesaIdCnt, setDespesaIdCnt] = useState(0);
   const [search, setSearch] = useState("");
@@ -1145,27 +1145,29 @@ export default function Despesas({ isPro = false }) {
   const [periodoCustom, setPeriodoCustom] = useState({ inicio: "", fim: "" });
 
   // Categorias dinâmicas
-  const { categorias, criarCategoria, desativarCategoria, renomearCategoria } = useCategorias(uid);
+  const { categorias, criarCategoria, desativarCategoria, renomearCategoria } = useCategorias(tenantUid);
 
   // Modais
+  // ── Multi-tenant ──
+  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+
+  // ── Flags de permissão ──
+  const podeCriarV   = podeCriar("despesas");
+  const podeEditarV  = podeEditar("despesas");
+  const podeExcluirV = podeExcluir("despesas");
+
   const [modalNovo, setModalNovo]             = useState(false);
   const [editando, setEditando]               = useState(null);
   const [pagando, setPagando]                 = useState(null);
   const [deletando, setDeletando]             = useState(null);
   const [modalCategorias, setModalCategorias] = useState(false);
 
-  /* ── Auth ── */
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => setUid(user?.uid || null));
-    return unsub;
-  }, []);
-
   /* ── Firestore ── */
   useEffect(() => {
-    if (!uid) { setLoading(false); return; }
+    if (!tenantUid) { setLoading(false); return; }
 
-    const userRef   = doc(db, "users", uid);
-    const despesasCol = collection(db, "users", uid, "despesas");
+    const userRef   = doc(db, "users", tenantUid);
+    const despesasCol = collection(db, "users", tenantUid, "despesas");
     const q = query(despesasCol, orderBy("vencimento", "asc"));
 
     const unsubUser = onSnapshot(userRef, (snap) => {
@@ -1181,7 +1183,7 @@ export default function Despesas({ isPro = false }) {
       docs.forEach(d => {
         const novoStatus = calcularStatus(d.vencimento, d.status);
         if (novoStatus !== d.status) {
-          batch.update(doc(db, "users", uid, "despesas", d.id), { status: novoStatus });
+          batch.update(doc(db, "users", tenantUid, "despesas", d.id), { status: novoStatus });
           mudou = true;
         }
       });
@@ -1192,11 +1194,11 @@ export default function Despesas({ isPro = false }) {
     });
 
     return () => { unsubUser(); unsubDesp(); };
-  }, [uid]);
+  }, [tenantUid]);
 
   /* ── Criar despesa(s) ── */
   const handleAdd = async (form) => {
-    if (!uid) return;
+    if (!tenantUid) return;
     let cnt = despesaIdCnt;
 
     if (form.parcelado && form.totalParcelas > 1) {
@@ -1216,7 +1218,7 @@ export default function Despesas({ isPro = false }) {
         })();
         const status = calcularStatus(dataVenc, "pendente");
 
-        batch.set(doc(db, "users", uid, "despesas", newDocId), {
+        batch.set(doc(db, "users", tenantUid, "despesas", newDocId), {
           ...form, parcelado: true, grupoId,
           parcelaAtual: i + 1,
           idShow,
@@ -1226,7 +1228,7 @@ export default function Despesas({ isPro = false }) {
       }
       cnt++; // grupo inteiro consome apenas 1 número sequencial
 
-      batch.set(doc(db, "users", uid), { despesaIdCnt: cnt }, { merge: true });
+      batch.set(doc(db, "users", tenantUid), { despesaIdCnt: cnt }, { merge: true });
       await batch.commit();
     } else {
       // Despesa única
@@ -1234,10 +1236,10 @@ export default function Despesas({ isPro = false }) {
       const idShow = gerarIdShow(cnt);
       const status = calcularStatus(form.vencimento, "pendente");
 
-      await setDoc(doc(db, "users", uid, "despesas", newDocId), {
+      await setDoc(doc(db, "users", tenantUid, "despesas", newDocId), {
         ...form, status, idShow, dataCriacao: new Date().toISOString(),
       });
-      await setDoc(doc(db, "users", uid), { despesaIdCnt: cnt + 1 }, { merge: true });
+      await setDoc(doc(db, "users", tenantUid), { despesaIdCnt: cnt + 1 }, { merge: true });
     }
 
     setModalNovo(false);
@@ -1245,16 +1247,16 @@ export default function Despesas({ isPro = false }) {
 
   /* ── Editar ── */
   const handleEdit = async (form) => {
-    if (!uid || !editando) return;
+    if (!tenantUid || !editando) return;
     const status = calcularStatus(form.vencimento, editando.status);
-    await setDoc(doc(db, "users", uid, "despesas", editando.id), { ...form, status }, { merge: true });
+    await setDoc(doc(db, "users", tenantUid, "despesas", editando.id), { ...form, status }, { merge: true });
     setEditando(null);
   };
 
   /* ── Pagar ── */
   const handlePagar = async (formaPagamento) => {
-    if (!uid || !pagando) return;
-    const ref = doc(db, "users", uid, "despesas", pagando.id);
+    if (!tenantUid || !pagando) return;
+    const ref = doc(db, "users", tenantUid, "despesas", pagando.id);
 
     await setDoc(ref, {
       status: "pago",
@@ -1272,7 +1274,7 @@ export default function Despesas({ isPro = false }) {
           const newDocId = `${gerarIdBase(cnt)}-${Date.now()}`;
           const idShow = gerarIdShow(cnt);
           const novoStatus = calcularStatus(novaData, "pendente");
-          await setDoc(doc(db, "users", uid, "despesas", newDocId), {
+          await setDoc(doc(db, "users", tenantUid, "despesas", newDocId), {
             descricao:      pagando.descricao,
             valor:          pagando.valor,
             vencimento:     novaData,
@@ -1289,7 +1291,7 @@ export default function Despesas({ isPro = false }) {
             status:         novoStatus,
             dataCriacao:    new Date().toISOString(),
           });
-          await setDoc(doc(db, "users", uid), { despesaIdCnt: cnt + 1 }, { merge: true });
+          await setDoc(doc(db, "users", tenantUid), { despesaIdCnt: cnt + 1 }, { merge: true });
         }
       }
     }
@@ -1299,17 +1301,17 @@ export default function Despesas({ isPro = false }) {
 
   /* ── Desfazer pagamento ── */
   const handleDesfazerPagamento = async (despesa) => {
-    if (!uid) return;
+    if (!tenantUid) return;
     const status = calcularStatus(despesa.vencimento, "pendente");
-    await setDoc(doc(db, "users", uid, "despesas", despesa.id), {
+    await setDoc(doc(db, "users", tenantUid, "despesas", despesa.id), {
       status, dataPagamento: null,
     }, { merge: true });
   };
 
   /* ── Deletar ── */
   const handleDelete = async () => {
-    if (!uid || !deletando) return;
-    await deleteDoc(doc(db, "users", uid, "despesas", deletando.id));
+    if (!tenantUid || !deletando) return;
+    await deleteDoc(doc(db, "users", tenantUid, "despesas", deletando.id));
     setDeletando(null);
   };
 
@@ -1386,7 +1388,7 @@ export default function Despesas({ isPro = false }) {
     [categorias]
   );
 
-  if (!uid) return <div className="desp-loading">Carregando autenticação...</div>;
+  // App.jsx bloqueia render enquanto loadingAuth||!tenantUid
 
   return (
     <>
@@ -1412,6 +1414,7 @@ export default function Despesas({ isPro = false }) {
           <button
             className="btn-nova-desp"
             onClick={() => setModalNovo(true)}
+            disabled={!podeCriarV}
             disabled={!isPro && despesas.length >= LIMITES_FREE.despesas}
             title={!isPro && despesas.length >= LIMITES_FREE.despesas ? `Limite de ${LIMITES_FREE.despesas} despesas atingido no plano Free` : undefined}
           >
@@ -1605,12 +1608,12 @@ export default function Despesas({ isPro = false }) {
                   <RotateCcw size={13} />
                 </button>
               )}
-              <button className="btn-icon btn-icon-edit" title="Editar" onClick={() => setEditando(d)}>
+              {podeEditarV && <button className="btn-icon btn-icon-edit" title="Editar" onClick={() => setEditando(d)}>
                 <Edit2 size={13} />
-              </button>
-              <button className="btn-icon btn-icon-del" title="Excluir" onClick={() => setDeletando(d)}>
+              </button>}
+              {podeExcluirV && <button className="btn-icon btn-icon-del" title="Excluir" onClick={() => setDeletando(d)}>
                 <Trash2 size={13} />
-              </button>
+              </button>}
             </div>
           </div>
         ))}
@@ -1626,7 +1629,7 @@ export default function Despesas({ isPro = false }) {
           onClose={() => setModalCategorias(false)}
         />
       )}
-      {modalNovo && (
+      {modalNovo && podeCriarV && (
         <ModalNovaDespesa
           despesas={despesas}
           categorias={categorias}
@@ -1636,7 +1639,7 @@ export default function Despesas({ isPro = false }) {
           onClose={() => setModalNovo(false)}
         />
       )}
-      {editando && (
+      {editando && podeEditarV && (
         <ModalNovaDespesa
           despesa={editando}
           despesas={despesas}
@@ -1650,7 +1653,7 @@ export default function Despesas({ isPro = false }) {
       {pagando && (
         <ModalPagar despesa={pagando} onConfirm={handlePagar} onClose={() => setPagando(null)} />
       )}
-      {deletando && (
+      {deletando && podeExcluirV && (
         <ModalConfirmDelete despesa={deletando} onConfirm={handleDelete} onClose={() => setDeletando(null)} />
       )}
     </>
