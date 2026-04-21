@@ -538,7 +538,10 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
   }, [configTaxas]);
 
   const dados = useMemo(() => {
-    const dFiltradas = despesas.filter((d) => dentroDoIntervalo(d.data, intervalo));
+    const // Regime de caixa: só despesas PAGAS entram no DRE
+      dFiltradas = despesas.filter((d) =>
+        d.status === "pago" &&
+        dentroDoIntervalo(d.dataPagamento || d.data, intervalo));
 
     /* ══════════════════════════════════════════════════════════════════
        REGIME DE CAIXA PURO — RECEITA
@@ -635,17 +638,6 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
       porCategoria[cat] = (porCategoria[cat] || 0) + Number(d.valor || 0);
     });
 
-    /* Diagnóstico */
-    console.log(
-      "[DRE — Caixa] entradas de venda no período:", caixaVendas.length,
-      "| vendas legadas (fallback):", vendasLegadas.length,
-      "\n[DRE] receitaBruta:", receitaBruta,
-      "| descontos:", descontosTotais,
-      "| taxasCartao:", taxasCartao,
-      "| receitaLiquida:", receitaLiquida,
-      "| custoTotal:", custoTotal,
-      "| totalDespesas:", totalDespesas,
-      "| lucroLiquido:", lucroLiquido,
     );
 
     return {
@@ -1250,7 +1242,6 @@ function RelatorioEstoque({ produtos }) {
   const dados = useMemo(() => {
     /* CORREÇÃO 4: campos corretos do Firestore são p.estoque, p.preco, p.custo, p.margem
        Estrutura real: produtos/{id} { custo, estoque, preco, margem, nome } */
-    console.log("[Estoque] produtos carregados:", produtos.length,
       "| exemplo:", produtos[0] ? JSON.stringify(Object.keys(produtos[0])) : "vazio");
 
     const estoque    = (p) => Number(p.estoque   ?? p.quantidade ?? 0);
@@ -1406,8 +1397,6 @@ function RelatorioClientes({ clientes, vendas, intervalo }) {
     /* Clientes que compraram no período */
     const vendasPeriodo = vendas.filter((v) => dentroDoIntervalo(v.data, intervalo));
 
-    console.log("[Clientes] total clientes:", total,
-      "| vendas no período:", vendasPeriodo.length,
       "| exemplo venda keys:", vendasPeriodo[0] ? JSON.stringify(Object.keys(vendasPeriodo[0])) : "sem vendas");
 
     /* CORREÇÃO 5: Vendas.jsx salva v.cliente (string nome), não v.clienteId.
@@ -1425,8 +1414,6 @@ function RelatorioClientes({ clientes, vendas, intervalo }) {
       nomesAtivos.has((c.nome || "").trim().toLowerCase())
     );
 
-    console.log("[Clientes] idsAtivos:", idsAtivos.size,
-      "| nomesAtivos:", nomesAtivos.size,
       "| ativos encontrados:", ativos.length);
 
     /* Clientes com fiado */
@@ -1567,8 +1554,6 @@ function RelatorioAgenda({ agenda, intervalo }) {
     hoje.setHours(0, 0, 0, 0);
 
     /* CORREÇÃO 6: log para debugar campos reais da agenda */
-    console.log("[Agenda] total itens:", agenda.length,
-      "| exemplo keys:", agenda[0] ? JSON.stringify(Object.keys(agenda[0])) : "vazio",
       "| exemplo item:", agenda[0] ? JSON.stringify(agenda[0]) : "vazio");
 
     /* Helper: extrai a data do item tentando múltiplos campos possíveis */
@@ -1589,7 +1574,6 @@ function RelatorioAgenda({ agenda, intervalo }) {
         return (da || 0) - (db2 || 0);
       });
 
-    console.log("[Agenda] filtrada:", filtrada.length,
       "| intervalo:", intervalo.de?.toLocaleDateString("pt-BR"), "→", intervalo.ate?.toLocaleDateString("pt-BR"));
 
     const futuros = filtrada.filter((a) => {
@@ -1603,7 +1587,6 @@ function RelatorioAgenda({ agenda, intervalo }) {
       return dt && dt < hoje;
     });
 
-    console.log("[Agenda] futuros:", futuros.length, "| passados:", passados.length);
 
     return { filtrada, futuros, passados, getDataAgenda };
   }, [agenda, intervalo]);
