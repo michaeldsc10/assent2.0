@@ -1415,8 +1415,7 @@ export default function Despesas({ isPro = false }) {
           <button
             className="btn-nova-desp"
             onClick={() => setModalNovo(true)}
-            disabled={!podeCriarV}
-            disabled={!isPro && despesas.length >= LIMITES_FREE.despesas}
+            disabled={!podeCriarV || (!isPro && despesas.length >= LIMITES_FREE.despesas)}
             title={!isPro && despesas.length >= LIMITES_FREE.despesas ? `Limite de ${LIMITES_FREE.despesas} despesas atingido no plano Free` : undefined}
           >
             <Plus size={14} /> Nova Despesa
