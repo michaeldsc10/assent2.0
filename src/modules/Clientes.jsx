@@ -8,7 +8,8 @@ import {
   Search, UserPlus, Edit2, Trash2, X, ChevronRight, Printer,
 } from "lucide-react";
 
-import { db, auth, onAuthStateChanged } from "../lib/firebase";
+import { db } from "../lib/firebase";
+import { useAuth } from "../contexts/AuthContext";
 import {
   collection,
   doc,
@@ -782,7 +783,14 @@ function ModalConfirmDelete({ cliente, onConfirm, onClose }) {
 
 /* ======================= COMPONENTE PRINCIPAL ======================= */
 export default function Clientes() {
-  const [uid, setUid] = useState(null);
+  // ── Multi-tenant ──
+  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+
+  // ── Flags de permissão ──
+  const podeCriarV  = podeCriar("clientes");
+  const podeEditarV = podeEditar("clientes");
+  const podeExcluirV = podeExcluir("clientes");
+
   const [clientes, setClientes] = useState([]);
   const [vendas, setVendas] = useState([]);
   const [clienteIdCnt, setClienteIdCnt] = useState(0);
@@ -795,22 +803,16 @@ export default function Clientes() {
   const [historico, setHistorico] = useState(null);
   const [vendaDetalhe, setVendaDetalhe] = useState(null);
 
-  // Auth
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => setUid(user?.uid || null));
-    return unsub;
-  }, []);
-
   // Firestore
   useEffect(() => {
-    if (!uid) {
+    if (!tenantUid) {
       setLoading(false);
       return;
     }
 
-    const userRef = doc(db, "users", uid);
-    const clientesCol = collection(db, "users", uid, "clientes");
-    const vendasCol = collection(db, "users", uid, "vendas");
+    const userRef = doc(db, "users", tenantUid);
+    const clientesCol = collection(db, "users", tenantUid, "clientes");
+    const vendasCol = collection(db, "users", tenantUid, "vendas");
 
     const unsubUser = onSnapshot(userRef, (snap) => {
       if (snap.exists()) setClienteIdCnt(snap.data().clienteIdCnt || 0);
@@ -830,28 +832,28 @@ export default function Clientes() {
       unsubClientes();
       unsubVendas();
     };
-  }, [uid]);
+  }, [tenantUid]);
 
   const handleAdd = async (form) => {
-    if (!uid) return;
+    if (!tenantUid) return;
     const newId = gerarIdCliente(clienteIdCnt);
-    await setDoc(doc(db, "users", uid, "clientes", newId), {
+    await setDoc(doc(db, "users", tenantUid, "clientes", newId), {
       ...form,
       criadoEm: new Date().toISOString(),
     });
-    await setDoc(doc(db, "users", uid), { clienteIdCnt: clienteIdCnt + 1 }, { merge: true });
+    await setDoc(doc(db, "users", tenantUid), { clienteIdCnt: clienteIdCnt + 1 }, { merge: true });
     setModalNovo(false);
   };
 
   const handleEdit = async (form) => {
-    if (!uid || !editando) return;
-    await setDoc(doc(db, "users", uid, "clientes", editando.id), form, { merge: true });
+    if (!tenantUid || !editando) return;
+    await setDoc(doc(db, "users", tenantUid, "clientes", editando.id), form, { merge: true });
     setEditando(null);
   };
 
   const handleDelete = async () => {
-    if (!uid || !deletando) return;
-    await deleteDoc(doc(db, "users", uid, "clientes", deletando.id));
+    if (!tenantUid || !deletando) return;
+    await deleteDoc(doc(db, "users", tenantUid, "clientes", deletando.id));
     setDeletando(null);
   };
 
@@ -865,7 +867,7 @@ export default function Clientes() {
     );
   }, [clientes, search]);
 
-  if (!uid) return <div className="cl-loading">Carregando autenticação...</div>;
+  // App.jsx bloqueia render enquanto loadingAuth||!tenantUid
 
   return (
     <>
@@ -886,9 +888,10 @@ export default function Clientes() {
           />
         </div>
 
-        <button className="btn-novo-cl" onClick={() => setModalNovo(true)}>
+        {podeCriarV && <button className="btn-novo-cl" onClick={() => setModalNovo(true)}>
           <UserPlus size={14} /> Novo Cliente
-        </button>
+        </button>}
+
       </header>
 
       <div className="ag-content">
@@ -924,12 +927,12 @@ export default function Clientes() {
                 <span className="cl-insta">{c.instagram ? `@${c.instagram}` : "—"}</span>
                 <span className="cl-overflow">{c.endereco || "—"}</span>
                 <div className="cl-actions">
-                  <button className="btn-icon btn-icon-edit" onClick={() => setEditando(c)}>
+                  {podeEditarV && <button className="btn-icon btn-icon-edit" onClick={() => setEditando(c)}>
                     <Edit2 size={13} />
-                  </button>
-                  <button className="btn-icon btn-icon-del" onClick={() => setDeletando(c)}>
+                  </button>}
+                  {podeExcluirV && <button className="btn-icon btn-icon-del" onClick={() => setDeletando(c)}>
                     <Trash2 size={13} />
-                  </button>
+                  </button>}
                 </div>
               </div>
             ))
@@ -938,9 +941,9 @@ export default function Clientes() {
       </div>
 
       {/* Modais */}
-      {modalNovo && <ModalNovoCliente clientes={clientes} onSave={handleAdd} onClose={() => setModalNovo(false)} />}
-      {editando && <ModalNovoCliente cliente={editando} clientes={clientes} onSave={handleEdit} onClose={() => setEditando(null)} />}
-      {deletando && <ModalConfirmDelete cliente={deletando} onConfirm={handleDelete} onClose={() => setDeletando(null)} />}
+      {modalNovo && podeCriarV && <ModalNovoCliente clientes={clientes} onSave={handleAdd} onClose={() => setModalNovo(false)} />}
+      {editando && podeEditarV && <ModalNovoCliente cliente={editando} clientes={clientes} onSave={handleEdit} onClose={() => setEditando(null)} />}
+      {deletando && podeExcluirV && <ModalConfirmDelete cliente={deletando} onConfirm={handleDelete} onClose={() => setDeletando(null)} />}
       {historico && <ModalHistorico cliente={historico} vendas={vendas} onClose={() => setHistorico(null)} onVerVenda={setVendaDetalhe} />}
       {vendaDetalhe && <ModalDetalheVenda venda={vendaDetalhe} onClose={() => setVendaDetalhe(null)} />}
     </>
