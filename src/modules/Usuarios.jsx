@@ -23,6 +23,7 @@ import {
   doc,
   setDoc,
   updateDoc,
+  deleteDoc,
   onSnapshot,
   serverTimestamp,
   getDocs,
@@ -257,6 +258,12 @@ const CSS = `
     border-color: rgba(224,82,82,0.18);
   }
   .usr-btn-acao.desativar:hover { background: rgba(224,82,82,0.15); }
+  .usr-btn-acao.excluir {
+    background: rgba(224,82,82,0.08);
+    color: var(--red);
+    border-color: rgba(224,82,82,0.18);
+  }
+  .usr-btn-acao.excluir:hover { background: rgba(224,82,82,0.18); }
 
   /* ── Linha Admin (destacada) ── */
   .usr-row-admin td:first-child { border-left: 2px solid var(--gold); }
@@ -880,26 +887,31 @@ export default function Usuarios() {
     }
   }
 
-  /* ─────────────────────────────────────────
-     RENDER: acesso negado
-  ───────────────────────────────────────── */
-  if (!isAdmin) {
-    return (
-      <>
-        <style>{CSS}</style>
-        <div className="usr-root">
-          <div className="usr-acesso-negado">
-            <div className="usr-acesso-negado-icon">🔒</div>
-            <h3>Acesso restrito</h3>
-            <p>
-              O módulo de Usuários é exclusivo para o <strong>Administrador</strong> da conta.
-              Entre em contato com o responsável caso precise de alterações.
-            </p>
-          </div>
-        </div>
-      </>
-    );
+  /* ── Excluir usuário (remove perfil + índice reverso) ── */
+  async function excluirUsuario(usr) {
+    if (!window.confirm(
+      `Excluir permanentemente "${usr.nome}"?\n\n` +
+      `Esta ação remove o acesso e todos os dados de perfil do usuário. ` +
+      `Registros históricos (vendas, pedidos, etc.) são preservados.\n\n` +
+      `Esta ação não pode ser desfeita.`
+    )) return;
+
+    try {
+      // Remove perfil do tenant
+      await deleteDoc(doc(db, "users", raiz, "usuarios", usr.uid));
+      // Remove índice reverso (AuthContext não reconhecerá mais o usuário)
+      await deleteDoc(doc(db, "userIndex", usr.uid));
+      mostrarToast(`"${usr.nome}" removido permanentemente.`);
+    } catch (err) {
+      console.error("[Usuarios] Erro ao excluir usuário:", err);
+      mostrarToast("Erro ao excluir usuário.", "erro");
+    }
   }
+
+  /* ─────────────────────────────────────────
+     Módulo invisível para não-admins
+  ───────────────────────────────────────── */
+  if (!isAdmin) return null;
 
   /* ─────────────────────────────────────────
      RENDER: loading
@@ -1080,6 +1092,13 @@ export default function Usuarios() {
                             onClick={() => toggleAtivo(usr)}
                           >
                             {isAtivo ? "Desativar" : "Reativar"}
+                          </button>
+                          <button
+                            className="usr-btn-acao excluir"
+                            onClick={() => excluirUsuario(usr)}
+                            title="Remover usuário permanentemente"
+                          >
+                            Excluir
                           </button>
                         </div>
                       </td>
