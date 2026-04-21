@@ -998,7 +998,7 @@ export default function Servicos({ isPro = false }) {
                   </button>}
                   {podeExcluirV && <button className="btn-icon btn-icon-del" onClick={() => setDeletando(s)}>
                     <Trash2 size={13} />
-                  </button>
+                  </button>}
                 </div>
               </div>
             ))
