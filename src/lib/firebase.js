@@ -22,7 +22,8 @@ import {
 // ⚠️ Todas as chaves são lidas de variáveis de ambiente (.env)
 // Nunca commite valores reais neste arquivo.
 // Copie .env.example para .env e preencha com suas credenciais.
-const firebaseConfig = {
+// O objeto é exportado pois o módulo Usuarios.jsx usa para criar a secondary app.
+export const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
