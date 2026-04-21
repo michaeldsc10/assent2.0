@@ -46,8 +46,8 @@ import RotaProtegida from "./contexts/RotaProtegida";
 import { usePermissao } from "./hooks/usePermissao";
 
 /* ── Firebase ──────────────────────────────────── */
-import { db, auth, logout } from "./lib/firebase";
-import { onAuthStateChanged }    from "firebase/auth";
+import { db, logout } from "./lib/firebase";
+import { useAuth } from "./contexts/AuthContext";
 import { doc, onSnapshot }       from "firebase/firestore";
 
 /* ── Hooks de dados ────────────────────────────── */
@@ -1062,8 +1062,6 @@ export default function Dashboard() {
   const [period,        setPeriod]       = useState("Este mês");
   const [customRange,   setCustomRange]  = useState({ from: "", to: "" });
   const [module,        setModule]       = useState("Dashboard");
-  const [uid,           setUid]          = useState(null);
-  const [authUser,      setAuthUser]     = useState(null);
   const [userName,      setUserName]     = useState("Usuário");
   const [menuVisivel,   setMenuVisivel]  = useState({});
   const [collapsed,     setCollapsed]    = useState(
@@ -1076,6 +1074,8 @@ export default function Dashboard() {
   );
    
 const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin } = usePermissao();
+  const { user: authUser, tenantUid } = useAuth();
+  const uid = tenantUid; // alias — mantém compatibilidade com hooks (useEmpresa, useLicenca, useDashboardData)
    
   const toggleTheme = () => {
     setTheme(prev => {
@@ -1103,14 +1103,6 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     setMobileMenuOpen(false);
   };
 
-  /* ── Auth ── */
-  useEffect(() => {
-    return onAuthStateChanged(auth, (user) => {
-      setAuthUser(user);
-      setUid(user?.uid ?? null);
-    });
-  }, []);
-
   /* ── Nome do usuário ── */
   useEffect(() => {
     if (!uid) return;
@@ -1122,7 +1114,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         "Usuário";
       setUserName(name);
     });
-  }, [uid, authUser]);
+  }, [authUser]);
 
   /* ── Visibilidade do menu ── */
   useEffect(() => {
@@ -1691,6 +1683,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   {sec.items.map((item) => {
                     const dbKey = KEY_MAP[item.label];
                     if (dbKey && menuVisivel[dbKey] === false) return null;
+                    if (!podeVer(item.modulo)) return null;
                     return (
                       <div
                         key={item.label}
@@ -1787,6 +1780,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     {sec.items.map((item) => {
                       const dbKey = KEY_MAP[item.label];
                       if (dbKey && menuVisivel[dbKey] === false) return null;
+                      if (!podeVer(item.modulo)) return null;
                       return (
                         <div
                           key={item.label}
