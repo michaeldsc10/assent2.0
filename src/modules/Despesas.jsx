@@ -862,9 +862,12 @@ function ModalPagar({ despesa, onConfirm, onClose }) {
   const [formaPag, setFormaPag] = useState(despesa.formaPagamento || "pix");
   const [pagando, setPagando] = useState(false);
 
+  const [dataPag, setDataPag] = useState(new Date().toISOString().split("T")[0]);
+
   const handlePagar = async () => {
+    if (!dataPag) return;
     setPagando(true);
-    await onConfirm(formaPag);
+    await onConfirm(formaPag, dataPag);
     setPagando(false);
   };
 
@@ -1258,14 +1261,14 @@ export default function Despesas({ isPro = false }) {
   };
 
   /* ── Pagar ── */
-  const handlePagar = async (formaPagamento) => {
+  const handlePagar = async (formaPagamento, dataPagamento) => {
     if (!tenantUid || !pagando) return;
     const ref = doc(db, "users", tenantUid, "despesas", pagando.id);
 
     await setDoc(ref, {
       status: "pago",
       formaPagamento,
-      dataPagamento: new Date().toISOString().split("T")[0],
+      dataPagamento: dataPagamento || new Date().toISOString().split("T")[0],
     }, { merge: true });
 
     // Recorrência: gerar próximo lançamento
