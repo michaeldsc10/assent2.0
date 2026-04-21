@@ -18,8 +18,8 @@ import AuthContext from "../contexts/AuthContext";
 import { db, auth } from "../lib/firebase";
 
 import {
-  collection, doc, setDoc, deleteDoc,
-  onSnapshot, runTransaction, increment, getDoc, addDoc,
+  collection, doc, setDoc, deleteDoc, updateDoc,
+  onSnapshot, runTransaction, increment, getDoc, addDoc, serverTimestamp,
   query, where, getDocs,
 } from "firebase/firestore";
 
@@ -1539,7 +1539,7 @@ const permVendas = (cargo, acao) => PERMISSOES_VENDAS[cargo]?.[acao] ?? false;
    ═══════════════════════════════════════ */
 export default function Vendas() {
   // ── Auth via contexto — tenantUid garante acesso correto para convidados ──
-  const { user, cargo, tenantUid, vendedorId, vendedorNome } = useContext(AuthContext);
+  const { user, cargo, tenantUid, vendedorId, vendedorNome, isVendedor } = useContext(AuthContext);
 
   const podeCriar   = permVendas(cargo, "criar");
   const podeEditar  = permVendas(cargo, "editar");
@@ -1595,7 +1595,7 @@ useEffect(() => {
     .catch(() => { /* mantém os TAXAS_DEFAULT em caso de falha */ });
 
   const unsub2 = onSnapshot(vendasCol, (snap) => {
-    const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const arr = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(v => v.status !== "cancelada");
     arr.sort((a, b) => {
       const da = a.data?.toDate ? a.data.toDate() : new Date(a.data || 0);
       const db_ = b.data?.toDate ? b.data.toDate() : new Date(b.data || 0);
@@ -1846,7 +1846,11 @@ useEffect(() => {
           tx.update(ref, { estoque: increment(item.qtd || 1) });
         }
       }
-      tx.delete(doc(db, "users", tenantUid, "vendas", vendaId));
+      tx.update(doc(db, "users", tenantUid, "vendas", vendaId), {
+      status: "cancelada",
+      canceladaEm: serverTimestamp(),
+      canceladaPor: { uid: user?.uid, nome: user?.displayName || user?.email || "—", cargo },
+    });
     });
 
     /* 2. Remover entradas do Caixa vinculadas a esta venda
