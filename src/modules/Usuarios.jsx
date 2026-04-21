@@ -29,7 +29,7 @@ import {
   getDocs,
 } from "firebase/firestore";
 import { initializeApp, getApps } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
+import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { db, firebaseConfig } from "../lib/firebase";
 import AuthContext from "../contexts/AuthContext";
 
@@ -264,6 +264,42 @@ const CSS = `
     border-color: rgba(224,82,82,0.18);
   }
   .usr-btn-acao.excluir:hover { background: rgba(224,82,82,0.18); }
+  .usr-btn-acao.detalhes {
+    background: rgba(200,165,94,0.08);
+    color: var(--gold);
+    border-color: rgba(200,165,94,0.18);
+  }
+  .usr-btn-acao.detalhes:hover { background: rgba(200,165,94,0.15); }
+
+  /* ── Modal Detalhes ── */
+  .usr-detalhe-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    margin-bottom: 16px;
+  }
+  .usr-detalhe-item { display: flex; flex-direction: column; gap: 3px; }
+  .usr-detalhe-label {
+    font-size: 10px; font-weight: 600; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--text-3);
+  }
+  .usr-detalhe-val { font-size: 13px; color: var(--text); }
+  .usr-detalhe-sep {
+    border: none; border-top: 1px solid var(--border); margin: 4px 0 16px;
+  }
+  .usr-reset-box {
+    background: rgba(200,165,94,0.06); border: 1px solid rgba(200,165,94,0.18);
+    border-radius: 10px; padding: 14px 16px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  }
+  .usr-reset-info { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+  .usr-reset-info strong { color: var(--text); display: block; margin-bottom: 2px; }
+  .usr-btn-reset {
+    padding: 7px 14px; border-radius: 8px; white-space: nowrap; flex-shrink: 0;
+    background: linear-gradient(135deg, #c8a55e, #dfc07c);
+    color: #0a0808; border: none; cursor: pointer;
+    font-size: 12px; font-weight: 700; transition: opacity .15s;
+  }
+  .usr-btn-reset:hover { opacity: .88; }
+  .usr-btn-reset:disabled { opacity: .5; cursor: not-allowed; }
 
   /* ── Linha Admin (destacada) ── */
   .usr-row-admin td:first-child { border-left: 2px solid var(--gold); }
@@ -711,6 +747,78 @@ function ModalUsuario({ usuario, vendedores, onSalvar, onFechar, salvando }) {
   );
 }
 
+
+/* ─────────────────────────────────────────────
+   MODAL: Detalhes do colaborador
+───────────────────────────────────────────── */
+function ModalDetalhes({ usr, vendedores, onFechar, onResetSenha, resetando }) {
+  const cargo    = CARGO_MAP[usr.cargo];
+  const vendedor = vendedores.find(v => v.id === usr.vendedorId);
+  const criado   = usr.criadoEm?.toDate?.()?.toLocaleDateString("pt-BR") ?? "—";
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onFechar()}>
+      <div className="modal-box" style={{ maxWidth: 480 }}>
+        <div className="modal-header">
+          <div>
+            <h3>{usr.nome}</h3>
+            <p>{usr.email}</p>
+          </div>
+          <button className="modal-close" onClick={onFechar}>✕</button>
+        </div>
+
+        <div className="modal-body">
+          <div className="usr-detalhe-grid">
+            <div className="usr-detalhe-item">
+              <span className="usr-detalhe-label">Cargo</span>
+              <BadgeCargo cargo={usr.cargo} />
+            </div>
+            <div className="usr-detalhe-item">
+              <span className="usr-detalhe-label">Status</span>
+              <span className={`usr-badge-ativo ${usr.ativo !== false ? "ativo" : "inativo"}`}>
+                <span className={`usr-dot ${usr.ativo !== false ? "ativo" : "inativo"}`} />
+                {usr.ativo !== false ? "Ativo" : "Inativo"}
+              </span>
+            </div>
+            <div className="usr-detalhe-item">
+              <span className="usr-detalhe-label">Convidado em</span>
+              <span className="usr-detalhe-val">{criado}</span>
+            </div>
+            <div className="usr-detalhe-item">
+              <span className="usr-detalhe-label">Vendedor vinculado</span>
+              <span className="usr-detalhe-val">{vendedor?.nome ?? "—"}</span>
+            </div>
+            <div className="usr-detalhe-item" style={{ gridColumn: "1 / -1" }}>
+              <span className="usr-detalhe-label">UID</span>
+              <span className="usr-detalhe-val" style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "monospace" }}>
+                {usr.uid}
+              </span>
+            </div>
+          </div>
+
+          <hr className="usr-detalhe-sep" />
+
+          {/* Redefinir senha */}
+          <div className="usr-reset-box">
+            <div className="usr-reset-info">
+              <strong>Redefinir senha de acesso</strong>
+              Um e-mail de redefinição será enviado para <strong>{usr.email}</strong>.
+              O usuário poderá definir uma nova senha pelo link recebido.
+            </div>
+            <button
+              className="usr-btn-reset"
+              onClick={onResetSenha}
+              disabled={resetando}
+            >
+              {resetando ? "Enviando…" : "Enviar link"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─────────────────────────────────────────────
    COMPONENTE PRINCIPAL
 ───────────────────────────────────────────── */
@@ -724,6 +832,8 @@ export default function Usuarios() {
   const [usuarioEditando, setUsuarioEditando] = useState(null);
   const [salvando,   setSalvando]   = useState(false);
   const [toast,      setToast]      = useState(null); // { msg, tipo }
+  const [detalhe,    setDetalhe]    = useState(null); // usr sendo visualizado
+  const [resetando,  setResetando]  = useState(false);
 
   // tenantUid = uid do Admin dono da conta (raiz do Firestore)
   const raiz = tenantUid || user?.uid;
@@ -887,31 +997,59 @@ export default function Usuarios() {
     }
   }
 
+  /* ── Redefinir senha do colaborador ── */
+  async function resetarSenha(usr) {
+    setResetando(true);
+    try {
+      const { getAuth } = await import("firebase/auth");
+      await sendPasswordResetEmail(getAuth(), usr.email);
+      mostrarToast(`Link de redefinição enviado para "${usr.email}".`);
+    } catch (err) {
+      console.error("[Usuarios] Erro ao redefinir senha:", err);
+      mostrarToast("Erro ao enviar e-mail de redefinição.", "erro");
+    } finally {
+      setResetando(false);
+    }
+  }
+
   /* ── Excluir usuário (remove perfil + índice reverso) ── */
   async function excluirUsuario(usr) {
     if (!window.confirm(
       `Excluir permanentemente "${usr.nome}"?\n\n` +
-      `Esta ação remove o acesso e todos os dados de perfil do usuário. ` +
+      `Esta ação remove o acesso e todos os dados de perfil. ` +
       `Registros históricos (vendas, pedidos, etc.) são preservados.\n\n` +
       `Esta ação não pode ser desfeita.`
     )) return;
-
     try {
-      // Remove perfil do tenant
       await deleteDoc(doc(db, "users", raiz, "usuarios", usr.uid));
-      // Remove índice reverso (AuthContext não reconhecerá mais o usuário)
       await deleteDoc(doc(db, "userIndex", usr.uid));
       mostrarToast(`"${usr.nome}" removido permanentemente.`);
     } catch (err) {
-      console.error("[Usuarios] Erro ao excluir usuário:", err);
+      console.error("[Usuarios] Erro ao excluir:", err);
       mostrarToast("Erro ao excluir usuário.", "erro");
     }
   }
 
   /* ─────────────────────────────────────────
-     Módulo invisível para não-admins
+     RENDER: acesso negado
   ───────────────────────────────────────── */
-  if (!isAdmin) return null;
+  if (!isAdmin) {
+    return (
+      <>
+        <style>{CSS}</style>
+        <div className="usr-root">
+          <div className="usr-acesso-negado">
+            <div className="usr-acesso-negado-icon">🔒</div>
+            <h3>Acesso restrito</h3>
+            <p>
+              O módulo de Usuários é exclusivo para o <strong>Administrador</strong> da conta.
+              Entre em contato com o responsável caso precise de alterações.
+            </p>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   /* ─────────────────────────────────────────
      RENDER: loading
@@ -1082,6 +1220,12 @@ export default function Usuarios() {
                       <td>
                         <div className="usr-acoes">
                           <button
+                            className="usr-btn-acao detalhes"
+                            onClick={() => setDetalhe(usr)}
+                          >
+                            Detalhes
+                          </button>
+                          <button
                             className="usr-btn-acao editar"
                             onClick={() => abrirEditar(usr)}
                           >
@@ -1096,7 +1240,7 @@ export default function Usuarios() {
                           <button
                             className="usr-btn-acao excluir"
                             onClick={() => excluirUsuario(usr)}
-                            title="Remover usuário permanentemente"
+                            title="Remover permanentemente"
                           >
                             Excluir
                           </button>
@@ -1118,6 +1262,17 @@ export default function Usuarios() {
             onSalvar={handleSalvar}
             onFechar={fecharModal}
             salvando={salvando}
+          />
+        )}
+
+        {/* ── Modal Detalhes ── */}
+        {detalhe && (
+          <ModalDetalhes
+            usr={detalhe}
+            vendedores={vendedores}
+            onFechar={() => setDetalhe(null)}
+            onResetSenha={() => resetarSenha(detalhe)}
+            resetando={resetando}
           />
         )}
 
