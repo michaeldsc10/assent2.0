@@ -932,7 +932,7 @@ export default function AReceber() {
 
         {podeCriarV && <button className="btn-novo-ar" onClick={() => setModalNovo(true)}>
           <Plus size={14} /> Nova Conta
-        </button>
+        </button>}
       </header>
 
       <div className="ag-content">
