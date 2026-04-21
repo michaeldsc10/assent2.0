@@ -1,14 +1,14 @@
 /* ═══════════════════════════════════════════════════
-   ASSENT v2.0 — Compras.jsx
+   ASSENT v2.1 — Compras.jsx
    Módulo: Gestão de Compras / Insumos / Estoque
-   Coleções: compras | insumos | movimentacoes | a_receber
+   Coleções: compras | insumos | movimentacoes | despesas
    ═══════════════════════════════════════════════════ */
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   ShoppingCart, Package, BarChart2, Plus, Edit2, Trash2, X,
   Eye, ChevronDown, AlertTriangle, CheckCircle, Clock, XCircle,
-  Search, Filter, ArrowDown, ArrowUp, Layers,
+  Search, Filter, ArrowDown, ArrowUp, Layers, Ban,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
@@ -17,8 +17,8 @@ import {
   collection, doc, onSnapshot, writeBatch, updateDoc, deleteDoc,
 } from "firebase/firestore";
 
-import  { useLicenca  }         from "../hooks/useLicenca";   // ajuste o path se necessário
-import { BannerLimite }          from "../hooks/LicencaUI.jsx";           // ajuste o path se necessário
+import  { useLicenca  }         from "../hooks/useLicenca";
+import { BannerLimite }          from "../hooks/LicencaUI.jsx";
 import { useComprasData }        from "../hooks/useComprasData";
 
 /* ═══════════════════════════════════════════════════
@@ -34,6 +34,7 @@ const METODOS_PAG = [
   { value: "boleto",       label: "Boleto" },
   { value: "cartao",       label: "Cartão" },
   { value: "transferencia",label: "Transferência" },
+  { value: "parcelado",    label: "Parcelado" },
 ];
 
 const MOTIVOS_SAIDA = [
@@ -43,6 +44,9 @@ const MOTIVOS_SAIDA = [
   { value: "devolucao",   label: "Devolução ao Fornecedor" },
 ];
 
+/* STATUS_COMPRA: usado APENAS para exibição e filtros.
+   No formulário de cadastro, só pago/pendente aparecem.
+   "cancelado" é atribuído pela ação de cancelamento, não pelo form. */
 const STATUS_COMPRA = [
   { value: "pago",      label: "Pago" },
   { value: "pendente",  label: "Pendente" },
@@ -160,7 +164,7 @@ const CSS = `
   /* Compras table */
   .cp-row-compra {
     display:grid;
-    grid-template-columns:100px 160px 1fr 120px 110px 100px 90px;
+    grid-template-columns:100px 160px 1fr 120px 110px 100px 110px;
     padding:10px 18px; gap:8px; border-bottom:1px solid var(--border);
     align-items:center; font-size:12px; color:var(--text-2);
   }
@@ -342,6 +346,8 @@ const CSS = `
   .btn-icon-del:hover  { background:var(--red-d); border-color:rgba(224,82,82,.2); }
   .btn-icon-view { color:var(--text-2); }
   .btn-icon-view:hover { background:var(--s3); border-color:var(--border); }
+  .btn-icon-cancel { color:#e06a1a; }
+  .btn-icon-cancel:hover { background:rgba(224,106,26,.12); border-color:rgba(224,106,26,.2); }
   .cp-row-actions { display:flex; align-items:center; gap:4px; justify-content:flex-end; }
 
   /* ── Itens da compra ── */
@@ -448,6 +454,18 @@ const CSS = `
     font-size:12px; color:var(--text-2);
   }
   .cp-parcel-info strong { color:var(--gold); }
+
+  /* Info DRE badge */
+  .cp-dre-info {
+    display:flex; align-items:center; gap:8px;
+    background:rgba(72,199,142,.06); border:1px solid rgba(72,199,142,.18);
+    border-radius:8px; padding:8px 12px; margin-top:10px;
+    font-size:11px; color:var(--green);
+  }
+  .cp-dre-info.pendente {
+    background:rgba(200,165,94,.06); border-color:rgba(200,165,94,.2);
+    color:var(--gold);
+  }
 `;
 
 /* ═══════════════════════════════════════════════════
@@ -480,9 +498,10 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
   const [form, setForm] = useState({
     fornecedorId:    compra?.fornecedorId    || "",
     data:            compra?.data            || hojeISO(),
-    status:          compra?.status          || "pago",
+    /* status no form: apenas "pago" ou "pendente".
+       "cancelado" é atribuído somente via ação de cancelamento. */
+    status:          (compra?.status === "cancelado" ? "pendente" : compra?.status) || "pago",
     metodoPagamento: compra?.metodoPagamento || "pix",
-    parcelado:       compra?.parcelado       || false,
     numParcelas:     compra?.numParcelas     || 2,
     vencimento:      compra?.vencimento      || "",
     observacao:      compra?.observacao      || "",
@@ -497,8 +516,18 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
   const [erros,    setErros]    = useState({});
   const [salvando, setSalvando] = useState(false);
 
+  /* Parcelado é derivado do método de pagamento selecionado */
+  const isParcelado = form.metodoPagamento === "parcelado";
+
+  /* Quando seleciona parcelado, força status para pendente */
   const set = useCallback((campo, valor) => {
-    setForm(f => ({ ...f, [campo]: valor }));
+    setForm(f => {
+      const novo = { ...f, [campo]: valor };
+      if (campo === "metodoPagamento" && valor === "parcelado") {
+        novo.status = "pendente";
+      }
+      return novo;
+    });
     setErros(e => ({ ...e, [campo]: "" }));
   }, []);
 
@@ -506,7 +535,6 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
     setItens(prev => {
       const copia = [...prev];
       copia[idx] = { ...copia[idx], [campo]: valor };
-      // Se mudou insumo, preenche nome e unidade
       if (campo === "insumoId") {
         const ins = insumos.find(i => i.id === valor);
         copia[idx].insumoNome = ins?.nome || "";
@@ -530,7 +558,8 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
 
   const valorTotal = itens.reduce((s, it) => s + calcSubtotal(it), 0);
 
-  const precisaVencimento = form.status === "pendente" || form.parcelado;
+  /* Precisa de vencimento se pendente (sem parcelamento) ou se parcelado */
+  const precisaVencimento = form.status === "pendente" || isParcelado;
 
   const validar = () => {
     const e = {};
@@ -538,7 +567,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
     if (!form.data)            e.data         = "Data é obrigatória.";
     if (!form.metodoPagamento) e.metodoPagamento = "Selecione o método.";
     if (precisaVencimento && !form.vencimento) e.vencimento = "Informe o vencimento.";
-    if (form.parcelado && (isNaN(form.numParcelas) || form.numParcelas < 2))
+    if (isParcelado && (isNaN(form.numParcelas) || form.numParcelas < 2))
       e.numParcelas = "Mínimo 2 parcelas.";
 
     itens.forEach((it, i) => {
@@ -560,12 +589,12 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
       const forn      = fornecedores.find(f => f.id === form.fornecedorId);
       const now       = new Date().toISOString();
       const itensFinais = itens.map(it => ({
-        insumoId:     it.insumoId,
-        insumoNome:   it.insumoNome,
-        quantidade:   parseBRL(it.quantidade),
-        unidade:      it.unidade || "",
+        insumoId:      it.insumoId,
+        insumoNome:    it.insumoNome,
+        quantidade:    parseBRL(it.quantidade),
+        unidade:       it.unidade || "",
         valorUnitario: parseBRL(it.valorUnitario),
-        subtotal:     calcSubtotal(it),
+        subtotal:      calcSubtotal(it),
       }));
 
       const compraData = {
@@ -576,8 +605,8 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
         valorTotal,
         status:          form.status,
         metodoPagamento: form.metodoPagamento,
-        parcelado:       form.parcelado,
-        numParcelas:     form.parcelado ? Number(form.numParcelas) : 1,
+        parcelado:       isParcelado,
+        numParcelas:     isParcelado ? Number(form.numParcelas) : 1,
         vencimento:      precisaVencimento ? form.vencimento : null,
         observacao:      form.observacao.trim(),
         criadoEm:        isEdit ? (compra.criadoEm || now) : now,
@@ -585,7 +614,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
       };
 
       if (isEdit) {
-        /* Edição: atualiza apenas a doc de compra (sem recriar movimentações) */
+        /* Edição: atualiza apenas a doc de compra (sem recriar movimentações/despesas) */
         await updateDoc(doc(collection(db, "users", uid, "compras"), compra.id), compraData);
       } else {
         /* Criação: writeBatch atômico */
@@ -596,65 +625,99 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
         const compraId  = compraRef.id;
         batch.set(compraRef, compraData);
 
-        /* 2 — Movimentacoes (entrada por item) */
+        /* 2 — Movimentações (entrada por item) */
         itensFinais.forEach(it => {
           const movRef = doc(collection(db, "users", uid, "movimentacoes"));
           batch.set(movRef, {
-            insumoId:     it.insumoId,
-            insumoNome:   it.insumoNome,
-            tipo:         "entrada",
-            quantidade:   it.quantidade,
-            unidade:      it.unidade,
-            motivo:       "compra",
+            insumoId:      it.insumoId,
+            insumoNome:    it.insumoNome,
+            tipo:          "entrada",
+            quantidade:    it.quantidade,
+            unidade:       it.unidade,
+            motivo:        "compra",
             compraId,
-            fornecedorId: form.fornecedorId,
+            fornecedorId:  form.fornecedorId,
             valorUnitario: it.valorUnitario,
-            data:         form.data,
-            observacao:   form.observacao.trim(),
-            criadoEm:     now,
+            data:          form.data,
+            observacao:    form.observacao.trim(),
+            criadoEm:      now,
           });
         });
 
-        /* 3 — Lançamentos em a_receber (se pendente ou parcelado)
-           Nota: registra como contas a PAGAR usando clienteNome = fornecedor.
-           Integre com módulo A Pagar quando disponível. */
-        if (form.status === "pendente" && !form.parcelado) {
-          const arRef = doc(collection(db, "users", uid, "a_receber"));
-          batch.set(arRef, {
-            clienteNome:     forn?.nome || "Fornecedor",
-            descricao:       `Compra — ${forn?.nome || "Fornecedor"}`,
-            valorTotal,
-            valorPago:       0,
-            valorRestante:   valorTotal,
-            dataVencimento:  form.vencimento,
-            observacoes:     form.observacao.trim(),
-            status:          "pendente",
-            origem:          "compra",
-            referenciaId:    compraId,
-            dataCriacao:     now,
-            dataAtualizacao: now,
-          });
-        } else if (form.parcelado && Number(form.numParcelas) >= 2) {
-          const nParc      = Number(form.numParcelas);
-          const vlParcela  = Number((valorTotal / nParc).toFixed(2));
+        /* ─────────────────────────────────────────────────────
+           3 — DESPESAS (lançamento financeiro para DRE)
+
+           Regra:
+           • Pago        → 1 doc em despesas  status:"pago"     → DRE computa como despesa realizada
+           • Pendente    → 1 doc em despesas  status:"pendente" → módulo Despesas e DRE (a vencer)
+           • Parcelado   → N docs em despesas status:"pendente" → um por parcela, vencimentos mensais
+        ───────────────────────────────────────────────────── */
+        const despesaBase = {
+          fornecedorId:    form.fornecedorId,
+          fornecedorNome:  forn?.nome || "Fornecedor",
+          metodoPagamento: form.metodoPagamento,
+          categoria:       "Compras",
+          origem:          "compra",
+          referenciaId:    compraId,
+          observacoes:     form.observacao.trim(),
+          dataCriacao:     now,
+          dataAtualizacao: now,
+        };
+
+        if (isParcelado) {
+          /* Parcelado → N docs pendentes */
+          const nParc     = Number(form.numParcelas);
+          const vlParcela = Number((valorTotal / nParc).toFixed(2));
 
           for (let i = 0; i < nParc; i++) {
-            const arRef = doc(collection(db, "users", uid, "a_receber"));
-            batch.set(arRef, {
-              clienteNome:     forn?.nome || "Fornecedor",
-              descricao:       `Compra ${forn?.nome || ""} — parcela ${i+1}/${nParc}`,
-              valorTotal:      vlParcela,
-              valorPago:       0,
-              valorRestante:   vlParcela,
-              dataVencimento:  addMeses(form.vencimento, i),
-              observacoes:     form.observacao.trim(),
-              status:          "pendente",
-              origem:          "compra",
-              referenciaId:    compraId,
-              dataCriacao:     now,
-              dataAtualizacao: now,
+            const despRef = doc(collection(db, "users", uid, "despesas"));
+            batch.set(despRef, {
+              ...despesaBase,
+              descricao:      `Compra ${forn?.nome || ""} — parcela ${i + 1}/${nParc}`,
+              valor:          vlParcela,
+              valorTotal:     vlParcela,
+              data:           form.data,
+              dataCompetencia:form.data,
+              vencimento:     addMeses(form.vencimento, i),
+              dataVencimento: addMeses(form.vencimento, i),
+              status:         "pendente",
+              parcelaNum:     i + 1,
+              totalParcelas:  nParc,
             });
           }
+        } else if (form.status === "pago") {
+          /* Pago à vista → 1 doc pago → DRE computa */
+          const despRef = doc(collection(db, "users", uid, "despesas"));
+          batch.set(despRef, {
+            ...despesaBase,
+            descricao:      `Compra — ${forn?.nome || "Fornecedor"}`,
+            valor:          valorTotal,
+            valorTotal,
+            data:           form.data,
+            dataCompetencia:form.data,
+            dataPagamento:  form.data,
+            vencimento:     form.data,
+            dataVencimento: form.data,
+            status:         "pago",
+            parcelaNum:     null,
+            totalParcelas:  null,
+          });
+        } else {
+          /* Pendente à vista → 1 doc pendente */
+          const despRef = doc(collection(db, "users", uid, "despesas"));
+          batch.set(despRef, {
+            ...despesaBase,
+            descricao:      `Compra — ${forn?.nome || "Fornecedor"}`,
+            valor:          valorTotal,
+            valorTotal,
+            data:           form.data,
+            dataCompetencia:form.data,
+            vencimento:     form.vencimento,
+            dataVencimento: form.vencimento,
+            status:         "pendente",
+            parcelaNum:     null,
+            totalParcelas:  null,
+          });
         }
 
         await batch.commit();
@@ -669,6 +732,13 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
       setSalvando(false);
     }
   };
+
+  /* Label do info DRE na parte inferior do form */
+  const dreInfoMsg = isParcelado
+    ? `${form.numParcelas >= 2 ? form.numParcelas : "N"}× de ${fmtR$(form.numParcelas >= 2 ? valorTotal / form.numParcelas : 0)} lançadas em Despesas (pendente)`
+    : form.status === "pago"
+      ? `${fmtR$(valorTotal)} lançado no DRE como despesa paga`
+      : `${fmtR$(valorTotal)} lançado em Despesas como pendente`;
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -707,9 +777,19 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Status do Pagamento <span className="form-label-req">*</span></label>
-              <select className="form-input" value={form.status} onChange={e => set("status", e.target.value)}>
-                {STATUS_COMPRA.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              <select className="form-input"
+                value={isParcelado ? "pendente" : form.status}
+                disabled={isParcelado}
+                onChange={e => set("status", e.target.value)}>
+                {/* Apenas pago/pendente no formulário de criação */}
+                <option value="pago">Pago</option>
+                <option value="pendente">Pendente</option>
               </select>
+              {isParcelado && (
+                <div style={{fontSize:11,color:"var(--text-3)",marginTop:4}}>
+                  Compras parceladas são sempre pendentes.
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">Método de Pagamento <span className="form-label-req">*</span></label>
@@ -721,42 +801,37 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
             </div>
           </div>
 
-          {/* Parcelamento (só se não for pago ou cancelado) */}
-          {form.status === "pendente" && (
-            <div className="form-group">
-              <label className="form-check-row" style={{marginBottom:0}}>
-                <input type="checkbox" checked={form.parcelado}
-                  onChange={e => set("parcelado", e.target.checked)} />
-                <span className="form-check-label">Compra parcelada</span>
-              </label>
-            </div>
-          )}
-
-          {/* Vencimento + Parcelas */}
-          {precisaVencimento && (
+          {/* Campos de parcelamento — aparecem quando método = Parcelado */}
+          {isParcelado && (
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">
-                  {form.parcelado ? "Vencimento da 1ª parcela" : "Vencimento"}<span className="form-label-req"> *</span>
-                </label>
+                <label className="form-label">Vencimento da 1ª Parcela <span className="form-label-req">*</span></label>
                 <input type="date" className={`form-input${erros.vencimento?" err":""}`}
                   value={form.vencimento} onChange={e => set("vencimento", e.target.value)} />
                 {erros.vencimento && <div className="form-error">{erros.vencimento}</div>}
               </div>
-              {form.parcelado && (
-                <div className="form-group">
-                  <label className="form-label">Nº de Parcelas <span className="form-label-req">*</span></label>
-                  <input type="number" min="2" max="60" className={`form-input${erros.numParcelas?" err":""}`}
-                    value={form.numParcelas}
-                    onChange={e => { set("numParcelas", Number(e.target.value)); }} />
-                  {erros.numParcelas && <div className="form-error">{erros.numParcelas}</div>}
-                </div>
-              )}
+              <div className="form-group">
+                <label className="form-label">Nº de Parcelas <span className="form-label-req">*</span></label>
+                <input type="number" min="2" max="60" className={`form-input${erros.numParcelas?" err":""}`}
+                  value={form.numParcelas}
+                  onChange={e => set("numParcelas", Number(e.target.value))} />
+                {erros.numParcelas && <div className="form-error">{erros.numParcelas}</div>}
+              </div>
+            </div>
+          )}
+
+          {/* Vencimento para pendente NÃO parcelado */}
+          {form.status === "pendente" && !isParcelado && (
+            <div className="form-group">
+              <label className="form-label">Vencimento <span className="form-label-req">*</span></label>
+              <input type="date" className={`form-input${erros.vencimento?" err":""}`}
+                value={form.vencimento} onChange={e => set("vencimento", e.target.value)} />
+              {erros.vencimento && <div className="form-error">{erros.vencimento}</div>}
             </div>
           )}
 
           {/* Preview parcelamento */}
-          {form.parcelado && form.vencimento && form.numParcelas >= 2 && valorTotal > 0 && (
+          {isParcelado && form.vencimento && form.numParcelas >= 2 && valorTotal > 0 && (
             <div className="cp-parcel-info">
               <strong>{form.numParcelas}×</strong> de{" "}
               <strong>{fmtR$(valorTotal / form.numParcelas)}</strong>
@@ -776,7 +851,6 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
 
             {itens.map((it, idx) => (
               <div key={idx} className="cp-item-row">
-                {/* Insumo */}
                 <div>
                   <select className={`form-input${erros[`item_ins_${idx}`]?" err":""}`}
                     value={it.insumoId} onChange={e => setItem(idx, "insumoId", e.target.value)}>
@@ -787,21 +861,17 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
                   </select>
                   {erros[`item_ins_${idx}`] && <div className="form-error">{erros[`item_ins_${idx}`]}</div>}
                 </div>
-                {/* Quantidade */}
                 <div>
                   <input className={`form-input${erros[`item_qtd_${idx}`]?" err":""}`}
                     placeholder="Qtd" inputMode="decimal" value={it.quantidade}
                     onChange={e => setItem(idx, "quantidade", e.target.value)} />
                 </div>
-                {/* Valor Unit. */}
                 <div>
                   <input className={`form-input${erros[`item_val_${idx}`]?" err":""}`}
                     placeholder="R$ unit." inputMode="decimal" value={it.valorUnitario}
                     onChange={e => setItem(idx, "valorUnitario", e.target.value)} />
                 </div>
-                {/* Subtotal */}
                 <div className="cp-item-subtotal">{fmtR$(calcSubtotal(it))}</div>
-                {/* Remover */}
                 <button className="cp-btn-rem-item" onClick={() => remItem(idx)}>
                   <X size={11}/>
                 </button>
@@ -820,12 +890,71 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
             <textarea className="form-textarea" placeholder="Informações adicionais..."
               value={form.observacao} onChange={e => set("observacao", e.target.value)} />
           </div>
+
+          {/* Info DRE — apenas em criação */}
+          {!isEdit && valorTotal > 0 && (
+            <div className={`cp-dre-info${form.status !== "pago" || isParcelado ? " pendente" : ""}`}
+              style={{marginTop:14}}>
+              <CheckCircle size={12}/>
+              <span>{dreInfoMsg}</span>
+            </div>
+          )}
         </div>
 
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
             {salvando ? "Salvando..." : isEdit ? "Salvar Alterações" : "Registrar Compra"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════
+   MODAL: Confirmar Cancelamento de Compra
+   ═══════════════════════════════════════════════════ */
+function ModalCancelarCompra({ compra, uid, onClose }) {
+  const [cancelando, setCancelando] = useState(false);
+
+  const handleCancelar = async () => {
+    setCancelando(true);
+    try {
+      const now = new Date().toISOString();
+      await updateDoc(doc(collection(db, "users", uid, "compras"), compra.id), {
+        status:       "cancelado",
+        atualizadoEm: now,
+      });
+      onClose();
+    } catch (err) {
+      console.error("[Compras] Erro ao cancelar compra:", err);
+      alert("Erro ao cancelar. Tente novamente.");
+    } finally {
+      setCancelando(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box modal-box-sm">
+        <div className="modal-header">
+          <div className="modal-title">Cancelar Compra</div>
+          <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)"/></button>
+        </div>
+        <div className="confirm-body">
+          <div className="confirm-icon">🚫</div>
+          <p><strong>Cancelar compra de {compra.fornecedorNome}?</strong></p>
+          <p style={{fontSize:12,marginTop:8,color:"var(--text-3)"}}>
+            A compra será marcada como cancelada. As movimentações de estoque
+            já registradas <strong style={{color:"var(--text)"}}>não</strong> serão revertidas automaticamente.
+          </p>
+          <p style={{marginTop:8,fontSize:12}}>Esta ação pode ser desfeita editando o status da compra.</p>
+        </div>
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Voltar</button>
+          <button className="btn-danger" onClick={handleCancelar} disabled={cancelando}>
+            {cancelando ? "Cancelando..." : "Confirmar Cancelamento"}
           </button>
         </div>
       </div>
@@ -1183,6 +1312,7 @@ function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEdita
   const [editando,     setEditando]     = useState(null);
   const [detalhes,     setDetalhes]     = useState(null);
   const [deletando,    setDeletando]    = useState(null);
+  const [cancelando,   setCancelando]   = useState(null);
 
   const filtradas = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -1212,16 +1342,18 @@ function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEdita
           <input placeholder="Buscar fornecedor..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <div className="cp-filter-group">
-          {["Todos","pago","pendente","cancelado"].map(f => (
+          {["Todos", "pago", "pendente", "cancelado"].map(f => (
             <button key={f} className={`cp-filter-btn${filtroStatus===f?" active":""}`}
               onClick={() => setFiltroStatus(f)}>
               {f === "Todos" ? "Todos" : STATUS_COMPRA.find(s=>s.value===f)?.label || f}
             </button>
           ))}
         </div>
-        <button className="cp-btn-new" onClick={() => setModalNova(true)}>
-          <Plus size={14}/> Nova Compra
-        </button>
+        {podeCriarV && (
+          <button className="cp-btn-new" onClick={() => setModalNova(true)}>
+            <Plus size={14}/> Nova Compra
+          </button>
+        )}
       </div>
 
       <div className="ag-content">
@@ -1249,11 +1381,27 @@ function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEdita
               <span style={{color:"var(--text-3)"}}>{c.itens?.length || 0} item{c.itens?.length !== 1 ? "s":""}</span>
               <span style={{fontFamily:"'Sora',sans-serif",fontWeight:600,color:"var(--gold)"}}>{fmtR$(c.valorTotal)}</span>
               <StatusBadgeCompra status={c.status}/>
-              <span style={{color:"var(--text-3)"}}>{METODOS_PAG.find(m=>m.value===c.metodoPagamento)?.label || c.metodoPagamento}</span>
+              <span style={{color:"var(--text-3)"}}>
+                {METODOS_PAG.find(m=>m.value===c.metodoPagamento)?.label || c.metodoPagamento}
+                {c.parcelado && c.numParcelas > 1 && (
+                  <span style={{marginLeft:4,fontSize:10,color:"var(--text-3)"}}>({c.numParcelas}×)</span>
+                )}
+              </span>
               <div className="cp-row-actions">
-                <button className="btn-icon btn-icon-view" title="Detalhes" onClick={() => setDetalhes(c)}><Eye size={12}/></button>
-                {podeEditarV  && <button className="btn-icon btn-icon-edit" title="Editar"   onClick={() => setEditando(c)}><Edit2 size={12}/></button>}
-                {podeExcluirV && <button className="btn-icon btn-icon-del"  title="Excluir"  onClick={() => setDeletando(c)}><Trash2 size={12}/></button>}
+                <button className="btn-icon btn-icon-view" title="Detalhes"
+                  onClick={() => setDetalhes(c)}><Eye size={12}/></button>
+                {podeEditarV && c.status !== "cancelado" && (
+                  <button className="btn-icon btn-icon-edit" title="Editar"
+                    onClick={() => setEditando(c)}><Edit2 size={12}/></button>
+                )}
+                {podeEditarV && c.status !== "cancelado" && (
+                  <button className="btn-icon btn-icon-cancel" title="Cancelar Compra"
+                    onClick={() => setCancelando(c)}><Ban size={12}/></button>
+                )}
+                {podeExcluirV && (
+                  <button className="btn-icon btn-icon-del" title="Excluir"
+                    onClick={() => setDeletando(c)}><Trash2 size={12}/></button>
+                )}
               </div>
             </div>
           ))}
@@ -1261,15 +1409,26 @@ function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEdita
       </div>
 
       {/* Modais */}
-      {modalNova && <ModalNovaCompra uid={uid} fornecedores={fornecedores} insumos={insumos}
-        onClose={() => setModalNova(false)} onSaved={() => {}} />}
-      {editando && podeEditarV && <ModalNovaCompra uid={uid} compra={editando} fornecedores={fornecedores} insumos={insumos}
-        onClose={() => setEditando(null)} onSaved={() => {}} />}
-      {detalhes && <ModalDetalheCompra compra={detalhes} onClose={() => setDetalhes(null)} />}
-      {deletando && podeExcluirV && <ModalConfirmDelete
-        titulo={`Excluir compra de ${deletando.fornecedorNome}`}
-        subtitulo="As movimentações de estoque desta compra NÃO serão revertidas automaticamente."
-        onConfirm={handleDeletar} onClose={() => setDeletando(null)} />}
+      {modalNova && (
+        <ModalNovaCompra uid={uid} fornecedores={fornecedores} insumos={insumos}
+          onClose={() => setModalNova(false)} onSaved={() => {}} />
+      )}
+      {editando && podeEditarV && (
+        <ModalNovaCompra uid={uid} compra={editando} fornecedores={fornecedores} insumos={insumos}
+          onClose={() => setEditando(null)} onSaved={() => {}} />
+      )}
+      {detalhes && (
+        <ModalDetalheCompra compra={detalhes} onClose={() => setDetalhes(null)} />
+      )}
+      {cancelando && podeEditarV && (
+        <ModalCancelarCompra compra={cancelando} uid={uid} onClose={() => setCancelando(null)} />
+      )}
+      {deletando && podeExcluirV && (
+        <ModalConfirmDelete
+          titulo={`Excluir compra de ${deletando.fornecedorNome}`}
+          subtitulo="As movimentações de estoque desta compra NÃO serão revertidas automaticamente."
+          onConfirm={handleDeletar} onClose={() => setDeletando(null)} />
+      )}
     </>
   );
 }
@@ -1283,11 +1442,13 @@ function TabInsumos({ uid, insumos, isPro, podeCriarV, podeEditarV, podeExcluirV
   const [editando,  setEditando]  = useState(null);
   const [deletando, setDeletando] = useState(null);
 
-  const atingiuLimite = !isPro && insumos.length >= LIMITE_FREE_INSUMOS;
+  const limiteAtingido = !isPro && insumos.length >= LIMITE_FREE_INSUMOS;
 
   const filtrados = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return insumos.filter(i => !q || i.nome?.toLowerCase().includes(q) || i.categoria?.toLowerCase().includes(q));
+    return insumos
+      .filter(i => !q || i.nome?.toLowerCase().includes(q) || i.categoria?.toLowerCase().includes(q))
+      .sort((a,b) => (a.nome||"").localeCompare(b.nome||"", "pt-BR"));
   }, [insumos, search]);
 
   const handleDeletar = async () => {
@@ -1298,7 +1459,8 @@ function TabInsumos({ uid, insumos, isPro, podeCriarV, podeEditarV, podeExcluirV
 
   const handleToggleAtivo = async (insumo) => {
     await updateDoc(doc(collection(db, "users", uid, "insumos"), insumo.id), {
-      ativo: !insumo.ativo, atualizadoEm: new Date().toISOString()
+      ativo:        !insumo.ativo,
+      atualizadoEm: new Date().toISOString(),
     });
   };
 
@@ -1313,32 +1475,33 @@ function TabInsumos({ uid, insumos, isPro, podeCriarV, podeEditarV, podeExcluirV
           <Search size={12} color="var(--text-3)"/>
           <input placeholder="Buscar insumo..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <button className="cp-btn-new" disabled={atingiuLimite}
-          onClick={() => !atingiuLimite && setModalNovo(true)}>
-          <Plus size={14}/> Novo Insumo
-        </button>
+        {podeCriarV && (
+          <button className="cp-btn-new"
+            onClick={() => { if (limiteAtingido) return; setModalNovo(true); }}
+            style={limiteAtingido ? {opacity:.5,cursor:"not-allowed"} : {}}>
+            <Plus size={14}/> Novo Insumo
+          </button>
+        )}
       </div>
 
-      <div className="ag-content">
-        {/* Banner Free limit */}
-        {!isPro && (
+      {limiteAtingido && (
+        <div style={{padding:"0 22px 12px"}}>
           <BannerLimite
-            atual={insumos.length}
-            limite={LIMITE_FREE_INSUMOS}
-            label="insumos"
-          />
-        )}
+            mensagem={`Você atingiu o limite de ${LIMITE_FREE_INSUMOS} insumos no plano gratuito.`}
+            recurso="insumos" />
+        </div>
+      )}
 
+      <div className="ag-content">
         <div className="cp-table-wrap">
           <div className="cp-table-hdr">
             <span className="cp-table-hdr-title">Insumos Cadastrados</span>
-            <span className="cp-count-badge">{insumos.length}/{isPro ? "∞" : LIMITE_FREE_INSUMOS}</span>
+            <span className="cp-count-badge">{insumos.length}{!isPro ? `/${LIMITE_FREE_INSUMOS}`:""}</span>
           </div>
 
           <div className="cp-row-insumo cp-row-head">
-            <span>Nome</span><span>Unidade</span><span>Categoria</span>
-            <span>Est. Mínimo</span><span>Status</span>
-            <span style={{textAlign:"right"}}>Ações</span>
+            <span>Nome</span><span>Unid.</span><span>Categoria</span>
+            <span>Est. Mín.</span><span>Status</span><span style={{textAlign:"right"}}>Ações</span>
           </div>
 
           {filtrados.length === 0 ? (
@@ -1350,11 +1513,13 @@ function TabInsumos({ uid, insumos, isPro, podeCriarV, podeEditarV, podeExcluirV
               <span style={{color:"var(--text)",fontWeight:500}}>{ins.nome}</span>
               <span>{ins.unidade}</span>
               <span style={{color:"var(--text-3)"}}>{ins.categoria || "—"}</span>
-              <span>{ins.estoqueMinimo || 0} {ins.unidade}</span>
-              <Toggle checked={ins.ativo !== false} onChange={() => handleToggleAtivo(ins)} />
+              <span>{ins.estoqueMinimo ?? 0}</span>
+              <span>
+                <Toggle checked={ins.ativo !== false} onChange={() => handleToggleAtivo(ins)} />
+              </span>
               <div className="cp-row-actions">
-                {podeEditarV  && <button className="btn-icon btn-icon-edit" onClick={() => setEditando(ins)}><Edit2 size={12}/></button>}
-                {podeExcluirV && <button className="btn-icon btn-icon-del"  onClick={() => setDeletando(ins)}><Trash2 size={12}/></button>}
+                {podeEditarV  && <button className="btn-icon btn-icon-edit" title="Editar"   onClick={() => setEditando(ins)}><Edit2 size={12}/></button>}
+                {podeExcluirV && <button className="btn-icon btn-icon-del"  title="Excluir"  onClick={() => setDeletando(ins)}><Trash2 size={12}/></button>}
               </div>
             </div>
           ))}
@@ -1484,22 +1649,17 @@ function TabEstoque({ uid, insumos, movimentacoes, estoquePorInsumo }) {
 export default function Compras() {
   const [tab,  setTab]  = useState("compras");
 
-  // ── Multi-tenant ──
   const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
-  const uid = tenantUid; // alias — mantém compatibilidade com hooks e sub-componentes
+  const uid = tenantUid;
 
-  // ── Flags de permissão ──
   const podeCriarV   = podeCriar("compras");
   const podeEditarV  = podeEditar("compras");
   const podeExcluirV = podeExcluir("compras");
 
-  /* ── Licença ── */
   const { isPro, ativo: licAtivo, loadingLicenca } = useLicenca(uid);
 
-  /* ── Dados reativos ── */
   const { compras, insumos, movimentacoes, loading, estoquePorInsumo, insumosAbaixoMinimo } = useComprasData(uid);
 
-  /* ── Fornecedores (lidos direto — já existem no app) ── */
   const [fornecedores, setFornecedores] = useState([]);
   useEffect(() => {
     if (!uid) return;
@@ -1511,7 +1671,6 @@ export default function Compras() {
     return unsub;
   }, [tenantUid]);
 
-  /* ── Guard ── */
   if (!uid || loadingLicenca) return <div className="cp-loading">Carregando...</div>;
   if (loading)                return <div className="cp-loading">Carregando módulo de compras...</div>;
 
@@ -1525,7 +1684,6 @@ export default function Compras() {
     <>
       <style>{CSS}</style>
 
-      {/* Tabs */}
       <div className="cp-tabs">
         {TABS.map(t => (
           <button key={t.id} className={`cp-tab${tab===t.id?" active":""}`} onClick={() => setTab(t.id)}>
@@ -1535,7 +1693,6 @@ export default function Compras() {
         ))}
       </div>
 
-      {/* Conteúdo por aba */}
       {tab === "compras" && (
         <TabCompras uid={uid} compras={compras} fornecedores={fornecedores} insumos={insumos}
           podeCriarV={podeCriarV} podeEditarV={podeEditarV} podeExcluirV={podeExcluirV} />
