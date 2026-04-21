@@ -11,8 +11,8 @@ import {
   Search, Filter, ArrowDown, ArrowUp, Layers,
 } from "lucide-react";
 
-import { db, auth } from "../lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { db } from "../lib/firebase";
+import { useAuth } from "../contexts/AuthContext";
 import {
   collection, doc, onSnapshot, writeBatch, updateDoc, deleteDoc,
 } from "firebase/firestore";
@@ -1176,7 +1176,7 @@ function ModalConfirmDelete({ titulo, subtitulo, onConfirm, onClose }) {
 /* ═══════════════════════════════════════════════════
    TAB: Compras
    ═══════════════════════════════════════════════════ */
-function TabCompras({ uid, compras, fornecedores, insumos }) {
+function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEditarV, podeExcluirV }) {
   const [search,       setSearch]       = useState("");
   const [filtroStatus, setFiltroStatus] = useState("Todos");
   const [modalNova,    setModalNova]    = useState(false);
@@ -1252,8 +1252,8 @@ function TabCompras({ uid, compras, fornecedores, insumos }) {
               <span style={{color:"var(--text-3)"}}>{METODOS_PAG.find(m=>m.value===c.metodoPagamento)?.label || c.metodoPagamento}</span>
               <div className="cp-row-actions">
                 <button className="btn-icon btn-icon-view" title="Detalhes" onClick={() => setDetalhes(c)}><Eye size={12}/></button>
-                <button className="btn-icon btn-icon-edit" title="Editar"   onClick={() => setEditando(c)}><Edit2 size={12}/></button>
-                <button className="btn-icon btn-icon-del"  title="Excluir"  onClick={() => setDeletando(c)}><Trash2 size={12}/></button>
+                {podeEditarV  && <button className="btn-icon btn-icon-edit" title="Editar"   onClick={() => setEditando(c)}><Edit2 size={12}/></button>}
+                {podeExcluirV && <button className="btn-icon btn-icon-del"  title="Excluir"  onClick={() => setDeletando(c)}><Trash2 size={12}/></button>}
               </div>
             </div>
           ))}
@@ -1263,10 +1263,10 @@ function TabCompras({ uid, compras, fornecedores, insumos }) {
       {/* Modais */}
       {modalNova && <ModalNovaCompra uid={uid} fornecedores={fornecedores} insumos={insumos}
         onClose={() => setModalNova(false)} onSaved={() => {}} />}
-      {editando && <ModalNovaCompra uid={uid} compra={editando} fornecedores={fornecedores} insumos={insumos}
+      {editando && podeEditarV && <ModalNovaCompra uid={uid} compra={editando} fornecedores={fornecedores} insumos={insumos}
         onClose={() => setEditando(null)} onSaved={() => {}} />}
       {detalhes && <ModalDetalheCompra compra={detalhes} onClose={() => setDetalhes(null)} />}
-      {deletando && <ModalConfirmDelete
+      {deletando && podeExcluirV && <ModalConfirmDelete
         titulo={`Excluir compra de ${deletando.fornecedorNome}`}
         subtitulo="As movimentações de estoque desta compra NÃO serão revertidas automaticamente."
         onConfirm={handleDeletar} onClose={() => setDeletando(null)} />}
@@ -1277,7 +1277,7 @@ function TabCompras({ uid, compras, fornecedores, insumos }) {
 /* ═══════════════════════════════════════════════════
    TAB: Insumos
    ═══════════════════════════════════════════════════ */
-function TabInsumos({ uid, insumos, isPro }) {
+function TabInsumos({ uid, insumos, isPro, podeCriarV, podeEditarV, podeExcluirV }) {
   const [search,    setSearch]    = useState("");
   const [modalNovo, setModalNovo] = useState(false);
   const [editando,  setEditando]  = useState(null);
@@ -1353,17 +1353,17 @@ function TabInsumos({ uid, insumos, isPro }) {
               <span>{ins.estoqueMinimo || 0} {ins.unidade}</span>
               <Toggle checked={ins.ativo !== false} onChange={() => handleToggleAtivo(ins)} />
               <div className="cp-row-actions">
-                <button className="btn-icon btn-icon-edit" onClick={() => setEditando(ins)}><Edit2 size={12}/></button>
-                <button className="btn-icon btn-icon-del"  onClick={() => setDeletando(ins)}><Trash2 size={12}/></button>
+                {podeEditarV  && <button className="btn-icon btn-icon-edit" onClick={() => setEditando(ins)}><Edit2 size={12}/></button>}
+                {podeExcluirV && <button className="btn-icon btn-icon-del"  onClick={() => setDeletando(ins)}><Trash2 size={12}/></button>}
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {modalNovo && <ModalInsumo uid={uid} onClose={() => setModalNovo(false)} onSaved={() => {}} />}
-      {editando  && <ModalInsumo uid={uid} insumo={editando} onClose={() => setEditando(null)} onSaved={() => {}} />}
-      {deletando && <ModalConfirmDelete
+      {modalNovo && podeCriarV  && <ModalInsumo uid={uid} onClose={() => setModalNovo(false)} onSaved={() => {}} />}
+      {editando  && podeEditarV  && <ModalInsumo uid={uid} insumo={editando} onClose={() => setEditando(null)} onSaved={() => {}} />}
+      {deletando && podeExcluirV && <ModalConfirmDelete
         titulo={`Excluir insumo "${deletando.nome}"`}
         subtitulo="O histórico de movimentações deste insumo será mantido, mas o insumo não poderá ser selecionado em novas compras."
         onConfirm={handleDeletar} onClose={() => setDeletando(null)} />}
@@ -1482,14 +1482,16 @@ function TabEstoque({ uid, insumos, movimentacoes, estoquePorInsumo }) {
    COMPONENTE PRINCIPAL: Compras
    ═══════════════════════════════════════════════════ */
 export default function Compras() {
-  const [uid,  setUid]  = useState(null);
   const [tab,  setTab]  = useState("compras");
 
-  /* ── Auth ── */
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, user => setUid(user?.uid || null));
-    return unsub;
-  }, []);
+  // ── Multi-tenant ──
+  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+  const uid = tenantUid; // alias — mantém compatibilidade com hooks e sub-componentes
+
+  // ── Flags de permissão ──
+  const podeCriarV   = podeCriar("compras");
+  const podeEditarV  = podeEditar("compras");
+  const podeExcluirV = podeExcluir("compras");
 
   /* ── Licença ── */
   const { isPro, ativo: licAtivo, loadingLicenca } = useLicenca(uid);
@@ -1507,7 +1509,7 @@ export default function Compras() {
       err  => console.error("[Compras] fornecedores:", err)
     );
     return unsub;
-  }, [uid]);
+  }, [tenantUid]);
 
   /* ── Guard ── */
   if (!uid || loadingLicenca) return <div className="cp-loading">Carregando...</div>;
@@ -1535,10 +1537,12 @@ export default function Compras() {
 
       {/* Conteúdo por aba */}
       {tab === "compras" && (
-        <TabCompras uid={uid} compras={compras} fornecedores={fornecedores} insumos={insumos} />
+        <TabCompras uid={uid} compras={compras} fornecedores={fornecedores} insumos={insumos}
+          podeCriarV={podeCriarV} podeEditarV={podeEditarV} podeExcluirV={podeExcluirV} />
       )}
       {tab === "insumos" && (
-        <TabInsumos uid={uid} insumos={insumos} isPro={isPro && licAtivo} />
+        <TabInsumos uid={uid} insumos={insumos} isPro={isPro && licAtivo}
+          podeCriarV={podeCriarV} podeEditarV={podeEditarV} podeExcluirV={podeExcluirV} />
       )}
       {tab === "estoque" && (
         <TabEstoque uid={uid} insumos={insumos} movimentacoes={movimentacoes} estoquePorInsumo={estoquePorInsumo} />
