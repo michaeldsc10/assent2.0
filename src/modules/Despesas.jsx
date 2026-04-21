@@ -1144,10 +1144,6 @@ export default function Despesas({ isPro = false }) {
   const [filtroPeriodo, setFiltroPeriodo] = useState("mes");
   const [periodoCustom, setPeriodoCustom] = useState({ inicio: "", fim: "" });
 
-  // Categorias dinâmicas
-  const { categorias, criarCategoria, desativarCategoria, renomearCategoria } = useCategorias(tenantUid);
-
-  // Modais
   // ── Multi-tenant ──
   const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
 
@@ -1155,6 +1151,11 @@ export default function Despesas({ isPro = false }) {
   const podeCriarV   = podeCriar("despesas");
   const podeEditarV  = podeEditar("despesas");
   const podeExcluirV = podeExcluir("despesas");
+
+  // Categorias dinâmicas
+  const { categorias, criarCategoria, desativarCategoria, renomearCategoria } = useCategorias(tenantUid);
+
+  // Modais
 
   const [modalNovo, setModalNovo]             = useState(false);
   const [editando, setEditando]               = useState(null);
