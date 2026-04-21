@@ -1114,7 +1114,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         "Usuário";
       setUserName(name);
     });
-  }, [authUser]);
+  }, [uid, authUser]);
 
   /* ── Visibilidade do menu ── */
   useEffect(() => {
@@ -1683,7 +1683,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   {sec.items.map((item) => {
                     const dbKey = KEY_MAP[item.label];
                     if (dbKey && menuVisivel[dbKey] === false) return null;
-                    if (!podeVer(item.modulo)) return null;
+                    if (item.modulo && !podeVer(item.modulo)) return null;
                     return (
                       <div
                         key={item.label}
@@ -1780,7 +1780,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     {sec.items.map((item) => {
                       const dbKey = KEY_MAP[item.label];
                       if (dbKey && menuVisivel[dbKey] === false) return null;
-                      if (!podeVer(item.modulo)) return null;
+                      if (item.modulo && !podeVer(item.modulo)) return null;
                       return (
                         <div
                           key={item.label}
