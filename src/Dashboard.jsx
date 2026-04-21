@@ -1176,7 +1176,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
   /* ── Hooks de dados ── */
   const empresa = useEmpresa(uid);
-  const { isPro } = useLicenca(uid);
+  const { isPro } = useLicenca(tenantUid);
   const dash    = useDashboardData(
     uid, period,
     period === "Personalizado" && customRange.from && customRange.to ? customRange : null
