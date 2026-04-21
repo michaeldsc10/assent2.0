@@ -147,7 +147,6 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
         (snap) => {
           const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
           if (col === "vendas") {
-            console.log(`[useDashboardData] vendas carregadas: ${docs.length} doc(s)`, docs.map(d => ({ id: d.id, data: d.data, total: d.total })));
           }
           setRaw((prev) => ({ ...prev, [key]: docs }));
           markDone();
@@ -164,6 +163,8 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
 
   /* ── Métricas computadas (memoizadas) ─────────── */
   const metrics = useMemo(() => {
+    // Guard: não calcula com dados incompletos (evita flash de valores errados)
+    if (loading) return null;
     const { vendas, clientes, produtos, servicos, despesas, aReceber } = raw;
     const { start: periodStart, end: periodEnd } = getPeriodBounds(period, customRange);
     const now  = new Date();
@@ -386,7 +387,7 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
       topClientes,
       ultimasVendas,
     };
-  }, [raw, period, customRange]);
+  }, [raw, period, customRange, loading]);
 
-  return { ...metrics, loading };
+  return { ...(metrics ?? {}), loading };
 }
