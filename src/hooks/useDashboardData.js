@@ -164,7 +164,16 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
   /* ── Métricas computadas (memoizadas) ─────────── */
   const metrics = useMemo(() => {
     // Guard: não calcula com dados incompletos (evita flash de valores errados)
-    if (loading) return null;
+    // Retorna zeros seguros em vez de null — evita .toFixed() em undefined
+    if (loading) return {
+      receitaBruta: 0, custoTotal: 0, lucroLiquido: 0, margem: 0,
+      numVendas: 0, ticketMedio: 0, projecao: 0,
+      numClientes: 0, numProdutos: 0, numServicos: 0,
+      totalAReceber: 0, valorDespesasPagas: 0,
+      despesasVencidas: 0, despesasAVencer: 0, despesasPendentes: 0, despesasPagasMes: 0,
+      faturamentoPorDia: [], mixData: [{ name: "Produtos", value: 50 }, { name: "Serviços", value: 50 }],
+      topProdutos: [], topClientes: [], ultimasVendas: [],
+    };
     const { vendas, clientes, produtos, servicos, despesas, aReceber } = raw;
     const { start: periodStart, end: periodEnd } = getPeriodBounds(period, customRange);
     const now  = new Date();
