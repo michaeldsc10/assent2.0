@@ -19,8 +19,8 @@ import {
   Filter,
 } from "lucide-react";
 
-import { db, auth } from "../lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { db } from "../lib/firebase";
+import { useAuth } from "../contexts/AuthContext";
 import {
   collection,
   doc,
@@ -717,12 +717,19 @@ function ModalConfirmDelete({ conta, onConfirm, onClose }) {
    COMPONENTE PRINCIPAL: AReceber
    ══════════════════════════════════════════════════ */
 export default function AReceber() {
-  const [uid, setUid]         = useState(null);
   const [contas, setContas]   = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch]           = useState("");
   const [filtroStatus, setFiltroStatus] = useState("Todos");
+
+  // ── Multi-tenant ──
+  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+
+  // ── Flags de permissão ──
+  const podeCriarV   = podeCriar("aReceber");
+  const podeEditarV  = podeEditar("aReceber");
+  const podeExcluirV = podeExcluir("aReceber");
 
   const [modalNovo, setModalNovo]   = useState(false);
   const [editando, setEditando]     = useState(null);
@@ -730,19 +737,14 @@ export default function AReceber() {
   const [pagamento, setPagamento]   = useState(null);
 
   /* ── Auth ── */
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => setUid(user?.uid || null));
-    return unsub;
-  }, []);
-
   /* ── Firestore — listener em tempo real ── */
   useEffect(() => {
-    if (!uid) {
+    if (!tenantUid) {
       setLoading(false);
       return;
     }
 
-    const col = collection(db, "users", uid, "a_receber");
+    const col = collection(db, "users", tenantUid, "a_receber");
 
     const unsub = onSnapshot(
       col,
@@ -758,14 +760,14 @@ export default function AReceber() {
     );
 
     return unsub;
-  }, [uid]);
+  }, [tenantUid]);
 
   /* ── Handler: Criar nova conta ── */
   const handleCriar = useCallback(async (dados) => {
-    if (!uid) return;
+    if (!tenantUid) return;
     try {
       const now = new Date().toISOString();
-      await addDoc(collection(db, "users", uid, "a_receber"), {
+      await addDoc(collection(db, "users", tenantUid, "a_receber"), {
         ...dados,
         dataCriacao:     now,
         dataAtualizacao: now,
@@ -775,13 +777,13 @@ export default function AReceber() {
       console.error("[AReceber] Erro ao criar conta:", err);
       alert("Erro ao criar conta. Tente novamente.");
     }
-  }, [uid]);
+  }, [tenantUid]);
 
   /* ── Handler: Editar conta ── */
   const handleEditar = useCallback(async (dados) => {
     if (!uid || !editando) return;
     try {
-      const ref = doc(db, "users", uid, "a_receber", editando.id);
+      const ref = doc(db, "users", tenantUid, "a_receber", editando.id);
       await updateDoc(ref, {
         ...dados,
         dataAtualizacao: new Date().toISOString(),
@@ -804,7 +806,7 @@ export default function AReceber() {
       const agora             = new Date().toISOString();
 
       /* 1. Atualiza o documento em a_receber (comportamento existente) */
-      const ref = doc(db, "users", uid, "a_receber", conta.id);
+      const ref = doc(db, "users", tenantUid, "a_receber", conta.id);
       await updateDoc(ref, {
         valorPago:       novoValorPago,
         valorRestante:   novoValorRestante,
@@ -824,7 +826,7 @@ export default function AReceber() {
          original), nunca é a mesma operação executada duas vezes. */
       try {
         const ehVenda = conta.origem === "venda";
-        await addDoc(collection(db, "users", uid, "caixa"), {
+        await addDoc(collection(db, "users", tenantUid, "caixa"), {
           tipo:         "entrada",
           origem:       ehVenda ? "venda" : "a_receber",
           referenciaId: ehVenda ? (conta.referenciaId || null) : conta.id,
@@ -850,7 +852,7 @@ export default function AReceber() {
   const handleDeletar = useCallback(async () => {
     if (!uid || !deletando) return;
     try {
-      await deleteDoc(doc(db, "users", uid, "a_receber", deletando.id));
+      await deleteDoc(doc(db, "users", tenantUid, "a_receber", deletando.id));
       setDeletando(null);
     } catch (err) {
       console.error("[AReceber] Erro ao excluir conta:", err);
@@ -892,7 +894,7 @@ export default function AReceber() {
   }, [contas]);
 
   /* ── Guard ── */
-  if (!uid) return <div className="ar-loading">Carregando autenticação...</div>;
+  // App.jsx bloqueia render enquanto loadingAuth||!tenantUid
 
   return (
     <>
@@ -928,7 +930,7 @@ export default function AReceber() {
           ))}
         </div>
 
-        <button className="btn-novo-ar" onClick={() => setModalNovo(true)}>
+        {podeCriarV && <button className="btn-novo-ar" onClick={() => setModalNovo(true)}>
           <Plus size={14} /> Nova Conta
         </button>
       </header>
@@ -1011,20 +1013,20 @@ export default function AReceber() {
                         <DollarSign size={13} />
                       </button>
                     )}
-                    <button
+                    {podeEditarV && <button
                       className="btn-icon btn-icon-edit"
                       title="Editar"
                       onClick={() => setEditando(c)}
                     >
                       <Edit2 size={13} />
-                    </button>
-                    <button
+                    </button>}
+                    {podeExcluirV && <button
                       className="btn-icon btn-icon-del"
                       title="Excluir"
                       onClick={() => setDeletando(c)}
                     >
                       <Trash2 size={13} />
-                    </button>
+                    </button>}
                   </div>
                 </div>
               );
@@ -1034,13 +1036,13 @@ export default function AReceber() {
       </div>
 
       {/* ── Modais ── */}
-      {modalNovo && (
+      {modalNovo && podeCriarV && (
         <ModalFormConta
           onSave={handleCriar}
           onClose={() => setModalNovo(false)}
         />
       )}
-      {editando && (
+      {editando && podeEditarV && (
         <ModalFormConta
           conta={editando}
           onSave={handleEditar}
@@ -1054,7 +1056,7 @@ export default function AReceber() {
           onClose={() => setPagamento(null)}
         />
       )}
-      {deletando && (
+      {deletando && podeExcluirV && (
         <ModalConfirmDelete
           conta={deletando}
           onConfirm={handleDeletar}
