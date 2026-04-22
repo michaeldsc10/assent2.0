@@ -14,7 +14,7 @@ import {
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
 import {
-  collection, doc, onSnapshot, writeBatch, updateDoc, deleteDoc,
+  collection, doc, onSnapshot, writeBatch, updateDoc, deleteDoc, getDoc,
 } from "firebase/firestore";
 
 import  { useLicenca  }         from "../hooks/useLicenca";
@@ -81,6 +81,14 @@ const addMeses = (dateISO, meses) => {
 };
 
 const parseBRL = (s) => parseFloat(String(s).replace(",", ".")) || 0;
+
+/* ── Helpers de ID sequencial (espelham Despesas.jsx) ── */
+const gerarIdBase  = (cnt) => `D${String(cnt + 1).padStart(4, "0")}`;
+const gerarIdShow  = (cnt, parcelaAtual = null, totalParcelas = null) => {
+  const base = gerarIdBase(cnt);
+  if (parcelaAtual && totalParcelas && totalParcelas > 1) return `${base}-${parcelaAtual}`;
+  return base;
+};
 
 /* ═══════════════════════════════════════════════════
    CSS
@@ -651,7 +659,15 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
            • Pago        → 1 doc em despesas  status:"pago"     → DRE computa como despesa realizada
            • Pendente    → 1 doc em despesas  status:"pendente" → módulo Despesas e DRE (a vencer)
            • Parcelado   → N docs em despesas status:"pendente" → um por parcela, vencimentos mensais
+
+           idShow: lido do contador users/{uid}.despesaIdCnt — mesmo padrão de Despesas.jsx
         ───────────────────────────────────────────────────── */
+
+        /* Lê o contador ANTES de commitar o batch */
+        const userRef  = doc(db, "users", uid);
+        const userSnap = await getDoc(userRef);
+        let cnt = (userSnap.exists() ? userSnap.data().despesaIdCnt : 0) || 0;
+
         const despesaBase = {
           fornecedorId:    form.fornecedorId,
           fornecedorNome:  forn?.nome || "Fornecedor",
@@ -665,14 +681,18 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
         };
 
         if (isParcelado) {
-          /* Parcelado → N docs pendentes */
+          /* Parcelado → N docs pendentes, todos sob o mesmo número base */
           const nParc     = Number(form.numParcelas);
           const vlParcela = Number((valorTotal / nParc).toFixed(2));
 
           for (let i = 0; i < nParc; i++) {
-            const despRef = doc(collection(db, "users", uid, "despesas"));
+            const idShow  = gerarIdShow(cnt, i + 1, nParc);
+            const docId   = `${gerarIdBase(cnt)}-${i + 1}-${Date.now()}-${i}`;
+            const despRef = doc(db, "users", uid, "despesas", docId);
             batch.set(despRef, {
               ...despesaBase,
+              idShow,
+              parcelado:      true,
               descricao:      `Compra ${forn?.nome || ""} — parcela ${i + 1}/${nParc}`,
               valor:          vlParcela,
               valorTotal:     vlParcela,
@@ -681,15 +701,20 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
               vencimento:     addMeses(form.vencimento, i),
               dataVencimento: addMeses(form.vencimento, i),
               status:         "pendente",
-              parcelaNum:     i + 1,
+              parcelaAtual:   i + 1,
               totalParcelas:  nParc,
             });
           }
+          cnt++; /* grupo inteiro consome 1 número sequencial */
+
         } else if (form.status === "pago") {
-          /* Pago à vista → 1 doc pago → DRE computa */
-          const despRef = doc(collection(db, "users", uid, "despesas"));
+          /* Pago à vista → 1 doc pago */
+          const idShow  = gerarIdShow(cnt);
+          const docId   = `${gerarIdBase(cnt)}-${Date.now()}`;
+          const despRef = doc(db, "users", uid, "despesas", docId);
           batch.set(despRef, {
             ...despesaBase,
+            idShow,
             descricao:      `Compra — ${forn?.nome || "Fornecedor"}`,
             valor:          valorTotal,
             valorTotal,
@@ -699,14 +724,20 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
             vencimento:     form.data,
             dataVencimento: form.data,
             status:         "pago",
-            parcelaNum:     null,
+            parcelado:      false,
+            parcelaAtual:   null,
             totalParcelas:  null,
           });
+          cnt++;
+
         } else {
           /* Pendente à vista → 1 doc pendente */
-          const despRef = doc(collection(db, "users", uid, "despesas"));
+          const idShow  = gerarIdShow(cnt);
+          const docId   = `${gerarIdBase(cnt)}-${Date.now()}`;
+          const despRef = doc(db, "users", uid, "despesas", docId);
           batch.set(despRef, {
             ...despesaBase,
+            idShow,
             descricao:      `Compra — ${forn?.nome || "Fornecedor"}`,
             valor:          valorTotal,
             valorTotal,
@@ -715,10 +746,15 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
             vencimento:     form.vencimento,
             dataVencimento: form.vencimento,
             status:         "pendente",
-            parcelaNum:     null,
+            parcelado:      false,
+            parcelaAtual:   null,
             totalParcelas:  null,
           });
+          cnt++;
         }
+
+        /* Atualiza o contador no mesmo batch → atômico */
+        batch.set(userRef, { despesaIdCnt: cnt }, { merge: true });
 
         await batch.commit();
       }
