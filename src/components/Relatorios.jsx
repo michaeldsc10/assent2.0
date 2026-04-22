@@ -1,1844 +1,1915 @@
 /* ═══════════════════════════════════════════════════
-   ASSENT v2.0 — Despesas.jsx
-   Estrutura: users/{uid}/despesas/{id}
-              users/{uid}/recorrencias/{id}
+   ASSENT v2.0 — Relatorios.jsx
+   Módulo completo de Relatórios Profissionais
+   ─────────────────────────────────────────────────
+   DEPENDÊNCIA NECESSÁRIA:
+     npm install xlsx
    ═══════════════════════════════════════════════════ */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useContext } from "react";
+import * as XLSX from "xlsx";
+
 import {
-  Search, Plus, Edit2, Trash2, X, CheckCircle, RefreshCw,
-  AlertCircle, Clock, AlertTriangle, RotateCcw, TrendingUp,
-  CreditCard, Wallet, Smartphone, ChevronDown, ChevronUp, Settings,
+  BarChart2, TrendingUp, TrendingDown, DollarSign,
+  ShoppingCart, Package, Users, Calendar, FileText,
+  Download, Printer, AlertCircle, Loader2,
+  ArrowUpRight, ArrowDownRight, Minus,
+  ChevronRight, Receipt, Wallet, LayoutDashboard,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
-import { useAuth } from "../contexts/AuthContext";
-import {  LIMITES_FREE } from "../hooks/useLicenca";
-import { BannerLimite } from "../hooks/LicencaUI";
-import {
-  collection, doc, setDoc, deleteDoc, onSnapshot,
-  query, orderBy, writeBatch, addDoc, serverTimestamp,
-} from "firebase/firestore";
+import AuthContext from "../contexts/AuthContext";
+import { Lock } from "lucide-react";
+import { collection, onSnapshot, doc, getDoc } from "firebase/firestore";
 
-/* ── CSS ── */
+import FiltroPeriodo, { getIntervalo, dentroDoIntervalo } from "./FiltroPeriodo";
+import CardResumo from "./CardResumo";
+import TabelaRelatorio from "./TabelaRelatorio";
+
+/* ══════════════════════════════════════════════════════
+   CSS GLOBAL DO MÓDULO
+   ══════════════════════════════════════════════════════ */
 const CSS = `
-  @keyframes fadeIn  { from { opacity: 0 }               to { opacity: 1 } }
-  @keyframes slideUp { from { opacity: 0; transform: translateY(14px) } to { opacity: 1; transform: translateY(0) } }
+/* ── Layout principal ── */
+.rel-root {
+  display: flex; flex-direction: column;
+  height: 100%; min-height: 0; overflow: hidden;
+}
+.rel-topbar {
+  padding: 14px 22px;
+  background: var(--s1); border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 14px; flex-shrink: 0;
+}
+.rel-topbar-left { display: flex; align-items: center; gap: 14px; }
+.rel-topbar-title h1 {
+  font-family: 'Sora', sans-serif; font-size: 17px; font-weight: 600;
+  color: var(--text);
+}
+.rel-topbar-title p { font-size: 11px; color: var(--text-2); margin-top: 2px; }
 
-  /* Modal */
-  .modal-overlay {
-    position: fixed; inset: 0; z-index: 1000;
-    background: rgba(0,0,0,0.78); backdrop-filter: blur(5px);
-    display: flex; align-items: center; justify-content: center;
-    padding: 20px; animation: fadeIn .15s ease;
-  }
-  .modal-overlay-top { z-index: 1100; }
-  .modal-box {
-    background: var(--s1); border: 1px solid var(--border-h);
-    border-radius: 16px; width: 100%; max-width: 560px;
-    max-height: 92vh; overflow-y: auto;
-    box-shadow: 0 28px 72px rgba(0,0,0,0.65);
-    animation: slideUp .18s ease;
-  }
-  .modal-box-lg  { max-width: 700px; }
-  .modal-box-md  { max-width: 420px; }
-  .modal-box::-webkit-scrollbar { width: 3px; }
-  .modal-box::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
-  .modal-header {
-    padding: 20px 22px 16px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
-  }
-  .modal-title { font-family: 'Sora', sans-serif; font-size: 16px; font-weight: 600; color: var(--text); }
-  .modal-sub { font-size: 12px; color: var(--text-2); margin-top: 3px; }
-  .modal-close {
-    width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
-    background: var(--s3); border: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; margin-top: 2px; transition: background .13s;
-  }
-  .modal-close:hover { background: var(--s2); border-color: var(--border-h); }
-  .modal-body   { padding: 20px 22px; }
-  .modal-footer {
-    padding: 14px 22px; border-top: 1px solid var(--border);
-    display: flex; justify-content: flex-end; gap: 10px;
-  }
+.rel-actions { display: flex; align-items: center; gap: 8px; }
 
-  /* Form */
-  .form-group { margin-bottom: 16px; }
-  .form-group-0 { margin-bottom: 0; }
-  .form-label {
-    display: block; font-size: 10px; font-weight: 600;
-    letter-spacing: .07em; text-transform: uppercase;
-    color: var(--text-2); margin-bottom: 7px;
-  }
-  .form-label-req { color: var(--gold); margin-left: 2px; }
-  .form-input {
-    width: 100%; background: var(--s2);
-    border: 1px solid var(--border); border-radius: 9px;
-    padding: 10px 13px; color: var(--text); font-size: 13px;
-    font-family: 'DM Sans', sans-serif;
-    outline: none; transition: border-color .15s, box-shadow .15s;
-  }
-  .form-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(200,165,94,0.1); }
-  .form-input.err   { border-color: var(--red); }
-  .form-input.err:focus { box-shadow: 0 0 0 3px rgba(224,82,82,0.1); }
-  .form-error { font-size: 11px; color: var(--red); margin-top: 5px; }
-  .form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
-  .form-divider {
-    border: none; border-top: 1px solid var(--border);
-    margin: 18px 0 16px;
-  }
-  .form-section-title {
-    font-size: 10px; font-weight: 600; letter-spacing: .07em;
-    text-transform: uppercase; color: var(--text-3);
-    margin-bottom: 14px;
-  }
+.rel-body {
+  display: flex; flex: 1; min-height: 0; overflow: hidden;
+}
 
-  /* Toggle chips */
-  .chip-group { display: flex; gap: 6px; flex-wrap: wrap; }
-  .chip {
-    padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 500;
-    border: 1px solid var(--border); cursor: pointer;
-    background: var(--s2); color: var(--text-2);
-    transition: all .13s;
-  }
-  .chip.active {
-    background: var(--gold); color: #0a0808;
-    border-color: var(--gold);
-  }
-  .chip:hover:not(.active) { border-color: var(--border-h); color: var(--text); }
+/* ── Sidebar de navegação interna ── */
+.rel-nav {
+  width: 192px; flex-shrink: 0;
+  background: var(--s1); border-right: 1px solid var(--border);
+  padding: 14px 10px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px;
+}
+.rel-nav-label {
+  font-size: 9px; font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--text-3);
+  padding: 10px 10px 6px;
+}
+.rel-nav-btn {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 10px; border-radius: 8px;
+  background: transparent; border: none;
+  color: var(--text-2); cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px; font-weight: 500;
+  width: 100%; text-align: left;
+  transition: all .13s;
+}
+.rel-nav-btn:hover { background: var(--s2); color: var(--text); }
+.rel-nav-btn.active {
+  background: rgba(200,165,94,0.12);
+  color: var(--gold);
+  border: 1px solid rgba(200,165,94,0.18);
+}
+.rel-nav-btn.active svg { color: var(--gold); }
 
-  /* Buttons */
-  .btn-primary {
-    padding: 9px 20px; border-radius: 9px;
-    background: var(--gold); color: #0a0808;
-    border: none; cursor: pointer;
-    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
-    transition: opacity .13s, transform .1s;
-  }
-  .btn-primary:hover  { opacity: .88; }
-  .btn-primary:active { transform: scale(.97); }
-  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+/* ── Conteúdo principal ── */
+.rel-content {
+  flex: 1; overflow-y: auto; padding: 22px;
+  display: flex; flex-direction: column; gap: 22px;
+}
+.rel-content::-webkit-scrollbar { width: 3px; }
+.rel-content::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
 
-  .btn-secondary {
-    padding: 9px 20px; border-radius: 9px;
-    background: var(--s3); color: var(--text-2);
-    border: 1px solid var(--border); cursor: pointer;
-    font-family: 'DM Sans', sans-serif; font-size: 13px;
-    transition: background .13s, color .13s;
-  }
-  .btn-secondary:hover { background: var(--s2); color: var(--text); }
+/* ── Filtro de período ── */
+.fp-wrap {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 12px 16px;
+  background: var(--s1); border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.fp-label {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--text-3); flex-shrink: 0;
+}
+.fp-btns { display: flex; gap: 4px; flex-wrap: wrap; }
+.fp-btn {
+  padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 500;
+  background: var(--s3); border: 1px solid var(--border);
+  color: var(--text-2); cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all .13s;
+}
+.fp-btn:hover { background: var(--s2); color: var(--text); }
+.fp-btn.active {
+  background: rgba(200,165,94,0.15); border-color: var(--gold);
+  color: var(--gold);
+}
+.fp-custom {
+  display: flex; align-items: center; gap: 8px;
+  margin-left: 4px;
+}
+.fp-date {
+  background: var(--s2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 10px;
+  color: var(--text); font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+}
+.fp-date:focus { border-color: var(--gold); }
+.fp-sep { font-size: 11px; color: var(--text-3); }
 
-  .btn-danger {
-    padding: 9px 20px; border-radius: 9px;
-    background: var(--red-d); color: var(--red);
-    border: 1px solid rgba(224,82,82,.25); cursor: pointer;
-    font-family: 'DM Sans', sans-serif; font-size: 13px;
-    transition: background .13s;
-  }
-  .btn-danger:hover { background: rgba(224,82,82,.18); }
+/* ── Cards de resumo ── */
+.cr-grid {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+.cr-card {
+  background: var(--s1); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px;
+  display: flex; align-items: flex-start; gap: 14px;
+  transition: border-color .15s;
+}
+.cr-card:hover { border-color: var(--border-h); }
+.cr-icon-wrap {
+  width: 38px; height: 38px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.cr-body { flex: 1; min-width: 0; }
+.cr-label {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--text-3); margin-bottom: 6px;
+}
+.cr-value {
+  font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 700;
+  line-height: 1.1; margin-bottom: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cr-sub {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; color: var(--text-3);
+}
+.cr-skeleton {
+  height: 26px; border-radius: 6px;
+  background: linear-gradient(90deg, var(--s2) 25%, var(--s3) 50%, var(--s2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  margin-bottom: 4px;
+}
+@keyframes shimmer { to { background-position: -200% 0; } }
 
-  .btn-success {
-    padding: 9px 20px; border-radius: 9px;
-    background: rgba(74,186,130,.12); color: var(--green);
-    border: 1px solid rgba(74,186,130,.25); cursor: pointer;
-    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
-    transition: background .13s;
-  }
-  .btn-success:hover { background: rgba(74,186,130,.2); }
+/* ── Tabela ── */
+.tr-wrap {
+  background: var(--s1); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+}
+.tr-header {
+  padding: 13px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.tr-title {
+  font-family: 'Sora', sans-serif; font-size: 13px;
+  font-weight: 600; color: var(--text);
+}
+.tr-badge {
+  font-size: 11px; font-weight: 600;
+  background: var(--s3); border: 1px solid var(--border-h);
+  color: var(--text-2); padding: 2px 10px; border-radius: 20px;
+}
+.tr-head {
+  display: grid; padding: 9px 18px; gap: 8px;
+  background: var(--s2); border-bottom: 1px solid var(--border);
+  font-size: 9px; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-3);
+}
+.tr-row {
+  display: grid; padding: 10px 18px; gap: 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px; color: var(--text-2);
+  align-items: center; transition: background .1s;
+}
+.tr-row:last-child { border-bottom: none; }
+.tr-row:hover { background: rgba(255,255,255,0.02); }
+.tr-state {
+  padding: 40px; text-align: center;
+  font-size: 13px; color: var(--text-3);
+}
 
-  .btn-icon {
-    width: 30px; height: 30px; border-radius: 7px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; border: 1px solid transparent;
-    background: transparent; transition: all .13s;
-  }
-  .btn-icon-edit  { color: var(--blue); }
-  .btn-icon-edit:hover  { background: var(--blue-d); border-color: rgba(91,142,240,.2); }
-  .btn-icon-del   { color: var(--red); }
-  .btn-icon-del:hover   { background: var(--red-d);  border-color: rgba(224,82,82,.2); }
-  .btn-icon-pay   { color: var(--green); }
-  .btn-icon-pay:hover   { background: rgba(74,186,130,.12); border-color: rgba(74,186,130,.2); }
-  .btn-icon-undo  { color: var(--text-3); }
-  .btn-icon-undo:hover  { background: var(--s2); border-color: var(--border-h); color: var(--text-2); }
+/* ── DRE específico ── */
+.dre-section { margin-bottom: 2px; }
+.dre-row {
+  display: grid; grid-template-columns: 1fr 130px 90px;
+  padding: 10px 18px; gap: 8px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px; color: var(--text-2); align-items: center;
+}
+.dre-row:hover { background: rgba(255,255,255,0.015); }
+.dre-row-cat {
+  background: var(--s2);
+  font-size: 9px; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-3);
+  padding: 7px 18px; border-bottom: 1px solid var(--border);
+}
+.dre-row-result {
+  background: rgba(0,0,0,0.18);
+  font-weight: 700;
+  border-top: 1px solid var(--border-h);
+}
+.dre-label { color: var(--text); }
+.dre-sub-label { color: var(--text-2); padding-left: 14px; }
+.dre-val { font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; }
+.dre-pct {
+  font-size: 11px; color: var(--text-3);
+  font-family: 'Sora', sans-serif; text-align: right;
+}
+.dre-positivo { color: var(--green) !important; }
+.dre-negativo { color: var(--red) !important; }
+.dre-neutro   { color: var(--text-2) !important; }
 
-  .btn-nova-desp {
-    display: flex; align-items: center; gap: 7px;
-    padding: 8px 16px; border-radius: 9px;
-    background: var(--gold); color: #0a0808;
-    border: none; cursor: pointer;
-    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
-    white-space: nowrap; transition: opacity .13s;
-  }
-  .btn-nova-desp:hover { opacity: .88; }
+/* ── Banner de resultado final (lucro / prejuízo) ── */
+.dre-resultado-banner {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-radius: 12px; margin-top: 14px;
+  border: 1px solid transparent;
+}
+.dre-resultado-banner.lucro {
+  background: rgba(74,222,128,0.08);
+  border-color: rgba(74,222,128,0.25);
+}
+.dre-resultado-banner.prejuizo {
+  background: rgba(224,82,82,0.08);
+  border-color: rgba(224,82,82,0.25);
+}
+.dre-resultado-esquerda {
+  display: flex; align-items: center; gap: 10px;
+}
+.dre-resultado-emoji { font-size: 20px; line-height: 1; }
+.dre-resultado-textos { display: flex; flex-direction: column; gap: 2px; }
+.dre-resultado-titulo {
+  font-family: 'Sora', sans-serif; font-size: 13px;
+  font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+}
+.dre-resultado-banner.lucro    .dre-resultado-titulo { color: var(--green); }
+.dre-resultado-banner.prejuizo .dre-resultado-titulo { color: var(--red); }
+.dre-resultado-sub {
+  font-size: 11px; color: var(--text-3);
+}
+.dre-resultado-valor {
+  font-family: 'Sora', sans-serif; font-size: 20px; font-weight: 700;
+}
+.dre-resultado-banner.lucro    .dre-resultado-valor { color: var(--green); }
+.dre-resultado-banner.prejuizo .dre-resultado-valor { color: var(--red); }
 
-  /* Topbar */
-  .desp-topbar {
-    padding: 14px 22px; background: var(--s1);
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 14px; flex-shrink: 0; flex-wrap: wrap;
-  }
-  .desp-topbar-title h1 {
-    font-family: 'Sora', sans-serif; font-size: 17px; font-weight: 600; color: var(--text);
-  }
-  .desp-topbar-title p { font-size: 11px; color: var(--text-2); margin-top: 2px; }
+/* ── Ranking de despesas ── */
+.rank-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 18px; border-bottom: 1px solid var(--border);
+}
+.rank-item:last-child { border-bottom: none; }
+.rank-num {
+  font-family: 'Sora', sans-serif; font-size: 11px;
+  font-weight: 700; color: var(--gold); width: 20px; flex-shrink: 0;
+}
+.rank-label { flex: 1; font-size: 13px; color: var(--text); }
+.rank-bar-wrap { width: 120px; flex-shrink: 0; }
+.rank-bar-bg {
+  height: 4px; border-radius: 2px; background: var(--s3);
+  overflow: hidden;
+}
+.rank-bar-fill {
+  height: 100%; border-radius: 2px;
+  background: var(--gold);
+  transition: width .4s ease;
+}
+.rank-val {
+  font-family: 'Sora', sans-serif; font-size: 12px;
+  font-weight: 600; color: var(--text); min-width: 90px; text-align: right;
+}
 
-  .desp-search {
-    display: flex; align-items: center; gap: 8px;
-    background: var(--s2); border: 1px solid var(--border);
-    border-radius: 8px; padding: 8px 12px; width: 240px;
-  }
-  .desp-search input {
-    background: transparent; border: none; outline: none;
-    color: var(--text); font-size: 12px; width: 100%;
-  }
+/* ── Agenda ── */
+.ag-item {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 13px 18px; border-bottom: 1px solid var(--border);
+  transition: background .1s;
+}
+.ag-item:last-child { border-bottom: none; }
+.ag-item:hover { background: rgba(255,255,255,0.018); }
+.ag-date-box {
+  flex-shrink: 0; width: 44px; text-align: center;
+  background: var(--s2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 4px;
+}
+.ag-date-day {
+  font-family: 'Sora', sans-serif; font-size: 18px;
+  font-weight: 700; color: var(--text); line-height: 1;
+}
+.ag-date-mon {
+  font-size: 9px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--text-3); margin-top: 2px;
+}
+.ag-info { flex: 1; min-width: 0; }
+.ag-titulo { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 3px; }
+.ag-meta { font-size: 11px; color: var(--text-3); display: flex; gap: 10px; }
+.ag-badge {
+  font-size: 10px; font-weight: 600; padding: 2px 8px;
+  border-radius: 4px; text-transform: uppercase; letter-spacing: .05em;
+  flex-shrink: 0; align-self: flex-start; margin-top: 2px;
+}
+.ag-badge-hoje { background: rgba(200,165,94,0.15); color: var(--gold); }
+.ag-badge-prox { background: rgba(91,142,240,0.12); color: var(--blue); }
+.ag-badge-fut  { background: var(--s3); color: var(--text-2); }
 
-  /* Métricas cards */
-  .desp-metrics {
-    display: grid; grid-template-columns: repeat(4, 1fr);
-    gap: 12px; padding: 18px 22px;
-  }
-  .metric-card {
-    border-radius: 12px; padding: 14px 16px;
-    border: 1px solid transparent; position: relative; overflow: hidden;
-  }
-  .metric-card-red    { background: rgba(224,82,82,.08);    border-color: rgba(224,82,82,.18); }
-  .metric-card-amber  { background: rgba(200,165,94,.08);   border-color: rgba(200,165,94,.18); }
-  .metric-card-purple { background: rgba(139,92,246,.08);   border-color: rgba(139,92,246,.18); }
-  .metric-card-green  { background: rgba(74,186,130,.08);   border-color: rgba(74,186,130,.18); }
+/* ── Botões ── */
+.btn-primary {
+  padding: 9px 20px; border-radius: 9px;
+  background: var(--gold); color: #0a0808;
+  border: none; cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 7px;
+  transition: opacity .13s, transform .1s;
+}
+.btn-primary:hover  { opacity: .88; }
+.btn-primary:active { transform: scale(.97); }
 
-  .metric-icon {
-    width: 28px; height: 28px; border-radius: 7px;
-    display: flex; align-items: center; justify-content: center; margin-bottom: 10px;
-  }
-  .metric-icon-red    { background: rgba(224,82,82,.15); }
-  .metric-icon-amber  { background: rgba(200,165,94,.15); }
-  .metric-icon-purple { background: rgba(139,92,246,.15); }
-  .metric-icon-green  { background: rgba(74,186,130,.15); }
+.btn-secondary {
+  padding: 8px 16px; border-radius: 9px;
+  background: var(--s3); color: var(--text-2);
+  border: 1px solid var(--border); cursor: pointer;
+  font-family: 'DM Sans', sans-serif; font-size: 13px;
+  display: flex; align-items: center; gap: 7px;
+  transition: background .13s, color .13s;
+}
+.btn-secondary:hover { background: var(--s2); color: var(--text); }
 
-  .metric-label { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
-  .metric-val   { font-family: 'Sora', sans-serif; font-size: 22px; font-weight: 600; }
-  .metric-val-red    { color: var(--red); }
-  .metric-val-amber  { color: var(--gold); }
-  .metric-val-purple { color: #8b5cf6; }
-  .metric-val-green  { color: var(--green); }
-  .metric-sub { font-size: 11px; color: var(--text-3); margin-top: 3px; }
+/* ── Seções ── */
+.rel-section-title {
+  font-family: 'Sora', sans-serif; font-size: 14px;
+  font-weight: 600; color: var(--text);
+  display: flex; align-items: center; gap: 8px;
+  padding-bottom: 2px;
+}
+.rel-section-title svg { color: var(--gold); }
+.rel-divider {
+  height: 1px; background: var(--border); margin: 4px 0;
+}
 
-  /* Filtros */
-  .desp-filters {
-    padding: 0 22px 14px;
-    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  }
-  .filter-label { font-size: 11px; color: var(--text-3); margin-right: 2px; }
-  .filter-chip {
-    padding: 5px 12px; border-radius: 20px; font-size: 11px; font-weight: 500;
-    border: 1px solid var(--border); background: var(--s2); color: var(--text-2);
-    cursor: pointer; transition: all .13s;
-  }
-  .filter-chip:hover { border-color: var(--border-h); color: var(--text); }
-  .filter-chip.active { background: var(--s3); border-color: var(--border-h); color: var(--text); }
+/* ── Estados ── */
+.rel-empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 60px 20px; gap: 12px;
+  color: var(--text-3); text-align: center;
+}
+.rel-empty p { font-size: 13px; }
+.rel-loading {
+  display: flex; align-items: center; justify-content: center;
+  padding: 60px; color: var(--text-3); gap: 10px; font-size: 13px;
+}
 
-  .filter-select {
-    padding: 5px 10px; border-radius: 8px; font-size: 12px;
-    border: 1px solid var(--border); background: var(--s2); color: var(--text-2);
-    cursor: pointer; outline: none; font-family: 'DM Sans', sans-serif;
-    transition: border-color .13s;
-  }
-  .filter-select:focus { border-color: var(--border-h); }
+/* ── Saldo positivo/negativo ── */
+.val-pos { color: var(--green); font-family: 'Sora', sans-serif; font-weight: 600; }
+.val-neg { color: var(--red);   font-family: 'Sora', sans-serif; font-weight: 600; }
+.val-neu { color: var(--text);  font-family: 'Sora', sans-serif; font-weight: 600; }
 
-  /* Período personalizado */
-  .periodo-custom {
-    display: flex; align-items: center; gap: 6px;
-  }
-  .periodo-custom input[type="date"] {
-    padding: 4px 8px; border-radius: 8px; font-size: 12px;
-    border: 1px solid var(--border); background: var(--s2); color: var(--text-2);
-    outline: none; font-family: 'DM Sans', sans-serif;
-    transition: border-color .13s;
-  }
-  .periodo-custom input[type="date"]:focus { border-color: var(--border-h); }
-  .periodo-custom span { font-size: 11px; color: var(--text-3); }
+/* ══════════════════════════════════════════
+   IMPRESSÃO — @media print
+   ══════════════════════════════════════════ */
+@media print {
+  body { background: #fff !important; color: #111 !important; }
 
-  /* Gerenciar categorias */
-  .cat-manager {
-    background: var(--s2); border: 1px solid var(--border);
-    border-radius: 10px; padding: 12px 14px; margin-top: 10px;
-  }
-  .cat-manager-title {
-    font-size: 10px; font-weight: 600; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--text-3); margin-bottom: 10px;
-  }
-  .cat-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-  .cat-item {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 3px 10px; border-radius: 20px; font-size: 12px;
-    background: var(--s3); border: 1px solid var(--border); color: var(--text-2);
-  }
-  .cat-item-del {
-    display: flex; align-items: center; cursor: pointer;
-    color: var(--text-3); transition: color .1s; background: none; border: none; padding: 0;
-  }
-  .cat-item-del:hover { color: var(--red); }
-  .cat-add-row { display: flex; gap: 6px; }
-  .cat-add-row input {
-    flex: 1; padding: 7px 10px; border-radius: 8px; font-size: 12px;
-    border: 1px solid var(--border); background: var(--s1); color: var(--text);
-    outline: none; font-family: 'DM Sans', sans-serif;
-    transition: border-color .13s;
-  }
-  .cat-add-row input:focus { border-color: var(--gold); }
-  .cat-add-btn {
-    padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
-    background: var(--gold); color: #0a0808; border: none; cursor: pointer;
-    font-family: 'DM Sans', sans-serif; white-space: nowrap;
-    transition: opacity .13s;
-  }
-  .cat-add-btn:hover { opacity: .88; }
-  .cat-add-btn:disabled { opacity: .5; cursor: not-allowed; }
-  .cat-select-row {
-    display: flex; align-items: center; gap: 6px;
-  }
-  .cat-toggle-btn {
-    padding: 4px 8px; border-radius: 7px; font-size: 11px;
-    border: 1px solid var(--border); background: var(--s2); color: var(--text-3);
-    cursor: pointer; display: flex; align-items: center; gap: 4px;
-    transition: all .13s; white-space: nowrap;
-  }
-  .cat-toggle-btn:hover { border-color: var(--border-h); color: var(--text-2); }
+  /* Ocultar tudo exceto o conteúdo do relatório */
+  .rel-nav, .rel-topbar, .fp-wrap,
+  .rel-actions, .btn-primary, .btn-secondary,
+  [data-print-hide] { display: none !important; }
 
-  /* Tabela */
-  .desp-table-wrap {
-    margin: 0 22px 22px;
-    background: var(--s1); border: 1px solid var(--border);
-    border-radius: 12px; overflow: hidden;
-  }
-  .desp-table-header {
-    padding: 13px 18px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between;
-  }
-  .desp-table-title { font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; color: var(--text); }
-  .count-badge {
-    font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 600;
-    background: var(--s3); border: 1px solid var(--border-h);
-    color: var(--text-2); padding: 2px 10px; border-radius: 20px;
-  }
-
-  .desp-row {
-    display: grid;
-    grid-template-columns: 80px 1fr 100px 110px 110px 90px 100px 110px 90px;
-    padding: 11px 18px; gap: 8px;
-    border-bottom: 1px solid var(--border);
-    align-items: center; font-size: 12px; color: var(--text-2);
-    transition: background .1s;
-  }
-  .desp-row:last-child { border-bottom: none; }
-  .desp-row:hover { background: rgba(255,255,255,0.02); }
-  .desp-row-head { background: var(--s2); }
-  .desp-row-head span {
-    font-size: 10px; font-weight: 500; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--text-3);
-  }
-
-  .desp-id    { font-family: 'Sora', sans-serif; font-size: 11px; color: var(--gold); font-weight: 500; }
-  .desp-desc  { color: var(--text); font-size: 13px; font-weight: 500; }
-  .desp-desc-obs { font-size: 11px; color: var(--text-3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
-  .desp-valor { font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; color: var(--text); }
-  .desp-actions { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
-
-  /* Status badges */
-  .status-badge {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 500;
-  }
-  .status-pago    { background: rgba(74,186,130,.1);   color: var(--green); border: 1px solid rgba(74,186,130,.2); }
-  .status-pendente{ background: rgba(200,165,94,.1);   color: var(--gold);  border: 1px solid rgba(200,165,94,.2); }
-  .status-vencido { background: rgba(224,82,82,.1);    color: var(--red);   border: 1px solid rgba(224,82,82,.2); }
-  .status-cancelado{ background: var(--s3);            color: var(--text-3);border: 1px solid var(--border); }
-
-  /* Categoria badge */
-  .cat-badge {
-    display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px;
-    background: var(--s3); border: 1px solid var(--border); color: var(--text-2);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 90px;
-  }
-
-  /* Recorrente icon */
-  .recorr-icon { color: var(--blue); opacity: .8; }
-
-  /* Parcel badge */
-  .parcel-badge {
-    font-size: 10px; color: var(--text-3); background: var(--s3);
-    border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px;
-    font-family: 'Sora', sans-serif;
-  }
-
-  .desp-empty, .desp-loading { padding: 56px 20px; text-align: center; color: var(--text-3); font-size: 13px; }
-
-  /* Btn engrenagem categorias */
-  .btn-gear-cat {
-    display: flex; align-items: center; gap: 5px;
-    padding: 5px 10px; border-radius: 8px; font-size: 11px; font-weight: 500;
-    border: 1px solid var(--border); background: var(--s2); color: var(--text-3);
-    cursor: pointer; transition: all .13s; white-space: nowrap;
-  }
-  .btn-gear-cat:hover { border-color: var(--border-h); color: var(--text-2); background: var(--s3); }
-  .btn-gear-cat.active { border-color: var(--gold); color: var(--gold); }
-
-  /* Modal categorias standalone */
-  .cat-modal-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
-  .cat-modal-item {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 8px 12px; border-radius: 8px;
-    background: var(--s2); border: 1px solid var(--border);
-  }
-  .cat-modal-item-name { font-size: 13px; color: var(--text); font-weight: 500; }
-  .cat-modal-item-actions { display: flex; gap: 4px; align-items: center; }
-  .cat-modal-edit-input {
-    flex: 1; padding: 6px 10px; border-radius: 7px; font-size: 12px;
-    border: 1px solid var(--gold); background: var(--s1); color: var(--text);
-    outline: none; font-family: 'DM Sans', sans-serif;
-  }
-  .cat-modal-empty { font-size: 13px; color: var(--text-3); text-align: center; padding: 24px 0; }
-
-  /* Modal Detalhes */
-  .det-section-title {
-    font-size: 10px; font-weight: 600; letter-spacing: .07em;
-    text-transform: uppercase; color: var(--text-3); margin-bottom: 10px;
-  }
-  .det-grid {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px;
-    background: var(--s2); border: 1px solid var(--border);
-    border-radius: 10px; padding: 14px 16px; margin-bottom: 14px;
-  }
-  .det-grid-full { grid-column: 1 / -1; }
-  .det-item-label {
-    font-size: 10px; font-weight: 600; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--text-3); margin-bottom: 3px;
-  }
-  .det-item-val {
-    font-size: 13px; color: var(--text); font-weight: 500;
-  }
-  .det-item-val-mono { font-family: 'Sora', sans-serif; }
-  .det-actions-row {
-    display: flex; gap: 8px; flex-wrap: wrap;
+  .rel-body { display: block !important; }
+  .rel-content {
+    padding: 0 !important; overflow: visible !important;
+    gap: 16px;
   }
 
-  .confirm-body p { font-size: 13px; color: var(--text-2); line-height: 1.6; }
-  .confirm-body strong { color: var(--text); }
-  .confirm-icon-wrap {
-    width: 44px; height: 44px; border-radius: 50%; margin: 0 auto 14px;
-    display: flex; align-items: center; justify-content: center;
+  .cr-card, .tr-wrap, .dre-wrap {
+    background: #fff !important;
+    border: 1px solid #ccc !important;
+    break-inside: avoid;
   }
-  .confirm-icon-del   { background: var(--red-d); }
-  .confirm-icon-pay   { background: rgba(74,186,130,.12); }
+  .cr-grid {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
 
-  /* Modal pagar */
-  .pay-info { background: var(--s2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
-  .pay-info-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-2); margin-bottom: 6px; }
-  .pay-info-row:last-child { margin-bottom: 0; }
-  .pay-info-val { font-weight: 600; color: var(--text); }
+  .tr-head { background: #f5f5f5 !important; }
+  .dre-row-cat { background: #f5f5f5 !important; }
+  .dre-row-result { background: #ebebeb !important; }
+
+  * { color: #111 !important; }
+  .dre-positivo { color: #1a7a3c !important; }
+  .dre-negativo { color: #c0392b !important; }
+  .val-pos { color: #1a7a3c !important; }
+  .val-neg { color: #c0392b !important; }
+
+  .rel-print-header {
+    display: flex !important; justify-content: space-between;
+    align-items: flex-end; margin-bottom: 24px;
+    padding-bottom: 12px; border-bottom: 2px solid #ccc;
+  }
+  .rel-print-header h2 {
+    font-family: 'Sora', sans-serif; font-size: 20px;
+    font-weight: 700; color: #111;
+  }
+  .rel-print-header p { font-size: 11px; color: #666; margin-top: 3px; }
+  .rel-print-brand {
+    font-family: 'Sora', sans-serif; font-size: 13px;
+    font-weight: 700; color: #111;
+  }
+
+  @page { size: A4; margin: 20mm 15mm; }
+}
+/* Ocultar no print por padrão */
+.rel-print-header { display: none; }
 `;
 
-/* ── Helpers ── */
+/* ══════════════════════════════════════════════════════
+   HELPERS GLOBAIS
+   ══════════════════════════════════════════════════════ */
 const fmtR$ = (v) =>
   `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
-const fmtData = (d) => {
-  if (!d) return "—";
-  try {
-    const dt = typeof d === "string" ? new Date(d + "T12:00:00") : d?.toDate ? d.toDate() : new Date(d);
-    return dt.toLocaleDateString("pt-BR");
-  } catch { return String(d); }
-};
-
-const hoje = () => {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
+const fmtPct = (v) =>
+  `${Number(v || 0).toFixed(1)}%`;
 
 const parseDate = (d) => {
   if (!d) return null;
   try {
-    const dt = typeof d === "string" ? new Date(d + "T12:00:00") : d?.toDate ? d.toDate() : new Date(d);
-    dt.setHours(0, 0, 0, 0);
-    return dt;
+    const dt = d?.toDate ? d.toDate() : new Date(d);
+    return isNaN(dt.getTime()) ? null : dt;
   } catch { return null; }
 };
 
-const calcularStatus = (vencimento, statusAtual) => {
-  if (statusAtual === "pago" || statusAtual === "cancelado") return statusAtual;
-  const venc = parseDate(vencimento);
-  if (!venc) return "pendente";
-  return venc < hoje() ? "vencido" : "pendente";
+const fmtData = (d) => {
+  const dt = parseDate(d);
+  return dt ? dt.toLocaleDateString("pt-BR") : "—";
 };
 
-const gerarIdBase = (cnt) => `D${String(cnt + 1).padStart(4, "0")}`;
-// idShow: para parcelas = "D0002-1" / "D0002-2" etc. Para simples = "D0001"
-const gerarIdShow = (cnt, parcelaAtual = null, totalParcelas = null) => {
-  const base = gerarIdBase(cnt);
-  if (parcelaAtual && totalParcelas && totalParcelas > 1) return `${base}-${parcelaAtual}`;
-  return base;
+const fmtDataCurta = (d) => {
+  const dt = parseDate(d);
+  return dt ? dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—";
 };
 
-const proximaData = (dataBase, tipo, intervalo = 1) => {
-  const d = parseDate(dataBase);
-  if (!d) return null;
-  const nova = new Date(d);
-  if (tipo === "mensal")  nova.setMonth(nova.getMonth() + intervalo);
-  if (tipo === "semanal") nova.setDate(nova.getDate() + 7 * intervalo);
-  if (tipo === "anual")   nova.setFullYear(nova.getFullYear() + intervalo);
-  return nova.toISOString().split("T")[0];
+const MESES_CURTOS = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+
+const getDiasRestantes = (rawDate) => {
+  const dt = parseDate(rawDate);
+  if (!dt) return null;
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const diff = Math.round((dt.setHours(0,0,0,0) - hoje) / 86400000);
+  return diff;
 };
 
-const FORMAS_PAG = [
-  { value: "dinheiro", label: "Dinheiro", Icon: Wallet },
-  { value: "pix",      label: "Pix",      Icon: Smartphone },
-  { value: "cartão",   label: "Cartão",   Icon: CreditCard },
-];
+/* ══════════════════════════════════════════════════════
+   FUNÇÃO: exportar para Excel
+   ══════════════════════════════════════════════════════ */
+function exportarExcel(nomeRelatorio, sheets) {
+  /* sheets: [{ nome: "Planilha", colunas: [str], dados: [[...]] }] */
+  const wb = XLSX.utils.book_new();
 
-/* ════════════════════════════════════════
-   HOOK: Categorias dinâmicas
-   Estrutura: categorias_despesas/{categoriaId}
-   ════════════════════════════════════════ */
-function useCategorias(tenantUid) {
-  const [categorias, setCategorias] = useState([]);
+  sheets.forEach(({ nome, colunas, dados }) => {
+    const wsData = [colunas, ...dados];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
 
-  useEffect(() => {
-    if (!tenantUid) return;
-    const col = collection(db, "users", tenantUid, "categorias_despesas");
-    const q = query(col, orderBy("nome", "asc"));
-    const unsub = onSnapshot(q, (snap) => {
-      setCategorias(
-        snap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .filter(c => c.ativa !== false)
-      );
-    });
-    return unsub;
-  }, [tenantUid]);
+    /* Largura automática */
+    const maxCols = wsData[0]?.length || 0;
+    ws["!cols"] = Array.from({ length: maxCols }, (_, i) => ({
+      wch: Math.max(
+        colunas[i]?.length || 10,
+        ...dados.map((r) => String(r[i] || "").length)
+      ) + 2,
+    }));
 
-  const criarCategoria = async (nome) => {
-    if (!tenantUid) return;
-    const nomeTrimmed = nome.trim();
-    if (!nomeTrimmed) return;
-    await addDoc(collection(db, "users", tenantUid, "categorias_despesas"), {
-      nome: nomeTrimmed,
-      ativa: true,
-      criadoEm: new Date().toISOString(),
-    });
-  };
+    XLSX.utils.book_append_sheet(wb, ws, nome);
+  });
 
-  const desativarCategoria = async (id) => {
-    if (!tenantUid) return;
-    await setDoc(doc(db, "users", tenantUid, "categorias_despesas", id), { ativa: false }, { merge: true });
-  };
-
-  const renomearCategoria = async (id, novoNome) => {
-    if (!tenantUid || !novoNome.trim()) return;
-    await setDoc(doc(db, "users", tenantUid, "categorias_despesas", id), { nome: novoNome.trim() }, { merge: true });
-  };
-
-  return { categorias, criarCategoria, desativarCategoria, renomearCategoria };
+  const hoje = new Date();
+  const dataStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}`;
+  XLSX.writeFile(wb, `relatorio-${nomeRelatorio}-${dataStr}.xlsx`);
 }
 
-/* ════════════════════════════════════════
-   COMPONENTE: Gerenciar Categorias (inline no modal)
-   ════════════════════════════════════════ */
-function CategoriasManager({ categorias, onCriar, onDesativar }) {
-  const [novaCategoria, setNovaCategoria] = useState("");
-  const [salvando, setSalvando] = useState(false);
+/* ══════════════════════════════════════════════════════
+   RELATÓRIO: DRE
+   ══════════════════════════════════════════════════════ */
+function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
+  /* Estado para guardar taxas do Firestore (config/geral) — usadas só como fallback */
+  const [configTaxas, setConfigTaxas] = useState(null);
 
-  const handleCriar = async () => {
-    if (!novaCategoria.trim()) return;
-    setSalvando(true);
-    await onCriar(novaCategoria);
-    setNovaCategoria("");
-    setSalvando(false);
+  /* Busca config/geral uma única vez quando uid estiver disponível */
+  useEffect(() => {
+    if (!uid) return;
+    getDoc(doc(db, "users", uid, "config", "geral"))
+      .then((snap) => {
+        if (snap.exists()) setConfigTaxas(snap.data()?.taxas || {});
+      })
+      .catch(() => {}); // não bloqueia se config não existir
+  }, [uid]);
+
+  /* ── Helper de fallback: calcula taxa com base em config/geral ──
+     Só chamado quando v.valorTaxa não existe no documento da venda.
+     Estrutura: taxas.credito_1, taxas.debito, taxas.pix (strings em %)
+     Vendas.jsx usa credito_1 para "Cartão de Crédito" → mantemos o mesmo mapeamento. */
+  const calcularTaxaFallback = useCallback((venda) => {
+    if (!configTaxas) return 0;
+    const fp = venda.formaPagamento || "";
+    let pct = 0;
+    if (fp === "Cartão de Crédito") pct = parseFloat(configTaxas.credito_1) || 0;
+    else if (fp === "Cartão de Débito") pct = parseFloat(configTaxas.debito)   || 0;
+    else if (fp === "Pix")              pct = parseFloat(configTaxas.pix)       || 0;
+    // Dinheiro, Boleto, Transferência, Sinal etc. → pct = 0
+    return pct > 0 ? parseFloat(((Number(venda.total || 0)) * (pct / 100)).toFixed(2)) : 0;
+  }, [configTaxas]);
+
+  const dados = useMemo(() => {
+    const // Regime de caixa: só despesas PAGAS entram no DRE
+      // dataPagamento = quando o dinheiro saiu de fato; fallback para vencimento (não d.data, que não existe em despesas)
+      dFiltradas = despesas.filter((d) =>
+        d.status === "pago" &&
+        dentroDoIntervalo(d.dataPagamento || d.vencimento, intervalo));
+
+    /* ══════════════════════════════════════════════════════════════════
+       REGIME DE CAIXA PURO — RECEITA
+       ══════════════════════════════════════════════════════════════════
+       Fonte de receita em dois grupos:
+
+       1. SISTEMA NOVO: entradas no caixa com origem = "venda"
+          → Data de referência = data do lançamento no caixa (quando o dinheiro entrou)
+          → Valor = o que foi efetivamente recebido (sinal parcial ou total)
+
+       2. SISTEMA LEGADO: vendas sem campo statusPagamento
+          → Não têm lançamento de caixa correspondente
+          → Fallback: tratamos como integralmente recebidas (compatibilidade)
+          → Data de referência = data da venda
+    ═══════════════════════════════════════════════════════════════════ */
+
+    /* Grupo 1 — Entradas de venda no caixa (sistema novo) */
+    const caixaVendas = caixa.filter((c) =>
+      c.origem === "venda" &&
+      (c.tipo || "").toLowerCase().includes("entrada") &&
+      dentroDoIntervalo(c.data, intervalo)
+    );
+
+    /* IDs de vendas já cobertas pelo caixa (para evitar dupla contagem) */
+    const vendasCobertasPorCaixa = new Set(
+      caixaVendas.map((c) => c.referenciaId).filter(Boolean)
+    );
+
+    /* Grupo 2 — Vendas legadas (sem statusPagamento) não cobertas pelo caixa */
+    const vendasLegadas = vendas.filter((v) =>
+      v.statusPagamento == null &&
+      !vendasCobertasPorCaixa.has(v.id) &&
+      dentroDoIntervalo(v.data, intervalo)
+    );
+
+    /* Receita real recebida no período */
+    const receitaCaixa   = caixaVendas.reduce((s, c) => s + Number(c.valor || 0), 0);
+    const receitaLegados = vendasLegadas.reduce((s, v) => s + Number(v.total || 0), 0);
+    const receitaBruta   = receitaCaixa + receitaLegados;
+
+    /* ══════════════════════════════════════════════════════════════════
+       CUSTOS — vinculados às vendas que geraram receita
+       ══════════════════════════════════════════════════════════════════
+       Para vendas novas (cobertas pelo caixa): busca o documento de venda
+       pelo referenciaId para obter custos/taxas reais.
+       Para vendas legadas: usa os campos diretamente.
+    ═══════════════════════════════════════════════════════════════════ */
+
+    /* Mapa id → venda para lookup rápido */
+    const vendasMap = Object.fromEntries(vendas.map((v) => [v.id, v]));
+
+    /* Vendas novas correspondentes às entradas de caixa */
+    const vendasNovas = caixaVendas
+      .map((c) => c.referenciaId ? vendasMap[c.referenciaId] : null)
+      .filter(Boolean)
+      /* Deduplica: mesma venda pode ter múltiplas entradas (parcelas futuras) */
+      .filter((v, idx, arr) => arr.findIndex((x) => x.id === v.id) === idx);
+
+    /* Todas as vendas que compõem a receita deste período */
+    const todasVendasReceita = [...vendasNovas, ...vendasLegadas];
+
+    /* Descontos */
+    const descontosTotais = todasVendasReceita.reduce((s, v) => s + Number(v.descontos || 0), 0);
+
+    /* Taxas de cartão */
+    const taxasCartao = todasVendasReceita.reduce((s, v) => {
+      const taxa = v.valorTaxa != null
+        ? Number(v.valorTaxa)
+        : calcularTaxaFallback(v);
+      return s + taxa;
+    }, 0);
+
+    const receitaLiquida = receitaBruta - descontosTotais - taxasCartao;
+
+    /* Custo dos produtos */
+    const custoTotal = todasVendasReceita.reduce((s, v) => {
+      if (v.custoTotal != null) return s + Number(v.custoTotal);
+      if (v.itens?.length) {
+        return s + v.itens.reduce((si, it) =>
+          si + (Number(it.custo || 0) * Number(it.qtd || it.quantidade || 1)), 0);
+      }
+      return s + Number(v.custo || 0);
+    }, 0);
+
+    const lucroBruto    = receitaLiquida - custoTotal;
+    const totalDespesas = dFiltradas.reduce((s, d) => s + Number(d.valor || 0), 0);
+    const lucroLiquido  = lucroBruto - totalDespesas;
+    const margem        = receitaBruta > 0 ? (lucroLiquido / receitaBruta) * 100 : 0;
+
+    /* Despesas por categoria */
+    const porCategoria = {};
+    dFiltradas.forEach((d) => {
+      const cat = d.categoria || "Sem categoria";
+      porCategoria[cat] = (porCategoria[cat] || 0) + Number(d.valor || 0);
+    });
+
+
+    return {
+      receitaBruta, receitaLiquida, descontosTotais,
+      taxasCartao, custoTotal, lucroBruto,
+      totalDespesas, lucroLiquido, margem,
+      qtdeVendas: todasVendasReceita.length,
+      porCategoria,
+      /* informativo */
+      _entradaNovasCaixa: caixaVendas.length,
+      _vendasLegadas: vendasLegadas.length,
+    };
+  }, [vendas, despesas, caixa, intervalo, calcularTaxaFallback]);
+
+  const pct = (v) =>
+    dados.receitaBruta > 0
+      ? fmtPct((v / dados.receitaBruta) * 100)
+      : "0.0%";
+
+  const handleExport = () => {
+    exportarExcel("dre", [{
+      nome: "DRE",
+      colunas: ["Item", "Valor (R$)", "% Receita"],
+      dados: [
+        ["Receita Bruta (Vendas)", dados.receitaBruta.toFixed(2), pct(dados.receitaBruta)],
+        ["(-) Taxas de Cartão",   `-${dados.taxasCartao.toFixed(2)}`, pct(dados.taxasCartao)],
+        ["= Receita Líquida",     dados.receitaLiquida.toFixed(2), pct(dados.receitaLiquida)],
+        ["(-) Custos de Produtos",  `-${dados.custoTotal.toFixed(2)}`, pct(dados.custoTotal)],
+        ["= Lucro Bruto",          dados.lucroBruto.toFixed(2),  pct(dados.lucroBruto)],
+        ["(-) Despesas Totais",    `-${dados.totalDespesas.toFixed(2)}`, pct(dados.totalDespesas)],
+        ...Object.entries(dados.porCategoria).map(([k, v]) => [`  · ${k}`, `-${v.toFixed(2)}`, pct(v)]),
+        ["= Lucro Líquido",        dados.lucroLiquido.toFixed(2), fmtPct(dados.margem)],
+      ],
+    }]);
   };
 
   return (
-    <div className="cat-manager">
-      <div className="cat-manager-title">Gerenciar categorias</div>
-      <div className="cat-list">
-        {categorias.length === 0 && (
-          <span style={{ fontSize: 12, color: "var(--text-3)" }}>Nenhuma categoria cadastrada.</span>
-        )}
-        {categorias.map(c => (
-          <span key={c.id} className="cat-item">
-            {c.nome}
-            <button className="cat-item-del" onClick={() => onDesativar(c.id)} title="Remover">
-              <X size={10} />
-            </button>
-          </span>
-        ))}
-      </div>
-      <div className="cat-add-row">
-        <input
-          value={novaCategoria}
-          onChange={e => setNovaCategoria(e.target.value)}
-          onKeyDown={e => e.key === "Enter" && handleCriar()}
-          placeholder="Nova categoria..."
+    <div className="dre-wrap">
+      {/* KPIs */}
+      <div className="cr-grid" style={{ marginBottom: 20 }}>
+        <CardResumo
+          icon={<TrendingUp size={18} />}
+          label="Receita Bruta"
+          value={fmtR$(dados.receitaBruta)}
+          sub={`${dados.qtdeVendas} venda(s)`}
+          trend="neutral"
+          colorVar="var(--gold)"
         />
-        <button className="cat-add-btn" onClick={handleCriar} disabled={salvando || !novaCategoria.trim()}>
-          {salvando ? "..." : "+ Adicionar"}
+        <CardResumo
+          icon={<Package size={18} />}
+          label="Custos (Produtos)"
+          value={fmtR$(dados.custoTotal)}
+          sub={pct(dados.custoTotal) + " da receita"}
+          trend="down"
+          colorVar="var(--text-2)"
+        />
+        <CardResumo
+          icon={<BarChart2 size={18} />}
+          label="Lucro Bruto"
+          value={fmtR$(dados.lucroBruto)}
+          sub={pct(dados.lucroBruto) + " da receita"}
+          trend={dados.lucroBruto >= 0 ? "up" : "down"}
+          colorVar={dados.lucroBruto >= 0 ? "var(--green)" : "var(--red)"}
+        />
+        <CardResumo
+          icon={<Receipt size={18} />}
+          label="Despesas"
+          value={fmtR$(dados.totalDespesas)}
+          sub={pct(dados.totalDespesas) + " da receita"}
+          trend="down"
+          colorVar="var(--red)"
+        />
+        <CardResumo
+          icon={<Wallet size={18} />}
+          label="Lucro Líquido"
+          value={fmtR$(dados.lucroLiquido)}
+          sub={`Margem: ${fmtPct(dados.margem)}`}
+          trend={dados.lucroLiquido >= 0 ? "up" : "down"}
+          colorVar={dados.lucroLiquido >= 0 ? "var(--green)" : "var(--red)"}
+        />
+      </div>
+
+      {/* Tabela DRE */}
+      <div className="tr-wrap">
+        <div className="tr-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span className="tr-title">Demonstração do Resultado do Exercício</span>
+            <span
+              title={`Regime de Caixa: ${dados._entradaNovasCaixa} entrada(s) do caixa + ${dados._vendasLegadas} venda(s) legada(s) como fallback`}
+              style={{
+                fontSize: 10, fontWeight: 600, padding: "2px 8px",
+                borderRadius: 20, background: "rgba(74,222,128,0.1)",
+                border: "1px solid rgba(74,222,128,0.25)", color: "var(--green)",
+                cursor: "default",
+              }}
+            >
+              ✓ Regime de Caixa
+            </span>
+          </div>
+          <button className="btn-secondary" style={{ fontSize: 11, padding: "5px 12px" }} onClick={handleExport}>
+            <Download size={12} /> Excel
+          </button>
+        </div>
+
+        {/* Receitas */}
+        <div className="dre-row dre-row-cat">RECEITAS</div>
+        <div className="dre-row">
+          <span className="dre-label">Receita Bruta (Vendas)</span>
+          <span className="dre-val dre-positivo">{fmtR$(dados.receitaBruta)}</span>
+          <span className="dre-pct">{pct(dados.receitaBruta)}</span>
+        </div>
+        {dados.taxasCartao > 0 && (
+          <div className="dre-row">
+            <span className="dre-sub-label">(-) Taxas de Cartão</span>
+            <span className="dre-val dre-negativo">- {fmtR$(dados.taxasCartao)}</span>
+            <span className="dre-pct">{pct(dados.taxasCartao)}</span>
+          </div>
+        )}
+        {dados.taxasCartao > 0 && (
+          <div className="dre-row" style={{ background: "rgba(0,0,0,0.08)" }}>
+            <span className="dre-label">= Receita Líquida</span>
+            <span className="dre-val dre-positivo">{fmtR$(dados.receitaLiquida)}</span>
+            <span className="dre-pct">{pct(dados.receitaLiquida)}</span>
+          </div>
+        )}
+
+        {/* Custos */}
+        <div className="dre-row dre-row-cat">CUSTOS</div>
+        <div className="dre-row">
+          <span className="dre-sub-label">(-) Custo dos Produtos Vendidos</span>
+          <span className="dre-val dre-negativo">- {fmtR$(dados.custoTotal)}</span>
+          <span className="dre-pct">{pct(dados.custoTotal)}</span>
+        </div>
+
+        {/* Lucro Bruto */}
+        <div className={`dre-row dre-row-result`}>
+          <span className="dre-label" style={{ fontFamily: "'Sora', sans-serif" }}>= LUCRO BRUTO</span>
+          <span className={`dre-val ${dados.lucroBruto >= 0 ? "dre-positivo" : "dre-negativo"}`}>
+            {fmtR$(dados.lucroBruto)}
+          </span>
+          <span className="dre-pct" style={{ fontWeight: 700 }}>{pct(dados.lucroBruto)}</span>
+        </div>
+
+        {/* Despesas */}
+        <div className="dre-row dre-row-cat">DESPESAS OPERACIONAIS</div>
+        {Object.entries(dados.porCategoria).length > 0
+          ? Object.entries(dados.porCategoria)
+              .sort((a, b) => b[1] - a[1])
+              .map(([cat, val]) => (
+                <div key={cat} className="dre-row">
+                  <span className="dre-sub-label">(-) {cat}</span>
+                  <span className="dre-val dre-negativo">- {fmtR$(val)}</span>
+                  <span className="dre-pct">{pct(val)}</span>
+                </div>
+              ))
+          : <div className="dre-row">
+              <span className="dre-sub-label">(-) Despesas Totais</span>
+              <span className="dre-val dre-negativo">- {fmtR$(dados.totalDespesas)}</span>
+              <span className="dre-pct">{pct(dados.totalDespesas)}</span>
+            </div>
+        }
+
+        {/* Lucro Líquido */}
+        <div className="dre-row dre-row-result">
+          <span className="dre-label" style={{ fontFamily: "'Sora', sans-serif" }}>= LUCRO LÍQUIDO</span>
+          <span className={`dre-val ${dados.lucroLiquido >= 0 ? "dre-positivo" : "dre-negativo"}`}>
+            {fmtR$(dados.lucroLiquido)}
+          </span>
+          <span
+            className="dre-pct"
+            style={{
+              fontWeight: 700,
+              color: dados.lucroLiquido >= 0 ? "var(--green)" : "var(--red)",
+            }}
+          >
+            {fmtPct(dados.margem)}
+          </span>
+        </div>
+      </div>
+
+      {/* ── Banner de resultado final ── */}
+      {(() => {
+        const isLucro = dados.lucroLiquido >= 0;
+        return (
+          <div className={`dre-resultado-banner ${isLucro ? "lucro" : "prejuizo"}`}>
+            <div className="dre-resultado-esquerda">
+              <span className="dre-resultado-emoji">{isLucro ? "✅" : "❌"}</span>
+              <div className="dre-resultado-textos">
+                <span className="dre-resultado-titulo">
+                  {isLucro ? "Lucro do Período" : "Prejuízo do Período"}
+                </span>
+                <span className="dre-resultado-sub">
+                  {isLucro
+                    ? `Margem líquida: ${fmtPct(dados.margem)}`
+                    : `Margem líquida: ${fmtPct(dados.margem)}`}
+                </span>
+              </div>
+            </div>
+            <span className="dre-resultado-valor">{fmtR$(dados.lucroLiquido)}</span>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   RELATÓRIO: FINANCEIRO (CAIXA)
+   ══════════════════════════════════════════════════════ */
+function RelatorioFinanceiro({ caixa, intervalo }) {
+  const dados = useMemo(() => {
+    const filtrado = caixa.filter((c) => dentroDoIntervalo(c.data, intervalo));
+    const entradas = filtrado.filter((c) =>
+      (c.tipo || "").toLowerCase().includes("entrada") || Number(c.valor || 0) > 0 && !c.tipo
+    );
+    const saidas = filtrado.filter((c) =>
+      (c.tipo || "").toLowerCase().includes("saida") || (c.tipo || "").toLowerCase().includes("saída")
+    );
+    const totalEntradas = entradas.reduce((s, c) => s + Number(c.valor || 0), 0);
+    const totalSaidas   = saidas.reduce((s, c) => s + Number(c.valor || 0), 0);
+    const saldo = totalEntradas - totalSaidas;
+
+    /* Agrupar por dia para caixa diário */
+    const porDia = {};
+    filtrado.forEach((c) => {
+      const dt = parseDate(c.data);
+      if (!dt) return;
+      const key = dt.toLocaleDateString("pt-BR");
+      if (!porDia[key]) porDia[key] = { data: c.data, entradas: 0, saidas: 0 };
+      const isEntrada = (c.tipo || "").toLowerCase().includes("entrada");
+      if (isEntrada) porDia[key].entradas += Number(c.valor || 0);
+      else            porDia[key].saidas  += Number(c.valor || 0);
+    });
+
+    const linhasDiarias = Object.entries(porDia)
+      .sort((a, b) => {
+        const da = parseDate(porDia[a[0]].data);
+        const db2 = parseDate(porDia[b[0]].data);
+        return (db2 || 0) - (da || 0);
+      })
+      .map(([dia, v]) => ({
+        dia,
+        entradas: v.entradas,
+        saidas: v.saidas,
+        saldo: v.entradas - v.saidas,
+      }));
+
+    return { totalEntradas, totalSaidas, saldo, linhasDiarias, qtde: filtrado.length };
+  }, [caixa, intervalo]);
+
+  const handleExport = () => {
+    exportarExcel("financeiro", [{
+      nome: "Caixa Diário",
+      colunas: ["Data", "Entradas (R$)", "Saídas (R$)", "Saldo Dia (R$)"],
+      dados: dados.linhasDiarias.map((r) => [
+        r.dia,
+        r.entradas.toFixed(2),
+        r.saidas.toFixed(2),
+        r.saldo.toFixed(2),
+      ]),
+    }]);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div className="cr-grid">
+        <CardResumo
+          icon={<ArrowUpRight size={18} />}
+          label="Total Entradas"
+          value={fmtR$(dados.totalEntradas)}
+          sub={`${dados.qtde} movimentações`}
+          trend="up" colorVar="var(--green)"
+        />
+        <CardResumo
+          icon={<ArrowDownRight size={18} />}
+          label="Total Saídas"
+          value={fmtR$(dados.totalSaidas)}
+          sub="no período" trend="down" colorVar="var(--red)"
+        />
+        <CardResumo
+          icon={<Wallet size={18} />}
+          label="Saldo do Período"
+          value={fmtR$(dados.saldo)}
+          sub={dados.saldo >= 0 ? "Positivo" : "Negativo"}
+          trend={dados.saldo >= 0 ? "up" : "down"}
+          colorVar={dados.saldo >= 0 ? "var(--green)" : "var(--red)"}
+        />
+      </div>
+
+      <TabelaRelatorio
+        title="Caixa Diário"
+        count={dados.linhasDiarias.length}
+        empty="Nenhuma movimentação no período."
+        data={dados.linhasDiarias}
+        columns={[
+          { key: "dia", label: "Data" },
+          {
+            key: "entradas", label: "Entradas", align: "right",
+            render: (v) => <span className="val-pos">{fmtR$(v)}</span>,
+          },
+          {
+            key: "saidas", label: "Saídas", align: "right",
+            render: (v) => <span className="val-neg">{fmtR$(v)}</span>,
+          },
+          {
+            key: "saldo", label: "Saldo", align: "right",
+            render: (v) => (
+              <span className={v >= 0 ? "val-pos" : "val-neg"}>{fmtR$(v)}</span>
+            ),
+          },
+        ]}
+      />
+
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="btn-secondary" onClick={handleExport}>
+          <Download size={13} /> Exportar Excel
         </button>
       </div>
     </div>
   );
 }
 
-/* ════════════════════════════════════════
-   MODAL: Nova / Editar Despesa
-   ════════════════════════════════════════ */
-function ModalNovaDespesa({ despesa, despesas, categorias, onCriarCategoria, onDesativarCategoria, onSave, onClose }) {
-  const isEdit = !!despesa;
-  const [showCatManager, setShowCatManager] = useState(false);
+/* ══════════════════════════════════════════════════════
+   RELATÓRIO: DESPESAS
+   ══════════════════════════════════════════════════════ */
+function RelatorioDespesas({ despesas, intervalo }) {
+  const dados = useMemo(() => {
+    // Para despesas pagas, a data relevante é dataPagamento (quando saiu o dinheiro).
+    // Para pendentes/vencidas, a data relevante é vencimento.
+    const dataRefDespesa = (d) =>
+      d.status === "pago" && d.dataPagamento ? d.dataPagamento : d.vencimento;
 
-  const primeiraCategoria = categorias[0]?.nome || "";
+    const filtradas = despesas
+      .filter((d) => dentroDoIntervalo(dataRefDespesa(d), intervalo))
+      .sort((a, b) => {
+        const da  = parseDate(dataRefDespesa(a));
+        const db2 = parseDate(dataRefDespesa(b));
+        return (db2 || 0) - (da || 0);
+      });
 
-  const [form, setForm] = useState({
-    descricao:      despesa?.descricao      || "",
-    valor:          despesa?.valor          || "",
-    vencimento:     despesa?.vencimento     || "",
-    categoria:      despesa?.categoria      || primeiraCategoria,
-    centroCusto:    despesa?.centroCusto    || "",
-    fornecedor:     despesa?.fornecedor     || "",
-    formaPagamento: despesa?.formaPagamento || "pix",
-    recorrente:     despesa?.recorrente     || false,
-    tipoRecorrencia:despesa?.tipoRecorrencia|| "mensal",
-    intervalo:      despesa?.intervalo      || 1,
-    dataFim:        despesa?.dataFim        || "",
-    parcelado:      despesa?.parcelado      || false,
-    totalParcelas:  despesa?.totalParcelas  || 2,
-    observacao:     despesa?.observacao     || "",
-  });
-  const [erros, setErros] = useState({});
-  const [salvando, setSalvando] = useState(false);
+    const total = filtradas.reduce((s, d) => s + Number(d.valor || 0), 0);
 
-  const set = (campo, valor) => {
-    setForm(f => ({ ...f, [campo]: valor }));
-    if (erros[campo]) setErros(e => ({ ...e, [campo]: "" }));
-  };
-
-  const validar = () => {
-    const e = {};
-    if (!form.descricao.trim()) e.descricao = "Descrição é obrigatória.";
-    if (!form.valor || isNaN(Number(form.valor)) || Number(form.valor) <= 0) e.valor = "Valor inválido.";
-    if (!form.vencimento) e.vencimento = "Data de vencimento é obrigatória.";
-    setErros(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSalvar = async () => {
-    if (!validar()) return;
-    setSalvando(true);
-    await onSave({
-      descricao:       form.descricao.trim(),
-      valor:           Number(form.valor),
-      vencimento:      form.vencimento,
-      categoria:       form.categoria,
-      centroCusto:     form.centroCusto.trim(),
-      fornecedor:      form.fornecedor.trim(),
-      formaPagamento:  form.formaPagamento,
-      recorrente:      form.recorrente,
-      tipoRecorrencia: form.recorrente ? form.tipoRecorrencia : null,
-      intervalo:       form.recorrente ? Number(form.intervalo) : null,
-      dataFim:         form.recorrente && form.dataFim ? form.dataFim : null,
-      parcelado:       form.parcelado && !isEdit,
-      totalParcelas:   form.parcelado && !isEdit ? Number(form.totalParcelas) : null,
-      observacao:      form.observacao.trim(),
+    const porCategoria = {};
+    filtradas.forEach((d) => {
+      const cat = d.categoria || "Sem categoria";
+      porCategoria[cat] = (porCategoria[cat] || 0) + Number(d.valor || 0);
     });
-    setSalvando(false);
+
+    const ranking = Object.entries(porCategoria)
+      .sort((a, b) => b[1] - a[1])
+      .map(([cat, val]) => ({ cat, val }));
+
+    const maxVal = ranking[0]?.val || 1;
+
+    return { filtradas, total, ranking, maxVal };
+  }, [despesas, intervalo]);
+
+  const handleExport = () => {
+    exportarExcel("despesas", [{
+      nome: "Despesas",
+      colunas: ["Data Referência", "Vencimento", "Descrição", "Categoria", "Status", "Valor (R$)"],
+      dados: dados.filtradas.map((d) => [
+        fmtData(d.status === "pago" && d.dataPagamento ? d.dataPagamento : d.vencimento),
+        fmtData(d.vencimento),
+        d.descricao || "—",
+        d.categoria || "—",
+        d.status || "—",
+        Number(d.valor || 0).toFixed(2),
+      ]),
+    }]);
   };
 
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box modal-box-lg">
-        <div className="modal-header">
-          <div>
-            <div className="modal-title">{isEdit ? "Editar Despesa" : "Nova Despesa"}</div>
-            <div className="modal-sub">
-              {isEdit ? `Editando ${despesa.idShow || despesa.id} — ${despesa.descricao}` : "Preencha os dados da despesa"}
-            </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div className="cr-grid">
+        <CardResumo
+          icon={<Receipt size={18} />}
+          label="Total de Despesas"
+          value={fmtR$(dados.total)}
+          sub={`${dados.filtradas.length} registros`}
+          trend="down" colorVar="var(--red)"
+        />
+        <CardResumo
+          icon={<BarChart2 size={18} />}
+          label="Categorias"
+          value={String(dados.ranking.length)}
+          sub="categorias distintas" trend="neutral" colorVar="var(--blue)"
+        />
+        <CardResumo
+          icon={<DollarSign size={18} />}
+          label="Média por Despesa"
+          value={dados.filtradas.length > 0 ? fmtR$(dados.total / dados.filtradas.length) : "R$ 0,00"}
+          sub="ticket médio" trend="neutral" colorVar="var(--gold)"
+        />
+      </div>
+
+      {/* Ranking por categoria */}
+      {dados.ranking.length > 0 && (
+        <div className="tr-wrap">
+          <div className="tr-header">
+            <span className="tr-title">Ranking por Categoria</span>
+            <span className="tr-badge">{dados.ranking.length}</span>
           </div>
-          <button className="modal-close" onClick={onClose}>
-            <X size={14} color="var(--text-2)" />
-          </button>
+          {dados.ranking.map((r, i) => (
+            <div key={r.cat} className="rank-item">
+              <span className="rank-num">#{i + 1}</span>
+              <span className="rank-label">{r.cat}</span>
+              <div className="rank-bar-wrap">
+                <div className="rank-bar-bg">
+                  <div className="rank-bar-fill" style={{ width: `${(r.val / dados.maxVal) * 100}%` }} />
+                </div>
+              </div>
+              <span className="rank-val">{fmtR$(r.val)}</span>
+            </div>
+          ))}
         </div>
+      )}
 
-        <div className="modal-body">
+      <TabelaRelatorio
+        title="Lançamentos de Despesas"
+        count={dados.filtradas.length}
+        empty="Nenhuma despesa no período."
+        data={dados.filtradas}
+        columns={[
+          {
+            key: "dataPagamento",
+            label: "Data Referência",
+            render: (v, row) => {
+              const dataRef = row.status === "pago" && v ? v : row.vencimento;
+              const label   = row.status === "pago" ? "Pago em" : "Vence em";
+              return (
+                <span title={label} style={{ color: row.status === "pago" ? "var(--green)" : "var(--text-2)" }}>
+                  {fmtData(dataRef)}
+                </span>
+              );
+            },
+          },
+          {
+            key: "vencimento",
+            label: "Vencimento",
+            render: (v, row) => {
+              if (!v) return <span style={{ color: "var(--text-3)" }}>—</span>;
+              const dias = getDiasRestantes(v);
+              const color = dias !== null && dias < 0
+                ? "var(--red)"
+                : dias !== null && dias <= 3
+                ? "var(--gold)"
+                : "var(--text-2)";
+              return <span style={{ color }}>{fmtData(v)}</span>;
+            },
+          },
+          { key: "descricao", label: "Descrição" },
+          { key: "categoria", label: "Categoria" },
+          {
+            key: "valor", label: "Valor", align: "right",
+            render: (v) => <span className="val-neg">{fmtR$(v)}</span>,
+          },
+        ]}
+      />
 
-          {/* Descrição */}
-          <div className="form-group">
-            <label className="form-label">Descrição <span className="form-label-req">*</span></label>
-            <input
-              className={`form-input ${erros.descricao ? "err" : ""}`}
-              value={form.descricao}
-              onChange={e => set("descricao", e.target.value)}
-              placeholder="Ex: Aluguel, energia elétrica..."
-              autoFocus
-            />
-            {erros.descricao && <div className="form-error">{erros.descricao}</div>}
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="btn-secondary" onClick={handleExport}>
+          <Download size={13} /> Exportar Excel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   RELATÓRIO: VENDAS
+   ══════════════════════════════════════════════════════ */
+function RelatorioVendas({ vendas, intervalo }) {
+  const dados = useMemo(() => {
+    const filtradas = vendas
+      .filter((v) => dentroDoIntervalo(v.data, intervalo))
+      .sort((a, b) => {
+        const da = parseDate(a.data), db2 = parseDate(b.data);
+        return (db2 || 0) - (da || 0);
+      });
+
+    const total = filtradas.reduce((s, v) => s + Number(v.total || 0), 0);
+    const ticket = filtradas.length > 0 ? total / filtradas.length : 0;
+
+    /* Produtos mais vendidos */
+    const prodContagem = {};
+    filtradas.forEach((v) => {
+      (v.itens || []).forEach((it) => {
+        const nome = it.produto || it.nome || "Produto";
+        const qtd  = Number(it.quantidade || it.qtd || 1);
+
+        /* CORREÇÃO: it.total/it.subtotal já é o subtotal da linha (preço × qtd).
+           Não multiplicar por qtd de novo. Fallback: preco/valorUnitario × qtd. */
+        const subtotalLinha = Number(it.total ?? it.subtotal ?? NaN);
+        const precoUnit     = Number(it.valorUnitario ?? it.preco ?? it.valor ?? 0);
+        const val = !isNaN(subtotalLinha) && subtotalLinha > 0
+          ? subtotalLinha
+          : precoUnit * qtd;
+
+        if (!prodContagem[nome]) prodContagem[nome] = { qtd: 0, total: 0 };
+        prodContagem[nome].qtd   += qtd;
+        prodContagem[nome].total += val;
+      });
+    });
+
+    const maisPedidos = Object.entries(prodContagem)
+      .sort((a, b) => b[1].qtd - a[1].qtd)
+      .slice(0, 10)
+      .map(([nome, v]) => ({ nome, ...v }));
+
+    /* Por forma de pagamento */
+    const porFP = {};
+    filtradas.forEach((v) => {
+      const fp = v.formaPagamento || "Não informado";
+      porFP[fp] = (porFP[fp] || 0) + 1;
+    });
+
+    return { filtradas, total, ticket, maisPedidos, porFP };
+  }, [vendas, intervalo]);
+
+  const handleExport = () => {
+    exportarExcel("vendas", [
+      {
+        nome: "Vendas",
+        colunas: ["ID", "Data", "Cliente", "Forma Pagamento", "Total (R$)"],
+        dados: dados.filtradas.map((v) => [
+          v.id, fmtData(v.data), v.clienteNome || v.cliente || "—",
+          v.formaPagamento || "—", Number(v.total || 0).toFixed(2),
+        ]),
+      },
+      {
+        nome: "Produtos mais vendidos",
+        colunas: ["Produto", "Qtd Vendida", "Total (R$)"],
+        dados: dados.maisPedidos.map((p) => [p.nome, p.qtd, p.total.toFixed(2)]),
+      },
+    ]);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div className="cr-grid">
+        <CardResumo
+          icon={<ShoppingCart size={18} />}
+          label="Total Vendido"
+          value={fmtR$(dados.total)}
+          sub={`${dados.filtradas.length} vendas`}
+          trend="up" colorVar="var(--gold)"
+        />
+        <CardResumo
+          icon={<BarChart2 size={18} />}
+          label="Ticket Médio"
+          value={fmtR$(dados.ticket)}
+          sub="por venda" trend="neutral" colorVar="var(--blue)"
+        />
+        <CardResumo
+          icon={<TrendingUp size={18} />}
+          label="Qtd. de Vendas"
+          value={String(dados.filtradas.length)}
+          sub="no período" trend="neutral" colorVar="var(--green)"
+        />
+      </div>
+
+      {/* Produtos mais vendidos */}
+      {dados.maisPedidos.length > 0 && (
+        <div className="tr-wrap">
+          <div className="tr-header">
+            <span className="tr-title">Produtos Mais Vendidos</span>
           </div>
+          {dados.maisPedidos.map((p, i) => (
+            <div key={p.nome} className="rank-item">
+              <span className="rank-num">#{i + 1}</span>
+              <span className="rank-label">{p.nome}</span>
+              <span style={{ fontSize: 11, color: "var(--text-3)", marginLeft: "auto" }}>
+                {p.qtd} un.
+              </span>
+              <span className="rank-val">{fmtR$(p.total)}</span>
+            </div>
+          ))}
+        </div>
+      )}
 
-          {/* Valor + Vencimento + Forma Pagamento */}
-          <div className="form-row-3">
-            <div className="form-group form-group-0">
-              <label className="form-label">Valor (R$) <span className="form-label-req">*</span></label>
-              <input
-                className={`form-input ${erros.valor ? "err" : ""}`}
-                type="number" min="0" step="0.01"
-                value={form.valor}
-                onChange={e => set("valor", e.target.value)}
-                placeholder="0,00"
-              />
-              {erros.valor && <div className="form-error">{erros.valor}</div>}
-            </div>
-            <div className="form-group form-group-0">
-              <label className="form-label">Vencimento <span className="form-label-req">*</span></label>
-              <input
-                className={`form-input ${erros.vencimento ? "err" : ""}`}
-                type="date"
-                value={form.vencimento}
-                onChange={e => set("vencimento", e.target.value)}
-              />
-              {erros.vencimento && <div className="form-error">{erros.vencimento}</div>}
-            </div>
-            <div className="form-group form-group-0">
-              <label className="form-label">Forma de pagamento</label>
-              <div className="chip-group" style={{ marginTop: 2 }}>
-                {FORMAS_PAG.map(fp => (
-                  <button
-                    key={fp.value}
-                    className={`chip ${form.formaPagamento === fp.value ? "active" : ""}`}
-                    onClick={() => set("formaPagamento", fp.value)}
-                    type="button"
-                  >
-                    <fp.Icon size={11} style={{ display: "inline", marginRight: 4, verticalAlign: "middle" }} />
-                    {fp.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+      <TabelaRelatorio
+        title="Histórico de Vendas"
+        count={dados.filtradas.length}
+        empty="Nenhuma venda no período."
+        data={dados.filtradas}
+        columns={[
+          { key: "id",    label: "ID", render: (v) => <span style={{ color: "var(--gold)", fontFamily: "'Sora', sans-serif", fontSize: 11 }}>{v}</span> },
+          { key: "data",  label: "Data", render: (v) => fmtData(v) },
+          { key: "clienteNome", label: "Cliente", render: (v, row) => v || row.cliente || "—" },
+          { key: "formaPagamento", label: "Pagamento" },
+          {
+            key: "total", label: "Total", align: "right",
+            render: (v) => <span className="val-pos">{fmtR$(v)}</span>,
+          },
+        ]}
+      />
+
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="btn-secondary" onClick={handleExport}>
+          <Download size={13} /> Exportar Excel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   RELATÓRIO: ESTOQUE
+   ══════════════════════════════════════════════════════ */
+function RelatorioEstoque({ produtos }) {
+  /* Estoque não usa filtro de período — é snapshot atual */
+  const dados = useMemo(() => {
+    /* CORREÇÃO 4: campos corretos do Firestore são p.estoque, p.preco, p.custo, p.margem
+       Estrutura real: produtos/{id} { custo, estoque, preco, margem, nome } */
+
+    const estoque    = (p) => Number(p.estoque   ?? p.quantidade ?? 0);
+    const precoVenda = (p) => Number(p.preco      ?? p.precoVenda ?? 0);
+    const precoCusto = (p) => Number(p.custo      ?? p.precoCusto ?? 0);
+    const estoqueMin = (p) => Number(p.estoqueMinimo ?? p.estoque_minimo ?? 5);
+
+    const total = produtos.length;
+
+    /* Valor em estoque = preco de venda × quantidade em estoque */
+    const valorTotal = produtos.reduce(
+      (s, p) => s + precoVenda(p) * estoque(p), 0
+    );
+
+    /* Valor de custo em estoque */
+    const valorCusto = produtos.reduce(
+      (s, p) => s + precoCusto(p) * estoque(p), 0
+    );
+
+    const baixoEstoque = produtos.filter(
+      (p) => estoque(p) > 0 && estoque(p) <= estoqueMin(p)
+    );
+    const semEstoque = produtos.filter((p) => estoque(p) === 0);
+
+    /* Ordena do menor para o maior estoque */
+    const sorted = [...produtos].sort((a, b) => estoque(a) - estoque(b));
+
+    return { total, valorTotal, valorCusto, baixoEstoque, semEstoque, sorted,
+             /* helpers reutilizados no render */ _estoque: estoque, _preco: precoVenda, _custo: precoCusto };
+  }, [produtos]);
+
+  const { _estoque, _preco, _custo } = dados;
+
+  const handleExport = () => {
+    exportarExcel("estoque", [{
+      nome: "Estoque",
+      colunas: ["Produto", "Estoque Atual", "Preço Venda (R$)", "Custo (R$)", "Margem (%)", "Valor Total (R$)"],
+      dados: dados.sorted.map((p) => [
+        p.nome || "—",
+        _estoque(p),
+        _preco(p).toFixed(2),
+        _custo(p).toFixed(2),
+        Number(p.margem || 0).toFixed(1),
+        (_preco(p) * _estoque(p)).toFixed(2),
+      ]),
+    }]);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div className="cr-grid">
+        <CardResumo
+          icon={<Package size={18} />}
+          label="Total de Produtos"
+          value={String(dados.total)}
+          sub="cadastrados" trend="neutral" colorVar="var(--gold)"
+        />
+        <CardResumo
+          icon={<DollarSign size={18} />}
+          label="Valor em Estoque"
+          value={fmtR$(dados.valorTotal)}
+          sub="pelo preço de venda" trend="neutral" colorVar="var(--green)"
+        />
+        <CardResumo
+          icon={<DollarSign size={18} />}
+          label="Custo do Estoque"
+          value={fmtR$(dados.valorCusto)}
+          sub="pelo preço de custo" trend="neutral" colorVar="var(--text-2)"
+        />
+        <CardResumo
+          icon={<AlertCircle size={18} />}
+          label="Estoque Baixo"
+          value={String(dados.baixoEstoque.length)}
+          sub="produtos críticos"
+          trend={dados.baixoEstoque.length > 0 ? "down" : "neutral"}
+          colorVar={dados.baixoEstoque.length > 0 ? "var(--red)" : "var(--text-2)"}
+        />
+        <CardResumo
+          icon={<Minus size={18} />}
+          label="Sem Estoque"
+          value={String(dados.semEstoque.length)}
+          sub="produtos zerados"
+          trend={dados.semEstoque.length > 0 ? "down" : "neutral"}
+          colorVar={dados.semEstoque.length > 0 ? "var(--red)" : "var(--text-2)"}
+        />
+      </div>
+
+      {dados.baixoEstoque.length > 0 && (
+        <div className="tr-wrap" style={{ border: "1px solid rgba(224,82,82,.3)" }}>
+          <div className="tr-header" style={{ background: "rgba(224,82,82,.06)" }}>
+            <span className="tr-title" style={{ color: "var(--red)" }}>
+              ⚠ Produtos com Estoque Crítico
+            </span>
+            <span className="tr-badge">{dados.baixoEstoque.length}</span>
           </div>
+          <TabelaRelatorio
+            data={dados.baixoEstoque}
+            columns={[
+              { key: "nome", label: "Produto" },
+              { key: "estoque", label: "Qtd Atual", align: "center",
+                render: (v, row) => <span style={{ color: "var(--red)", fontWeight: 700 }}>{_estoque(row)}</span> },
+              { key: "estoqueMinimo", label: "Mínimo", align: "center",
+                render: (v, row) => v ?? row.estoque_minimo ?? 5 },
+              { key: "preco", label: "Preço", align: "right",
+                render: (v, row) => fmtR$(_preco(row)) },
+            ]}
+            empty=""
+          />
+        </div>
+      )}
 
-          {/* Categoria + Centro de custo + Fornecedor */}
-          <div className="form-row-3" style={{ marginTop: 14 }}>
-            <div className="form-group form-group-0">
-              <label className="form-label">Categoria</label>
-              <div className="cat-select-row">
-                <select
-                  className="form-input"
-                  value={form.categoria}
-                  onChange={e => set("categoria", e.target.value)}
-                  style={{ flex: 1 }}
-                >
-                  {categorias.length === 0 && (
-                    <option value="">— Sem categorias —</option>
-                  )}
-                  {categorias.map(c => (
-                    <option key={c.id} value={c.nome}>{c.nome}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  className="cat-toggle-btn"
-                  onClick={() => setShowCatManager(v => !v)}
-                  title="Gerenciar categorias"
-                >
-                  <Plus size={11} />
-                </button>
-              </div>
-              {showCatManager && (
-                <CategoriasManager
-                  categorias={categorias}
-                  onCriar={onCriarCategoria}
-                  onDesativar={onDesativarCategoria}
-                />
-              )}
-            </div>
-            <div className="form-group form-group-0">
-              <label className="form-label">Centro de custo</label>
-              <input
-                className="form-input"
-                value={form.centroCusto}
-                onChange={e => set("centroCusto", e.target.value)}
-                placeholder="Ex: Marketing, TI..."
-              />
-            </div>
-            <div className="form-group form-group-0">
-              <label className="form-label">Fornecedor</label>
-              <input
-                className="form-input"
-                value={form.fornecedor}
-                onChange={e => set("fornecedor", e.target.value)}
-                placeholder="Nome do fornecedor"
-              />
-            </div>
+      <TabelaRelatorio
+        title="Todos os Produtos"
+        count={dados.total}
+        empty="Nenhum produto cadastrado."
+        data={dados.sorted}
+        columns={[
+          { key: "nome",      label: "Produto" },
+          { key: "categoria", label: "Categoria" },
+          { key: "estoque",   label: "Estoque", align: "center",
+            render: (v, row) => {
+              const qt = _estoque(row);
+              const color = qt === 0 ? "var(--red)" : qt <= 5 ? "var(--gold)" : "var(--green)";
+              return <span style={{ color, fontWeight: 600 }}>{qt}</span>;
+            }},
+          { key: "preco",  label: "Preço Venda", align: "right",
+            render: (v, row) => fmtR$(_preco(row)) },
+          { key: "custo",  label: "Custo", align: "right",
+            render: (v, row) => fmtR$(_custo(row)) },
+          { key: "margem", label: "Margem %", align: "right",
+            render: (v) => <span style={{ color: "var(--gold)" }}>{Number(v || 0).toFixed(1)}%</span> },
+          { key: "estoque", label: "Valor em Estoque", align: "right",
+            render: (v, row) => fmtR$(_preco(row) * _estoque(row)) },
+        ]}
+      />
+
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="btn-secondary" onClick={handleExport}>
+          <Download size={13} /> Exportar Excel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   RELATÓRIO: CLIENTES
+   ══════════════════════════════════════════════════════ */
+function RelatorioClientes({ clientes, vendas, intervalo }) {
+  const dados = useMemo(() => {
+    const total = clientes.length;
+
+    /* Clientes que compraram no período */
+    const vendasPeriodo = vendas.filter((v) => dentroDoIntervalo(v.data, intervalo));
+
+
+    /* CORREÇÃO 5: Vendas.jsx salva v.cliente (string nome), não v.clienteId.
+       Estratégia: primeiro tenta match por ID, fallback por nome normalizado */
+    const idsAtivos = new Set();
+    const nomesAtivos = new Set();
+    vendasPeriodo.forEach((v) => {
+      if (v.clienteId)  idsAtivos.add(v.clienteId);
+      if (v.cliente_id) idsAtivos.add(v.cliente_id);
+      if (v.cliente)    nomesAtivos.add((v.cliente || "").trim().toLowerCase());
+    });
+
+    const ativos = clientes.filter((c) =>
+      idsAtivos.has(c.id) ||
+      nomesAtivos.has((c.nome || "").trim().toLowerCase())
+    );
+
+
+    /* Clientes com fiado */
+    const comFiado = clientes.filter((c) => Number(c.fiado || c.debito || 0) > 0);
+    const totalFiado = comFiado.reduce((s, c) => s + Number(c.fiado || c.debito || 0), 0);
+
+    /* Top clientes por valor gasto no período — resolve tanto por id quanto por nome */
+    const gastosPorCliente = {};
+    vendasPeriodo.forEach((v) => {
+      /* Tenta resolver o cliente: prioriza id, fallback nome */
+      const chave = v.clienteId || v.cliente_id || (v.cliente || "").trim().toLowerCase();
+      if (!chave) return;
+      gastosPorCliente[chave] = (gastosPorCliente[chave] || 0) + Number(v.total || 0);
+    });
+
+    const topClientes = Object.entries(gastosPorCliente)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([chave, totalGasto]) => {
+        const c = clientes.find(
+          (x) => x.id === chave || (x.nome || "").trim().toLowerCase() === chave
+        );
+        return { chave, nome: c?.nome || chave, total: totalGasto };
+      });
+
+    /* Lista completa ordenada por nome */
+    const listaCompleta = [...clientes].sort((a, b) =>
+      (a.nome || "").localeCompare(b.nome || "", "pt-BR")
+    );
+
+    return { total, ativos, comFiado, totalFiado, topClientes, listaCompleta };
+  }, [clientes, vendas, intervalo]);
+
+  const handleExport = () => {
+    exportarExcel("clientes", [{
+      nome: "Clientes",
+      colunas: ["ID", "Nome", "Telefone", "CPF/CNPJ", "Fiado (R$)"],
+      dados: clientes.map((c) => [
+        c.id, c.nome || "—", c.telefone || "—", c.cpf || "—",
+        Number(c.fiado || c.debito || 0).toFixed(2),
+      ]),
+    }]);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div className="cr-grid">
+        <CardResumo
+          icon={<Users size={18} />}
+          label="Total de Clientes"
+          value={String(dados.total)}
+          sub="cadastrados" trend="neutral" colorVar="var(--gold)"
+        />
+        <CardResumo
+          icon={<TrendingUp size={18} />}
+          label="Clientes Ativos"
+          value={String(dados.ativos.length)}
+          sub="compraram no período" trend="up" colorVar="var(--green)"
+        />
+        <CardResumo
+          icon={<Receipt size={18} />}
+          label="Clientes c/ Fiado"
+          value={String(dados.comFiado.length)}
+          sub={fmtR$(dados.totalFiado) + " em aberto"}
+          trend={dados.comFiado.length > 0 ? "down" : "neutral"}
+          colorVar={dados.comFiado.length > 0 ? "var(--red)" : "var(--text-2)"}
+        />
+      </div>
+
+      {dados.topClientes.length > 0 && (
+        <div className="tr-wrap">
+          <div className="tr-header">
+            <span className="tr-title">Top Clientes no Período</span>
           </div>
-
-          <hr className="form-divider" />
-
-          {/* Recorrência */}
-          <div className="form-group">
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
-                <input
-                  type="checkbox"
-                  checked={form.recorrente}
-                  onChange={e => set("recorrente", e.target.checked)}
-                  style={{ accentColor: "var(--gold)", width: 15, height: 15 }}
-                />
-                <span className="form-label" style={{ marginBottom: 0 }}>Despesa recorrente</span>
-              </label>
+          {dados.topClientes.map((c, i) => (
+            <div key={c.chave || c.nome} className="rank-item">
+              <span className="rank-num">#{i + 1}</span>
+              <span className="rank-label">{c.nome}</span>
+              <span className="rank-val">{fmtR$(c.total)}</span>
             </div>
+          ))}
+        </div>
+      )}
 
-            {form.recorrente && (
-              <div className="form-row-3">
-                <div className="form-group form-group-0">
-                  <label className="form-label">Tipo</label>
-                  <select className="form-input" value={form.tipoRecorrencia} onChange={e => set("tipoRecorrencia", e.target.value)}>
-                    <option value="semanal">Semanal</option>
-                    <option value="mensal">Mensal</option>
-                    <option value="anual">Anual</option>
-                  </select>
-                </div>
-                <div className="form-group form-group-0">
-                  <label className="form-label">Intervalo</label>
-                  <input
-                    type="number" min="1" className="form-input"
-                    value={form.intervalo}
-                    onChange={e => set("intervalo", e.target.value)}
-                    placeholder="1"
-                  />
-                </div>
-                <div className="form-group form-group-0">
-                  <label className="form-label">Data fim (opcional)</label>
-                  <input type="date" className="form-input" value={form.dataFim} onChange={e => set("dataFim", e.target.value)} />
-                </div>
-              </div>
-            )}
+      {dados.comFiado.length > 0 && (
+        <TabelaRelatorio
+          title="Clientes com Fiado em Aberto"
+          count={dados.comFiado.length}
+          empty=""
+          data={dados.comFiado}
+          columns={[
+            { key: "id",   label: "ID", render: (v) => <span style={{ color: "var(--gold)", fontFamily: "'Sora', sans-serif", fontSize: 11 }}>{v}</span> },
+            { key: "nome", label: "Nome" },
+            { key: "telefone", label: "Telefone" },
+            { key: "fiado", label: "Fiado", align: "right",
+              render: (v, row) => <span className="val-neg">{fmtR$(v || row.debito)}</span> },
+          ]}
+        />
+      )}
+
+      {/* CORREÇÃO 5: Lista completa de todos os clientes — estava ausente */}
+      <TabelaRelatorio
+        title="Todos os Clientes"
+        count={dados.total}
+        empty="Nenhum cliente cadastrado."
+        data={dados.listaCompleta}
+        columns={[
+          { key: "id",       label: "ID", render: (v) => <span style={{ color: "var(--gold)", fontFamily: "'Sora', sans-serif", fontSize: 11 }}>{v}</span> },
+          { key: "nome",     label: "Nome" },
+          { key: "telefone", label: "Telefone" },
+          { key: "cpf",      label: "CPF / CNPJ" },
+          { key: "email",    label: "E-mail" },
+          { key: "fiado",    label: "Fiado", align: "right",
+            render: (v, row) => {
+              const val = Number(v || row.debito || 0);
+              return val > 0
+                ? <span className="val-neg">{fmtR$(val)}</span>
+                : <span style={{ color: "var(--text-3)" }}>—</span>;
+            }},
+        ]}
+      />
+
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="btn-secondary" onClick={handleExport}>
+          <Download size={13} /> Exportar Excel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   RELATÓRIO: AGENDA
+   ══════════════════════════════════════════════════════ */
+function RelatorioAgenda({ agenda, intervalo }) {
+  const dados = useMemo(() => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+
+
+    /* Helper: extrai a data do item tentando múltiplos campos possíveis */
+    const getDataAgenda = (a) =>
+      a.data || a.dataHora || a.inicio || a.date || a.start || a.dataInicio || null;
+
+    /* Agenda usa a data do compromisso como referência */
+    const filtrada = agenda
+      .filter((a) => {
+        const rawDate = getDataAgenda(a);
+        /* Se periodo for "todos" (intervalo sem datas), mostra tudo */
+        if (!intervalo.de && !intervalo.ate) return true;
+        return dentroDoIntervalo(rawDate, intervalo);
+      })
+      .sort((a, b) => {
+        const da = parseDate(getDataAgenda(a));
+        const db2 = parseDate(getDataAgenda(b));
+        return (da || 0) - (db2 || 0);
+      });
+
+
+    const futuros = filtrada.filter((a) => {
+      const dt = parseDate(getDataAgenda(a));
+      /* CORREÇÃO: itens sem data parseável ficavam fora de futuros E passados,
+         causando Total > Futuros + Passados. Sem data → inclui em futuros. */
+      return !dt || dt >= hoje;
+    });
+    const passados = filtrada.filter((a) => {
+      const dt = parseDate(getDataAgenda(a));
+      return dt && dt < hoje;
+    });
+
+
+    return { filtrada, futuros, passados, getDataAgenda };
+  }, [agenda, intervalo]);
+
+  const { getDataAgenda } = dados;
+
+  const getBadge = (rawDate) => {
+    const dias = getDiasRestantes(rawDate);
+    if (dias === null) return null;
+    if (dias === 0) return { label: "Hoje", cls: "ag-badge-hoje" };
+    if (dias > 0 && dias <= 7) return { label: `Em ${dias}d`, cls: "ag-badge-prox" };
+    if (dias > 7) return { label: "Futuro", cls: "ag-badge-fut" };
+    return null;
+  };
+
+  const handleExport = () => {
+    exportarExcel("agenda", [{
+      nome: "Agenda",
+      colunas: ["Data", "Hora", "Título", "Tipo", "Status", "Descrição"],
+      dados: dados.filtrada.map((a) => [
+        fmtData(getDataAgenda(a)),
+        a.hora || "—",
+        a.titulo || a.title || "—",
+        a.tipo || a.type || "—",
+        a.status || "—",
+        a.descricao || a.description || "—",
+      ]),
+    }]);
+  };
+
+  const renderItem = (a, i) => {
+    const rawDate = getDataAgenda(a);
+    const dt = parseDate(rawDate);
+    const badge = getBadge(rawDate);
+    const dia  = dt ? dt.getDate() : "?";
+    const mes  = dt ? MESES_CURTOS[dt.getMonth()] : "?";
+
+    return (
+      <div key={a.id || i} className="ag-item">
+        <div className="ag-date-box">
+          <div className="ag-date-day">{dia}</div>
+          <div className="ag-date-mon">{mes}</div>
+        </div>
+        <div className="ag-info">
+          <div className="ag-titulo">{a.titulo || a.title || "Sem título"}</div>
+          <div className="ag-meta">
+            {a.hora && <span>🕐 {a.hora}</span>}
+            {(a.tipo || a.type) && <span>{a.tipo || a.type}</span>}
+            {a.status && <span style={{ textTransform: "capitalize" }}>{a.status}</span>}
           </div>
-
-          {/* Parcelamento (somente criação) */}
-          {!isEdit && (
-            <div className="form-group form-group-0">
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", userSelect: "none" }}>
-                  <input
-                    type="checkbox"
-                    checked={form.parcelado}
-                    disabled={form.recorrente}
-                    onChange={e => set("parcelado", e.target.checked)}
-                    style={{ accentColor: "var(--gold)", width: 15, height: 15 }}
-                  />
-                  <span className="form-label" style={{ marginBottom: 0 }}>
-                    Parcelado {form.recorrente && <span style={{ color: "var(--text-3)" }}>(indisponível com recorrência)</span>}
-                  </span>
-                </label>
-              </div>
-              {form.parcelado && !form.recorrente && (
-                <div style={{ maxWidth: 160 }}>
-                  <label className="form-label">Número de parcelas</label>
-                  <input
-                    type="number" min="2" max="60" className="form-input"
-                    value={form.totalParcelas}
-                    onChange={e => set("totalParcelas", e.target.value)}
-                  />
-                </div>
-              )}
+          {(a.descricao || a.description) && (
+            <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 4 }}>
+              {a.descricao || a.description}
             </div>
           )}
+        </div>
+        {badge && <span className={`ag-badge ${badge.cls}`}>{badge.label}</span>}
+      </div>
+    );
+  };
 
-          {/* Observação */}
-          <div className="form-group" style={{ marginTop: 14, marginBottom: 0 }}>
-            <label className="form-label">Observação</label>
-            <input
-              className="form-input"
-              value={form.observacao}
-              onChange={e => set("observacao", e.target.value)}
-              placeholder="Opcional"
-            />
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div className="cr-grid">
+        <CardResumo icon={<Calendar size={18} />} label="Total no Período"
+          value={String(dados.filtrada.length)} sub="compromissos" trend="neutral" colorVar="var(--gold)" />
+        <CardResumo icon={<TrendingUp size={18} />} label="Futuros"
+          value={String(dados.futuros.length)} sub="agendados" trend="up" colorVar="var(--green)" />
+        <CardResumo icon={<TrendingDown size={18} />} label="Passados"
+          value={String(dados.passados.length)} sub="realizados" trend="neutral" colorVar="var(--text-2)" />
+      </div>
+
+      {dados.futuros.length > 0 && (
+        <div className="tr-wrap">
+          <div className="tr-header">
+            <span className="tr-title">Próximos Compromissos</span>
+            <span className="tr-badge">{dados.futuros.length}</span>
           </div>
-
+          {dados.futuros.map(renderItem)}
         </div>
+      )}
 
-        <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
-            {salvando ? "Salvando..." : isEdit ? "Salvar Alterações" : (form.parcelado ? `Criar ${form.totalParcelas} parcelas` : "Registrar Despesa")}
-          </button>
+      {dados.passados.length > 0 && (
+        <div className="tr-wrap">
+          <div className="tr-header">
+            <span className="tr-title">Compromissos Passados</span>
+            <span className="tr-badge">{dados.passados.length}</span>
+          </div>
+          {dados.passados.map(renderItem)}
         </div>
+      )}
+
+      {dados.filtrada.length === 0 && (
+        <div className="rel-empty">
+          <Calendar size={32} color="var(--text-3)" />
+          <p>Nenhum compromisso no período selecionado.</p>
+        </div>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="btn-secondary" onClick={handleExport}>
+          <Download size={13} /> Exportar Excel
+        </button>
       </div>
     </div>
   );
 }
 
-/* ════════════════════════════════════════
-   MODAL: Registrar Pagamento
-   ════════════════════════════════════════ */
-function ModalPagar({ despesa, onConfirm, onClose }) {
-  const [formaPag, setFormaPag] = useState(despesa.formaPagamento || "pix");
-  const [pagando, setPagando] = useState(false);
+/* ══════════════════════════════════════════════════════
+   MENU DE NAVEGAÇÃO — configuração
+   ══════════════════════════════════════════════════════ */
+const PERMISSOES_RELATORIO = {
+  dre:        ["financeiro"],
+  financeiro: ["financeiro"],
+  despesas:   ["financeiro"],
+  compras:    ["financeiro", "compras"],
+  estoque:    ["financeiro", "comercial", "compras", "operacional", "vendedor"],
+  vendas:     ["financeiro", "comercial", "vendedor", "suporte"],
+  clientes:   ["comercial", "vendedor", "suporte"],
+  agenda:     ["comercial", "vendedor", "suporte"],
+};
 
-  const [dataPag, setDataPag] = useState(new Date().toISOString().split("T")[0]);
+const MENU = [
+  { key: "dre",        label: "DRE",        icon: <LayoutDashboard size={15} /> },
+  { key: "financeiro", label: "Financeiro", icon: <Wallet size={15} />         },
+  { key: "vendas",     label: "Vendas",     icon: <ShoppingCart size={15} />   },
+  { key: "despesas",   label: "Despesas",   icon: <Receipt size={15} />        },
+  { key: "estoque",    label: "Estoque",    icon: <Package size={15} />        },
+  { key: "clientes",   label: "Clientes",   icon: <Users size={15} />          },
+  { key: "agenda",     label: "Agenda",     icon: <Calendar size={15} />       },
+];
 
-  const handlePagar = async () => {
-    if (!dataPag) return;
-    setPagando(true);
-    await onConfirm(formaPag, dataPag);
-    setPagando(false);
+const TITULO_RELATORIO = {
+  dre:        "DRE — Demonstração do Resultado",
+  financeiro: "Relatório Financeiro",
+  vendas:     "Relatório de Vendas",
+  despesas:   "Relatório de Despesas",
+  estoque:    "Relatório de Estoque",
+  clientes:   "Relatório de Clientes",
+  agenda:     "Relatório de Agenda",
+};
+
+/* ══════════════════════════════════════════════════════
+   COMPONENTE PRINCIPAL: Relatorios
+   ══════════════════════════════════════════════════════ */
+export default function Relatorios() {
+  // ── Auth via contexto — usa tenantUid para convidados acessarem dados do tenant ──
+  const { cargo, isAdmin, tenantUid, vendedorId } = useContext(AuthContext);
+
+  const [loading, setLoading]   = useState(true);
+  const [ativo, setAtivo]       = useState("dre");
+
+  /* Filtro de período */
+  const [periodo,     setPeriodo]     = useState("mes");
+  const [dataInicio,  setDataInicio]  = useState("");
+  const [dataFim,     setDataFim]     = useState("");
+
+  /* Dados das collections */
+  const [vendas,    setVendas]    = useState([]);
+  const [clientes,  setClientes]  = useState([]);
+  const [despesas,  setDespesas]  = useState([]);
+  const [produtos,  setProdutos]  = useState([]);
+  const [agenda,    setAgenda]    = useState([]);
+  const [caixa,     setCaixa]     = useState([]);
+
+  // Permissão por sub-relatório
+  const temAcesso = (id) => {
+    if (isAdmin) return true;
+    return (PERMISSOES_RELATORIO[id] ?? []).includes(cargo);
   };
 
-  return (
-    <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box modal-box-md">
-        <div className="modal-header">
-          <div>
-            <div className="modal-title">Registrar Pagamento</div>
-            <div className="modal-sub">{despesa.descricao}</div>
-          </div>
-          <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)" /></button>
-        </div>
-
-        <div className="modal-body">
-          <div className="pay-info">
-            <div className="pay-info-row">
-              <span>Valor</span>
-              <span className="pay-info-val" style={{ color: "var(--green)" }}>{fmtR$(despesa.valor)}</span>
-            </div>
-            <div className="pay-info-row">
-              <span>Vencimento</span>
-              <span className="pay-info-val">{fmtData(despesa.vencimento)}</span>
-            </div>
-            {despesa.categoria && (
-              <div className="pay-info-row">
-                <span>Categoria</span>
-                <span className="pay-info-val">{despesa.categoria}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="form-group" style={{ marginBottom: 16 }}>
-            <label className="form-label">Data do pagamento <span className="form-label-req">*</span></label>
-            <input
-              className="form-input"
-              type="date"
-              value={dataPag}
-              onChange={e => setDataPag(e.target.value)}
-            />
-          </div>
-
-          <div className="form-group form-group-0">
-            <label className="form-label">Forma de pagamento</label>
-            <div className="chip-group" style={{ marginTop: 6 }}>
-              {FORMAS_PAG.map(fp => (
-                <button
-                  key={fp.value}
-                  className={`chip ${formaPag === fp.value ? "active" : ""}`}
-                  onClick={() => setFormaPag(fp.value)}
-                  type="button"
-                >
-                  <fp.Icon size={11} style={{ display: "inline", marginRight: 4, verticalAlign: "middle" }} />
-                  {fp.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-success" onClick={handlePagar} disabled={pagando || !dataPag}>
-            {pagando ? "Registrando..." : "Confirmar Pagamento"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════
-   MODAL: Confirmar Exclusão
-   ════════════════════════════════════════ */
-function ModalConfirmDelete({ despesa, onConfirm, onClose }) {
-  const [excluindo, setExcluindo] = useState(false);
-
-  const handleConfirm = async () => {
-    setExcluindo(true);
-    await onConfirm();
-    setExcluindo(false);
-  };
-
-  return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box modal-box-md">
-        <div className="modal-header">
-          <div className="modal-title">Excluir Despesa</div>
-          <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)" /></button>
-        </div>
-        <div className="confirm-body">
-          <div className="confirm-icon-wrap confirm-icon-del">
-            <Trash2 size={18} color="var(--red)" />
-          </div>
-          <p>
-            Deseja excluir <strong>{despesa.descricao}</strong>?<br />
-            Esta ação não pode ser desfeita.
-          </p>
-        </div>
-        <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-danger" onClick={handleConfirm} disabled={excluindo}>
-            {excluindo ? "Excluindo..." : "Confirmar Exclusão"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════
-   MODAL: Detalhes da Despesa
-   ════════════════════════════════════════ */
-function ModalDetalhes({ despesa, onEditar, onPagar, onDesfazer, onDeletar, podeEditar, podeExcluir, onClose }) {
-  const d = despesa;
-  const FORMAS_LABEL = { dinheiro: "Dinheiro", pix: "Pix", cartão: "Cartão" };
-
-  return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box modal-box-lg">
-        <div className="modal-header">
-          <div>
-            <div className="modal-title" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontFamily: "Sora", color: "var(--gold)", fontSize: 13 }}>{d.idShow || d.id}</span>
-              <span>·</span>
-              {d.descricao}
-            </div>
-            <div className="modal-sub" style={{ marginTop: 4 }}>
-              <StatusBadge status={d.status} />
-            </div>
-          </div>
-          <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)" /></button>
-        </div>
-
-        <div className="modal-body">
-          {/* Dados financeiros */}
-          <div className="det-section-title">Dados financeiros</div>
-          <div className="det-grid">
-            <div>
-              <div className="det-item-label">Valor</div>
-              <div className="det-item-val det-item-val-mono" style={{ color: "var(--green)", fontSize: 16 }}>{fmtR$(d.valor)}</div>
-            </div>
-            <div>
-              <div className="det-item-label">Vencimento</div>
-              <div className="det-item-val">{fmtData(d.vencimento)}</div>
-            </div>
-            <div>
-              <div className="det-item-label">Data de pagamento</div>
-              <div className="det-item-val">{d.dataPagamento ? fmtData(d.dataPagamento) : <span style={{ color: "var(--text-3)" }}>—</span>}</div>
-            </div>
-            <div>
-              <div className="det-item-label">Forma de pagamento</div>
-              <div className="det-item-val">{FORMAS_LABEL[d.formaPagamento] || d.formaPagamento || <span style={{ color: "var(--text-3)" }}>—</span>}</div>
-            </div>
-            <div>
-              <div className="det-item-label">Categoria</div>
-              <div className="det-item-val">{d.categoria || <span style={{ color: "var(--text-3)" }}>—</span>}</div>
-            </div>
-            <div>
-              <div className="det-item-label">Centro de custo</div>
-              <div className="det-item-val">{d.centroCusto || <span style={{ color: "var(--text-3)" }}>—</span>}</div>
-            </div>
-            <div>
-              <div className="det-item-label">Fornecedor</div>
-              <div className="det-item-val">{d.fornecedor || <span style={{ color: "var(--text-3)" }}>—</span>}</div>
-            </div>
-            {d.parcelado && d.totalParcelas && (
-              <div>
-                <div className="det-item-label">Parcela</div>
-                <div className="det-item-val">{d.parcelaAtual}/{d.totalParcelas}</div>
-              </div>
-            )}
-            {d.observacao && (
-              <div className="det-grid-full">
-                <div className="det-item-label">Observação</div>
-                <div className="det-item-val" style={{ color: "var(--text-2)" }}>{d.observacao}</div>
-              </div>
-            )}
-          </div>
-
-          {/* Recorrência */}
-          {d.recorrente && (
-            <>
-              <div className="det-section-title">Recorrência</div>
-              <div className="det-grid">
-                <div>
-                  <div className="det-item-label">Tipo</div>
-                  <div className="det-item-val" style={{ textTransform: "capitalize" }}>{d.tipoRecorrencia || "—"}</div>
-                </div>
-                <div>
-                  <div className="det-item-label">Intervalo</div>
-                  <div className="det-item-val">{d.intervalo || 1}x</div>
-                </div>
-                {d.dataFim && (
-                  <div>
-                    <div className="det-item-label">Data fim</div>
-                    <div className="det-item-val">{fmtData(d.dataFim)}</div>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-
-          {/* Ações */}
-          <div className="det-actions-row">
-            {d.status !== "pago" && d.status !== "cancelado" && (
-              <button className="btn-success" onClick={() => { onClose(); onPagar(d); }}>
-                <CheckCircle size={13} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
-                Registrar Pagamento
-              </button>
-            )}
-            {d.status === "pago" && (
-              <button className="btn-secondary" onClick={() => { onClose(); onDesfazer(d); }}>
-                <RotateCcw size={13} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
-                Desfazer Pagamento
-              </button>
-            )}
-            {podeEditar && (
-              <button className="btn-secondary" onClick={() => { onClose(); onEditar(d); }}>
-                <Edit2 size={13} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
-                Editar
-              </button>
-            )}
-            {podeExcluir && (
-              <button className="btn-danger" onClick={() => { onClose(); onDeletar(d); }}>
-                <Trash2 size={13} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
-                Excluir
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════
-   STATUS BADGE
-   ════════════════════════════════════════ */
-function StatusBadge({ status }) {
-  const map = {
-    pago:      { cls: "status-pago",     Icon: CheckCircle, label: "Pago" },
-    pendente:  { cls: "status-pendente", Icon: Clock,       label: "Pendente" },
-    vencido:   { cls: "status-vencido",  Icon: AlertCircle, label: "Vencido" },
-    cancelado: { cls: "status-cancelado",Icon: X,           label: "Cancelado" },
-  };
-  const s = map[status] || map.pendente;
-  return (
-    <span className={`status-badge ${s.cls}`}>
-      <s.Icon size={10} />
-      {s.label}
-    </span>
-  );
-}
-
-/* ════════════════════════════════════════
-   MODAL: Gerenciar Categorias (standalone)
-   ════════════════════════════════════════ */
-function ModalCategorias({ categorias, onCriar, onRenomear, onDesativar, onClose }) {
-  const [novaCategoria, setNovaCategoria] = useState("");
-  const [salvando, setSalvando]           = useState(false);
-  const [editandoId, setEditandoId]       = useState(null);
-  const [editandoNome, setEditandoNome]   = useState("");
-  const [confirmDelId, setConfirmDelId]   = useState(null);
-
-  const handleCriar = async () => {
-    if (!novaCategoria.trim()) return;
-    setSalvando(true);
-    await onCriar(novaCategoria);
-    setNovaCategoria("");
-    setSalvando(false);
-  };
-
-  const handleIniciarEdit = (cat) => {
-    setEditandoId(cat.id);
-    setEditandoNome(cat.nome);
-    setConfirmDelId(null);
-  };
-
-  const handleSalvarEdit = async () => {
-    if (!editandoNome.trim()) return;
-    await onRenomear(editandoId, editandoNome);
-    setEditandoId(null);
-    setEditandoNome("");
-  };
-
-  const handleExcluir = async (id) => {
-    await onDesativar(id);
-    setConfirmDelId(null);
-  };
-
-  return (
-    <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box modal-box-md">
-        <div className="modal-header">
-          <div>
-            <div className="modal-title">Gerenciar Categorias</div>
-            <div className="modal-sub">Crie, edite ou exclua categorias de despesas</div>
-          </div>
-          <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)" /></button>
-        </div>
-
-        <div className="modal-body">
-          {/* Lista de categorias */}
-          {categorias.length === 0 ? (
-            <div className="cat-modal-empty">Nenhuma categoria cadastrada ainda.</div>
-          ) : (
-            <div className="cat-modal-list">
-              {categorias.map(c => (
-                <div key={c.id} className="cat-modal-item">
-                  {editandoId === c.id ? (
-                    /* Modo edição */
-                    <div style={{ display: "flex", gap: 6, flex: 1, alignItems: "center" }}>
-                      <input
-                        className="cat-modal-edit-input"
-                        value={editandoNome}
-                        onChange={e => setEditandoNome(e.target.value)}
-                        onKeyDown={e => {
-                          if (e.key === "Enter") handleSalvarEdit();
-                          if (e.key === "Escape") setEditandoId(null);
-                        }}
-                        autoFocus
-                      />
-                      <button className="btn-success" style={{ padding: "5px 12px", fontSize: 12 }} onClick={handleSalvarEdit}>
-                        Salvar
-                      </button>
-                      <button className="btn-secondary" style={{ padding: "5px 10px", fontSize: 12 }} onClick={() => setEditandoId(null)}>
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ) : confirmDelId === c.id ? (
-                    /* Confirmar exclusão inline */
-                    <div style={{ display: "flex", gap: 6, flex: 1, alignItems: "center" }}>
-                      <span style={{ fontSize: 12, color: "var(--red)", flex: 1 }}>
-                        Excluir <strong style={{ color: "var(--text)" }}>{c.nome}</strong>?
-                      </span>
-                      <button className="btn-danger" style={{ padding: "5px 12px", fontSize: 12 }} onClick={() => handleExcluir(c.id)}>
-                        Confirmar
-                      </button>
-                      <button className="btn-secondary" style={{ padding: "5px 10px", fontSize: 12 }} onClick={() => setConfirmDelId(null)}>
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ) : (
-                    /* Visualização normal */
-                    <>
-                      <span className="cat-modal-item-name">{c.nome}</span>
-                      <div className="cat-modal-item-actions">
-                        <button
-                          className="btn-icon btn-icon-edit"
-                          title="Renomear"
-                          onClick={() => handleIniciarEdit(c)}
-                        >
-                          <Edit2 size={12} />
-                        </button>
-                        <button
-                          className="btn-icon btn-icon-del"
-                          title="Excluir"
-                          onClick={() => { setConfirmDelId(c.id); setEditandoId(null); }}
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Criar nova */}
-          <hr className="form-divider" />
-          <div className="form-section-title">Nova Categoria</div>
-          <div className="cat-add-row">
-            <input
-              className="cat-modal-edit-input"
-              style={{ borderColor: "var(--border)" }}
-              value={novaCategoria}
-              onChange={e => setNovaCategoria(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && handleCriar()}
-              placeholder="Nome da nova categoria..."
-            />
-            <button
-              className="cat-add-btn"
-              onClick={handleCriar}
-              disabled={salvando || !novaCategoria.trim()}
-            >
-              {salvando ? "..." : "+ Adicionar"}
-            </button>
-          </div>
-        </div>
-
-        <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>Fechar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ════════════════════════════════════════
-   COMPONENTE PRINCIPAL
-   ════════════════════════════════════════ */
-export default function Despesas({ isPro = false }) {
-  const [despesas, setDespesas] = useState([]);
-  const [despesaIdCnt, setDespesaIdCnt] = useState(0);
-  const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-
-  // Filtros
-  const [filtroStatus, setFiltroStatus] = useState("todas");
-  const [filtroCategoria, setFiltroCategoria] = useState("todas");
-  const [filtroPeriodo, setFiltroPeriodo] = useState("mes");
-  const [periodoCustom, setPeriodoCustom] = useState({ inicio: "", fim: "" });
-
-  // ── Multi-tenant ──
-  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
-
-  // ── Flags de permissão ──
-  const podeCriarV   = podeCriar("despesas");
-  const podeEditarV  = podeEditar("despesas");
-  const podeExcluirV = podeExcluir("despesas");
-
-  // Categorias dinâmicas
-  const { categorias, criarCategoria, desativarCategoria, renomearCategoria } = useCategorias(tenantUid);
-
-  // Modais
-
-  const [modalNovo, setModalNovo]             = useState(false);
-  const [editando, setEditando]               = useState(null);
-  const [pagando, setPagando]                 = useState(null);
-  const [deletando, setDeletando]             = useState(null);
-  const [modalCategorias, setModalCategorias] = useState(false);
-  const [viendoDetalhes, setViendoDetalhes]   = useState(null);
-
-  /* ── Firestore ── */
+  /* Firestore — usa tenantUid (funciona para admin E convidados) */
   useEffect(() => {
     if (!tenantUid) { setLoading(false); return; }
 
-    const userRef   = doc(db, "users", tenantUid);
-    const despesasCol = collection(db, "users", tenantUid, "despesas");
-    const q = query(despesasCol, orderBy("vencimento", "asc"));
+    const col = (name) => collection(db, "users", tenantUid, name);
+    setLoading(true);
 
-    const unsubUser = onSnapshot(userRef, (snap) => {
-      if (snap.exists()) setDespesaIdCnt(snap.data().despesaIdCnt || 0);
-    });
+    const subs = [
+      onSnapshot(col("vendas"),   (s) => setVendas(s.docs.map((d) => ({ id: d.id, ...d.data() })))),
+      onSnapshot(col("clientes"), (s) => setClientes(s.docs.map((d) => ({ id: d.id, ...d.data() })))),
+      onSnapshot(col("despesas"), (s) => { setDespesas(s.docs.map((d) => ({ id: d.id, ...d.data() }))); setLoading(false); }),
+      onSnapshot(col("produtos"), (s) => setProdutos(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        /* Ignorar erro se collection não existir */ () => {}),
+      onSnapshot(col("eventos"),   (s) => setAgenda(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        () => {}),
+      onSnapshot(col("caixa"),    (s) => setCaixa(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        () => {}),
+    ];
 
-    const unsubDesp = onSnapshot(q, (snap) => {
-      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Fallback: garantir que loading pare mesmo sem despesas
+    const timeout = setTimeout(() => setLoading(false), 3000);
 
-      // Rotina diária: atualizar status vencido
-      const batch = writeBatch(db);
-      let mudou = false;
-      docs.forEach(d => {
-        const novoStatus = calcularStatus(d.vencimento, d.status);
-        if (novoStatus !== d.status) {
-          batch.update(doc(db, "users", tenantUid, "despesas", d.id), {
-            status: novoStatus,
-            ...(novoStatus === "pago" ? { pagoEm: serverTimestamp() } : {}),
-          });
-          mudou = true;
-        }
-      });
-      if (mudou) batch.commit();
-
-      setDespesas(docs.map(d => ({ ...d, status: calcularStatus(d.vencimento, d.status) })));
-      setLoading(false);
-    });
-
-    return () => { unsubUser(); unsubDesp(); };
+    return () => {
+      subs.forEach((fn) => { try { fn(); } catch {} });
+      clearTimeout(timeout);
+    };
   }, [tenantUid]);
 
-  /* ── Criar despesa(s) ── */
-  const handleAdd = async (form) => {
-    if (!tenantUid) return;
-    let cnt = despesaIdCnt;
-
-    if (form.parcelado && form.totalParcelas > 1) {
-      // Parcelamento: todas as parcelas compartilham o mesmo número base (cnt atual)
-      // e recebem idShow = "D000X-N"
-      const grupoId = `G${Date.now()}`;
-      const batch = writeBatch(db);
-      const baseNum = cnt; // número sequencial desse grupo
-
-      for (let i = 0; i < form.totalParcelas; i++) {
-        const newDocId = `${gerarIdBase(baseNum)}-${i + 1}-${Date.now()}-${i}`;
-        const idShow = gerarIdShow(baseNum, i + 1, form.totalParcelas);
-        const dataVenc = (() => {
-          const d = new Date(form.vencimento + "T12:00:00");
-          d.setMonth(d.getMonth() + i);
-          return d.toISOString().split("T")[0];
-        })();
-        const status = calcularStatus(dataVenc, "pendente");
-
-        batch.set(doc(db, "users", tenantUid, "despesas", newDocId), {
-          ...form, parcelado: true, grupoId,
-          parcelaAtual: i + 1,
-          idShow,
-          vencimento: dataVenc, status,
-          dataCriacao: new Date().toISOString(),
-        });
-      }
-      cnt++; // grupo inteiro consome apenas 1 número sequencial
-
-      batch.set(doc(db, "users", tenantUid), { despesaIdCnt: cnt }, { merge: true });
-      await batch.commit();
-    } else {
-      // Despesa única
-      const newDocId = `${gerarIdBase(cnt)}-${Date.now()}`;
-      const idShow = gerarIdShow(cnt);
-      const status = calcularStatus(form.vencimento, "pendente");
-
-      await setDoc(doc(db, "users", tenantUid, "despesas", newDocId), {
-        ...form, status, idShow, dataCriacao: new Date().toISOString(),
-      });
-      await setDoc(doc(db, "users", tenantUid), { despesaIdCnt: cnt + 1 }, { merge: true });
-    }
-
-    setModalNovo(false);
-  };
-
-  /* ── Editar ── */
-  const handleEdit = async (form) => {
-    if (!tenantUid || !editando) return;
-    const status = calcularStatus(form.vencimento, editando.status);
-    await setDoc(doc(db, "users", tenantUid, "despesas", editando.id), { ...form, status }, { merge: true });
-    setEditando(null);
-  };
-
-  /* ── Pagar ── */
-  const handlePagar = async (formaPagamento, dataPagamento) => {
-    if (!tenantUid || !pagando) return;
-    const ref = doc(db, "users", tenantUid, "despesas", pagando.id);
-
-    await setDoc(ref, {
-      status: "pago",
-      formaPagamento,
-      dataPagamento: dataPagamento || new Date().toISOString().split("T")[0],
-    }, { merge: true });
-
-    // Recorrência: gerar próximo lançamento
-    if (pagando.recorrente) {
-      const dataFimOk = !pagando.dataFim || new Date(pagando.dataFim) > new Date();
-      if (dataFimOk) {
-        const novaData = proximaData(pagando.vencimento, pagando.tipoRecorrencia, pagando.intervalo || 1);
-        if (novaData) {
-          const cnt = despesaIdCnt;
-          const newDocId = `${gerarIdBase(cnt)}-${Date.now()}`;
-          const idShow = gerarIdShow(cnt);
-          const novoStatus = calcularStatus(novaData, "pendente");
-          await setDoc(doc(db, "users", tenantUid, "despesas", newDocId), {
-            descricao:      pagando.descricao,
-            valor:          pagando.valor,
-            vencimento:     novaData,
-            categoria:      pagando.categoria,
-            centroCusto:    pagando.centroCusto,
-            fornecedor:     pagando.fornecedor,
-            formaPagamento: pagando.formaPagamento,
-            recorrente:     true,
-            tipoRecorrencia:pagando.tipoRecorrencia,
-            intervalo:      pagando.intervalo,
-            dataFim:        pagando.dataFim || null,
-            recorrenciaOrigemId: pagando.id,
-            idShow,
-            status:         novoStatus,
-            dataCriacao:    new Date().toISOString(),
-          });
-          await setDoc(doc(db, "users", tenantUid), { despesaIdCnt: cnt + 1 }, { merge: true });
-        }
-      }
-    }
-
-    setPagando(null);
-  };
-
-  /* ── Desfazer pagamento ── */
-  const handleDesfazerPagamento = async (despesa) => {
-    if (!tenantUid) return;
-    const status = calcularStatus(despesa.vencimento, "pendente");
-    await setDoc(doc(db, "users", tenantUid, "despesas", despesa.id), {
-      status, dataPagamento: null,
-    }, { merge: true });
-  };
-
-  /* ── Deletar ── */
-  const handleDelete = async () => {
-    if (!tenantUid || !deletando) return;
-    await deleteDoc(doc(db, "users", tenantUid, "despesas", deletando.id));
-    setDeletando(null);
-  };
-
-  /* ── Filtros e métricas ── */
-  const mesAtual = new Date().getMonth();
-  const anoAtual = new Date().getFullYear();
-
-  const despesasFiltradas = useMemo(() => {
-    let lista = [...despesas];
-
-    // Regime de caixa: despesas pagas usam dataPagamento como referência,
-    // as demais (pendente/vencido) usam vencimento.
-    const getDataRef = (d) => {
-      if (d.status === "pago" && d.dataPagamento) return parseDate(d.dataPagamento);
-      return parseDate(d.vencimento);
-    };
-
-    // Período
-    if (filtroPeriodo === "mes") {
-      lista = lista.filter(d => {
-        const dt = getDataRef(d);
-        return dt && dt.getMonth() === mesAtual && dt.getFullYear() === anoAtual;
-      });
-    } else if (filtroPeriodo === "semana") {
-      const inicio = new Date(); inicio.setDate(inicio.getDate() - inicio.getDay());
-      const fim    = new Date(inicio); fim.setDate(inicio.getDate() + 6);
-      lista = lista.filter(d => {
-        const dt = getDataRef(d);
-        return dt && dt >= inicio && dt <= fim;
-      });
-    } else if (filtroPeriodo === "custom") {
-      const inicio = periodoCustom.inicio ? parseDate(periodoCustom.inicio) : null;
-      const fim    = periodoCustom.fim    ? parseDate(periodoCustom.fim)    : null;
-      lista = lista.filter(d => {
-        const dt = getDataRef(d);
-        if (!dt) return false;
-        if (inicio && dt < inicio) return false;
-        if (fim    && dt > fim)    return false;
-        return true;
-      });
-    }
-
-    // Status
-    if (filtroStatus !== "todas") lista = lista.filter(d => d.status === filtroStatus);
-
-    // Categoria
-    if (filtroCategoria !== "todas") lista = lista.filter(d => d.categoria === filtroCategoria);
-
-    // Busca
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      lista = lista.filter(d =>
-        d.descricao?.toLowerCase().includes(q) ||
-        d.fornecedor?.toLowerCase().includes(q) ||
-        d.categoria?.toLowerCase().includes(q)
-      );
-    }
-
-    return lista;
-  }, [despesas, filtroStatus, filtroCategoria, filtroPeriodo, periodoCustom, search, mesAtual, anoAtual]);
-
-  const metricas = useMemo(() => {
-    const base = filtroPeriodo === "todas" ? despesas : despesasFiltradas;
-    const vencidas  = base.filter(d => d.status === "vencido").length;
-    const em3dias   = base.filter(d => {
-      if (d.status !== "pendente") return false;
-      const dt = parseDate(d.vencimento);
-      if (!dt) return false;
-      const diff = (dt - hoje()) / (1000 * 60 * 60 * 24);
-      return diff >= 0 && diff <= 3;
-    }).length;
-    const totalPendente = base.filter(d => d.status === "pendente" || d.status === "vencido")
-      .reduce((s, d) => s + (d.valor || 0), 0);
-    const totalPago = base.filter(d => d.status === "pago")
-      .reduce((s, d) => s + (d.valor || 0), 0);
-    return { vencidas, em3dias, totalPendente, totalPago };
-  }, [despesas, despesasFiltradas, filtroPeriodo]);
-
-  const categoriasFiltro = useMemo(() =>
-    categorias.map(c => c.nome),
-    [categorias]
+  /* Intervalo calculado */
+  const intervalo = useMemo(
+    () => getIntervalo(periodo, dataInicio, dataFim),
+    [periodo, dataInicio, dataFim]
   );
 
-  // App.jsx bloqueia render enquanto loadingAuth||!tenantUid
+  /* Impressão */
+  const handlePrint = useCallback(() => window.print(), []);
+
+  if (!tenantUid) {
+    return (
+      <div className="rel-loading">
+        <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
+        Carregando autenticação...
+      </div>
+    );
+  }
+
+  /* Renderiza o relatório ativo */
+  const renderConteudo = () => {
+    if (loading) {
+      return (
+        <div className="rel-loading">
+          <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
+          Carregando dados...
+        </div>
+      );
+    }
+    switch (ativo) {
+      case "dre":        return <RelatorioDRE vendas={vendas} despesas={despesas} caixa={caixa} intervalo={intervalo} uid={tenantUid} />;
+      case "financeiro": return <RelatorioFinanceiro caixa={caixa} intervalo={intervalo} />;
+      case "vendas":     return <RelatorioVendas vendas={vendas} intervalo={intervalo} />;
+      case "despesas":   return <RelatorioDespesas despesas={despesas} intervalo={intervalo} />;
+      case "estoque":    return <RelatorioEstoque produtos={produtos} />;
+      case "clientes":   return <RelatorioClientes clientes={clientes} vendas={vendas} intervalo={intervalo} />;
+      case "agenda":     return <RelatorioAgenda agenda={agenda} intervalo={intervalo} />;
+      default:           return null;
+    }
+  };
 
   return (
     <>
       <style>{CSS}</style>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      {/* Topbar */}
-      <header className="desp-topbar">
-        <div className="desp-topbar-title">
-          <h1>Despesas</h1>
-          <p>Controle de pagamentos e obrigações financeiras</p>
-        </div>
-
-        <div className="desp-search">
-          <Search size={13} color="var(--text-3)" />
-          <input
-            placeholder="Buscar por descrição, fornecedor..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-
-        <div style={{ marginLeft: "auto" }}>
-          <button
-            className="btn-nova-desp"
-            onClick={() => setModalNovo(true)}
-            disabled={!podeCriarV || (!isPro && despesas.length >= LIMITES_FREE.despesas)}
-            title={!isPro && despesas.length >= LIMITES_FREE.despesas ? `Limite de ${LIMITES_FREE.despesas} despesas atingido no plano Free` : undefined}
-          >
-            <Plus size={14} /> Nova Despesa
-          </button>
-        </div>
-      </header>
-
-      {/* Cards de métricas */}
-      <BannerLimite total={despesas.length} limite={LIMITES_FREE.despesas} tipo="despesas" isPro={isPro} />
-      <div className="desp-metrics">
-        <div className="metric-card metric-card-red">
-          <div className="metric-icon metric-icon-red">
-            <AlertCircle size={15} color="var(--red)" />
+      <div className="rel-root">
+        {/* Barra superior */}
+        <header className="rel-topbar">
+          <div className="rel-topbar-left">
+            <div className="rel-topbar-title">
+              <h1>Relatórios</h1>
+              <p>{TITULO_RELATORIO[ativo]}</p>
+            </div>
           </div>
-          <div className="metric-label">Vencidas</div>
-          <div className="metric-val metric-val-red">{metricas.vencidas}</div>
-          <div className="metric-sub">despesas em atraso</div>
-        </div>
+          {/* rel-actions removido daqui — botões foram para o cabeçalho do conteúdo */}
+        </header>
 
-        <div className="metric-card metric-card-amber">
-          <div className="metric-icon metric-icon-amber">
-            <AlertTriangle size={15} color="var(--gold)" />
-          </div>
-          <div className="metric-label">Vencem em 3 dias</div>
-          <div className="metric-val metric-val-amber">{metricas.em3dias}</div>
-          <div className="metric-sub">requerem atenção</div>
-        </div>
+        <div className="rel-body">
+          {/* Sidebar de navegação */}
+          <nav className="rel-nav" data-print-hide>
+            <div className="rel-nav-label">Relatórios</div>
+            {MENU.map((item) => {
+              const liberado = temAcesso(item.key);
+              return (
+                <button
+                  key={item.key}
+                  className={`rel-nav-btn ${ativo === item.key && liberado ? "active" : ""}`}
+                  onClick={() => liberado && setAtivo(item.key)}
+                  title={!liberado ? "Sem permissão para este relatório" : ""}
+                  style={!liberado ? { opacity: 0.45, cursor: "not-allowed" } : {}}
+                >
+                  {liberado ? item.icon : <Lock size={15} />}
+                  {item.label}
+                  {!liberado && <Lock size={11} style={{ marginLeft: "auto", color: "var(--text-3)" }} />}
+                </button>
+              );
+            })}
+          </nav>
 
-        <div className="metric-card metric-card-purple">
-          <div className="metric-icon metric-icon-purple">
-            <Clock size={15} color="#8b5cf6" />
-          </div>
-          <div className="metric-label">Total Pendente</div>
-          <div className="metric-val metric-val-purple" style={{ fontSize: 17 }}>{fmtR$(metricas.totalPendente)}</div>
-          <div className="metric-sub">a pagar</div>
-        </div>
-
-        <div className="metric-card metric-card-green">
-          <div className="metric-icon metric-icon-green">
-            <TrendingUp size={15} color="var(--green)" />
-          </div>
-          <div className="metric-label">Pago este mês</div>
-          <div className="metric-val metric-val-green" style={{ fontSize: 17 }}>{fmtR$(metricas.totalPago)}</div>
-          <div className="metric-sub">liquidado</div>
-        </div>
-      </div>
-
-      {/* Filtros */}
-      <div className="desp-filters">
-        <span className="filter-label">Mostrar:</span>
-        {[
-          { value: "todas",    label: "Todas" },
-          { value: "pendente", label: "Pendentes" },
-          { value: "vencido",  label: "Vencidas" },
-          { value: "pago",     label: "Pagas" },
-        ].map(f => (
-          <button
-            key={f.value}
-            className={`filter-chip ${filtroStatus === f.value ? "active" : ""}`}
-            onClick={() => setFiltroStatus(f.value)}
-          >
-            {f.label}
-          </button>
-        ))}
-
-        <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 4px" }} />
-
-        <select className="filter-select" value={filtroPeriodo} onChange={e => setFiltroPeriodo(e.target.value)}>
-          <option value="mes">Este mês</option>
-          <option value="semana">Esta semana</option>
-          <option value="todas">Tudo</option>
-          <option value="custom">Período personalizado</option>
-        </select>
-
-        {filtroPeriodo === "custom" && (
-          <div className="periodo-custom">
-            <input
-              type="date"
-              value={periodoCustom.inicio}
-              onChange={e => setPeriodoCustom(p => ({ ...p, inicio: e.target.value }))}
-            />
-            <span>até</span>
-            <input
-              type="date"
-              value={periodoCustom.fim}
-              onChange={e => setPeriodoCustom(p => ({ ...p, fim: e.target.value }))}
-            />
-          </div>
-        )}
-
-        <select className="filter-select" value={filtroCategoria} onChange={e => setFiltroCategoria(e.target.value)}>
-          <option value="todas">Todas categorias</option>
-          {categoriasFiltro.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-
-        <button
-          className={`btn-gear-cat ${modalCategorias ? "active" : ""}`}
-          onClick={() => setModalCategorias(true)}
-          title="Gerenciar categorias"
-        >
-          <Settings size={12} />
-          Categorias
-        </button>
-      </div>
-
-      {/* Tabela */}
-      <div className="desp-table-wrap">
-        <div className="desp-table-header">
-          <span className="desp-table-title">Despesas</span>
-          <span className="count-badge">{despesasFiltradas.length}</span>
-        </div>
-
-        {/* Cabeçalho */}
-        <div className="desp-row desp-row-head">
-          <span>ID</span>
-          <span>Descrição</span>
-          <span>Categoria</span>
-          <span>Valor</span>
-          <span>Vencimento</span>
-          <span>Status</span>
-          <span>Fornecedor</span>
-          <span>Pagamento</span>
-          <span style={{ textAlign: "right" }}>Ações</span>
-        </div>
-
-        {loading ? (
-          <div className="desp-loading">Carregando despesas...</div>
-        ) : despesasFiltradas.length === 0 ? (
-          <div className="desp-empty">Nenhuma despesa encontrada.</div>
-        ) : despesasFiltradas.map(d => (
-          <div key={d.id} className="desp-row" style={{ cursor: "pointer" }} onClick={() => setViendoDetalhes(d)}>
-            {/* ID */}
-            <span className="desp-id" title={`doc.id: ${d.id}`}>
-              {d.idShow || d.id}
-              {d.recorrente && (
-                <RefreshCw size={9} className="recorr-icon" style={{ marginLeft: 5, verticalAlign: "middle" }} />
-              )}
-            </span>
-
-            {/* Descrição */}
-            <div>
-              <div className="desp-desc">
-                {d.descricao}
-                {d.parcelado && d.totalParcelas && (
-                  <span className="parcel-badge" style={{ marginLeft: 6 }}>
-                    {d.parcelaAtual}/{d.totalParcelas}
-                  </span>
-                )}
+          {/* Área de conteúdo */}
+          <main className="rel-content">
+            {/* Cabeçalho de impressão (visível só no print) */}
+            <div className="rel-print-header">
+              <div>
+                <h2>{TITULO_RELATORIO[ativo]}</h2>
+                <p>Gerado em {new Date().toLocaleDateString("pt-BR", { dateStyle: "full" })}</p>
               </div>
-              {d.observacao && <div className="desp-desc-obs">{d.observacao}</div>}
+              <div className="rel-print-brand">ASSENT Gestão</div>
             </div>
 
-            {/* Categoria */}
-            <span className="cat-badge">{d.categoria || "—"}</span>
+            {/* Filtro de período */}
+            <FiltroPeriodo
+              periodo={periodo}
+              setPeriodo={setPeriodo}
+              dataInicio={dataInicio}
+              setDataInicio={setDataInicio}
+              dataFim={dataFim}
+              setDataFim={setDataFim}
+            />
 
-            {/* Valor */}
-            <span className="desp-valor">{fmtR$(d.valor)}</span>
-
-            {/* Vencimento */}
-            <span>{fmtData(d.vencimento)}</span>
-
-            {/* Status */}
-            <StatusBadge status={d.status} />
-
-            {/* Fornecedor */}
-            <span style={{ color: "var(--text-2)", fontSize: 12 }}>{d.fornecedor || "—"}</span>
-
-            {/* Data pagamento */}
-            <span style={{ fontSize: 12 }}>
-              {d.dataPagamento ? fmtData(d.dataPagamento) : "—"}
-            </span>
-
-            {/* Ações */}
-            <div className="desp-actions" onClick={e => e.stopPropagation()}>
-              {d.status !== "pago" && d.status !== "cancelado" && (
-                <button
-                  className="btn-icon btn-icon-pay"
-                  title="Registrar pagamento"
-                  onClick={() => setPagando(d)}
-                >
-                  <CheckCircle size={13} />
+            {/* CORREÇÃO 3: Cabeçalho do relatório ativo com botões de ação juntos */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <span className="rel-section-title">
+                <ChevronRight size={15} />
+                {TITULO_RELATORIO[ativo]}
+              </span>
+              <div style={{ display: "flex", gap: 8 }} data-print-hide>
+                <button className="btn-secondary" onClick={handlePrint}
+                  style={{ fontSize: 12, padding: "6px 14px" }}>
+                  <Printer size={13} /> Imprimir
                 </button>
-              )}
-              {d.status === "pago" && (
-                <button
-                  className="btn-icon btn-icon-undo"
-                  title="Desfazer pagamento"
-                  onClick={() => handleDesfazerPagamento(d)}
-                >
-                  <RotateCcw size={13} />
-                </button>
-              )}
-              {podeEditarV && <button className="btn-icon btn-icon-edit" title="Editar" onClick={() => setEditando(d)}>
-                <Edit2 size={13} />
-              </button>}
-              {podeExcluirV && <button className="btn-icon btn-icon-del" title="Excluir" onClick={() => setDeletando(d)}>
-                <Trash2 size={13} />
-              </button>}
+              </div>
             </div>
-          </div>
-        ))}
+
+            {/* Conteúdo do relatório */}
+            {renderConteudo()}
+          </main>
+        </div>
       </div>
-
-      {/* Modais */}
-      {viendoDetalhes && (
-        <ModalDetalhes
-          despesa={viendoDetalhes}
-          onEditar={setEditando}
-          onPagar={setPagando}
-          onDesfazer={handleDesfazerPagamento}
-          onDeletar={setDeletando}
-          podeEditar={podeEditarV}
-          podeExcluir={podeExcluirV}
-          onClose={() => setViendoDetalhes(null)}
-        />
-      )}
-      {modalCategorias && (
-        <ModalCategorias
-          categorias={categorias}
-          onCriar={criarCategoria}
-          onRenomear={renomearCategoria}
-          onDesativar={desativarCategoria}
-          onClose={() => setModalCategorias(false)}
-        />
-      )}
-      {modalNovo && podeCriarV && (
-        <ModalNovaDespesa
-          despesas={despesas}
-          categorias={categorias}
-          onCriarCategoria={criarCategoria}
-          onDesativarCategoria={desativarCategoria}
-          onSave={handleAdd}
-          onClose={() => setModalNovo(false)}
-        />
-      )}
-      {editando && podeEditarV && (
-        <ModalNovaDespesa
-          despesa={editando}
-          despesas={despesas}
-          categorias={categorias}
-          onCriarCategoria={criarCategoria}
-          onDesativarCategoria={desativarCategoria}
-          onSave={handleEdit}
-          onClose={() => setEditando(null)}
-        />
-      )}
-      {pagando && (
-        <ModalPagar despesa={pagando} onConfirm={handlePagar} onClose={() => setPagando(null)} />
-      )}
-      {deletando && podeExcluirV && (
-        <ModalConfirmDelete despesa={deletando} onConfirm={handleDelete} onClose={() => setDeletando(null)} />
-      )}
     </>
   );
 }
