@@ -538,11 +538,14 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
   }, [configTaxas]);
 
   const dados = useMemo(() => {
-    const // Regime de caixa: só despesas PAGAS entram no DRE
-      // dataPagamento = quando o dinheiro saiu de fato; fallback para vencimento (não d.data, que não existe em despesas)
-      dFiltradas = despesas.filter((d) =>
-        d.status === "pago" &&
-        dentroDoIntervalo(d.dataPagamento || d.vencimento, intervalo));
+    // Regime de caixa: só despesas PAGAS entram no DRE.
+    // Prioridade de data para filtro:
+    //   1. dataPagamentoTs → Timestamp Firestore (sem bug de timezone)
+    //   2. dataPagamento   → string "YYYY-MM-DD" (documentos antigos sem Ts)
+    //   3. vencimento      → fallback final
+    const dFiltradas = despesas.filter((d) =>
+      d.status === "pago" &&
+      dentroDoIntervalo(d.dataPagamentoTs || d.dataPagamento || d.vencimento, intervalo));
 
     /* ══════════════════════════════════════════════════════════════════
        REGIME DE CAIXA PURO — RECEITA
@@ -965,10 +968,13 @@ function RelatorioFinanceiro({ caixa, intervalo }) {
    ══════════════════════════════════════════════════════ */
 function RelatorioDespesas({ despesas, intervalo }) {
   const dados = useMemo(() => {
-    // Para despesas pagas, a data relevante é dataPagamento (quando saiu o dinheiro).
-    // Para pendentes/vencidas, a data relevante é vencimento.
+    // Para despesas pagas: priorizar dataPagamentoTs (Timestamp, sem bug de timezone),
+    // depois dataPagamento (string legada), depois vencimento.
+    // Para pendentes/vencidas: usar vencimento.
     const dataRefDespesa = (d) =>
-      d.status === "pago" && d.dataPagamento ? d.dataPagamento : d.vencimento;
+      d.status === "pago"
+        ? (d.dataPagamentoTs || d.dataPagamento || d.vencimento)
+        : d.vencimento;
 
     const filtradas = despesas
       .filter((d) => dentroDoIntervalo(dataRefDespesa(d), intervalo))
