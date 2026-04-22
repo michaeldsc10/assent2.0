@@ -214,16 +214,16 @@ const CSS = `
 
   /* ── Topbar ── */
   .vd-topbar {
-    padding: 10px 22px;
+    padding: 14px 22px;
     background: var(--s1); border-bottom: 1px solid var(--border);
     display: flex; align-items: center; gap: 12px; flex-shrink: 0;
   }
   .vd-topbar-title { flex-shrink: 0; }
   .vd-topbar-title h1 {
-    font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 600;
+    font-family: 'Sora', sans-serif; font-size: 19px; font-weight: 600;
     color: var(--text);
   }
-  .vd-topbar-title p { font-size: 11px; color: var(--text-2); margin-top: 1px; }
+  .vd-topbar-title p { font-size: 11px; color: var(--text-2); margin-top: 2px; }
   .vd-search {
     display: flex; align-items: center; gap: 8px;
     background: var(--s2); border: 1px solid var(--border);
