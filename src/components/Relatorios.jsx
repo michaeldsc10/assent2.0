@@ -1241,7 +1241,6 @@ function RelatorioEstoque({ produtos }) {
   const dados = useMemo(() => {
     /* CORREÇÃO 4: campos corretos do Firestore são p.estoque, p.preco, p.custo, p.margem
        Estrutura real: produtos/{id} { custo, estoque, preco, margem, nome } */
-      "| exemplo:", produtos[0] ? JSON.stringify(Object.keys(produtos[0])) : "vazio");
 
     const estoque    = (p) => Number(p.estoque   ?? p.quantidade ?? 0);
     const precoVenda = (p) => Number(p.preco      ?? p.precoVenda ?? 0);
@@ -1396,7 +1395,6 @@ function RelatorioClientes({ clientes, vendas, intervalo }) {
     /* Clientes que compraram no período */
     const vendasPeriodo = vendas.filter((v) => dentroDoIntervalo(v.data, intervalo));
 
-      "| exemplo venda keys:", vendasPeriodo[0] ? JSON.stringify(Object.keys(vendasPeriodo[0])) : "sem vendas");
 
     /* CORREÇÃO 5: Vendas.jsx salva v.cliente (string nome), não v.clienteId.
        Estratégia: primeiro tenta match por ID, fallback por nome normalizado */
@@ -1413,7 +1411,6 @@ function RelatorioClientes({ clientes, vendas, intervalo }) {
       nomesAtivos.has((c.nome || "").trim().toLowerCase())
     );
 
-      "| ativos encontrados:", ativos.length);
 
     /* Clientes com fiado */
     const comFiado = clientes.filter((c) => Number(c.fiado || c.debito || 0) > 0);
@@ -1552,8 +1549,6 @@ function RelatorioAgenda({ agenda, intervalo }) {
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
 
-    /* CORREÇÃO 6: log para debugar campos reais da agenda */
-      "| exemplo item:", agenda[0] ? JSON.stringify(agenda[0]) : "vazio");
 
     /* Helper: extrai a data do item tentando múltiplos campos possíveis */
     const getDataAgenda = (a) =>
@@ -1573,7 +1568,6 @@ function RelatorioAgenda({ agenda, intervalo }) {
         return (da || 0) - (db2 || 0);
       });
 
-      "| intervalo:", intervalo.de?.toLocaleDateString("pt-BR"), "→", intervalo.ate?.toLocaleDateString("pt-BR"));
 
     const futuros = filtrada.filter((a) => {
       const dt = parseDate(getDataAgenda(a));
