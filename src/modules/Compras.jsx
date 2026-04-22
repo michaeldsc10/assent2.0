@@ -15,7 +15,6 @@ import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
 import {
   collection, doc, onSnapshot, writeBatch, updateDoc, deleteDoc,
-  runTransaction, getDoc, serverTimestamp,
 } from "firebase/firestore";
 
 import  { useLicenca  }         from "../hooks/useLicenca";
@@ -369,22 +368,21 @@ const CSS = `
   }
   .cp-btn-add-item:hover { background:var(--s2); color:var(--text); border-color:var(--border-h); }
   .cp-item-row {
-    display:grid; grid-template-columns:1fr 70px 70px 90px 36px;
-    gap:8px; align-items:center; margin-bottom:8px;
+    display:grid; grid-template-columns:1fr 70px 70px 90px 28px;
+    gap:8px; align-items:start; margin-bottom:8px;
   }
   .cp-item-subtotal {
     font-family:'Sora',sans-serif; font-size:12px; font-weight:600;
     color:var(--gold); padding:9px 0 9px 4px; white-space:nowrap;
   }
   .cp-btn-rem-item {
-    width:36px; height:36px; border-radius:7px; margin-top:0;
+    width:28px; height:36px; border-radius:7px; margin-top:0;
     display:flex; align-items:center; justify-content:center;
-    cursor:pointer; background:rgba(224,82,82,.15);
-    border:1px solid rgba(224,82,82,.3);
+    cursor:pointer; background:var(--red-d);
+    border:1px solid rgba(224,82,82,.25); color:rgba(255,255,255,0.85);
     transition:background .13s; flex-shrink:0;
-    overflow:visible;
   }
-  .cp-btn-rem-item:hover { background:rgba(224,82,82,.28); }
+  .cp-btn-rem-item:hover { background:rgba(224,82,82,.2); }
   .cp-total-row {
     display:flex; justify-content:flex-end; align-items:center;
     gap:10px; padding:10px 0 0; border-top:1px solid var(--border); margin-top:4px;
@@ -646,18 +644,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
           });
         });
 
-          /* ── ID Sequencial para despesas (COM-05) ── */
-          const configRef   = doc(db, "users", uid, "config", "geral");
-          const qtdDespesas = isParcelado ? (parseInt(form.parcelas) || 1) : 1;
-          let idSeqInicial  = 0;
-          await runTransaction(db, async (tx) => {
-            const snap = await tx.get(configRef);
-            const atual = snap.exists() ? (snap.data().despesaIdCnt || 0) : 0;
-            idSeqInicial = atual + 1;
-            tx.update(configRef, { despesaIdCnt: atual + qtdDespesas });
-          });
-
-                  /* ─────────────────────────────────────────────────────
+        /* ─────────────────────────────────────────────────────
            3 — DESPESAS (lançamento financeiro para DRE)
 
            Regra:
@@ -670,7 +657,6 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
           fornecedorNome:  forn?.nome || "Fornecedor",
           metodoPagamento: form.metodoPagamento,
           categoria:       "Compras",
-          idSequencial:    idSeqInicial,
           origem:          "compra",
           referenciaId:    compraId,
           observacoes:     form.observacao.trim(),
@@ -687,7 +673,6 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
             const despRef = doc(collection(db, "users", uid, "despesas"));
             batch.set(despRef, {
               ...despesaBase,
-            idSequencial:   idSeqInicial + i,
               descricao:      `Compra ${forn?.nome || ""} — parcela ${i + 1}/${nParc}`,
               valor:          vlParcela,
               valorTotal:     vlParcela,
@@ -888,11 +873,8 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
                 </div>
                 <div className="cp-item-subtotal">{fmtR$(calcSubtotal(it))}</div>
                 <button className="cp-btn-rem-item" onClick={() => remItem(idx)}>
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <line x1="1" y1="1" x2="13" y2="13" stroke="#ff6b6b" strokeWidth="2.5" strokeLinecap="round"/>
-                    <line x1="13" y1="1" x2="1" y2="13" stroke="#ff6b6b" strokeWidth="2.5" strokeLinecap="round"/>
-                  </svg>
-                </button>
+  <X size={11} color="rgba(255,255,255,0.8)" strokeWidth={2.5}/>
+</button>
                
               </div>
             ))}
