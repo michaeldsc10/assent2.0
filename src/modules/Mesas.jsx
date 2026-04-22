@@ -973,7 +973,7 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
                     </div>
                     <div className="cmd-item-total">{fmtR$((item.preco || 0) * (item.qtd || 1))}</div>
                     <button className="cmd-item-remove" onClick={() => removerItem(idx)}>
-                      <X size={13} />
+                      <X size={13} color="var(--red)" />
                     </button>
                   </div>
                 ))
