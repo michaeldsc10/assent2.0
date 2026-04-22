@@ -11,7 +11,7 @@ import { useState, useEffect, useContext, useMemo, useRef } from "react";
 import {
   Search, Plus, Edit2, Trash2, X, Printer,
   ShoppingCart, Package, ChevronDown, FileText,
-  Download, Copy, Filter, Calendar,
+  Download, Copy, Filter, Calendar, Ban,
 } from "lucide-react";
 
 import AuthContext from "../contexts/AuthContext";
@@ -110,8 +110,21 @@ const CSS = `
     border: 1px solid rgba(224,82,82,.25); cursor: pointer;
     font-family: 'DM Sans', sans-serif; font-size: 13px;
     transition: background .13s;
+    display: flex; align-items: center; gap: 6px;
   }
   .btn-danger:hover { background: rgba(224,82,82,.18); }
+  .btn-danger:disabled { opacity: .5; cursor: not-allowed; }
+
+  .btn-warning {
+    padding: 9px 20px; border-radius: 9px;
+    background: rgba(245,166,35,.12); color: #F5A623;
+    border: 1px solid rgba(245,166,35,.25); cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    transition: background .13s;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .btn-warning:hover { background: rgba(245,166,35,.2); }
+  .btn-warning:disabled { opacity: .5; cursor: not-allowed; }
 
   .btn-icon {
     width: 30px; height: 30px; border-radius: 7px;
@@ -123,6 +136,8 @@ const CSS = `
   .btn-icon-edit:hover { background: var(--blue-d); border-color: rgba(91,142,240,.2); }
   .btn-icon-del  { color: var(--red); }
   .btn-icon-del:hover  { background: var(--red-d); border-color: rgba(224,82,82,.2); }
+  .btn-icon-cancel { color: #F5A623; }
+  .btn-icon-cancel:hover { background: rgba(245,166,35,.12); border-color: rgba(245,166,35,.25); }
   .btn-icon-view { color: var(--text-2); }
   .btn-icon-view:hover { background: var(--s3); border-color: var(--border-h); }
 
@@ -1287,7 +1302,7 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
 /* ══════════════════════════════════════════════════
    MODAL: Detalhe de Venda (clique na linha)
    ══════════════════════════════════════════════════ */
-function ModalDetalheVenda({ venda, onClose, onEditar, onExcluir }) {
+function ModalDetalheVenda({ venda, onClose, onEditar, onCancelar, onExcluirDef, isAdmin }) {
   if (!venda) return null;
   const itens = venda.itens || [];
 
@@ -1312,8 +1327,13 @@ function ModalDetalheVenda({ venda, onClose, onEditar, onExcluir }) {
                 <Edit2 size={13} />
               </button>
             )}
-            {onExcluir && (
-              <button className="btn-icon btn-icon-del" onClick={() => onExcluir(venda)} title="Excluir">
+            {onCancelar && (
+              <button className="btn-icon btn-icon-cancel" onClick={() => onCancelar(venda)} title="Cancelar venda">
+                <Ban size={13} />
+              </button>
+            )}
+            {isAdmin && onExcluirDef && (
+              <button className="btn-icon btn-icon-del" onClick={() => onExcluirDef(venda)} title="Excluir permanentemente">
                 <Trash2 size={13} />
               </button>
             )}
@@ -1477,15 +1497,15 @@ function ModalDetalheVenda({ venda, onClose, onEditar, onExcluir }) {
 
 
 /* ══════════════════════════════════════════════════
-   MODAL: Confirmar Exclusão de Venda
+   MODAL: Confirmar Cancelamento de Venda
    ══════════════════════════════════════════════════ */
-function ModalConfirmDeleteVenda({ venda, onConfirm, onClose }) {
-  const [excluindo, setExcluindo] = useState(false);
+function ModalCancelarVenda({ venda, onConfirm, onClose }) {
+  const [cancelando, setCancelando] = useState(false);
 
   const handleConfirm = async () => {
-    setExcluindo(true);
+    setCancelando(true);
     await onConfirm();
-    setExcluindo(false);
+    setCancelando(false);
   };
 
   return (
@@ -1498,19 +1518,74 @@ function ModalConfirmDeleteVenda({ venda, onConfirm, onClose }) {
           </button>
         </div>
         <div className="confirm-body">
-          <div className="confirm-icon">🗑️</div>
+          <div className="confirm-icon">🚫</div>
           <p>
-            Tem certeza que deseja excluir a venda <strong>{venda?.id}</strong>?<br />
+            Deseja cancelar a venda <strong>{venda?.id}</strong>?<br />
             <span style={{ color: "var(--gold)", fontSize: 12 }}>
-              Os produtos vendidos terão o estoque restaurado automaticamente.
-            </span><br /><br />
-            Esta ação não pode ser desfeita.
+              O estoque dos produtos será restaurado automaticamente.
+            </span><br />
+            <span style={{ fontSize: 12 }}>
+              A venda ficará salva no histórico com status <strong>Cancelada</strong>.
+            </span>
           </p>
+        </div>
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Voltar</button>
+          <button className="btn-warning" onClick={handleConfirm} disabled={cancelando}>
+            {cancelando ? "Cancelando..." : <><Ban size={13} /> Cancelar Venda</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════
+   MODAL: Excluir Venda Definitivamente (admin only)
+   ══════════════════════════════════════════════════ */
+function ModalExcluirVenda({ venda, onConfirm, onClose }) {
+  const [excluindo, setExcluindo] = useState(false);
+
+  const handleConfirm = async () => {
+    setExcluindo(true);
+    await onConfirm();
+    setExcluindo(false);
+  };
+
+  return (
+    <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box modal-box-md">
+        <div className="modal-header">
+          <div>
+            <div className="modal-title" style={{ color: "var(--red)" }}>Excluir Venda</div>
+            <div className="modal-sub">Ação irreversível — somente Admin</div>
+          </div>
+          <button className="modal-close" onClick={onClose}>
+            <X size={14} color="var(--text-2)" />
+          </button>
+        </div>
+        <div className="confirm-body">
+          <div className="confirm-icon">⚠️</div>
+          <p style={{ marginBottom: 14 }}>
+            Excluir essa venda irá apagar todo o histórico dela, talvez seja melhor apenas cancelar.
+          </p>
+          <p>
+            Tem certeza que quer excluir a venda <strong>{venda?.id}</strong>?
+          </p>
+          <div style={{
+            marginTop: 14, padding: "10px 14px",
+            background: "var(--red-d)", border: "1px solid rgba(224,82,82,.2)",
+            borderRadius: 10, fontSize: 12, color: "var(--red)", textAlign: "left",
+          }}>
+            <strong>Esta ação não pode ser desfeita.</strong><br />
+            O documento da venda será apagado permanentemente do banco de dados.
+          </div>
         </div>
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn-danger" onClick={handleConfirm} disabled={excluindo}>
-            {excluindo ? "Excluindo..." : "Confirmar Exclusão"}
+            {excluindo ? "Excluindo..." : <><Trash2 size={13} /> Excluir Permanentemente</>}
           </button>
         </div>
       </div>
@@ -1524,13 +1599,13 @@ function ModalConfirmDeleteVenda({ venda, onConfirm, onClose }) {
 // Permissões por cargo
 // ---------------------------------------------------------------------------
 const PERMISSOES_VENDAS = {
-  admin:       { ver: true,  criar: true,  editar: true,  excluir: true  },
-  financeiro:  { ver: true,  criar: false, editar: false, excluir: false },
-  comercial:   { ver: true,  criar: true,  editar: true,  excluir: false },
-  operacional: { ver: true,  criar: false, editar: false, excluir: false },
-  vendedor:    { ver: true,  criar: true,  editar: false, excluir: false },
-  compras:     { ver: false, criar: false, editar: false, excluir: false },
-  suporte:     { ver: false, criar: false, editar: false, excluir: false },
+  admin:       { ver: true,  criar: true,  editar: true,  cancelar: true,  excluir: true  },
+  financeiro:  { ver: true,  criar: false, editar: false, cancelar: false, excluir: false },
+  comercial:   { ver: true,  criar: true,  editar: true,  cancelar: true,  excluir: false },
+  operacional: { ver: true,  criar: false, editar: false, cancelar: false, excluir: false },
+  vendedor:    { ver: true,  criar: true,  editar: false, cancelar: false, excluir: false },
+  compras:     { ver: false, criar: false, editar: false, cancelar: false, excluir: false },
+  suporte:     { ver: false, criar: false, editar: false, cancelar: false, excluir: false },
 };
 const permVendas = (cargo, acao) => PERMISSOES_VENDAS[cargo]?.[acao] ?? false;
 
@@ -1543,7 +1618,8 @@ export default function Vendas() {
 
   const podeCriar   = permVendas(cargo, "criar");
   const podeEditar  = permVendas(cargo, "editar");
-  const podeExcluir = permVendas(cargo, "excluir");
+  const podeCancelar = permVendas(cargo, "cancelar");
+  const podeExcluir = permVendas(cargo, "excluir"); // apenas admin
 
   const [vendas, setVendas] = useState([]);
   const [clientes, setClientes]   = useState([]);
@@ -1561,7 +1637,8 @@ export default function Vendas() {
   const [modalNova, setModalNova]       = useState(false);
   const [editando, setEditando]         = useState(null);
   const [detalhe, setDetalhe]           = useState(null);
-  const [deletando, setDeletando]       = useState(null);
+  const [deletando, setDeletando]       = useState(null); // fluxo de cancelar
+  const [excluindoDef, setExcluindoDef] = useState(null); // fluxo de exclusão definitiva (admin)
   const [confirmarDepoisDetalhe, setConfirmarDepoisDetalhe] = useState(false);
 
 
@@ -1833,12 +1910,12 @@ useEffect(() => {
     setModalNova(false);
   };
 
-  /* ── Excluir venda — restaura estoque e remove lançamentos financeiros ── */
-  const handleDelete = async () => {
+  /* ── Cancelar venda — marca como cancelada, restaura estoque e remove lançamentos financeiros ── */
+  const handleCancelar = async () => {
     if (!tenantUid || !deletando) return;
     const vendaId = deletando.id;
 
-    /* 1. Deletar venda + restaurar estoque (atômico) */
+    /* 1. Marcar como cancelada + restaurar estoque (atômico) */
     await runTransaction(db, async (tx) => {
       for (const item of (deletando.itens || [])) {
         if (item.produtoId && item.tipo === "produto") {
@@ -1847,14 +1924,61 @@ useEffect(() => {
         }
       }
       tx.update(doc(db, "users", tenantUid, "vendas", vendaId), {
-      status: "cancelada",
-      canceladaEm: serverTimestamp(),
-      canceladaPor: { uid: user?.uid, nome: user?.displayName || user?.email || "—", cargo },
-    });
+        status: "cancelada",
+        canceladaEm: serverTimestamp(),
+        canceladaPor: { uid: user?.uid, nome: user?.displayName || user?.email || "—", cargo },
+      });
     });
 
-    /* 2. Remover entradas do Caixa vinculadas a esta venda
-          (é o que alimenta a Receita Bruta no DRE — sem isso o saldo fica inconsistente) */
+    /* 2. Remover entradas do Caixa vinculadas a esta venda */
+    try {
+      const caixaSnap = await getDocs(
+        query(
+          collection(db, "users", tenantUid, "caixa"),
+          where("referenciaId", "==", vendaId),
+          where("origem", "==", "venda")
+        )
+      );
+      await Promise.all(caixaSnap.docs.map((d) => deleteDoc(d.ref)));
+    } catch (err) {
+      console.error("[Vendas] Venda cancelada, mas erro ao remover lançamentos do Caixa:", err);
+    }
+
+    /* 3. Remover A Receber vinculado a esta venda */
+    try {
+      const arSnap = await getDocs(
+        query(
+          collection(db, "users", tenantUid, "a_receber"),
+          where("referenciaId", "==", vendaId),
+          where("origem", "==", "venda")
+        )
+      );
+      await Promise.all(arSnap.docs.map((d) => deleteDoc(d.ref)));
+    } catch (err) {
+      console.error("[Vendas] Venda cancelada, mas erro ao remover A Receber:", err);
+    }
+
+    setDeletando(null);
+    setDetalhe(null);
+  };
+
+  /* ── Excluir venda definitivamente (admin only) — apaga o documento e todo histórico ── */
+  const handleExcluirDefinitivo = async () => {
+    if (!tenantUid || !excluindoDef) return;
+    const vendaId = excluindoDef.id;
+
+    /* 1. Deletar venda + restaurar estoque (atômico) */
+    await runTransaction(db, async (tx) => {
+      for (const item of (excluindoDef.itens || [])) {
+        if (item.produtoId && item.tipo === "produto") {
+          const ref = doc(db, "users", tenantUid, "produtos", item.produtoId);
+          tx.update(ref, { estoque: increment(item.qtd || 1) });
+        }
+      }
+      tx.delete(doc(db, "users", tenantUid, "vendas", vendaId));
+    });
+
+    /* 2. Remover entradas do Caixa vinculadas a esta venda */
     try {
       const caixaSnap = await getDocs(
         query(
@@ -1868,7 +1992,7 @@ useEffect(() => {
       console.error("[Vendas] Venda excluída, mas erro ao remover lançamentos do Caixa:", err);
     }
 
-    /* 3. Remover A Receber vinculado a esta venda (evita cobranças fantasmas) */
+    /* 3. Remover A Receber vinculado a esta venda */
     try {
       const arSnap = await getDocs(
         query(
@@ -1882,7 +2006,7 @@ useEffect(() => {
       console.error("[Vendas] Venda excluída, mas erro ao remover A Receber:", err);
     }
 
-    setDeletando(null);
+    setExcluindoDef(null);
     setDetalhe(null);
   };
 
@@ -1987,12 +2111,21 @@ useEffect(() => {
               <span>{v.itens?.length || 0} item(s)</span>
               <span className="vd-total">{fmtR$(v.total)}</span>
               <div className="vd-actions" onClick={e => e.stopPropagation()}>
-                <button className="btn-icon btn-icon-edit" onClick={() => setEditando(v)} title="Editar">
-                  <Edit2 size={13} />
-                </button>
-                <button className="btn-icon btn-icon-del" onClick={() => setDeletando(v)} title="Excluir">
-                  <Trash2 size={13} />
-                </button>
+                {podeEditar && (
+                  <button className="btn-icon btn-icon-edit" onClick={() => setEditando(v)} title="Editar">
+                    <Edit2 size={13} />
+                  </button>
+                )}
+                {podeCancelar && (
+                  <button className="btn-icon btn-icon-cancel" onClick={() => setDeletando(v)} title="Cancelar venda">
+                    <Ban size={13} />
+                  </button>
+                )}
+                {podeExcluir && (
+                  <button className="btn-icon btn-icon-del" onClick={() => setExcluindoDef(v)} title="Excluir permanentemente">
+                    <Trash2 size={13} />
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -2037,16 +2170,26 @@ useEffect(() => {
         <ModalDetalheVenda
           venda={detalhe}
           onClose={() => setDetalhe(null)}
-          onEditar={(v) => { setDetalhe(null); setEditando(v); }}
-          onExcluir={(v) => { setDetalhe(null); setDeletando(v); }}
+          onEditar={podeEditar ? (v) => { setDetalhe(null); setEditando(v); } : null}
+          onCancelar={podeCancelar ? (v) => { setDetalhe(null); setDeletando(v); } : null}
+          onExcluirDef={podeExcluir ? (v) => { setDetalhe(null); setExcluindoDef(v); } : null}
+          isAdmin={cargo === "admin"}
         />
       )}
 
       {deletando && (
-        <ModalConfirmDeleteVenda
+        <ModalCancelarVenda
           venda={deletando}
-          onConfirm={handleDelete}
+          onConfirm={handleCancelar}
           onClose={() => setDeletando(null)}
+        />
+      )}
+
+      {excluindoDef && (
+        <ModalExcluirVenda
+          venda={excluindoDef}
+          onConfirm={handleExcluirDefinitivo}
+          onClose={() => setExcluindoDef(null)}
         />
       )}
     </>
