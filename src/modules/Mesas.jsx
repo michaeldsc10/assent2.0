@@ -331,12 +331,13 @@ const CSS = `
   /* ── Itens da comanda ── */
   .cmd-items-wrap {
     background: var(--s2); border: 1px solid var(--border);
-    border-radius: 12px; overflow: hidden; margin-bottom: 14px;
+    border-radius: 12px; margin-bottom: 14px;
   }
   .cmd-items-header {
     display: grid; grid-template-columns: 1fr auto auto auto;
     padding: 8px 12px; background: var(--s3);
     border-bottom: 1px solid var(--border); gap: 8px;
+    border-radius: 12px 12px 0 0;
   }
   .cmd-items-header span {
     font-size: 9px; font-weight: 600; letter-spacing: .06em;
@@ -347,7 +348,7 @@ const CSS = `
     padding: 10px 12px; border-bottom: 1px solid var(--border);
     gap: 8px; align-items: center;
   }
-  .cmd-item-row:last-child { border-bottom: none; }
+  .cmd-item-row:last-child { border-bottom: none; border-radius: 0 0 12px 12px; }
   .cmd-item-nome { font-size: 13px; color: var(--text); font-weight: 500; }
   .cmd-item-sub  { font-size: 11px; color: var(--text-3); margin-top: 1px; }
   .cmd-item-qtd  {
@@ -392,6 +393,7 @@ const CSS = `
   .cmd-empty-items {
     padding: 18px; text-align: center;
     font-size: 13px; color: var(--text-3);
+    border-radius: 0 0 12px 12px;
   }
 
   /* ── Adicionar item ── */
