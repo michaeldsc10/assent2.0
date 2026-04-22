@@ -624,7 +624,7 @@ const CSS = `
 
   .ag-notif-panel {
     position: absolute; top: calc(100% + 10px); right: 0;
-    width: 340px; max-height: 420px;
+    width: 400px; max-height: 560px;
     background: var(--s1); border: 1px solid var(--border);
     border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,.35);
     z-index: 200; overflow: hidden; display: flex; flex-direction: column;
@@ -635,15 +635,20 @@ const CSS = `
     border-bottom: 1px solid var(--border);
     font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
     text-transform: uppercase; color: var(--text-2);
+    flex-shrink: 0;
   }
   .ag-notif-list {
     overflow-y: auto; flex: 1;
-    max-height: 360px;
+    max-height: 500px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
   }
+  .ag-notif-list::-webkit-scrollbar { width: 4px; }
+  .ag-notif-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
   .ag-notif-item {
-    padding: 12px 16px;
+    padding: 14px 16px;
     border-bottom: 1px solid var(--border);
-    display: flex; flex-direction: column; gap: 3px;
+    display: flex; flex-direction: column; gap: 4px;
   }
   .ag-notif-item:last-child { border-bottom: none; }
   .ag-notif-item-title {
@@ -657,7 +662,7 @@ const CSS = `
     font-family: 'IBM Plex Mono', monospace; margin-top: 3px;
   }
   .ag-notif-empty {
-    padding: 32px 16px; text-align: center;
+    padding: 40px 16px; text-align: center;
     font-size: 12px; color: var(--text-3);
   }
 
@@ -1164,14 +1169,21 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   useEffect(() => {
     if (!tenantUid) return;
     const q = collection(db, "notificacoesAG");
-    const qOrdered = query(q, orderBy("criadoEm", "desc"), limit(30));
+    const qOrdered = query(q, orderBy("criadoEm", "desc"), limit(50));
+    const seteDiasAtras = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const unsub = onSnapshot(qOrdered, (snap) => {
       const todas = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       const filtradas = todas.filter((n) => {
-        if (n.destinatario === "todos") return true;
-        if (n.destinatario === "pro")  return isPro;
-        if (n.destinatario === "free") return !isPro;
-        return false;
+        // Filtro de plano
+        const planOk =
+          n.destinatario === "todos" ||
+          (n.destinatario === "pro"  && isPro) ||
+          (n.destinatario === "free" && !isPro);
+        if (!planOk) return false;
+        // Filtro de 7 dias — ignora notificações antigas para o usuário
+        const data = n.criadoEm?.toDate ? n.criadoEm.toDate() : null;
+        if (data && data < seteDiasAtras) return false;
+        return true;
       });
       setNotificacoes(filtradas);
     }, () => {/* silencia erros de permissão */});
