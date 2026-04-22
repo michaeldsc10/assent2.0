@@ -1047,7 +1047,8 @@ async function loadAllMembers() {
           telefone:    c.empresa?.telefone    || '',   // ✅
          cnpj:        c.empresa?.cnpj        || '',   // ✅
          nomeEmpresa: c.empresa?.nomeEmpresa || '',   // ✅
-      } catch {
+      } 
+      catch {
         return { uid, ativo:true, pro:lic.pro||false, admin:false, criadoEm:null, proExpiradoEm:null,
                  email:'', name:'—', telefone:'', endereco:'', cnpj:'', nomeEmpresa:'' };
       }
