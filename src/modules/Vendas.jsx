@@ -1618,9 +1618,9 @@ const PERMISSOES_VENDAS = {
   financeiro:  { ver: true,  criar: false, editar: false, cancelar: false, excluir: false },
   comercial:   { ver: true,  criar: true,  editar: true,  cancelar: true,  excluir: false },
   operacional: { ver: true,  criar: false, editar: false, cancelar: false, excluir: false },
-  vendedor:    { ver: true,  criar: true,  editar: false, cancelar: false, excluir: false },
+  vendedor:    { ver: true,  criar: true,  editar: true, cancelar: true, excluir: false },
   compras:     { ver: false, criar: false, editar: false, cancelar: false, excluir: false },
-  suporte:     { ver: false, criar: false, editar: false, cancelar: false, excluir: false },
+  suporte:     { ver: true, criar: false, editar: false, cancelar: false, excluir: false },
 };
 const permVendas = (cargo, acao) => PERMISSOES_VENDAS[cargo]?.[acao] ?? false;
 
