@@ -517,10 +517,16 @@ function ModalNovoProduto({ produto, produtos, onSave, onClose }) {
               <input
                 className={`form-input ${erros.preco ? "err" : ""}`}
                 value={form.preco}
-                onChange={(e) => set("preco", e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v.includes(".")) return;           // bloqueia ponto
+                  if (parseFloat(v.replace(",", ".")) < 0) return; // bloqueia negativo
+                  set("preco", v);
+                }}
                 placeholder="0,00"
                 inputMode="decimal"
               />
+              <div className="form-hint">Vírgula para centavos, não utilize ponto</div>
               {erros.preco && <div className="form-error">{erros.preco}</div>}
             </div>
             <div className="form-group">
@@ -528,10 +534,16 @@ function ModalNovoProduto({ produto, produtos, onSave, onClose }) {
               <input
                 className={`form-input ${erros.custo ? "err" : ""}`}
                 value={form.custo}
-                onChange={(e) => set("custo", e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v.includes(".")) return;           // bloqueia ponto
+                  if (parseFloat(v.replace(",", ".")) < 0) return; // bloqueia negativo
+                  set("custo", v);
+                }}
                 placeholder="0,00"
                 inputMode="decimal"
               />
+              <div className="form-hint">Vírgula para centavos, não utilize ponto</div>
               {erros.custo && <div className="form-error">{erros.custo}</div>}
             </div>
             <div className="form-group">
@@ -565,7 +577,11 @@ function ModalNovoProduto({ produto, produtos, onSave, onClose }) {
                 <input
                   className="form-input"
                   value={calcCusto}
-                  onChange={(e) => setCalcCusto(e.target.value)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v.includes(".")) return;
+                    setCalcCusto(v);
+                  }}
                   placeholder="ex: 100,00"
                   inputMode="decimal"
                 />
@@ -608,16 +624,26 @@ function ModalNovoProduto({ produto, produtos, onSave, onClose }) {
 
           {/* ── Estoque ── */}
           <div className="form-group" style={{ maxWidth: 180 }}>
-            <label className="form-label">Estoque Inicial</label>
+            <label className="form-label">
+              {isEdit ? "Estoque Atual (somente leitura)" : "Estoque Inicial"}
+            </label>
             <input
-              className={`form-input ${erros.estoque ? "err" : ""}`}
+              className="form-input"
               type="number"
               min="0"
               value={form.estoque}
-              onChange={(e) => set("estoque", e.target.value)}
+              readOnly={isEdit}
+              onChange={(e) => !isEdit && set("estoque", e.target.value)}
               placeholder="0"
+              style={isEdit ? { opacity: 0.6, cursor: "not-allowed" } : {}}
+              title={isEdit ? "Use o módulo Entrada de Estoque para movimentar o saldo" : ""}
             />
-            {erros.estoque && <div className="form-error">{erros.estoque}</div>}
+            {isEdit && (
+              <div className="form-hint">
+                Para alterar o estoque, use o módulo <strong>Entrada de Estoque</strong>
+              </div>
+            )}
+            {erros.estoque && !isEdit && <div className="form-error">{erros.estoque}</div>}
           </div>
 
           {/* ── Foto ── */}
