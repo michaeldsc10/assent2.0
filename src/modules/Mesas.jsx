@@ -388,10 +388,10 @@ const CSS = `
   .cmd-item-remove {
     width: 28px; height: 28px; border-radius: 7px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer; border: 1px solid transparent; background: transparent;
-    color: var(--red); transition: all .13s;
+    cursor: pointer; border: 1px solid var(--border); background: var(--s3);
+    color: var(--text-2); transition: all .13s;
   }
-  .cmd-item-remove:hover { background: var(--red-d); border-color: rgba(224,82,82,.2); }
+  .cmd-item-remove:hover { background: var(--red-d); border-color: rgba(224,82,82,.3); }
   .cmd-empty-items {
     padding: 18px; text-align: center;
     font-size: 13px; color: var(--text-3);
@@ -973,7 +973,7 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
                     </div>
                     <div className="cmd-item-total">{fmtR$((item.preco || 0) * (item.qtd || 1))}</div>
                     <button className="cmd-item-remove" onClick={() => removerItem(idx)}>
-                      <X size={13} color="var(--red)" />
+                      <X size={13} color="var(--text-2)" />
                     </button>
                   </div>
                 ))
