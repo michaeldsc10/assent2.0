@@ -853,7 +853,7 @@ export default function EntradaEstoque() {
         </button>
       
 
-      {/* Tabela */}
+      /* Tabela */
       <div className="ag-content">
         <div className="ee-table-wrap">
           <div className="ee-table-header">
