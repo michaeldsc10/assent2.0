@@ -334,7 +334,7 @@ const CSS = `
     border-radius: 12px; margin-bottom: 14px;
   }
   .cmd-items-header {
-    display: grid; grid-template-columns: 1fr auto auto auto;
+    display: flex; align-items: center;
     padding: 8px 12px; background: var(--s3);
     border-bottom: 1px solid var(--border); gap: 8px;
     border-radius: 12px 12px 0 0;
@@ -343,17 +343,23 @@ const CSS = `
     font-size: 9px; font-weight: 600; letter-spacing: .06em;
     text-transform: uppercase; color: var(--text-3);
   }
+  .cmd-h-item   { flex: 1; }
+  .cmd-h-qtd    { width: 90px; text-align: center; flex-shrink: 0; }
+  .cmd-h-total  { width: 90px; text-align: right;  flex-shrink: 0; }
+  .cmd-h-del    { width: 28px; flex-shrink: 0; }
+
   .cmd-item-row {
-    display: grid; grid-template-columns: 1fr auto auto auto;
+    display: flex; align-items: center;
     padding: 10px 12px; border-bottom: 1px solid var(--border);
-    gap: 8px; align-items: center;
+    gap: 8px;
   }
   .cmd-item-row:last-child { border-bottom: none; border-radius: 0 0 12px 12px; }
+  .cmd-item-cell-nome { flex: 1; min-width: 0; }
   .cmd-item-nome { font-size: 13px; color: var(--text); font-weight: 500; }
   .cmd-item-sub  { font-size: 11px; color: var(--text-3); margin-top: 1px; }
   .cmd-item-qtd  {
     display: flex; align-items: center; gap: 5px;
-    overflow: visible; flex-shrink: 0;
+    width: 90px; flex-shrink: 0; justify-content: center;
   }
   .cmd-qtd-btn {
     width: 22px; height: 22px; border-radius: 6px;
@@ -364,30 +370,26 @@ const CSS = `
   }
   .cmd-qtd-btn:hover { background: var(--s2); border-color: var(--border-h); }
   .cmd-qtd-input {
-    width: 36px; background: transparent;
+    width: 34px; background: transparent;
     border: 1px solid var(--border); border-radius: 5px;
     color: var(--text); font-family: 'Sora', sans-serif;
     font-size: 13px; font-weight: 700; text-align: center;
     padding: 2px 0; outline: none; transition: border-color .13s;
+    flex-shrink: 0;
   }
   .cmd-qtd-input:focus { border-color: var(--gold); }
   .cmd-qtd-input::-webkit-inner-spin-button,
   .cmd-qtd-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
   .cmd-qtd-input[type=number] { -moz-appearance: textfield; }
-  .cmd-qtd-num {
-    font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 700;
-    color: var(--text); min-width: 20px; text-align: center;
-  }
   .cmd-item-total {
     font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600;
-    color: var(--text);
+    color: var(--text); width: 90px; text-align: right; flex-shrink: 0;
   }
   .cmd-item-remove {
     width: 28px; height: 28px; border-radius: 7px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; border: 1px solid transparent; background: transparent;
     color: var(--red); transition: all .13s;
-    overflow: visible;
   }
   .cmd-item-remove:hover { background: var(--red-d); border-color: rgba(224,82,82,.2); }
   .cmd-empty-items {
@@ -571,8 +573,6 @@ const CSS = `
   @media (max-width: 600px) {
     .mesas-page { padding: 14px; }
     .mesas-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-    .cmd-items-header,
-    .cmd-item-row { grid-template-columns: 1fr auto auto auto; }
     .form-row { flex-direction: column; }
   }
 `;
@@ -947,16 +947,16 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
           {/* Itens */}
           <div className="cmd-items-wrap">
             <div className="cmd-items-header">
-              <span>Item</span>
-              <span>Qtd</span>
-              <span>Total</span>
-              <span></span>
+              <span className="cmd-h-item">Item</span>
+              <span className="cmd-h-qtd">Qtd</span>
+              <span className="cmd-h-total">Total</span>
+              <span className="cmd-h-del"></span>
             </div>
             {itens.length === 0
               ? <div className="cmd-empty-items">Nenhum item adicionado</div>
               : itens.map((item, idx) => (
                   <div key={idx} className="cmd-item-row">
-                    <div>
+                    <div className="cmd-item-cell-nome">
                       <div className="cmd-item-nome">{item.nome}</div>
                       <div className="cmd-item-sub">{fmtR$(item.preco)} /un</div>
                     </div>
