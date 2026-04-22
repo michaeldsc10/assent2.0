@@ -386,7 +386,7 @@ const CSS = `
   .cp-btn-rem-item {
     width:28px; height:36px; border-radius:7px; margin-top:0;
     display:flex; align-items:center; justify-content:center;
-    cursor:pointer; background:var(--red-d);
+    cursor:pointer; background:var(--red-d); padding:0;
     border:1px solid rgba(224,82,82,.25); color:rgba(255,255,255,0.85);
     transition:background .13s; flex-shrink:0;
   }
