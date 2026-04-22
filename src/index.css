@@ -86,7 +86,14 @@ button:focus-visible {
 .ag-app .modal-close,
 .ag-app .modal-close:hover,
 .ag-app .modal-close:focus,
-.ag-app .modal-close:focus-visible {
+.ag-app .modal-close:focus-visible,
+.ag-app .btn-foto-rm,
+.ag-app .btn-foto-rm:hover,
+.ag-app [class$="-rm"],
+.ag-app [class$="-rm"]:hover,
+.ag-app .confirm-icon-wrap,
+.ag-app .ag-sidebar-mobile-close,
+.ag-app .ag-sidebar-mobile-close:hover {
   padding: 0;
   font-size: inherit;
   font-weight: inherit;
