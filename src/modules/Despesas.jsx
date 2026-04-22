@@ -326,7 +326,7 @@ const CSS = `
   .desp-table-wrap {
     margin: 0 22px 22px;
     background: var(--s1); border: 1px solid var(--border);
-    border-radius: 12px; overflow: hidden;
+    border-radius: 12px; overflow: clip;
   }
   .desp-table-header {
     padding: 13px 18px; border-bottom: 1px solid var(--border);
