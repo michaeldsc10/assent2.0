@@ -1,5 +1,5 @@
 // AuthContext.jsx — ASSENT v2.0
-// Expõe: { user, cargo, tenantUid, vendedorId, vendedorNome, loadingAuth, signIn, signOut, permissoes }
+// Expõe: { user, cargo, tenantUid, vendedorId, vendedorNome, nomeUsuario, loadingAuth, signIn, signOut, permissoes }
 // Integrado com Firebase Auth + Firestore (estrutura multi-tenant)
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
@@ -46,9 +46,8 @@ export const PERMISSOES = {
   despesas:       { admin: "vcex", financeiro: "vce", comercial: "",    compras: "vc",  operacional: "",    vendedor: "",    suporte: ""   },
   // Todos veem o menu Relatórios; sub-relatórios são bloqueados internamente com cadeado
   relatorios:     { admin: "v",    financeiro: "v",   comercial: "v",   compras: "v",   operacional: "v",   vendedor: "v",   suporte: "v"  },
-usuarios:   { admin: "vcex", financeiro: "",  comercial: "",  compras: "",   operacional: "",   vendedor: "",   suporte: ""   },
-  configuracoes: { admin: "vcex", financeiro: "", comercial: "", compras: "",  operacional: "",   vendedor: "",   suporte: ""   },
-  
+  usuarios:       { admin: "vcex", financeiro: "",    comercial: "",    compras: "",    operacional: "",    vendedor: "",    suporte: ""   },
+  configuracoes:  { admin: "vcex", financeiro: "",    comercial: "",    compras: "",    operacional: "",    vendedor: "",    suporte: ""   },
 };
 
 // ─────────────────────────────────────────────
@@ -85,7 +84,7 @@ export function AuthProvider({ children }) {
   const [cargo, setCargo]                 = useState(null);  // string do cargo
   const [vendedorId, setVendedorId]       = useState(null);  // id em /vendedores
   const [vendedorNome, setVendedorNome]   = useState(null);  // nome para exibição
-  const [nomeUsuario, setNomeUsuario] = useState(null);
+  const [nomeUsuario, setNomeUsuario]     = useState(null);  // ← nome do Firestore (admin e convidados)
   const [loadingAuth, setLoadingAuth]     = useState(true);
 
   // ── Limpa todo o estado de sessão ──
@@ -102,6 +101,7 @@ export function AuthProvider({ children }) {
   const carregarPerfil = useCallback(async (firebaseUser) => {
     try {
       const uid = firebaseUser.uid;
+
       // ── Passo 1: verifica se é o Admin/dono do tenant ──
       // O Admin é identificado por ter um documento em /users/{uid} na raiz
       const adminDoc = await getDoc(doc(db, "users", uid));
@@ -111,6 +111,7 @@ export function AuthProvider({ children }) {
         setCargo(CARGOS.ADMIN);
         setVendedorId(null);
         setVendedorNome(null);
+        // Para admin: usa displayName do Firebase Auth ou email
         setNomeUsuario(firebaseUser.displayName || firebaseUser.email);
         return;
       }
@@ -120,13 +121,14 @@ export function AuthProvider({ children }) {
       // Isso evita varrer todos os tenants para localizar o usuário.
       const indexDoc = await getDoc(doc(db, "userIndex", uid));
       if (!indexDoc.exists()) {
-         console.error("[AuthContext] userIndex não encontrado");
+        console.error("[AuthContext] userIndex não encontrado");
         await firebaseSignOut(auth);
         return;
       }
 
       const data = indexDoc.data();
-const tUid = data.tenantUid ?? data.tenantUID;
+      const tUid = data.tenantUid ?? data.tenantUID;
+
       // ── Passo 3: lê o perfil em /users/{tenantUid}/usuarios/{uid} ──
       const perfilDoc = await getDoc(doc(db, "users", tUid, "usuarios", uid));
       if (!perfilDoc.exists()) {
@@ -147,6 +149,7 @@ const tUid = data.tenantUid ?? data.tenantUID;
       setUser(firebaseUser);
       setTenantUid(tUid);
       setCargo(perfil.cargo);
+      // Para convidado: nome vem do Firestore (cadastrado pelo admin ao convidar)
       setNomeUsuario(perfil.nome || firebaseUser.email);
 
       // ── Passo 4: se cargo === "vendedor", carrega dados do cadastro vinculado ──
@@ -218,6 +221,7 @@ const tUid = data.tenantUid ?? data.tenantUID;
     tenantUid,      // uid do dono do tenant — raiz das queries Firestore: /users/{tenantUid}/...
     vendedorId,     // id em /vendedores — null se cargo !== "vendedor" ou sem vínculo
     vendedorNome,   // nome para exibição no select travado em Vendas.jsx
+    nomeUsuario,    // ← ADICIONADO: nome real do Firestore para exibição no header
     loadingAuth,    // true enquanto o perfil ainda está sendo carregado
 
     // ── Ações ──
