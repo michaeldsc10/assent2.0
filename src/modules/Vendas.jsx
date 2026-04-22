@@ -618,7 +618,12 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
           : new Date(venda.data).toISOString().split("T")[0]) 
       : new Date().toISOString().split("T")[0]
   );
-  const [vendedor, setVendedor] = useState(venda?.vendedor || "");
+  // Se o usuário logado é vendedor: sempre usa o próprio nome (nova venda ou edição)
+  const [vendedor, setVendedor] = useState(
+    cargo === "vendedor"
+      ? (vendedorNomeLogado || venda?.vendedor || "")
+      : (venda?.vendedor || "")
+  );
   const [formaPgto, setFormaPgto] = useState(venda?.formaPagamento || "");
   const [observacao, setObservacao] = useState(venda?.observacao || "");
 
@@ -945,7 +950,17 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Vendedor</label>
-              {vendedores?.length > 0 ? (
+              {cargo === "vendedor" ? (
+                /* Vendedor logado: campo travado no próprio nome */
+                <input
+                  className="form-input"
+                  value={vendedorNomeLogado || vendedor || "—"}
+                  readOnly
+                  disabled
+                  style={{ opacity: 0.7, cursor: "not-allowed" }}
+                  title="Você só pode registrar vendas em seu próprio nome"
+                />
+              ) : vendedores?.length > 0 ? (
                 <select className="form-input" value={vendedor} onChange={e => setVendedor(e.target.value)}>
                   <option value="">— Nenhum / Não informado —</option>
                   {vendedores.map(v => (
