@@ -173,11 +173,17 @@ const CSS = `
   }
   .btn-nova-desp:hover { opacity: .88; }
 
-  /* Container principal com scroll */
+  /* Container principal com scroll.
+     Funciona em 3 cenários comuns de layout:
+     1) Pai com display:flex + overflow:hidden → flex:1 + min-height:0 resolve
+     2) Pai com position:relative e altura → position:absolute inset:0 resolve
+     3) Fallback: max-height:100dvh limita ao viewport */
   .desp-container {
-    display: flex; flex-direction: column;
-    height: 100%; overflow-y: auto;
+    flex: 1 1 0;
     min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
   }
   .desp-container::-webkit-scrollbar { width: 4px; }
   .desp-container::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
