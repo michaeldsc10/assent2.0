@@ -1074,7 +1074,7 @@ export default function Dashboard() {
   );
    
 const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin } = usePermissao();
-  const { user: authUser, tenantUid } = useAuth();
+  const { user: authUser, tenantUid, nomeUsuario } = useAuth();
 
   // uid como estado local derivado de tenantUid.
   // Necessário para que os data hooks (useEmpresa, useLicenca, useDashboardData)
@@ -1111,8 +1111,16 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     setMobileMenuOpen(false);
   };
 
-  /* ── Nome do usuário ── */
+  /* ── Nome do usuário ──
+     Prioridade: nomeUsuario do AuthContext (Firestore) → fallback onSnapshot admin doc
+     Isso garante que convidados vejam o nome cadastrado pelo admin, não o email do Firebase Auth. */
   useEffect(() => {
+    // Se o AuthContext já resolveu o nome (admin ou convidado), usa direto
+    if (nomeUsuario) {
+      setUserName(nomeUsuario);
+      return;
+    }
+    // Fallback: lê o doc do admin no Firestore (caso nomeUsuario ainda não tenha carregado)
     if (!uid) return;
     return onSnapshot(doc(db, "users", uid), (snap) => {
       const name =
@@ -1122,7 +1130,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         "Usuário";
       setUserName(name);
     });
-  }, [uid, authUser]);
+  }, [uid, authUser, nomeUsuario]);
 
   /* ── Visibilidade do menu ── */
   useEffect(() => {
@@ -1655,7 +1663,19 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               role="button" aria-haspopup="true" aria-expanded={dropdownOpen}
             >
               <div className="ag-avatar">{userInitial}</div>
-              <span className="ag-user-name">{userName}</span>
+              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.3 }}>
+                <span className="ag-user-name">{userName}</span>
+                {cargo && cargo !== "admin" && (
+                  <span style={{
+                    fontSize: 10,
+                    color: "var(--text-3)",
+                    textTransform: "capitalize",
+                    letterSpacing: "0.02em",
+                  }}>
+                    {cargo}
+                  </span>
+                )}
+              </div>
               <ChevronDown size={13} className={`ag-user-chevron ${dropdownOpen ? "open" : ""}`} />
             </div>
 
