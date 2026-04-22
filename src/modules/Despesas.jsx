@@ -883,7 +883,12 @@ function ModalPagar({ despesa, onConfirm, onClose }) {
   const [formaPag, setFormaPag] = useState(despesa.formaPagamento || "pix");
   const [pagando, setPagando] = useState(false);
 
-  const [dataPag, setDataPag] = useState(new Date().toISOString().split("T")[0]);
+  // toISOString() retorna UTC — em Brasília pode virar o dia anterior.
+  // Usar getFullYear/Month/Date garante a data LOCAL do usuário.
+  const [dataPag, setDataPag] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
 
   const handlePagar = async () => {
     if (!dataPag) return;
@@ -1423,10 +1428,23 @@ export default function Despesas({ isPro = false }) {
     if (!tenantUid || !pagando) return;
     const ref = doc(db, "users", tenantUid, "despesas", pagando.id);
 
+    // dataPagamento: string "YYYY-MM-DD" para exibição
+    // dataPagamentoTs: Date JS com horário local ao meio-dia → Firestore salva como Timestamp
+    //   ↳ evita o bug de timezone: new Date("2026-04-22") = UTC midnight = ontem às 21h em Brasília
+    //   ↳ dentroDoIntervalo (FiltroPeriodo) funciona corretamente com Timestamp, não com string
+    const dataEfetiva = dataPagamento || (() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    })();
+    const dtTs = new Date(dataEfetiva + "T12:00:00"); // meio-dia local → sem ambiguidade de fuso
+
     await setDoc(ref, {
-      status: "pago",
+      status:          "pago",
       formaPagamento,
-      dataPagamento: dataPagamento || new Date().toISOString().split("T")[0],
+      dataPagamento:   dataEfetiva,          // string para display
+      dataPagamentoTs: dtTs,                 // Timestamp para filtros do DRE
+      mesPagamento:    dtTs.getMonth() + 1,  // 1–12
+      anoPagamento:    dtTs.getFullYear(),
     }, { merge: true });
 
     // Recorrência: gerar próximo lançamento
@@ -1469,7 +1487,7 @@ export default function Despesas({ isPro = false }) {
     if (!tenantUid) return;
     const status = calcularStatus(despesa.vencimento, "pendente");
     await setDoc(doc(db, "users", tenantUid, "despesas", despesa.id), {
-      status, dataPagamento: null,
+      status, dataPagamento: null, dataPagamentoTs: null, mesPagamento: null, anoPagamento: null,
     }, { merge: true });
   };
 
