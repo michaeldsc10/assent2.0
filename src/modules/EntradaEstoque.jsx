@@ -1,17 +1,19 @@
 /* ═══════════════════════════════════════════════════
    ASSENT v2.0 — EntradaEstoque.jsx
-   Módulo: Entrada de Estoque
+   Módulo: Entrada + Saída de Estoque
    ═══════════════════════════════════════════════════ */
 
 import { useState, useEffect, useMemo } from "react";
 import {
-  PackagePlus, Search, X, AlertCircle, CheckCircle2, Edit2, Trash2,
+  PackagePlus, PackageMinus, Search, X, AlertCircle, CheckCircle2,
+  Edit2, Trash2, ArrowDownCircle, ArrowUpCircle,
 } from "lucide-react";
-import { db, auth, onAuthStateChanged } from "../lib/firebase";
+import { db } from "../lib/firebase";
 import {
   collection, doc, onSnapshot,
   serverTimestamp, runTransaction,
 } from "firebase/firestore";
+import { useAuth } from "../contexts/AuthContext"; // ← usa o contexto correto
 
 /* ══════════════════════════════════════════════════════
    CSS
@@ -131,6 +133,16 @@ const CSS = `
   }
   .btn-entrada:hover { background: rgba(52,199,89,0.2); }
 
+  .btn-saida {
+    display: flex; align-items: center; gap: 7px;
+    padding: 8px 16px; border-radius: 9px;
+    background: rgba(224,82,82,0.12); color: var(--red, #e05252);
+    border: 1px solid rgba(224,82,82,0.25); cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    white-space: nowrap; transition: background .13s;
+  }
+  .btn-saida:hover { background: rgba(224,82,82,0.2); }
+
   .btn-icon {
     width: 30px; height: 30px; border-radius: 7px;
     display: flex; align-items: center; justify-content: center;
@@ -145,7 +157,7 @@ const CSS = `
   /* ── Topbar ── */
   .ee-topbar {
     padding: 14px 22px; background: var(--s1); border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 14px; flex-shrink: 0;
+    display: flex; align-items: center; gap: 14px; flex-shrink: 0; flex-wrap: wrap;
   }
   .ee-topbar-title h1 {
     font-family: 'Sora', sans-serif; font-size: 17px; font-weight: 600; color: var(--text);
@@ -162,6 +174,23 @@ const CSS = `
     color: var(--text); font-size: 12px; width: 100%;
     font-family: 'DM Sans', sans-serif;
   }
+
+  /* ── Abas ── */
+  .ee-tabs {
+    display: flex; gap: 0; border-bottom: 1px solid var(--border);
+    padding: 0 22px; background: var(--s1);
+  }
+  .ee-tab {
+    display: flex; align-items: center; gap: 7px;
+    padding: 11px 16px; font-size: 13px; font-weight: 500;
+    color: var(--text-3); cursor: pointer; border: none;
+    background: transparent; border-bottom: 2px solid transparent;
+    margin-bottom: -1px; transition: color .13s, border-color .13s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .ee-tab:hover { color: var(--text-2); }
+  .ee-tab.active-entrada { color: var(--green, #34c759); border-bottom-color: var(--green, #34c759); }
+  .ee-tab.active-saida   { color: var(--red, #e05252);   border-bottom-color: var(--red, #e05252); }
 
   /* ── Tabela ── */
   .ee-table-wrap {
@@ -181,15 +210,26 @@ const CSS = `
     color: var(--text-2); padding: 2px 10px; border-radius: 20px;
   }
 
-  .ee-row {
+  /* ── Linha entrada ── */
+  .ee-row-entrada {
     display: grid;
     grid-template-columns: 100px 1fr 72px 130px 100px 1fr 72px;
     padding: 11px 18px; gap: 8px;
     border-bottom: 1px solid var(--border);
     align-items: center; font-size: 12px; color: var(--text-2);
   }
-  .ee-row:last-child { border-bottom: none; }
-  .ee-row:hover { background: rgba(255,255,255,0.02); }
+  /* ── Linha saída (tem coluna Registrado Por no lugar de Custo) ── */
+  .ee-row-saida {
+    display: grid;
+    grid-template-columns: 100px 1fr 72px 130px 1fr 72px;
+    padding: 11px 18px; gap: 8px;
+    border-bottom: 1px solid var(--border);
+    align-items: center; font-size: 12px; color: var(--text-2);
+  }
+  .ee-row-entrada:last-child,
+  .ee-row-saida:last-child { border-bottom: none; }
+  .ee-row-entrada:hover,
+  .ee-row-saida:hover { background: rgba(255,255,255,0.02); }
   .ee-row-head { background: var(--s2); }
   .ee-row-head span {
     font-size: 10px; font-weight: 500; letter-spacing: .06em;
@@ -198,15 +238,31 @@ const CSS = `
 
   .ee-data   { font-family:'Sora',sans-serif; font-size:11px; color:var(--gold); font-weight:500; }
   .ee-nome   { color:var(--text); font-size:13px; font-weight:500; }
-  .ee-qtd    { font-family:'Sora',sans-serif; font-size:13px; font-weight:600; color:var(--green,#34c759); }
+  .ee-qtd-in  { font-family:'Sora',sans-serif; font-size:13px; font-weight:600; color:var(--green,#34c759); }
+  .ee-qtd-out { font-family:'Sora',sans-serif; font-size:13px; font-weight:600; color:var(--red,#e05252); }
   .ee-motivo {
     background:var(--s3); border:1px solid var(--border); border-radius:5px;
     padding:2px 8px; font-size:11px; color:var(--text-2);
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
   }
+  .ee-motivo-saida {
+    background:rgba(224,82,82,0.08); border:1px solid rgba(224,82,82,0.2); border-radius:5px;
+    padding:2px 8px; font-size:11px; color:var(--red,#e05252);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
   .ee-custo  { color:var(--red,#e05252); font-size:12px; }
   .ee-obs    { font-size:11px; color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .ee-actions { display:flex; align-items:center; gap:5px; justify-content:flex-end; }
+
+  /* ── Log de responsável ── */
+  .ee-log {
+    display: flex; flex-direction: column; gap: 1px;
+  }
+  .ee-log-nome { font-size: 12px; color: var(--text); font-weight: 500; }
+  .ee-log-cargo {
+    font-size: 10px; color: var(--text-3); font-weight: 500;
+    text-transform: uppercase; letter-spacing: .05em;
+  }
 
   .ee-empty, .ee-loading {
     padding: 56px 20px; text-align: center; color: var(--text-3); font-size: 13px;
@@ -228,6 +284,7 @@ const CSS = `
   .ee-preview-val.atual { color: var(--text-2); }
   .ee-preview-val.add   { color: var(--blue, #5b8ef0); }
   .ee-preview-val.novo  { color: var(--green, #34c759); }
+  .ee-preview-val.sub   { color: var(--red, #e05252); }
 
   /* ── Aviso de edição ── */
   .ee-edit-warn {
@@ -291,7 +348,7 @@ const fmtData = (d) => {
   } catch { return String(d); }
 };
 
-const MOTIVOS = [
+const MOTIVOS_ENTRADA = [
   "Compra de fornecedor",
   "Ajuste de estoque",
   "Devolução de cliente",
@@ -299,6 +356,24 @@ const MOTIVOS = [
   "Produção interna",
   "Outros",
 ];
+
+const MOTIVOS_SAIDA = [
+  "Devolução ao fornecedor",
+  "Doação",
+  "Vencimento / Validade expirada",
+  "Outros",
+];
+
+/* Label legível para cargo */
+const CARGO_LABELS = {
+  admin:       "Admin",
+  financeiro:  "Financeiro",
+  comercial:   "Comercial",
+  compras:     "Compras",
+  operacional: "Operacional",
+  vendedor:    "Vendedor",
+  suporte:     "Suporte",
+};
 
 /* ══════════════════════════════════════════════════════
    TOAST
@@ -315,13 +390,8 @@ function Toast({ msg, tipo }) {
 
 /* ══════════════════════════════════════════════════════
    MODAL: Criar / Editar Entrada
-   ──────────────────────────────────────────────────────
-   CRIAR  → estoque += qtd (lida em tempo real dentro da tx)
-   EDITAR → estoque += (qtdNova - qtdAntiga)
-              A qtdAntiga é lida do Firestore DENTRO da tx,
-              nunca do estado local — zero chance de drift.
    ══════════════════════════════════════════════════════ */
-function ModalEntrada({ uid, produtos, fornecedores, movimentacao, onSalvo, onClose }) {
+function ModalEntrada({ tenantUid, produtos, fornecedores, movimentacao, onSalvo, onClose }) {
   const isEdit = !!movimentacao;
 
   const [form, setForm] = useState({
@@ -337,20 +407,16 @@ function ModalEntrada({ uid, produtos, fornecedores, movimentacao, onSalvo, onCl
   const [salvando, setSalvando]   = useState(false);
   const [errGlobal, setErrGlobal] = useState("");
 
-  /* Produto selecionado — para o preview */
   const produtoSelecionado = useMemo(
     () => produtos.find((p) => p._docId === form.produtoId) || null,
     [form.produtoId, produtos]
   );
 
-  /* Preview em tempo real.
-     Na edição, o estoque atual já contém a qtd antiga,
-     então subtraímos para mostrar a "base" antes desta entrada. */
   const baseEstoque = isEdit
     ? Math.max(0, num(produtoSelecionado?.estoque) - num(movimentacao.quantidade))
     : num(produtoSelecionado?.estoque);
-  const qtdNova    = Math.max(0, num(form.quantidade));
-  const prevNovo   = baseEstoque + qtdNova;
+  const qtdNova  = Math.max(0, num(form.quantidade));
+  const prevNovo = baseEstoque + qtdNova;
 
   const set = (campo, valor) => {
     setForm((f) => ({ ...f, [campo]: valor }));
@@ -375,35 +441,24 @@ function ModalEntrada({ uid, produtos, fornecedores, movimentacao, onSalvo, onCl
     setErrGlobal("");
 
     try {
-      const produtoSelecionadoObj = produtos.find((p) => p.id === form.produtoId || p._docId === form.produtoId);
-      const produtoDocId = produtoSelecionadoObj?._docId || form.produtoId;
-      const produtoRef = doc(db, "users", uid, "produtos", produtoDocId);
+      const prodObj    = produtos.find((p) => p.id === form.produtoId || p._docId === form.produtoId);
+      const prodDocId  = prodObj?._docId || form.produtoId;
+      const produtoRef = doc(db, "users", tenantUid, "produtos", prodDocId);
 
       if (isEdit) {
-        /* ── EDIÇÃO ──────────────────────────────────────────────
-           1. Lê estoque real e qtd antiga DENTRO da tx
-           2. novoEst = estoqueReal - qtdAntiga + qtdNova
-           3. Atualiza produto e movimentação atomicamente
-        ────────────────────────────────────────────────────────── */
-        const movRef = doc(db, "users", uid, "movimentacoes_estoque", movimentacao.id);
-
+        const movRef = doc(db, "users", tenantUid, "movimentacoes_estoque", movimentacao.id);
         await runTransaction(db, async (tx) => {
-          const [prodSnap, movSnap] = await Promise.all([
-            tx.get(produtoRef),
-            tx.get(movRef),
-          ]);
+          const [prodSnap, movSnap] = await Promise.all([tx.get(produtoRef), tx.get(movRef)]);
           if (!prodSnap.exists()) throw new Error("Produto não encontrado.");
           if (!movSnap.exists())  throw new Error("Movimentação não encontrada.");
 
           const estoqueReal = num(prodSnap.data().estoque);
-          const qtdAntiga   = num(movSnap.data().quantidade); // fonte de verdade: Firestore
+          const qtdAntiga   = num(movSnap.data().quantidade);
           const qtdN        = num(form.quantidade);
           const novoEst     = Math.max(0, estoqueReal - qtdAntiga + qtdN);
 
           const atualizaProduto = { estoque: novoEst };
-          if (form.custo !== "" && !isNaN(num(form.custo))) {
-            atualizaProduto.custo = num(form.custo);
-          }
+          if (form.custo !== "" && !isNaN(num(form.custo))) atualizaProduto.custo = num(form.custo);
           tx.update(produtoRef, atualizaProduto);
 
           tx.update(movRef, {
@@ -418,34 +473,24 @@ function ModalEntrada({ uid, produtos, fornecedores, movimentacao, onSalvo, onCl
             estoqueNovo:     novoEst,
           });
         });
-
         onSalvo("Entrada atualizada com sucesso!");
       } else {
-        /* ── CRIAÇÃO ─────────────────────────────────────────────
-           1. Lê estoque real DENTRO da tx
-           2. novoEst = estoqueReal + qtd
-           3. Cria movimentação com ID gerado pelo Firestore (doc())
-        ────────────────────────────────────────────────────────── */
-        const movRef = doc(collection(db, "users", uid, "movimentacoes_estoque"));
-
+        const movRef = doc(collection(db, "users", tenantUid, "movimentacoes_estoque"));
         await runTransaction(db, async (tx) => {
           const prodSnap = await tx.get(produtoRef);
           if (!prodSnap.exists()) throw new Error("Produto não encontrado.");
 
           const estoqueReal = num(prodSnap.data().estoque);
-          const qtdN        = num(form.quantidade);
-          const novoEst     = estoqueReal + qtdN;
+          const qtdN        = estoqueReal + num(form.quantidade);
 
-          const atualizaProduto = { estoque: novoEst };
-          if (form.custo !== "" && !isNaN(num(form.custo))) {
-            atualizaProduto.custo = num(form.custo);
-          }
+          const atualizaProduto = { estoque: qtdN };
+          if (form.custo !== "" && !isNaN(num(form.custo))) atualizaProduto.custo = num(form.custo);
           tx.update(produtoRef, atualizaProduto);
 
           tx.set(movRef, {
-            produtoId:       produtoDocId,
+            produtoId:       prodDocId,
             produtoNome:     sanitize(prodSnap.data().nome || ""),
-            quantidade:      qtdN,
+            quantidade:      num(form.quantidade),
             tipo:            "entrada",
             motivo:          sanitize(form.motivo),
             fornecedor:      sanitize(form.fornecedor) || null,
@@ -453,15 +498,13 @@ function ModalEntrada({ uid, produtos, fornecedores, movimentacao, onSalvo, onCl
             data:            sanitize(form.data),
             dataCriacao:     serverTimestamp(),
             custo:           form.custo !== "" ? num(form.custo) : null,
-            uid,
+            uid:             tenantUid,
             estoqueAnterior: estoqueReal,
-            estoqueNovo:     novoEst,
+            estoqueNovo:     qtdN,
           });
         });
-
         onSalvo("Entrada registrada com sucesso!");
       }
-
       onClose();
     } catch (err) {
       console.error("Erro ao salvar entrada:", err);
@@ -474,7 +517,6 @@ function ModalEntrada({ uid, produtos, fornecedores, movimentacao, onSalvo, onCl
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-box">
-
         <div className="modal-header">
           <div>
             <div className="modal-title">
@@ -492,7 +534,6 @@ function ModalEntrada({ uid, produtos, fornecedores, movimentacao, onSalvo, onCl
         </div>
 
         <div className="modal-body">
-
           {isEdit && (
             <div className="ee-edit-warn">
               <AlertCircle size={14} color="var(--gold)" style={{ flexShrink: 0, marginTop: 1 }} />
@@ -582,7 +623,7 @@ function ModalEntrada({ uid, produtos, fornecedores, movimentacao, onSalvo, onCl
               onChange={(e) => set("motivo", e.target.value)}
             >
               <option value="">Selecione o motivo...</option>
-              {MOTIVOS.map((m) => (
+              {MOTIVOS_ENTRADA.map((m) => (
                 <option key={m} value={m}>{m}</option>
               ))}
             </select>
@@ -649,20 +690,269 @@ function ModalEntrada({ uid, produtos, fornecedores, movimentacao, onSalvo, onCl
                 : <><PackagePlus size={14} /> Registrar Entrada</>}
           </button>
         </div>
-
       </div>
     </div>
   );
 }
 
 /* ══════════════════════════════════════════════════════
-   MODAL: Confirmar Exclusão
+   MODAL: Registrar Saída
    ──────────────────────────────────────────────────────
-   Lógica: estoque -= qtdAntiga (lida do Firestore na tx)
-   O documento é deletado e o produto atualizado
-   atomicamente na mesma runTransaction.
+   Grava tipo:"saida" + registradoPor: { nome, cargo }
+   Desconta do estoque atomicamente via runTransaction.
    ══════════════════════════════════════════════════════ */
-function ModalConfirmDelete({ uid, movimentacao, produtos, onSalvo, onClose }) {
+function ModalSaida({ tenantUid, nomeUsuario, cargo, produtos, onSalvo, onClose }) {
+  const [form, setForm] = useState({
+    produtoId:  "",
+    quantidade: "",
+    motivo:     "",
+    data:       hoje(),
+    observacao: "",
+  });
+  const [erros, setErros]         = useState({});
+  const [salvando, setSalvando]   = useState(false);
+  const [errGlobal, setErrGlobal] = useState("");
+
+  const produtoSelecionado = useMemo(
+    () => produtos.find((p) => p._docId === form.produtoId) || null,
+    [form.produtoId, produtos]
+  );
+
+  const estoqueAtual = num(produtoSelecionado?.estoque);
+  const qtdSaida     = Math.max(0, num(form.quantidade));
+  const prevNovo     = Math.max(0, estoqueAtual - qtdSaida);
+
+  const set = (campo, valor) => {
+    setForm((f) => ({ ...f, [campo]: valor }));
+    if (erros[campo]) setErros((e) => ({ ...e, [campo]: "" }));
+    setErrGlobal("");
+  };
+
+  const validar = () => {
+    const e = {};
+    if (!form.produtoId)                               e.produtoId  = "Selecione um produto.";
+    if (!form.quantidade || num(form.quantidade) <= 0) e.quantidade = "Quantidade deve ser maior que zero.";
+    if (produtoSelecionado && num(form.quantidade) > num(produtoSelecionado.estoque))
+                                                       e.quantidade = "Quantidade maior que o estoque disponível.";
+    if (!form.motivo)                                  e.motivo     = "Selecione o motivo.";
+    if (!form.data)                                    e.data       = "Data inválida.";
+    setErros(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSubmit = async () => {
+    if (!validar() || salvando) return;
+    setSalvando(true);
+    setErrGlobal("");
+
+    try {
+      const prodObj    = produtos.find((p) => p.id === form.produtoId || p._docId === form.produtoId);
+      const prodDocId  = prodObj?._docId || form.produtoId;
+      const produtoRef = doc(db, "users", tenantUid, "produtos", prodDocId);
+      const movRef     = doc(collection(db, "users", tenantUid, "movimentacoes_estoque"));
+
+      await runTransaction(db, async (tx) => {
+        const prodSnap = await tx.get(produtoRef);
+        if (!prodSnap.exists()) throw new Error("Produto não encontrado.");
+
+        const estoqueReal = num(prodSnap.data().estoque);
+        const qtdN        = num(form.quantidade);
+
+        if (qtdN > estoqueReal) throw new Error("Estoque insuficiente para realizar esta saída.");
+
+        const novoEst = Math.max(0, estoqueReal - qtdN);
+        tx.update(produtoRef, { estoque: novoEst });
+
+        tx.set(movRef, {
+          produtoId:       prodDocId,
+          produtoNome:     sanitize(prodSnap.data().nome || ""),
+          quantidade:      qtdN,
+          tipo:            "saida",
+          motivo:          sanitize(form.motivo),
+          observacao:      sanitize(form.observacao) || null,
+          data:            sanitize(form.data),
+          dataCriacao:     serverTimestamp(),
+          uid:             tenantUid,
+          estoqueAnterior: estoqueReal,
+          estoqueNovo:     novoEst,
+          // ── Log do responsável ──
+          registradoPor: {
+            nome:  nomeUsuario || "Desconhecido",
+            cargo: cargo       || "desconhecido",
+          },
+        });
+      });
+
+      onSalvo("Saída registrada com sucesso!");
+      onClose();
+    } catch (err) {
+      console.error("Erro ao registrar saída:", err);
+      setErrGlobal(err.message || "Erro ao registrar saída. Tente novamente.");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box">
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">Registrar Saída de Estoque</div>
+            <div className="modal-sub">Informe os dados da saída</div>
+          </div>
+          <button className="modal-close" onClick={onClose}>
+            <X size={14} color="var(--text-2)" />
+          </button>
+        </div>
+
+        <div className="modal-body">
+
+          {/* Produto */}
+          <div className="form-group">
+            <label className="form-label">
+              Produto <span className="form-label-req">*</span>
+            </label>
+            <select
+              className={`form-input ${erros.produtoId ? "err" : ""}`}
+              value={form.produtoId}
+              onChange={(e) => set("produtoId", e.target.value)}
+            >
+              <option value="">Selecione um produto...</option>
+              {produtos.map((p) => (
+                <option key={p._docId} value={p._docId}>
+                  {p.nome}{p.sku ? ` (${p.sku})` : ""} — estoque: {p.estoque ?? 0}
+                </option>
+              ))}
+            </select>
+            {erros.produtoId && <div className="form-error">{erros.produtoId}</div>}
+          </div>
+
+          {/* Preview em tempo real */}
+          {produtoSelecionado && (
+            <div className="ee-preview">
+              <div className="ee-preview-card">
+                <div className="ee-preview-label">Estoque Atual</div>
+                <div className="ee-preview-val atual">{estoqueAtual}</div>
+              </div>
+              <div className="ee-preview-card">
+                <div className="ee-preview-label">Saindo</div>
+                <div className="ee-preview-val sub">-{qtdSaida}</div>
+              </div>
+              <div className="ee-preview-card">
+                <div className="ee-preview-label">Novo Estoque</div>
+                <div className="ee-preview-val" style={{ color: prevNovo < 5 ? "var(--red,#e05252)" : "var(--green,#34c759)" }}>
+                  {prevNovo}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Quantidade + Data */}
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">
+                Quantidade <span className="form-label-req">*</span>
+              </label>
+              <input
+                type="number" min="1" step="1"
+                className={`form-input ${erros.quantidade ? "err" : ""}`}
+                value={form.quantidade}
+                onChange={(e) => set("quantidade", e.target.value)}
+                placeholder="0"
+              />
+              {erros.quantidade && <div className="form-error">{erros.quantidade}</div>}
+            </div>
+            <div className="form-group">
+              <label className="form-label">
+                Data <span className="form-label-req">*</span>
+              </label>
+              <input
+                type="date"
+                className={`form-input ${erros.data ? "err" : ""}`}
+                value={form.data}
+                onChange={(e) => set("data", e.target.value)}
+              />
+              {erros.data && <div className="form-error">{erros.data}</div>}
+            </div>
+          </div>
+
+          {/* Motivo */}
+          <div className="form-group">
+            <label className="form-label">
+              Motivo da Saída <span className="form-label-req">*</span>
+            </label>
+            <select
+              className={`form-input ${erros.motivo ? "err" : ""}`}
+              value={form.motivo}
+              onChange={(e) => set("motivo", e.target.value)}
+            >
+              <option value="">Selecione o motivo...</option>
+              {MOTIVOS_SAIDA.map((m) => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+            {erros.motivo && <div className="form-error">{erros.motivo}</div>}
+          </div>
+
+          {/* Observação */}
+          <div className="form-group">
+            <label className="form-label">Observação</label>
+            <textarea
+              className="form-input"
+              rows={2}
+              style={{ resize: "vertical", minHeight: 60 }}
+              value={form.observacao}
+              onChange={(e) => set("observacao", e.target.value)}
+              placeholder="Informações adicionais (opcional)..."
+            />
+          </div>
+
+          {/* Responsável — somente leitura, apenas informativo */}
+          <div
+            style={{
+              display: "flex", alignItems: "center", gap: 9,
+              background: "var(--s2)", border: "1px solid var(--border)",
+              borderRadius: 9, padding: "10px 13px", marginBottom: 0,
+            }}
+          >
+            <ArrowUpCircle size={14} color="var(--text-3)" style={{ flexShrink: 0 }} />
+            <div style={{ fontSize: 12, color: "var(--text-2)" }}>
+              Saída será registrada por{" "}
+              <strong style={{ color: "var(--text)" }}>{nomeUsuario || "—"}</strong>
+              {" "}•{" "}
+              <span style={{ color: "var(--text-3)" }}>
+                {CARGO_LABELS[cargo] || cargo || "—"}
+              </span>
+            </div>
+          </div>
+
+          {errGlobal && (
+            <div className="err-box" style={{ marginTop: 14 }}>
+              <AlertCircle size={14} /> {errGlobal}
+            </div>
+          )}
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose} disabled={salvando}>
+            Cancelar
+          </button>
+          <button className="btn-danger" onClick={handleSubmit} disabled={salvando}>
+            {salvando
+              ? <><div className="spinner spinner-red" /> Registrando...</>
+              : <><PackageMinus size={13} /> Registrar Saída</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   MODAL: Confirmar Exclusão de Entrada
+   ══════════════════════════════════════════════════════ */
+function ModalConfirmDelete({ tenantUid, movimentacao, produtos, onSalvo, onClose }) {
   const [excluindo, setExcluindo] = useState(false);
   const [errGlobal, setErrGlobal] = useState("");
 
@@ -672,26 +962,22 @@ function ModalConfirmDelete({ uid, movimentacao, produtos, onSalvo, onClose }) {
     setErrGlobal("");
 
     try {
-      const produtoSelecionadoObj = (produtos || []).find(
+      const prodObj    = (produtos || []).find(
         (p) => p._docId === movimentacao.produtoId || p.id === movimentacao.produtoId
       );
-      const produtoDocId = produtoSelecionadoObj?._docId || movimentacao.produtoId;
-      const produtoRef = doc(db, "users", uid, "produtos", produtoDocId);
-      const movRef     = doc(db, "users", uid, "movimentacoes_estoque", movimentacao.id);
+      const prodDocId  = prodObj?._docId || movimentacao.produtoId;
+      const produtoRef = doc(db, "users", tenantUid, "produtos", prodDocId);
+      const movRef     = doc(db, "users", tenantUid, "movimentacoes_estoque", movimentacao.id);
 
       await runTransaction(db, async (tx) => {
-        const [prodSnap, movSnap] = await Promise.all([
-          tx.get(produtoRef),
-          tx.get(movRef),
-        ]);
+        const [prodSnap, movSnap] = await Promise.all([tx.get(produtoRef), tx.get(movRef)]);
         if (!prodSnap.exists()) throw new Error("Produto não encontrado.");
         if (!movSnap.exists())  throw new Error("Movimentação não encontrada.");
 
         const estoqueReal = num(prodSnap.data().estoque);
-        const qtdEntrada  = num(movSnap.data().quantidade); // lê do Firestore, não da prop
+        const qtdEntrada  = num(movSnap.data().quantidade);
+        const novoEst     = Math.max(0, estoqueReal - qtdEntrada);
 
-        // Reverte: subtrai a qtd que havia sido entrada
-        const novoEst = Math.max(0, estoqueReal - qtdEntrada);
         tx.update(produtoRef, { estoque: novoEst });
         tx.delete(movRef);
       });
@@ -726,6 +1012,7 @@ function ModalConfirmDelete({ uid, movimentacao, produtos, onSalvo, onClose }) {
             <strong>{movimentacao.produtoNome || movimentacao.produtoId}</strong>?
             <br /><br />
             O estoque será <strong>reduzido em {movimentacao.quantidade} unidade(s)</strong>.
+            <br />
             Esta ação não pode ser desfeita.
           </p>
           {errGlobal && (
@@ -754,17 +1041,22 @@ function ModalConfirmDelete({ uid, movimentacao, produtos, onSalvo, onClose }) {
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════ */
 export default function EntradaEstoque() {
-  const [uid, setUid]                     = useState(null);
+  // ── Auth via contexto — funciona para admin E convidados ──
+  const { tenantUid, nomeUsuario, cargo, loadingAuth } = useAuth();
+
   const [produtos, setProdutos]           = useState([]);
   const [fornecedores, setFornecedores]   = useState([]);
-  const [movimentacoes, setMovimentacoes] = useState([]);
+  const [entradas, setEntradas]           = useState([]);
+  const [saidas, setSaidas]               = useState([]);
   const [loading, setLoading]             = useState(true);
   const [search, setSearch]               = useState("");
+  const [aba, setAba]                     = useState("entrada"); // "entrada" | "saida"
 
   /* Modais */
-  const [modalNovo, setModalNovo] = useState(false);
-  const [editando, setEditando]   = useState(null);
-  const [deletando, setDeletando] = useState(null);
+  const [modalNovo, setModalNovo]   = useState(false);
+  const [modalSaida, setModalSaida] = useState(false);
+  const [editando, setEditando]     = useState(null);
+  const [deletando, setDeletando]   = useState(null);
 
   /* Toast */
   const [toast, setToast] = useState({ msg: "", tipo: "sucesso" });
@@ -773,58 +1065,56 @@ export default function EntradaEstoque() {
     setTimeout(() => setToast({ msg: "", tipo: "sucesso" }), 3500);
   };
 
-  /* ── Auth ── */
+  /* ── Firestore: escuta em tempo real usando tenantUid ── */
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => setUid(user?.uid || null));
-    return unsub;
-  }, []);
-
-  /* ── Firestore: escuta em tempo real ── */
-  useEffect(() => {
-    if (!uid) { setLoading(false); return; }
+    if (!tenantUid) { setLoading(false); return; }
 
     const unsubP = onSnapshot(
-      collection(db, "users", uid, "produtos"),
+      collection(db, "users", tenantUid, "produtos"),
       (snap) => setProdutos(snap.docs.map((d) => ({ ...d.data(), id: d.id, _docId: d.id })))
     );
 
     const unsubF = onSnapshot(
-      collection(db, "users", uid, "fornecedores"),
+      collection(db, "users", tenantUid, "fornecedores"),
       (snap) => setFornecedores(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
 
     const unsubM = onSnapshot(
-      collection(db, "users", uid, "movimentacoes_estoque"),
+      collection(db, "users", tenantUid, "movimentacoes_estoque"),
       (snap) => {
-        const entradas = snap.docs
+        const todos = snap.docs
           .map((d) => ({ id: d.id, ...d.data() }))
-          .filter((m) => m.tipo === "entrada")
           .sort((a, b) => {
             const ta = a.dataCriacao?.toMillis?.() ?? 0;
             const tb = b.dataCriacao?.toMillis?.() ?? 0;
-            return tb - ta; // mais recente primeiro
+            return tb - ta;
           });
-        setMovimentacoes(entradas);
+        setEntradas(todos.filter((m) => m.tipo === "entrada"));
+        setSaidas(todos.filter((m) => m.tipo === "saida"));
         setLoading(false);
       }
     );
 
     return () => { unsubP(); unsubF(); unsubM(); };
-  }, [uid]);
+  }, [tenantUid]);
 
   /* ── Filtro ── */
   const movFiltradas = useMemo(() => {
+    const lista = aba === "entrada" ? entradas : saidas;
     const q = search.trim().toLowerCase();
-    if (!q) return movimentacoes;
-    return movimentacoes.filter(
+    if (!q) return lista;
+    return lista.filter(
       (m) =>
         m.produtoNome?.toLowerCase().includes(q) ||
         m.motivo?.toLowerCase().includes(q) ||
-        m.fornecedor?.toLowerCase().includes(q)
+        m.fornecedor?.toLowerCase().includes(q) ||
+        m.registradoPor?.nome?.toLowerCase().includes(q)
     );
-  }, [movimentacoes, search]);
+  }, [entradas, saidas, aba, search]);
 
-  if (!uid) return <div className="ee-loading">Carregando autenticação...</div>;
+  if (loadingAuth || !tenantUid) {
+    return <div className="ee-loading">Carregando autenticação...</div>;
+  }
 
   return (
     <>
@@ -833,14 +1123,18 @@ export default function EntradaEstoque() {
       {/* Topbar */}
       <header className="ee-topbar">
         <div className="ee-topbar-title">
-          <h1>Entrada de Estoque</h1>
-          <p>Registre e gerencie as entradas de produtos</p>
+          <h1>Estoque</h1>
+          <p>Registre entradas e saídas de produtos</p>
         </div>
 
         <div className="ee-search">
           <Search size={13} color="var(--text-3)" />
           <input
-            placeholder="Buscar produto, motivo ou fornecedor..."
+            placeholder={
+              aba === "entrada"
+                ? "Buscar produto, motivo ou fornecedor..."
+                : "Buscar produto, motivo ou responsável..."
+            }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -849,36 +1143,71 @@ export default function EntradaEstoque() {
         <button className="btn-entrada" onClick={() => setModalNovo(true)}>
           <PackagePlus size={14} /> Registrar Entrada
         </button>
+        <button className="btn-saida" onClick={() => setModalSaida(true)}>
+          <PackageMinus size={14} /> Registrar Saída
+        </button>
       </header>
+
+      {/* Abas */}
+      <div className="ee-tabs">
+        <button
+          className={`ee-tab ${aba === "entrada" ? "active-entrada" : ""}`}
+          onClick={() => setAba("entrada")}
+        >
+          <ArrowDownCircle size={14} /> Entradas ({entradas.length})
+        </button>
+        <button
+          className={`ee-tab ${aba === "saida" ? "active-saida" : ""}`}
+          onClick={() => setAba("saida")}
+        >
+          <ArrowUpCircle size={14} /> Saídas ({saidas.length})
+        </button>
+      </div>
 
       {/* Tabela */}
       <div className="ag-content">
         <div className="ee-table-wrap">
           <div className="ee-table-header">
-            <span className="ee-table-title">Histórico de Entradas</span>
-            <span className="ee-count-badge">{movimentacoes.length}</span>
+            <span className="ee-table-title">
+              {aba === "entrada" ? "Histórico de Entradas" : "Histórico de Saídas"}
+            </span>
+            <span className="ee-count-badge">{movFiltradas.length}</span>
           </div>
 
-          <div className="ee-row ee-row-head">
-            <span>Data</span>
-            <span>Produto</span>
-            <span>Qtd</span>
-            <span>Motivo</span>
-            <span>Custo Unit.</span>
-            <span>Observação</span>
-            <span style={{ textAlign: "right" }}>Ações</span>
-          </div>
+          {/* Cabeçalho de colunas */}
+          {aba === "entrada" ? (
+            <div className="ee-row-entrada ee-row-head">
+              <span>Data</span>
+              <span>Produto</span>
+              <span>Qtd</span>
+              <span>Motivo</span>
+              <span>Custo Unit.</span>
+              <span>Observação</span>
+              <span style={{ textAlign: "right" }}>Ações</span>
+            </div>
+          ) : (
+            <div className="ee-row-saida ee-row-head">
+              <span>Data</span>
+              <span>Produto</span>
+              <span>Qtd</span>
+              <span>Motivo</span>
+              <span>Registrado por</span>
+              <span style={{ textAlign: "right" }}>Ações</span>
+            </div>
+          )}
 
           {loading ? (
             <div className="ee-loading">Carregando movimentações...</div>
           ) : movFiltradas.length === 0 ? (
-            <div className="ee-empty">Nenhuma entrada registrada ainda.</div>
-          ) : (
+            <div className="ee-empty">
+              {aba === "entrada" ? "Nenhuma entrada registrada ainda." : "Nenhuma saída registrada ainda."}
+            </div>
+          ) : aba === "entrada" ? (
             movFiltradas.map((m) => (
-              <div key={m.id} className="ee-row">
+              <div key={m.id} className="ee-row-entrada">
                 <span className="ee-data">{fmtData(m.data)}</span>
                 <span className="ee-nome">{m.produtoNome || m.produtoId}</span>
-                <span className="ee-qtd">+{m.quantidade}</span>
+                <span className="ee-qtd-in">+{m.quantidade}</span>
                 <span className="ee-motivo">{m.motivo}</span>
                 <span className="ee-custo">{fmtR$(m.custo)}</span>
                 <span className="ee-obs">{m.observacao || "—"}</span>
@@ -900,6 +1229,31 @@ export default function EntradaEstoque() {
                 </div>
               </div>
             ))
+          ) : (
+            movFiltradas.map((m) => (
+              <div key={m.id} className="ee-row-saida">
+                <span className="ee-data">{fmtData(m.data)}</span>
+                <span className="ee-nome">{m.produtoNome || m.produtoId}</span>
+                <span className="ee-qtd-out">-{m.quantidade}</span>
+                <span className="ee-motivo-saida">{m.motivo}</span>
+                <div className="ee-log">
+                  <span className="ee-log-nome">{m.registradoPor?.nome || "—"}</span>
+                  <span className="ee-log-cargo">
+                    {CARGO_LABELS[m.registradoPor?.cargo] || m.registradoPor?.cargo || "—"}
+                  </span>
+                </div>
+                {/* Saídas são imutáveis — somente exclusão */}
+                <div className="ee-actions">
+                  <button
+                    className="btn-icon btn-icon-del"
+                    title="Excluir saída"
+                    onClick={() => setDeletando(m)}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              </div>
+            ))
           )}
         </div>
       </div>
@@ -907,7 +1261,7 @@ export default function EntradaEstoque() {
       {/* Modal: Nova entrada */}
       {modalNovo && (
         <ModalEntrada
-          uid={uid}
+          tenantUid={tenantUid}
           produtos={produtos}
           fornecedores={fornecedores}
           movimentacao={null}
@@ -917,9 +1271,9 @@ export default function EntradaEstoque() {
       )}
 
       {/* Modal: Editar entrada */}
-      {editando && (
+      {editando && editando.tipo === "entrada" && (
         <ModalEntrada
-          uid={uid}
+          tenantUid={tenantUid}
           produtos={produtos}
           fornecedores={fornecedores}
           movimentacao={editando}
@@ -928,10 +1282,22 @@ export default function EntradaEstoque() {
         />
       )}
 
-      {/* Modal: Confirmar exclusão */}
+      {/* Modal: Registrar saída */}
+      {modalSaida && (
+        <ModalSaida
+          tenantUid={tenantUid}
+          nomeUsuario={nomeUsuario}
+          cargo={cargo}
+          produtos={produtos}
+          onSalvo={(msg) => showToast(msg, "sucesso")}
+          onClose={() => setModalSaida(false)}
+        />
+      )}
+
+      {/* Modal: Confirmar exclusão (entrada ou saída) */}
       {deletando && (
         <ModalConfirmDelete
-          uid={uid}
+          tenantUid={tenantUid}
           movimentacao={deletando}
           produtos={produtos}
           onSalvo={(msg) => { showToast(msg, "sucesso"); setDeletando(null); }}
