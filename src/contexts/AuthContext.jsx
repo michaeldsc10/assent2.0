@@ -46,6 +46,7 @@ export const PERMISSOES = {
   despesas:       { admin: "vcex", financeiro: "vce", comercial: "",    compras: "vc",  operacional: "",    vendedor: "",    suporte: ""   },
   // Todos veem o menu Relatórios; sub-relatórios são bloqueados internamente com cadeado
   relatorios:     { admin: "v",    financeiro: "v",   comercial: "v",   compras: "v",   operacional: "v",   vendedor: "v",   suporte: "v"  },
+  mesas:          { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "vce", vendedor: "vc",  suporte: ""   },
   usuarios:       { admin: "vcex", financeiro: "",    comercial: "",    compras: "",    operacional: "",    vendedor: "",    suporte: ""   },
   configuracoes:  { admin: "vcex", financeiro: "",    comercial: "",    compras: "",    operacional: "",    vendedor: "",    suporte: ""   },
 };
