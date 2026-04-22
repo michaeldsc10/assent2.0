@@ -389,7 +389,7 @@ const CSS = `
     width: 28px; height: 28px; border-radius: 7px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; border: 1px solid var(--border); background: var(--s3);
-    color: var(--text-2); transition: all .13s;
+    color: var(--text-2); transition: all .13s; padding: 0;
   }
   .cmd-item-remove:hover { background: var(--red-d); border-color: rgba(224,82,82,.3); }
   .cmd-empty-items {
