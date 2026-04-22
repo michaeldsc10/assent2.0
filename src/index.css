@@ -87,13 +87,10 @@ button:focus-visible {
 .ag-app .modal-close:hover,
 .ag-app .modal-close:focus,
 .ag-app .modal-close:focus-visible,
-.ag-app .btn-foto-rm,
-.ag-app .btn-foto-rm:hover,
-.ag-app [class$="-rm"],
-.ag-app [class$="-rm"]:hover,
-.ag-app .confirm-icon-wrap,
-.ag-app .ag-sidebar-mobile-close,
-.ag-app .ag-sidebar-mobile-close:hover {
+.ag-app .cmd-item-remove,
+.ag-app .cmd-item-remove:hover,
+.ag-app .cmd-item-remove:focus,
+.ag-app .cmd-item-remove:focus-visible {
   padding: 0;
   font-size: inherit;
   font-weight: inherit;
