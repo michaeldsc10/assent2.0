@@ -1152,6 +1152,14 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   };
   const dropdownRef = useRef(null);
 
+  /* ── Hooks de dados — declarados aqui para isPro estar disponível nos useEffects abaixo ── */
+  const empresa = useEmpresa(uid);
+  const { isPro } = useLicenca(tenantUid);
+  const dash    = useDashboardData(
+    uid, period,
+    period === "Personalizado" && customRange.from && customRange.to ? customRange : null
+  );
+
   /* ── Notificações AG — listener em tempo real ── */
   useEffect(() => {
     if (!tenantUid) return;
@@ -1280,14 +1288,6 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       localStorage.setItem("ag_sidebar_collapsed", String(next));
       return next;
     });
-
-  /* ── Hooks de dados ── */
-  const empresa = useEmpresa(uid);
-  const { isPro } = useLicenca(tenantUid);
-  const dash    = useDashboardData(
-    uid, period,
-    period === "Personalizado" && customRange.from && customRange.to ? customRange : null
-  );
 
   /* ── Logo e nome da empresa ── */
   const logoUrl      = empresa?.logo || null;
