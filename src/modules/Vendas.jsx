@@ -212,16 +212,18 @@ const CSS = `
     background: rgba(224,82,82,.12); border: 1px solid rgba(224,82,82,.2); color: var(--red);
   }
 
-
-    padding: 14px 22px;
+  /* ── Topbar ── */
+  .vd-topbar {
+    padding: 10px 22px;
     background: var(--s1); border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 14px; flex-shrink: 0; flex-wrap: wrap;
+    display: flex; align-items: center; gap: 12px; flex-shrink: 0;
   }
+  .vd-topbar-title { flex-shrink: 0; }
   .vd-topbar-title h1 {
-    font-family: 'Sora', sans-serif; font-size: 17px; font-weight: 600;
+    font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 600;
     color: var(--text);
   }
-  .vd-topbar-title p { font-size: 11px; color: var(--text-2); margin-top: 2px; }
+  .vd-topbar-title p { font-size: 11px; color: var(--text-2); margin-top: 1px; }
   .vd-search {
     display: flex; align-items: center; gap: 8px;
     background: var(--s2); border: 1px solid var(--border);
@@ -1684,7 +1686,7 @@ const permVendas = (cargo, acao) => PERMISSOES_VENDAS[cargo]?.[acao] ?? false;
    ═══════════════════════════════════════ */
 export default function Vendas() {
   // ── Auth via contexto — tenantUid garante acesso correto para convidados ──
-  const { user, cargo, tenantUid, vendedorId, vendedorNome, isVendedor } = useContext(AuthContext);
+  const { user, cargo, tenantUid, vendedorId, vendedorNome, nomeUsuario, isVendedor } = useContext(AuthContext);
 
   const podeCriar   = permVendas(cargo, "criar");
   const podeEditar  = permVendas(cargo, "editar");
@@ -1999,7 +2001,7 @@ useEffect(() => {
       tx.update(doc(db, "users", tenantUid, "vendas", vendaId), {
         status: "cancelada",
         canceladaEm: serverTimestamp(),
-        canceladaPor: { uid: user?.uid, nome: user?.displayName || user?.email || "—", cargo },
+        canceladaPor: { uid: user?.uid, nome: nomeUsuario || user?.displayName || user?.email || "—", cargo },
       });
     });
 
@@ -2152,15 +2154,13 @@ useEffect(() => {
           />
         </div>
 
-        <div className="vd-topbar-right">
-          {tab === "ativas" && podeCriar && (
-            <button className="btn-novo-cl" onClick={() => setModalNova(true)}
-              style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: 9, background: "var(--gold)", color: "#0a0808", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", transition: "opacity .13s" }}
-            >
-              <Plus size={14} /> Nova Venda
-            </button>
-          )}
-        </div>
+        {tab === "ativas" && podeCriar && (
+          <button onClick={() => setModalNova(true)}
+            style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: 9, background: "var(--gold)", color: "#0a0808", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, transition: "opacity .13s" }}
+          >
+            <Plus size={14} /> Nova Venda
+          </button>
+        )}
       </header>
 
       {/* Filtros de período — compartilhado entre abas */}
