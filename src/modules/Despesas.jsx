@@ -401,8 +401,29 @@ const CSS = `
   }
   .cat-modal-empty { font-size: 13px; color: var(--text-3); text-align: center; padding: 24px 0; }
 
-  /* Confirm */
-  .confirm-body { padding: 24px 22px; text-align: center; }
+  /* Modal Detalhes */
+  .det-section-title {
+    font-size: 10px; font-weight: 600; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--text-3); margin-bottom: 10px;
+  }
+  .det-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px 20px;
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px; margin-bottom: 14px;
+  }
+  .det-grid-full { grid-column: 1 / -1; }
+  .det-item-label {
+    font-size: 10px; font-weight: 600; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-3); margin-bottom: 3px;
+  }
+  .det-item-val {
+    font-size: 13px; color: var(--text); font-weight: 500;
+  }
+  .det-item-val-mono { font-family: 'Sora', sans-serif; }
+  .det-actions-row {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+
   .confirm-body p { font-size: 13px; color: var(--text-2); line-height: 1.6; }
   .confirm-body strong { color: var(--text); }
   .confirm-icon-wrap {
@@ -900,6 +921,16 @@ function ModalPagar({ despesa, onConfirm, onClose }) {
             )}
           </div>
 
+          <div className="form-group" style={{ marginBottom: 16 }}>
+            <label className="form-label">Data do pagamento <span className="form-label-req">*</span></label>
+            <input
+              className="form-input"
+              type="date"
+              value={dataPag}
+              onChange={e => setDataPag(e.target.value)}
+            />
+          </div>
+
           <div className="form-group form-group-0">
             <label className="form-label">Forma de pagamento</label>
             <div className="chip-group" style={{ marginTop: 6 }}>
@@ -920,7 +951,7 @@ function ModalPagar({ despesa, onConfirm, onClose }) {
 
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-success" onClick={handlePagar} disabled={pagando}>
+          <button className="btn-success" onClick={handlePagar} disabled={pagando || !dataPag}>
             {pagando ? "Registrando..." : "Confirmar Pagamento"}
           </button>
         </div>
@@ -962,6 +993,132 @@ function ModalConfirmDelete({ despesa, onConfirm, onClose }) {
           <button className="btn-danger" onClick={handleConfirm} disabled={excluindo}>
             {excluindo ? "Excluindo..." : "Confirmar Exclusão"}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════
+   MODAL: Detalhes da Despesa
+   ════════════════════════════════════════ */
+function ModalDetalhes({ despesa, onEditar, onPagar, onDesfazer, onDeletar, podeEditar, podeExcluir, onClose }) {
+  const d = despesa;
+  const FORMAS_LABEL = { dinheiro: "Dinheiro", pix: "Pix", cartão: "Cartão" };
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box modal-box-lg">
+        <div className="modal-header">
+          <div>
+            <div className="modal-title" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ fontFamily: "Sora", color: "var(--gold)", fontSize: 13 }}>{d.idShow || d.id}</span>
+              <span>·</span>
+              {d.descricao}
+            </div>
+            <div className="modal-sub" style={{ marginTop: 4 }}>
+              <StatusBadge status={d.status} />
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)" /></button>
+        </div>
+
+        <div className="modal-body">
+          {/* Dados financeiros */}
+          <div className="det-section-title">Dados financeiros</div>
+          <div className="det-grid">
+            <div>
+              <div className="det-item-label">Valor</div>
+              <div className="det-item-val det-item-val-mono" style={{ color: "var(--green)", fontSize: 16 }}>{fmtR$(d.valor)}</div>
+            </div>
+            <div>
+              <div className="det-item-label">Vencimento</div>
+              <div className="det-item-val">{fmtData(d.vencimento)}</div>
+            </div>
+            <div>
+              <div className="det-item-label">Data de pagamento</div>
+              <div className="det-item-val">{d.dataPagamento ? fmtData(d.dataPagamento) : <span style={{ color: "var(--text-3)" }}>—</span>}</div>
+            </div>
+            <div>
+              <div className="det-item-label">Forma de pagamento</div>
+              <div className="det-item-val">{FORMAS_LABEL[d.formaPagamento] || d.formaPagamento || <span style={{ color: "var(--text-3)" }}>—</span>}</div>
+            </div>
+            <div>
+              <div className="det-item-label">Categoria</div>
+              <div className="det-item-val">{d.categoria || <span style={{ color: "var(--text-3)" }}>—</span>}</div>
+            </div>
+            <div>
+              <div className="det-item-label">Centro de custo</div>
+              <div className="det-item-val">{d.centroCusto || <span style={{ color: "var(--text-3)" }}>—</span>}</div>
+            </div>
+            <div>
+              <div className="det-item-label">Fornecedor</div>
+              <div className="det-item-val">{d.fornecedor || <span style={{ color: "var(--text-3)" }}>—</span>}</div>
+            </div>
+            {d.parcelado && d.totalParcelas && (
+              <div>
+                <div className="det-item-label">Parcela</div>
+                <div className="det-item-val">{d.parcelaAtual}/{d.totalParcelas}</div>
+              </div>
+            )}
+            {d.observacao && (
+              <div className="det-grid-full">
+                <div className="det-item-label">Observação</div>
+                <div className="det-item-val" style={{ color: "var(--text-2)" }}>{d.observacao}</div>
+              </div>
+            )}
+          </div>
+
+          {/* Recorrência */}
+          {d.recorrente && (
+            <>
+              <div className="det-section-title">Recorrência</div>
+              <div className="det-grid">
+                <div>
+                  <div className="det-item-label">Tipo</div>
+                  <div className="det-item-val" style={{ textTransform: "capitalize" }}>{d.tipoRecorrencia || "—"}</div>
+                </div>
+                <div>
+                  <div className="det-item-label">Intervalo</div>
+                  <div className="det-item-val">{d.intervalo || 1}x</div>
+                </div>
+                {d.dataFim && (
+                  <div>
+                    <div className="det-item-label">Data fim</div>
+                    <div className="det-item-val">{fmtData(d.dataFim)}</div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* Ações */}
+          <div className="det-actions-row">
+            {d.status !== "pago" && d.status !== "cancelado" && (
+              <button className="btn-success" onClick={() => { onClose(); onPagar(d); }}>
+                <CheckCircle size={13} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+                Registrar Pagamento
+              </button>
+            )}
+            {d.status === "pago" && (
+              <button className="btn-secondary" onClick={() => { onClose(); onDesfazer(d); }}>
+                <RotateCcw size={13} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+                Desfazer Pagamento
+              </button>
+            )}
+            {podeEditar && (
+              <button className="btn-secondary" onClick={() => { onClose(); onEditar(d); }}>
+                <Edit2 size={13} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+                Editar
+              </button>
+            )}
+            {podeExcluir && (
+              <button className="btn-danger" onClick={() => { onClose(); onDeletar(d); }}>
+                <Trash2 size={13} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
+                Excluir
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -1165,6 +1322,7 @@ export default function Despesas({ isPro = false }) {
   const [pagando, setPagando]                 = useState(null);
   const [deletando, setDeletando]             = useState(null);
   const [modalCategorias, setModalCategorias] = useState(false);
+  const [viendoDetalhes, setViendoDetalhes]   = useState(null);
 
   /* ── Firestore ── */
   useEffect(() => {
@@ -1552,7 +1710,7 @@ export default function Despesas({ isPro = false }) {
         ) : despesasFiltradas.length === 0 ? (
           <div className="desp-empty">Nenhuma despesa encontrada.</div>
         ) : despesasFiltradas.map(d => (
-          <div key={d.id} className="desp-row">
+          <div key={d.id} className="desp-row" style={{ cursor: "pointer" }} onClick={() => setViendoDetalhes(d)}>
             {/* ID */}
             <span className="desp-id" title={`doc.id: ${d.id}`}>
               {d.idShow || d.id}
@@ -1595,7 +1753,7 @@ export default function Despesas({ isPro = false }) {
             </span>
 
             {/* Ações */}
-            <div className="desp-actions">
+            <div className="desp-actions" onClick={e => e.stopPropagation()}>
               {d.status !== "pago" && d.status !== "cancelado" && (
                 <button
                   className="btn-icon btn-icon-pay"
@@ -1626,6 +1784,18 @@ export default function Despesas({ isPro = false }) {
       </div>
 
       {/* Modais */}
+      {viendoDetalhes && (
+        <ModalDetalhes
+          despesa={viendoDetalhes}
+          onEditar={setEditando}
+          onPagar={setPagando}
+          onDesfazer={handleDesfazerPagamento}
+          onDeletar={setDeletando}
+          podeEditar={podeEditarV}
+          podeExcluir={podeExcluirV}
+          onClose={() => setViendoDetalhes(null)}
+        />
+      )}
       {modalCategorias && (
         <ModalCategorias
           categorias={categorias}
