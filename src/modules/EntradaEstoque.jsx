@@ -851,7 +851,7 @@ export default function EntradaEstoque() {
         {podeCriarV && <button className="btn-entrada" onClick={() => setModalNovo(true)}>
           <PackagePlus size={14} /> Registrar Entrada
         </button>
-      </header>
+      
 
       {/* Tabela */}
       <div className="ag-content">
