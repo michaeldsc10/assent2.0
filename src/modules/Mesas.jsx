@@ -334,7 +334,7 @@ const CSS = `
     border-radius: 12px; overflow: hidden; margin-bottom: 14px;
   }
   .cmd-items-header {
-    display: grid; grid-template-columns: 1fr 72px 100px 36px;
+    display: grid; grid-template-columns: 1fr 90px 100px 36px;
     padding: 8px 12px; background: var(--s3);
     border-bottom: 1px solid var(--border); gap: 8px;
   }
@@ -343,7 +343,7 @@ const CSS = `
     text-transform: uppercase; color: var(--text-3);
   }
   .cmd-item-row {
-    display: grid; grid-template-columns: 1fr 72px 100px 36px;
+    display: grid; grid-template-columns: 1fr 90px 100px 36px;
     padding: 10px 12px; border-bottom: 1px solid var(--border);
     gap: 8px; align-items: center;
   }
@@ -361,6 +361,17 @@ const CSS = `
     cursor: pointer; transition: all .12s; flex-shrink: 0;
   }
   .cmd-qtd-btn:hover { background: var(--s2); border-color: var(--border-h); }
+  .cmd-qtd-input {
+    width: 36px; background: transparent;
+    border: 1px solid var(--border); border-radius: 5px;
+    color: var(--text); font-family: 'Sora', sans-serif;
+    font-size: 13px; font-weight: 700; text-align: center;
+    padding: 2px 0; outline: none; transition: border-color .13s;
+  }
+  .cmd-qtd-input:focus { border-color: var(--gold); }
+  .cmd-qtd-input::-webkit-inner-spin-button,
+  .cmd-qtd-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  .cmd-qtd-input[type=number] { -moz-appearance: textfield; }
   .cmd-qtd-num {
     font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 700;
     color: var(--text); min-width: 20px; text-align: center;
@@ -510,7 +521,7 @@ const CSS = `
     .mesas-page { padding: 14px; }
     .mesas-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
     .cmd-items-header,
-    .cmd-item-row { grid-template-columns: 1fr 56px 84px 28px; }
+    .cmd-item-row { grid-template-columns: 1fr 86px 80px 28px; }
     .form-row { flex-direction: column; }
   }
 `;
@@ -531,6 +542,9 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
   const [salvando, setSalvando] = useState(false);
   const [fechando, setFechando] = useState(false);
   const [confirmFechar, setConfirmFechar] = useState(false);
+  const [confirmCancelar, setConfirmCancelar] = useState(false);
+  const [motivoCancelamento, setMotivoCancelamento] = useState("");
+  const [cancelando, setCancelando] = useState(false);
 
   /* Catálogo unificado */
   const catalogo = useMemo(() => {
@@ -598,6 +612,17 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
       const novaQtd = (novo[idx].qtd || 1) + delta;
       if (novaQtd <= 0) return novo.filter((_, i) => i !== idx);
       novo[idx] = { ...novo[idx], qtd: novaQtd };
+      return novo;
+    });
+  };
+
+  const setQtdDireta = (idx, val) => {
+    const n = parseInt(val, 10);
+    if (isNaN(n)) return;
+    if (n <= 0) { setItens(prev => prev.filter((_, i) => i !== idx)); return; }
+    setItens(prev => {
+      const novo = [...prev];
+      novo[idx] = { ...novo[idx], qtd: n };
       return novo;
     });
   };
@@ -734,6 +759,69 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
 
   const podeFechar = podeOperar(cargo);
 
+  /* Cancelar comanda (cliente desistiu) */
+  const cancelarComanda = async () => {
+    if (!motivoCancelamento.trim()) return;
+    setCancelando(true);
+    try {
+      const cmdRef = doc(db, "users", uid, "comandas", mesa.id);
+
+      if (itens.length > 0) {
+        const gerarId = (cnt) => `V${String(cnt + 1).padStart(4, "0")}`;
+        const novoId = gerarId(vendaIdCnt);
+
+        const payload = {
+          cliente: clienteNome.trim() || `Mesa ${mesa.numero}`,
+          data: new Date(),
+          vendedor: nomeUsuario,
+          formaPagamento: "Cancelado",
+          observacao: `Mesa ${mesa.numero} — Cancelado: ${motivoCancelamento.trim()}`,
+          tipo: "produto",
+          total: 0,
+          subtotal,
+          descontos: subtotal,
+          custoTotal: 0,
+          lucroEstimado: 0,
+          parcelas: null,
+          taxaPercentual: 0,
+          valorTaxa: 0,
+          valorPago: 0,
+          valorRestante: 0,
+          statusPagamento: "cancelado",
+          valorRecebido: 0,
+          origem: "mesa",
+          mesaNumero: mesa.numero,
+          motivoCancelamento: motivoCancelamento.trim(),
+          itens: itens.map(i => ({
+            produtoId: i.produtoId || null,
+            nome: i.nome,
+            qtd: i.qtd || 1,
+            preco: i.preco || 0,
+            custo: 0,
+            desconto: 0,
+            tipo: i._tipo || "produto",
+          })),
+          criadoEm: new Date().toISOString(),
+        };
+
+        await runTransaction(db, async (tx) => {
+          tx.set(doc(db, "users", uid, "vendas", novoId), payload);
+          tx.set(doc(db, "users", uid), { vendaIdCnt: vendaIdCnt + 1 }, { merge: true });
+          tx.delete(cmdRef);
+        });
+      } else {
+        await deleteDoc(cmdRef);
+      }
+
+      onVendaSalva(null);
+      onClose();
+    } catch (err) {
+      console.error("[Mesas] Erro ao cancelar comanda:", err);
+      alert("Erro ao cancelar. Tente novamente.");
+    }
+    setCancelando(false);
+  };
+
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-box modal-box-lg">
@@ -827,7 +915,13 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
                     </div>
                     <div className="cmd-item-qtd">
                       <button className="cmd-qtd-btn" onClick={() => alterarQtd(idx, -1)}>−</button>
-                      <span className="cmd-qtd-num">{item.qtd}</span>
+                      <input
+                        type="number"
+                        className="cmd-qtd-input"
+                        value={item.qtd}
+                        min={1}
+                        onChange={e => setQtdDireta(idx, e.target.value)}
+                      />
                       <button className="cmd-qtd-btn" onClick={() => alterarQtd(idx, +1)}>+</button>
                     </div>
                     <div className="cmd-item-total">{fmtR$((item.preco || 0) * (item.qtd || 1))}</div>
@@ -920,7 +1014,14 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
 
         {/* FOOTER */}
         <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn-secondary" onClick={onClose}>Fechar</button>
+
+          {/* Cancelar comanda — cliente desistiu */}
+          {isOcupada && (
+            <button className="btn-danger" onClick={() => setConfirmCancelar(true)}>
+              <X size={14} /> Cancelar Comanda
+            </button>
+          )}
 
           {/* Salvar comanda aberta */}
           {(itens.length > 0 || isOcupada) && podeFechar && (
@@ -996,6 +1097,70 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
               <button className="btn-secondary" onClick={() => setConfirmFechar(false)}>Voltar</button>
               <button className="btn-success" onClick={fecharMesa} disabled={fechando}>
                 {fechando ? "Fechando..." : <><CheckCircle2 size={14} /> Confirmar e Fechar</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal cancelamento de comanda ── */}
+      {confirmCancelar && (
+        <div className="modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="modal-box modal-box-sm">
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">Cancelar Comanda — Mesa {mesa.numero}</div>
+                <div className="modal-sub">O cliente desistiu — registrar histórico</div>
+              </div>
+              <button className="modal-close" onClick={() => { setConfirmCancelar(false); setMotivoCancelamento(""); }}>
+                <X size={14} color="var(--text-2)" />
+              </button>
+            </div>
+            <div style={{ padding: "18px 20px" }}>
+              <div style={{ fontSize: 32, textAlign: "center", marginBottom: 12 }}>🚫</div>
+              <p style={{ fontSize: 13, color: "var(--text-2)", textAlign: "center", marginBottom: 16, lineHeight: 1.6 }}>
+                A comanda será cancelada e um histórico será salvo em{" "}
+                <strong style={{ color: "var(--text)" }}>Vendas Canceladas</strong>{" "}
+                com origem <em>Mesa {mesa.numero}</em>.
+              </p>
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="form-label">
+                  Motivo do cancelamento <span className="form-label-req">*</span>
+                </label>
+                <input
+                  className="form-input"
+                  placeholder="Ex: cliente desistiu, saiu sem consumir..."
+                  value={motivoCancelamento}
+                  onChange={e => setMotivoCancelamento(e.target.value)}
+                  autoFocus
+                  onKeyDown={e => e.key === "Enter" && motivoCancelamento.trim() && cancelarComanda()}
+                />
+              </div>
+              {itens.length > 0 && (
+                <div style={{
+                  padding: "10px 13px", borderRadius: 9,
+                  background: "var(--s3)", border: "1px solid var(--border)",
+                  fontSize: 12, color: "var(--text-2)",
+                  display: "flex", justifyContent: "space-between",
+                }}>
+                  <span>{itens.length} item(s) registrado(s)</span>
+                  <span style={{ color: "var(--text)", fontWeight: 600 }}>{fmtR$(subtotal)}</span>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button
+                className="btn-secondary"
+                onClick={() => { setConfirmCancelar(false); setMotivoCancelamento(""); }}
+              >
+                Voltar
+              </button>
+              <button
+                className="btn-danger"
+                onClick={cancelarComanda}
+                disabled={cancelando || !motivoCancelamento.trim()}
+              >
+                {cancelando ? "Cancelando..." : <><X size={14} /> Confirmar Cancelamento</>}
               </button>
             </div>
           </div>
