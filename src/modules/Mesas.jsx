@@ -334,7 +334,7 @@ const CSS = `
     border-radius: 12px; overflow: hidden; margin-bottom: 14px;
   }
   .cmd-items-header {
-    display: grid; grid-template-columns: 1fr auto 100px 36px;
+    display: grid; grid-template-columns: 1fr auto auto auto;
     padding: 8px 12px; background: var(--s3);
     border-bottom: 1px solid var(--border); gap: 8px;
   }
@@ -343,7 +343,7 @@ const CSS = `
     text-transform: uppercase; color: var(--text-3);
   }
   .cmd-item-row {
-    display: grid; grid-template-columns: 1fr auto 100px 36px;
+    display: grid; grid-template-columns: 1fr auto auto auto;
     padding: 10px 12px; border-bottom: 1px solid var(--border);
     gap: 8px; align-items: center;
   }
@@ -386,6 +386,7 @@ const CSS = `
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; border: 1px solid transparent; background: transparent;
     color: var(--red); transition: all .13s;
+    overflow: visible;
   }
   .cmd-item-remove:hover { background: var(--red-d); border-color: rgba(224,82,82,.2); }
   .cmd-empty-items {
@@ -569,7 +570,7 @@ const CSS = `
     .mesas-page { padding: 14px; }
     .mesas-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
     .cmd-items-header,
-    .cmd-item-row { grid-template-columns: 1fr auto 80px 28px; }
+    .cmd-item-row { grid-template-columns: 1fr auto auto auto; }
     .form-row { flex-direction: column; }
   }
 `;
@@ -1509,7 +1510,6 @@ export default function Mesas() {
               onClick={() => setAbaAtiva("historico")}
             >
               <Clock size={14} /> Histórico
-              {historico.length > 0 && <span className="count-badge" style={{ background: "var(--red)", color: "#fff" }}>{historico.length}</span>}
             </button>
           </div>
         </div>
