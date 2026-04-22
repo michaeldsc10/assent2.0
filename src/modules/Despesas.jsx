@@ -883,7 +883,14 @@ function ModalPagar({ despesa, onConfirm, onClose }) {
   const [formaPag, setFormaPag] = useState(despesa.formaPagamento || "pix");
   const [pagando, setPagando] = useState(false);
 
-  const [dataPag, setDataPag] = useState(new Date().toISOString().split("T")[0]);
+  const [dataPag, setDataPag] = useState(() => {
+    // Gera "YYYY-MM-DD" no fuso local (não UTC) para evitar virar dia anterior no Firestore
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm   = String(d.getMonth() + 1).padStart(2, "0");
+    const dd   = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  });
 
   const handlePagar = async () => {
     if (!dataPag) return;
@@ -1423,10 +1430,21 @@ export default function Despesas({ isPro = false }) {
     if (!tenantUid || !pagando) return;
     const ref = doc(db, "users", tenantUid, "despesas", pagando.id);
 
+    // dataPagamento vem como "YYYY-MM-DD" (fuso local, corrigido no ModalPagar).
+    // mesPagamento/anoPagamento facilitam queries no DRE sem depender de Timestamp.
+    const dataFinal = dataPagamento || (() => {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    })();
+    const dtObj = new Date(dataFinal + "T12:00:00");
+
     await setDoc(ref, {
       status: "pago",
       formaPagamento,
-      dataPagamento: dataPagamento || new Date().toISOString().split("T")[0],
+      dataPagamento:  dataFinal,
+      mesPagamento:   dtObj.getMonth() + 1,  // 1–12
+      anoPagamento:   dtObj.getFullYear(),
+      pagoEm: serverTimestamp(),
     }, { merge: true });
 
     // Recorrência: gerar próximo lançamento
@@ -1487,24 +1505,29 @@ export default function Despesas({ isPro = false }) {
   const despesasFiltradas = useMemo(() => {
     let lista = [...despesas];
 
+    // Para despesas pagas, a data relevante é dataPagamento (quando o dinheiro saiu).
+    // Para pendentes/vencidas, é o vencimento.
+    const dataRef = (d) =>
+      d.status === "pago" && d.dataPagamento ? d.dataPagamento : d.vencimento;
+
     // Período
     if (filtroPeriodo === "mes") {
       lista = lista.filter(d => {
-        const dt = parseDate(d.vencimento);
+        const dt = parseDate(dataRef(d));
         return dt && dt.getMonth() === mesAtual && dt.getFullYear() === anoAtual;
       });
     } else if (filtroPeriodo === "semana") {
       const inicio = new Date(); inicio.setDate(inicio.getDate() - inicio.getDay());
       const fim    = new Date(inicio); fim.setDate(inicio.getDate() + 6);
       lista = lista.filter(d => {
-        const dt = parseDate(d.vencimento);
+        const dt = parseDate(dataRef(d));
         return dt && dt >= inicio && dt <= fim;
       });
     } else if (filtroPeriodo === "custom") {
       const inicio = periodoCustom.inicio ? parseDate(periodoCustom.inicio) : null;
       const fim    = periodoCustom.fim    ? parseDate(periodoCustom.fim)    : null;
       lista = lista.filter(d => {
-        const dt = parseDate(d.vencimento);
+        const dt = parseDate(dataRef(d));
         if (!dt) return false;
         if (inicio && dt < inicio) return false;
         if (fim    && dt > fim)    return false;
