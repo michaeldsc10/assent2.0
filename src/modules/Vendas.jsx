@@ -690,8 +690,20 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
           : new Date(venda.data).toISOString().split("T")[0]) 
       : new Date().toISOString().split("T")[0]
   );
-  const [vendedor, setVendedor] = useState(venda?.vendedor || "");
-  const [vendedorCargo, setVendedorCargo] = useState(venda?.vendedorCargo || "");
+  // Vendedor: se cargo=vendedor, sempre usa o próprio nome (não pode trocar)
+  const isVendedorCargo = cargo === "vendedor";
+  const podeEscolherVendedor = cargo === "admin" || cargo === "comercial";
+
+  // Se cargo === "vendedor", sempre trava no próprio nome — em criação E edição.
+  // Somente admin/comercial podem escolher ou ver o vendedor salvo na venda.
+  const [vendedor, setVendedor] = useState(
+    isVendedorCargo
+      ? (vendedorNomeLogado || "")
+      : (venda?.vendedor || "")
+  );
+  const [vendedorCargo, setVendedorCargo] = useState(
+    isVendedorCargo ? cargo : (venda?.vendedorCargo || "")
+  );
   const [formaPgto, setFormaPgto] = useState(venda?.formaPagamento || "");
   const [observacao, setObservacao] = useState(venda?.observacao || "");
 
@@ -1019,7 +1031,15 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">Vendedor</label>
-              {vendedores?.length > 0 ? (
+              {isVendedorCargo ? (
+                /* Vendedor só pode criar no próprio nome — campo bloqueado */
+                <input
+                  className="form-input"
+                  value={vendedor}
+                  disabled
+                  style={{ opacity: 0.6, cursor: "not-allowed" }}
+                />
+              ) : podeEscolherVendedor && vendedores?.length > 0 ? (
                 <select className="form-input" value={vendedor} onChange={e => {
                   const nome = e.target.value;
                   setVendedor(nome);
@@ -1032,11 +1052,11 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
                   ))}
                 </select>
               ) : (
-                <input 
-                  className="form-input" 
-                  placeholder="Nome do vendedor..." 
-                  value={vendedor} 
-                  onChange={e => setVendedor(e.target.value)} 
+                <input
+                  className="form-input"
+                  placeholder="Nome do vendedor..."
+                  value={vendedor}
+                  onChange={e => setVendedor(e.target.value)}
                 />
               )}
             </div>
@@ -2371,8 +2391,16 @@ useEffect(() => {
         <ModalDetalheVenda
           venda={detalhe}
           onClose={() => setDetalhe(null)}
-          onEditar={podeEditar ? (v) => { setDetalhe(null); setEditando(v); } : null}
-          onCancelar={podeCancelar ? (v) => { setDetalhe(null); setDeletando(v); } : null}
+          onEditar={
+            podeEditar && (detalhe?.status !== "cancelada" || cargo === "admin")
+              ? (v) => { setDetalhe(null); setEditando(v); }
+              : null
+          }
+          onCancelar={
+            podeCancelar && detalhe?.status !== "cancelada"
+              ? (v) => { setDetalhe(null); setDeletando(v); }
+              : null
+          }
           onExcluirDef={podeExcluir ? (v) => { setDetalhe(null); setExcluindoDef(v); } : null}
           isAdmin={cargo === "admin"}
         />
