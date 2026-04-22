@@ -334,7 +334,7 @@ const CSS = `
     border-radius: 12px; overflow: hidden; margin-bottom: 14px;
   }
   .cmd-items-header {
-    display: grid; grid-template-columns: 1fr 90px 100px 36px;
+    display: grid; grid-template-columns: 1fr auto 100px 36px;
     padding: 8px 12px; background: var(--s3);
     border-bottom: 1px solid var(--border); gap: 8px;
   }
@@ -343,7 +343,7 @@ const CSS = `
     text-transform: uppercase; color: var(--text-3);
   }
   .cmd-item-row {
-    display: grid; grid-template-columns: 1fr 90px 100px 36px;
+    display: grid; grid-template-columns: 1fr auto 100px 36px;
     padding: 10px 12px; border-bottom: 1px solid var(--border);
     gap: 8px; align-items: center;
   }
@@ -352,6 +352,7 @@ const CSS = `
   .cmd-item-sub  { font-size: 11px; color: var(--text-3); margin-top: 1px; }
   .cmd-item-qtd  {
     display: flex; align-items: center; gap: 5px;
+    overflow: visible; flex-shrink: 0;
   }
   .cmd-qtd-btn {
     width: 22px; height: 22px; border-radius: 6px;
@@ -516,12 +517,59 @@ const CSS = `
     padding: 1px 6px; border-radius: 10px; line-height: 1.4;
   }
 
+  /* ── Histórico de cancelamentos ── */
+  .hist-wrap {
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+  }
+  .hist-header {
+    display: grid; grid-template-columns: 60px 90px 1fr 1fr 120px;
+    padding: 8px 14px; background: var(--s3);
+    border-bottom: 1px solid var(--border); gap: 10px;
+  }
+  .hist-header span {
+    font-size: 9px; font-weight: 600; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-3);
+  }
+  .hist-row {
+    display: grid; grid-template-columns: 60px 90px 1fr 1fr 120px;
+    padding: 11px 14px; border-bottom: 1px solid var(--border);
+    gap: 10px; align-items: center; font-size: 13px;
+    transition: background .1s;
+  }
+  .hist-row:last-child { border-bottom: none; }
+  .hist-row:hover { background: var(--s2); }
+  .hist-mesa {
+    font-family: 'Sora', sans-serif; font-weight: 700;
+    color: var(--gold); font-size: 14px;
+  }
+  .hist-data { font-size: 11px; color: var(--text-3); }
+  .hist-motivo { color: var(--text-2); font-size: 12px; }
+  .hist-itens { font-size: 12px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .hist-badge-cancelado {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 3px 10px; border-radius: 20px; font-size: 10px; font-weight: 700;
+    background: var(--red-d); color: var(--red);
+    border: 1px solid rgba(224,82,82,.25); white-space: nowrap;
+  }
+  .hist-empty {
+    padding: 32px; text-align: center;
+    font-size: 13px; color: var(--text-3);
+  }
+  @media (max-width: 640px) {
+    .hist-header, .hist-row { grid-template-columns: 48px 80px 1fr; }
+    .hist-header span:nth-child(4),
+    .hist-header span:nth-child(5),
+    .hist-row > *:nth-child(4),
+    .hist-row > *:nth-child(5) { display: none; }
+  }
+
   /* ── Responsivo ── */
   @media (max-width: 600px) {
     .mesas-page { padding: 14px; }
     .mesas-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
     .cmd-items-header,
-    .cmd-item-row { grid-template-columns: 1fr 86px 80px 28px; }
+    .cmd-item-row { grid-template-columns: 1fr auto 80px 28px; }
     .form-row { flex-direction: column; }
   }
 `;
@@ -765,53 +813,49 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
     setCancelando(true);
     try {
       const cmdRef = doc(db, "users", uid, "comandas", mesa.id);
+      const gerarId = (cnt) => `V${String(cnt + 1).padStart(4, "0")}`;
+      const novoId = gerarId(vendaIdCnt);
 
-      if (itens.length > 0) {
-        const gerarId = (cnt) => `V${String(cnt + 1).padStart(4, "0")}`;
-        const novoId = gerarId(vendaIdCnt);
+      const payload = {
+        cliente: clienteNome.trim() || `Mesa ${mesa.numero}`,
+        data: new Date(),
+        vendedor: nomeUsuario,
+        formaPagamento: "Cancelado",
+        observacao: `Mesa ${mesa.numero} — Cancelado: ${motivoCancelamento.trim()}`,
+        tipo: "produto",
+        total: 0,
+        subtotal,
+        descontos: subtotal,
+        custoTotal: 0,
+        lucroEstimado: 0,
+        parcelas: null,
+        taxaPercentual: 0,
+        valorTaxa: 0,
+        valorPago: 0,
+        valorRestante: 0,
+        statusPagamento: "cancelado",
+        valorRecebido: 0,
+        origem: "mesa",
+        mesaNumero: mesa.numero,
+        motivoCancelamento: motivoCancelamento.trim(),
+        canceladoEm: new Date().toISOString(),
+        itens: itens.map(i => ({
+          produtoId: i.produtoId || null,
+          nome: i.nome,
+          qtd: i.qtd || 1,
+          preco: i.preco || 0,
+          custo: 0,
+          desconto: 0,
+          tipo: i._tipo || "produto",
+        })),
+        criadoEm: new Date().toISOString(),
+      };
 
-        const payload = {
-          cliente: clienteNome.trim() || `Mesa ${mesa.numero}`,
-          data: new Date(),
-          vendedor: nomeUsuario,
-          formaPagamento: "Cancelado",
-          observacao: `Mesa ${mesa.numero} — Cancelado: ${motivoCancelamento.trim()}`,
-          tipo: "produto",
-          total: 0,
-          subtotal,
-          descontos: subtotal,
-          custoTotal: 0,
-          lucroEstimado: 0,
-          parcelas: null,
-          taxaPercentual: 0,
-          valorTaxa: 0,
-          valorPago: 0,
-          valorRestante: 0,
-          statusPagamento: "cancelado",
-          valorRecebido: 0,
-          origem: "mesa",
-          mesaNumero: mesa.numero,
-          motivoCancelamento: motivoCancelamento.trim(),
-          itens: itens.map(i => ({
-            produtoId: i.produtoId || null,
-            nome: i.nome,
-            qtd: i.qtd || 1,
-            preco: i.preco || 0,
-            custo: 0,
-            desconto: 0,
-            tipo: i._tipo || "produto",
-          })),
-          criadoEm: new Date().toISOString(),
-        };
-
-        await runTransaction(db, async (tx) => {
-          tx.set(doc(db, "users", uid, "vendas", novoId), payload);
-          tx.set(doc(db, "users", uid), { vendaIdCnt: vendaIdCnt + 1 }, { merge: true });
-          tx.delete(cmdRef);
-        });
-      } else {
-        await deleteDoc(cmdRef);
-      }
+      await runTransaction(db, async (tx) => {
+        tx.set(doc(db, "users", uid, "vendas", novoId), payload);
+        tx.set(doc(db, "users", uid), { vendaIdCnt: vendaIdCnt + 1 }, { merge: true });
+        tx.delete(cmdRef);
+      });
 
       onVendaSalva(null);
       onClose();
@@ -1337,6 +1381,8 @@ export default function Mesas() {
   const [mesaModal, setMesaModal] = useState(null);      // mesa selecionada
   const [configModal, setConfigModal] = useState(false);
   const [reciboModal, setReciboModal] = useState(null);
+  const [abaAtiva, setAbaAtiva] = useState("mesas");     // "mesas" | "historico"
+  const [historico, setHistorico] = useState([]);
 
   const podeCfg = cargo === "admin";
   const podeAbrirFechar = podeOperar(cargo);
@@ -1376,13 +1422,22 @@ export default function Mesas() {
       setServicos(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     );
 
+    /* Histórico de cancelamentos de mesa */
+    const vendasCol = collection(db, "users", uid, "vendas");
+    const qCanceladas = query(vendasCol, where("origem", "==", "mesa"), where("statusPagamento", "==", "cancelado"));
+    const u6 = onSnapshot(qCanceladas, snap => {
+      const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      arr.sort((a, b) => (b.criadoEm || "").localeCompare(a.criadoEm || ""));
+      setHistorico(arr);
+    });
+
     getDoc(doc(db, "users", uid, "config", "geral")).then(snap => {
       if (snap.exists() && snap.data().taxas) {
         setTaxas(prev => ({ ...TAXAS_DEFAULT, ...snap.data().taxas }));
       }
     }).catch(() => {});
 
-    return () => { u1(); u2(); u3(); u4(); u5(); };
+    return () => { u1(); u2(); u3(); u4(); u5(); u6(); };
   }, [uid]);
 
   /* ── Stats ── */
@@ -1439,50 +1494,72 @@ export default function Mesas() {
           </div>
         </div>
 
-        {/* LEGENDA */}
-        {mesas.length > 0 && (
-          <div className="mesas-legenda">
-            <div className="legenda-item">
-              <div className="legenda-dot livre" />
-              Livre
-            </div>
-            <div className="legenda-item">
-              <div className="legenda-dot ocupada" />
-              Ocupada
-            </div>
+        {/* ABAS */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+          <div className="mesas-tabs">
+            <button
+              className={`mesas-tab ${abaAtiva === "mesas" ? "active" : ""}`}
+              onClick={() => setAbaAtiva("mesas")}
+            >
+              <LayoutGrid size={14} /> Mesas
+              {mesasOcupadas > 0 && <span className="count-badge">{mesasOcupadas}</span>}
+            </button>
+            <button
+              className={`mesas-tab ${abaAtiva === "historico" ? "active" : ""}`}
+              onClick={() => setAbaAtiva("historico")}
+            >
+              <Clock size={14} /> Histórico
+              {historico.length > 0 && <span className="count-badge" style={{ background: "var(--red)", color: "#fff" }}>{historico.length}</span>}
+            </button>
           </div>
-        )}
+        </div>
 
-        {/* GRID */}
-        {mesas.length === 0 ? (
-          <div className="mesa-empty">
-            <UtensilsCrossed size={40} strokeWidth={1.2} />
-            <div>
-              <div style={{ fontWeight: 600, color: "var(--text-2)", marginBottom: 4 }}>
-                Nenhuma mesa cadastrada
+        {abaAtiva === "mesas" ? (
+          <>
+            {/* LEGENDA */}
+            {mesas.length > 0 && (
+              <div className="mesas-legenda">
+                <div className="legenda-item">
+                  <div className="legenda-dot livre" />
+                  Livre
+                </div>
+                <div className="legenda-item">
+                  <div className="legenda-dot ocupada" />
+                  Ocupada
+                </div>
               </div>
-              {podeCfg
-                ? <div>Clique em <strong>"Configurar Mesas"</strong> para adicionar.</div>
-                : <div>Solicite ao administrador que configure as mesas.</div>
-              }
-            </div>
-          </div>
-        ) : (
-          <div className="mesas-grid">
-            {mesas.map(mesa => {
-              const comanda = comandas[mesa.id];
-              const ocupada = !!comanda;
-              return (
-                <div
-                  key={mesa.id}
-                  className={`mesa-card ${ocupada ? "ocupada" : ""}`}
-                  onClick={() => podeAbrirFechar && setMesaModal({ mesa, comanda: comanda || null })}
-                  style={!podeAbrirFechar ? { cursor: "default", opacity: 0.7 } : {}}
-                >
-                  <div className="mesa-numero">{mesa.numero}</div>
-                  <div className={`mesa-status-badge ${ocupada ? "badge-ocupada" : "badge-livre"}`}>
-                    {ocupada ? "Ocupada" : "Livre"}
+            )}
+
+            {/* GRID */}
+            {mesas.length === 0 ? (
+              <div className="mesa-empty">
+                <UtensilsCrossed size={40} strokeWidth={1.2} />
+                <div>
+                  <div style={{ fontWeight: 600, color: "var(--text-2)", marginBottom: 4 }}>
+                    Nenhuma mesa cadastrada
                   </div>
+                  {podeCfg
+                    ? <div>Clique em <strong>"Configurar Mesas"</strong> para adicionar.</div>
+                    : <div>Solicite ao administrador que configure as mesas.</div>
+                  }
+                </div>
+              </div>
+            ) : (
+              <div className="mesas-grid">
+                {mesas.map(mesa => {
+                  const comanda = comandas[mesa.id];
+                  const ocupada = !!comanda;
+                  return (
+                    <div
+                      key={mesa.id}
+                      className={`mesa-card ${ocupada ? "ocupada" : ""}`}
+                      onClick={() => podeAbrirFechar && setMesaModal({ mesa, comanda: comanda || null })}
+                      style={!podeAbrirFechar ? { cursor: "default", opacity: 0.7 } : {}}
+                    >
+                      <div className="mesa-numero">{mesa.numero}</div>
+                      <div className={`mesa-status-badge ${ocupada ? "badge-ocupada" : "badge-livre"}`}>
+                        {ocupada ? "Ocupada" : "Livre"}
+                      </div>
                   {ocupada && comanda ? (
                     <>
                       {comanda.clienteNome && (
@@ -1502,9 +1579,48 @@ export default function Mesas() {
                       {mesa.nome || `Capacidade ${mesa.capacidade || 4}`}
                     </div>
                   )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        ) : (
+          /* ── ABA HISTÓRICO ── */
+          <div>
+            <div style={{ marginBottom: 14, fontSize: 13, color: "var(--text-3)" }}>
+              Comandas canceladas geradas por este módulo — com motivo registrado.
+            </div>
+
+            {historico.length === 0 ? (
+              <div className="hist-empty">
+                <div style={{ fontSize: 28, marginBottom: 8 }}>🕓</div>
+                Nenhum cancelamento registrado ainda.
+              </div>
+            ) : (
+              <div className="hist-wrap">
+                <div className="hist-header">
+                  <span>Mesa</span>
+                  <span>Data</span>
+                  <span>Motivo</span>
+                  <span>Itens</span>
+                  <span>Status</span>
                 </div>
-              );
-            })}
+                {historico.map(v => (
+                  <div key={v.id} className="hist-row">
+                    <div className="hist-mesa">{v.mesaNumero ?? "—"}</div>
+                    <div className="hist-data">{fmtDataHora(v.canceladoEm || v.criadoEm)}</div>
+                    <div className="hist-motivo">{v.motivoCancelamento || v.observacao || "—"}</div>
+                    <div className="hist-itens">
+                      {v.itens?.length
+                        ? v.itens.map(i => `${i.qtd}x ${i.nome}`).join(", ")
+                        : "Sem itens"}
+                    </div>
+                    <div><span className="hist-badge-cancelado">Cancelado</span></div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
