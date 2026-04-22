@@ -173,6 +173,15 @@ const CSS = `
   }
   .btn-nova-desp:hover { opacity: .88; }
 
+  /* Container principal com scroll */
+  .desp-container {
+    display: flex; flex-direction: column;
+    height: 100%; overflow-y: auto;
+    min-height: 0;
+  }
+  .desp-container::-webkit-scrollbar { width: 4px; }
+  .desp-container::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
+
   /* Topbar */
   .desp-topbar {
     padding: 14px 22px; background: var(--s1);
@@ -495,7 +504,8 @@ const proximaData = (dataBase, tipo, intervalo = 1) => {
 const FORMAS_PAG = [
   { value: "dinheiro", label: "Dinheiro", Icon: Wallet },
   { value: "pix",      label: "Pix",      Icon: Smartphone },
-  { value: "cartão",   label: "Cartão",   Icon: CreditCard },
+  { value: "debito",   label: "Débito",   Icon: CreditCard },
+  { value: "credito",  label: "Crédito",  Icon: CreditCard },
 ];
 
 /* ════════════════════════════════════════
@@ -1581,7 +1591,7 @@ export default function Despesas({ isPro = false }) {
   // App.jsx bloqueia render enquanto loadingAuth||!tenantUid
 
   return (
-    <>
+    <div className="desp-container">
       <style>{CSS}</style>
 
       {/* Topbar */}
@@ -1857,6 +1867,6 @@ export default function Despesas({ isPro = false }) {
       {deletando && podeExcluirV && (
         <ModalConfirmDelete despesa={deletando} onConfirm={handleDelete} onClose={() => setDeletando(null)} />
       )}
-    </>
+    </div>
   );
 }
