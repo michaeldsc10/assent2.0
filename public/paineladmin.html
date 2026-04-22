@@ -803,6 +803,17 @@ tbody tr:hover { background: var(--surface2); }
               <textarea class="field-input field-textarea" id="notifMsg" placeholder="Descreva a notificação..."></textarea>
             </div>
 
+            <div class="form-2col" style="margin-bottom:20px">
+              <div class="field-group">
+                <div class="field-label">Texto do Botão <span style="color:var(--text3);font-weight:400">(opcional)</span></div>
+                <input class="field-input" id="notifBtnTexto" type="text" placeholder="Ex: Ver novidade">
+              </div>
+              <div class="field-group">
+                <div class="field-label">URL do Botão <span style="color:var(--text3);font-weight:400">(opcional)</span></div>
+                <input class="field-input" id="notifBtnUrl" type="url" placeholder="https://...">
+              </div>
+            </div>
+
             <button class="btn-primary" id="btnSendNotif">Enviar Notificação</button>
             <span class="feedback-msg" id="notifFeedback"></span>
           </div>
@@ -1340,6 +1351,12 @@ function renderNotifList(list) {
       <div style="flex:1">
         <div class="notif-title">${esc(n.titulo||'')}</div>
         <div class="notif-body">${esc(n.mensagem||'')}</div>
+        ${n.btnUrl ? `<div style="margin-top:6px">
+          <a href="${esc(n.btnUrl)}" target="_blank" rel="noopener"
+             style="font-size:11px;color:var(--gold);font-family:'IBM Plex Mono',monospace;text-decoration:none;border-bottom:1px solid var(--gold-border)">
+            ↗ ${esc(n.btnTexto || n.btnUrl)}
+          </a>
+        </div>` : ''}
         <div class="notif-meta">
           ${fmtDateTime(n.criadoEm?.toDate?.() || null)} &nbsp;·&nbsp;
           Para: ${destTag[n.destinatario] || n.destinatario || '—'}
@@ -1349,22 +1366,33 @@ function renderNotifList(list) {
 }
 
 document.getElementById('btnSendNotif').addEventListener('click', async () => {
-  const titulo   = document.getElementById('notifTitle').value.trim();
-  const mensagem = document.getElementById('notifMsg').value.trim();
+  const titulo    = document.getElementById('notifTitle').value.trim();
+  const mensagem  = document.getElementById('notifMsg').value.trim();
+  const btnTexto  = document.getElementById('notifBtnTexto').value.trim();
+  const btnUrl    = document.getElementById('notifBtnUrl').value.trim();
   const fb = document.getElementById('notifFeedback');
   if (!titulo || !mensagem) {
     showFeedback(fb, 'Preencha título e mensagem.', 'var(--danger)'); return;
   }
+  if (btnUrl && !btnUrl.startsWith('http')) {
+    showFeedback(fb, 'URL inválida. Use https://...', 'var(--danger)'); return;
+  }
   const btn = document.getElementById('btnSendNotif');
   btn.textContent = 'Enviando...'; btn.disabled = true;
   try {
-    await db.collection('notificacoesAG').add({
+    const payload = {
       titulo, mensagem, destinatario: selectedDest,
       criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
       criadoPor: auth.currentUser?.uid || ''
-    });
-    document.getElementById('notifTitle').value = '';
-    document.getElementById('notifMsg').value = '';
+    };
+    if (btnUrl)   payload.btnUrl   = btnUrl;
+    if (btnTexto) payload.btnTexto = btnTexto;
+
+    await db.collection('notificacoesAG').add(payload);
+    document.getElementById('notifTitle').value   = '';
+    document.getElementById('notifMsg').value     = '';
+    document.getElementById('notifBtnTexto').value = '';
+    document.getElementById('notifBtnUrl').value   = '';
     showFeedback(fb, '✓ Notificação enviada!', 'var(--success)');
     loadNotifications();
   } catch(e) {
