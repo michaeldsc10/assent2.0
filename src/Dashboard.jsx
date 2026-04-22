@@ -21,7 +21,7 @@ import {
   ShoppingCart, Clock, Wallet, TrendingDown, Truck, BarChart3,
   Calendar, Settings, Zap, UserCheck, UserPlus, Search, ArrowUpRight,
   ArrowDownRight, ChevronRight, Bell, LogOut, ChevronDown,
-  PanelLeftClose, PanelLeftOpen, Menu, X, Sun, Moon,
+  PanelLeftClose, PanelLeftOpen, Menu, X, Sun, Moon, LayoutGrid,
 } from "lucide-react";
 
 /* ── Módulos ───────────────────────────────────── */
@@ -41,6 +41,7 @@ import CaixaDiario   from "./modules/CaixaDiario.jsx";
 import Orcamentos    from "./modules/Orcamentos.jsx";
 import Usuarios      from "./modules/Usuarios.jsx";
 import Compras       from "./modules/Compras.jsx";
+import Mesas         from "./modules/Mesas.jsx";
 
 import RotaProtegida from "./contexts/RotaProtegida";
 import { usePermissao } from "./hooks/usePermissao";
@@ -79,6 +80,7 @@ const KEY_MAP = {
   "Usuários":           "usuarios",
   "Configurações":      "config",
    "Compras":           "compras",
+   "Mesas":             "mesas",
 };
 
 const ATALHOS_TECLADO = [
@@ -98,6 +100,7 @@ const ATALHOS_TECLADO = [
   { code: "KeyM", label: "Vendedores",          dbKey: "vendedores"      },
   { code: "KeyU", label: "Usuários",            dbKey: "usuarios"        },
   { code: "KeyG", label: "Configurações",       dbKey: "config"          },
+  { code: "KeyT", label: "Mesas",               dbKey: "mesas"           },
 ];
 
 const LOCKED_KEYS  = new Set(["dashboard", "config"]);
@@ -115,6 +118,7 @@ const NAV = [
     { label: "Vendas",          modulo: "vendas",           icone: TrendingDown,       secao: "COMERCIAL" },
     { label: "A Receber",       modulo: "aReceber",         icone: Clock,            secao: "FINANCEIRO"},
    { label: "Compras",         modulo: "compras",          icone: ShoppingCart,     secao: "COMERCIAL" },
+    { label: "Mesas",           modulo: "mesas",            icone: LayoutGrid,       secao: "OPERAÇÕES"  },
     { label: "Caixa Diário",    modulo: "caixaDiario",      icone: Wallet,           secao: "FINANCEIRO"},
     { label: "Despesas",        modulo: "despesas",         icone: ArrowDownRight,          secao: "FINANCEIRO"},
    { label: "Fornecedores",    modulo: "fornecedores",     icone: Truck,            secao: "ESTOQUE"   },
@@ -1290,6 +1294,12 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         return (
           <RotaProtegida modulo="compras" label="Compras">
             <Compras />
+          </RotaProtegida>
+        );
+      case "Mesas":
+        return (
+          <RotaProtegida modulo="mesas" label="Mesas">
+            <Mesas />
           </RotaProtegida>
         );
       case "Orçamentos":
