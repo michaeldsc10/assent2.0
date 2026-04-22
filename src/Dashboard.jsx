@@ -1778,6 +1778,23 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                       <div key={n.id} className="ag-notif-item">
                         <div className="ag-notif-item-title">{n.titulo}</div>
                         <div className="ag-notif-item-body">{n.mensagem}</div>
+                        {n.btnUrl && (
+                          <a
+                            href={n.btnUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: "inline-block", marginTop: 8,
+                              padding: "5px 12px", borderRadius: 6,
+                              background: "linear-gradient(135deg,#B8860B,#D4AF37)",
+                              color: "#050505", fontSize: 11, fontWeight: 700,
+                              letterSpacing: "0.8px", textDecoration: "none",
+                              fontFamily: "'IBM Plex Mono', monospace",
+                            }}
+                          >
+                            {n.btnTexto || "Ver mais"} ↗
+                          </a>
+                        )}
                         <div className="ag-notif-item-meta">
                           {n.criadoEm?.toDate
                             ? n.criadoEm.toDate().toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
