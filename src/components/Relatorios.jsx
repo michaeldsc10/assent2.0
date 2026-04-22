@@ -539,9 +539,10 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
 
   const dados = useMemo(() => {
     const // Regime de caixa: só despesas PAGAS entram no DRE
+      // dataPagamento = quando o dinheiro saiu de fato; fallback para vencimento (não d.data, que não existe em despesas)
       dFiltradas = despesas.filter((d) =>
         d.status === "pago" &&
-        dentroDoIntervalo(d.dataPagamento || d.data, intervalo));
+        dentroDoIntervalo(d.dataPagamento || d.vencimento, intervalo));
 
     /* ══════════════════════════════════════════════════════════════════
        REGIME DE CAIXA PURO — RECEITA
@@ -964,17 +965,16 @@ function RelatorioFinanceiro({ caixa, intervalo }) {
    ══════════════════════════════════════════════════════ */
 function RelatorioDespesas({ despesas, intervalo }) {
   const dados = useMemo(() => {
+    // Para despesas pagas, a data relevante é dataPagamento (quando saiu o dinheiro).
+    // Para pendentes/vencidas, a data relevante é vencimento.
+    const dataRefDespesa = (d) =>
+      d.status === "pago" && d.dataPagamento ? d.dataPagamento : d.vencimento;
+
     const filtradas = despesas
-      /* CORREÇÃO 2: tenta d.data e fallback para d.dataVencimento no filtro */
-      .filter((d) => {
-        if (dentroDoIntervalo(d.data, intervalo)) return true;
-        /* Se d.data não existir, tenta vencimento como data principal */
-        if (!d.data && dentroDoIntervalo(d.dataVencimento || d.vencimento, intervalo)) return true;
-        return false;
-      })
+      .filter((d) => dentroDoIntervalo(dataRefDespesa(d), intervalo))
       .sort((a, b) => {
-        const da = parseDate(a.data || a.dataVencimento || a.vencimento);
-        const db2 = parseDate(b.data || b.dataVencimento || b.vencimento);
+        const da  = parseDate(dataRefDespesa(a));
+        const db2 = parseDate(dataRefDespesa(b));
         return (db2 || 0) - (da || 0);
       });
 
@@ -998,12 +998,13 @@ function RelatorioDespesas({ despesas, intervalo }) {
   const handleExport = () => {
     exportarExcel("despesas", [{
       nome: "Despesas",
-      colunas: ["Data Lançamento", "Vencimento", "Descrição", "Categoria", "Valor (R$)"],
+      colunas: ["Data Referência", "Vencimento", "Descrição", "Categoria", "Status", "Valor (R$)"],
       dados: dados.filtradas.map((d) => [
-        fmtData(d.data),
-        fmtData(d.dataVencimento || d.vencimento),
+        fmtData(d.status === "pago" && d.dataPagamento ? d.dataPagamento : d.vencimento),
+        fmtData(d.vencimento),
         d.descricao || "—",
         d.categoria || "—",
+        d.status || "—",
         Number(d.valor || 0).toFixed(2),
       ]),
     }]);
@@ -1061,20 +1062,31 @@ function RelatorioDespesas({ despesas, intervalo }) {
         empty="Nenhuma despesa no período."
         data={dados.filtradas}
         columns={[
-          { key: "data",      label: "Data Lançamento", render: (v) => fmtData(v) },
           {
-            key: "dataVencimento",
+            key: "dataPagamento",
+            label: "Data Referência",
+            render: (v, row) => {
+              const dataRef = row.status === "pago" && v ? v : row.vencimento;
+              const label   = row.status === "pago" ? "Pago em" : "Vence em";
+              return (
+                <span title={label} style={{ color: row.status === "pago" ? "var(--green)" : "var(--text-2)" }}>
+                  {fmtData(dataRef)}
+                </span>
+              );
+            },
+          },
+          {
+            key: "vencimento",
             label: "Vencimento",
             render: (v, row) => {
-              const raw = v || row.vencimento;
-              if (!raw) return <span style={{ color: "var(--text-3)" }}>—</span>;
-              const dias = getDiasRestantes(raw);
+              if (!v) return <span style={{ color: "var(--text-3)" }}>—</span>;
+              const dias = getDiasRestantes(v);
               const color = dias !== null && dias < 0
                 ? "var(--red)"
                 : dias !== null && dias <= 3
                 ? "var(--gold)"
                 : "var(--text-2)";
-              return <span style={{ color }}>{fmtData(raw)}</span>;
+              return <span style={{ color }}>{fmtData(v)}</span>;
             },
           },
           { key: "descricao", label: "Descrição" },
