@@ -1044,11 +1044,9 @@ async function loadAllMembers() {
           // proAtivadoEm: toDate(lic.proAtivadoEm),  // disponível quando estrutura estiver pronta
           email:          u.email        || '',
           name:           u.name || u.nome || u.email?.split('@')[0] || 'Sem nome',
-          telefone:       c.telefone     || '',
-          endereco:       c.endereco || c.endereço || '',
-          cnpj:           c.cnpj         || '',
-          nomeEmpresa:    c.nomeEmpresa  || '',
-        };
+          telefone:    c.empresa?.telefone    || '',   // ✅
+         cnpj:        c.empresa?.cnpj        || '',   // ✅
+         nomeEmpresa: c.empresa?.nomeEmpresa || '',   // ✅
       } catch {
         return { uid, ativo:true, pro:lic.pro||false, admin:false, criadoEm:null, proExpiradoEm:null,
                  email:'', name:'—', telefone:'', endereco:'', cnpj:'', nomeEmpresa:'' };
