@@ -638,7 +638,6 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
       porCategoria[cat] = (porCategoria[cat] || 0) + Number(d.valor || 0);
     });
 
-    );
 
     return {
       receitaBruta, receitaLiquida, descontosTotais,
