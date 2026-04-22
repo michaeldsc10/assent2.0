@@ -6,7 +6,7 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   PackagePlus, PackageMinus, Search, X, AlertCircle, CheckCircle2,
-  Edit2, Trash2, ArrowDownCircle, ArrowUpCircle,
+  Edit2, Trash2, ArrowDownCircle, ArrowUpCircle, Eye,
 } from "lucide-react";
 import { db } from "../lib/firebase";
 import {
@@ -326,6 +326,63 @@ const CSS = `
     background:rgba(224,82,82,0.1); border:1px solid rgba(224,82,82,0.25);
     border-radius:8px; padding:9px 13px; color:var(--red,#e05252); font-size:12px;
   }
+
+  /* ── Linha clicável ── */
+  .ee-row-saida.clickable { cursor: pointer; }
+  .ee-row-saida.clickable:hover { background: rgba(224,82,82,0.04); }
+
+  /* ── Modal de detalhes da saída ── */
+  .det-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px;
+  }
+  .det-card {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px;
+  }
+  .det-label {
+    font-size: 10px; font-weight: 600; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--text-3); margin-bottom: 5px;
+  }
+  .det-val { font-size: 13px; color: var(--text); font-weight: 500; }
+  .det-val-red { font-size: 18px; font-weight: 700; color: var(--red,#e05252); font-family:'Sora',sans-serif; }
+  .det-val-muted { font-size: 13px; color: var(--text-2); }
+
+  .det-motivo-badge {
+    display: inline-flex; align-items: center;
+    background: rgba(224,82,82,0.1); border: 1px solid rgba(224,82,82,0.25);
+    border-radius: 6px; padding: 4px 10px;
+    font-size: 12px; color: var(--red,#e05252); font-weight: 500;
+  }
+
+  .det-obs-box {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px; margin-bottom: 16px;
+  }
+
+  .det-responsavel {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px;
+  }
+  .det-avatar {
+    width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+    background: rgba(224,82,82,0.12); border: 1px solid rgba(224,82,82,0.2);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 700;
+    color: var(--red,#e05252);
+  }
+  .det-resp-nome { font-size: 13px; font-weight: 600; color: var(--text); }
+  .det-resp-cargo {
+    font-size: 10px; font-weight: 600; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--text-3); margin-top: 2px;
+  }
+
+  .det-divider {
+    border: none; border-top: 1px solid var(--border); margin: 16px 0;
+  }
+
+  .btn-icon-view { color: var(--text-3); }
+  .btn-icon-view:hover { background: var(--s2); border-color: var(--border); color: var(--text-2); }
 `;
 
 /* ══════════════════════════════════════════════════════
@@ -1038,6 +1095,105 @@ function ModalConfirmDelete({ tenantUid, movimentacao, produtos, onSalvo, onClos
 }
 
 /* ══════════════════════════════════════════════════════
+   MODAL: Detalhes da Saída (somente leitura)
+   ══════════════════════════════════════════════════════ */
+function ModalDetalhesSaida({ movimentacao: m, onExcluir, onClose }) {
+  const iniciais = (nome) =>
+    (nome || "?").split(" ").slice(0, 2).map((p) => p[0]).join("").toUpperCase();
+
+  return (
+    <div
+      className="modal-overlay modal-overlay-top"
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="modal-box modal-box-md" style={{ maxWidth: 480 }}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">Detalhes da Saída</div>
+            <div className="modal-sub">{fmtData(m.data)}</div>
+          </div>
+          <button className="modal-close" onClick={onClose}>
+            <X size={14} color="var(--text-2)" />
+          </button>
+        </div>
+
+        <div className="modal-body">
+
+          {/* Produto + Quantidade */}
+          <div className="det-grid">
+            <div className="det-card" style={{ gridColumn: "1 / -1" }}>
+              <div className="det-label">Produto</div>
+              <div className="det-val">{m.produtoNome || m.produtoId}</div>
+            </div>
+            <div className="det-card">
+              <div className="det-label">Quantidade retirada</div>
+              <div className="det-val-red">-{m.quantidade}</div>
+            </div>
+            <div className="det-card">
+              <div className="det-label">Data</div>
+              <div className="det-val">{fmtData(m.data)}</div>
+            </div>
+          </div>
+
+          {/* Motivo */}
+          <div style={{ marginBottom: 16 }}>
+            <div className="det-label" style={{ marginBottom: 8 }}>Motivo</div>
+            <span className="det-motivo-badge">{m.motivo}</span>
+          </div>
+
+          {/* Estoque antes / depois */}
+          {(m.estoqueAnterior != null || m.estoqueNovo != null) && (
+            <div className="det-grid" style={{ marginBottom: 16 }}>
+              <div className="det-card">
+                <div className="det-label">Estoque anterior</div>
+                <div className="det-val">{m.estoqueAnterior ?? "—"}</div>
+              </div>
+              <div className="det-card">
+                <div className="det-label">Estoque após saída</div>
+                <div className="det-val">{m.estoqueNovo ?? "—"}</div>
+              </div>
+            </div>
+          )}
+
+          {/* Observação */}
+          <div className="det-obs-box">
+            <div className="det-label" style={{ marginBottom: 6 }}>Observação</div>
+            {m.observacao
+              ? <div className="det-val-muted" style={{ lineHeight: 1.6 }}>{m.observacao}</div>
+              : <div className="det-val-muted" style={{ fontStyle: "italic", opacity: .6 }}>Nenhuma observação registrada.</div>
+            }
+          </div>
+
+          <hr className="det-divider" />
+
+          {/* Responsável */}
+          <div className="det-label" style={{ marginBottom: 8 }}>Registrado por</div>
+          <div className="det-responsavel">
+            <div className="det-avatar">
+              {iniciais(m.registradoPor?.nome)}
+            </div>
+            <div>
+              <div className="det-resp-nome">{m.registradoPor?.nome || "—"}</div>
+              <div className="det-resp-cargo">
+                {CARGO_LABELS[m.registradoPor?.cargo] || m.registradoPor?.cargo || "—"}
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Fechar</button>
+          <button className="btn-danger" onClick={onExcluir}>
+            <Trash2 size={13} /> Excluir Saída
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════ */
 export default function EntradaEstoque() {
@@ -1053,10 +1209,11 @@ export default function EntradaEstoque() {
   const [aba, setAba]                     = useState("entrada"); // "entrada" | "saida"
 
   /* Modais */
-  const [modalNovo, setModalNovo]   = useState(false);
-  const [modalSaida, setModalSaida] = useState(false);
-  const [editando, setEditando]     = useState(null);
-  const [deletando, setDeletando]   = useState(null);
+  const [modalNovo, setModalNovo]     = useState(false);
+  const [modalSaida, setModalSaida]   = useState(false);
+  const [editando, setEditando]       = useState(null);
+  const [deletando, setDeletando]     = useState(null);
+  const [detalheSaida, setDetalheSaida] = useState(null);
 
   /* Toast */
   const [toast, setToast] = useState({ msg: "", tipo: "sucesso" });
@@ -1231,7 +1388,11 @@ export default function EntradaEstoque() {
             ))
           ) : (
             movFiltradas.map((m) => (
-              <div key={m.id} className="ee-row-saida">
+              <div
+                key={m.id}
+                className="ee-row-saida clickable"
+                onClick={() => setDetalheSaida(m)}
+              >
                 <span className="ee-data">{fmtData(m.data)}</span>
                 <span className="ee-nome">{m.produtoNome || m.produtoId}</span>
                 <span className="ee-qtd-out">-{m.quantidade}</span>
@@ -1242,8 +1403,14 @@ export default function EntradaEstoque() {
                     {CARGO_LABELS[m.registradoPor?.cargo] || m.registradoPor?.cargo || "—"}
                   </span>
                 </div>
-                {/* Saídas são imutáveis — somente exclusão */}
-                <div className="ee-actions">
+                <div className="ee-actions" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    className="btn-icon btn-icon-view"
+                    title="Ver detalhes"
+                    onClick={() => setDetalheSaida(m)}
+                  >
+                    <Eye size={13} />
+                  </button>
                   <button
                     className="btn-icon btn-icon-del"
                     title="Excluir saída"
@@ -1302,6 +1469,15 @@ export default function EntradaEstoque() {
           produtos={produtos}
           onSalvo={(msg) => { showToast(msg, "sucesso"); setDeletando(null); }}
           onClose={() => setDeletando(null)}
+        />
+      )}
+
+      {/* Modal: Detalhes da saída */}
+      {detalheSaida && (
+        <ModalDetalhesSaida
+          movimentacao={detalheSaida}
+          onExcluir={() => { setDeletando(detalheSaida); setDetalheSaida(null); }}
+          onClose={() => setDetalheSaida(null)}
         />
       )}
 
