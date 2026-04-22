@@ -59,7 +59,7 @@ const MENU_SECTIONS = [
   { key: "clientes",        label: "Clientes",           sub: "Cadastro e histórico",     icon: "👥", locked: false },
   { key: "produtos",        label: "Produtos",           sub: "Catálogo de produtos",     icon: "📦", locked: false },
   { key: "servicos",        label: "Serviços",           sub: "Catálogo de serviços",     icon: "🔧", locked: false },
-  { key: "entrada_estoque", label: "Entrada de Estoque", sub: "Movimentação de entrada",  icon: "📥", locked: false },
+  { key: "entrada_estoque", label: "Estoque",             sub: "Movimentação de entrada",  icon: "📥", locked: false },
   { key: "vendas",          label: "Vendas",             sub: "PDV e registro de vendas", icon: "🛒", locked: false },
   { key: "fiado",           label: "Fiado / A Receber",  sub: "Contas a receber",         icon: "💳", locked: false },
   { key: "caixa",           label: "Caixa Diário",       sub: "Abertura e fechamento",    icon: "💰", locked: false },
