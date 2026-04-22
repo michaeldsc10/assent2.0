@@ -847,7 +847,8 @@ async function initFirebase() {
 
     firebase.initializeApp(firebaseConfig);
     auth = firebase.auth();
-    db   = firebase.firestore();
+db   = firebase.firestore();
+await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
     // Inicia os listeners de auth após o Firebase estar pronto
     setupAuth();
