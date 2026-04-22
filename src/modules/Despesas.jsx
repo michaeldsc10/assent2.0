@@ -1589,10 +1589,13 @@ export default function Despesas({ isPro = false }) {
     return { vencidas, em3dias, totalPendente, totalPago };
   }, [despesas, despesasFiltradas, filtroPeriodo]);
 
-  const categoriasFiltro = useMemo(() =>
-    categorias.map(c => c.nome),
-    [categorias]
-  );
+  const categoriasFiltro = useMemo(() => {
+    const fromCategorias = categorias.map(c => c.nome);
+    const fromDespesas   = despesas.map(d => d.categoria).filter(Boolean);
+    return [...new Set([...fromCategorias, ...fromDespesas])].sort((a, b) =>
+      a.localeCompare(b, "pt-BR")
+    );
+  }, [categorias, despesas]);
 
   // App.jsx bloqueia render enquanto loadingAuth||!tenantUid
 
