@@ -691,6 +691,7 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
       : new Date().toISOString().split("T")[0]
   );
   const [vendedor, setVendedor] = useState(venda?.vendedor || "");
+  const [vendedorCargo, setVendedorCargo] = useState(venda?.vendedorCargo || "");
   const [formaPgto, setFormaPgto] = useState(venda?.formaPagamento || "");
   const [observacao, setObservacao] = useState(venda?.observacao || "");
 
@@ -877,6 +878,7 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
       cliente: clienteSearch.trim(),
       data: new Date(dataVenda + "T12:00:00"),
       vendedor: vendedor.trim(),
+      vendedorCargo: vendedorCargo.trim(),
       formaPagamento: formaPgto,
       observacao: observacao.trim(),
       tipo,
@@ -1018,7 +1020,12 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
             <div className="form-group">
               <label className="form-label">Vendedor</label>
               {vendedores?.length > 0 ? (
-                <select className="form-input" value={vendedor} onChange={e => setVendedor(e.target.value)}>
+                <select className="form-input" value={vendedor} onChange={e => {
+                  const nome = e.target.value;
+                  setVendedor(nome);
+                  const found = vendedores.find(v => (v.nome || v) === nome);
+                  setVendedorCargo(found?.cargo || "");
+                }}>
                   <option value="">— Nenhum / Não informado —</option>
                   {vendedores.map(v => (
                     <option key={v.id || v} value={v.nome || v}>{v.nome || v}</option>
@@ -2235,7 +2242,9 @@ useEffect(() => {
                 <span className="vd-cliente">{v.cliente || "—"}</span>
                 <span>{fmtData(v.data)}</span>
                 <span><span className="vd-fp-badge">{v.formaPagamento || "—"}</span></span>
-                <span>{v.vendedor || "—"}</span>
+                <span>{v.vendedor || "—"}{v.vendedorCargo && (
+                  <span style={{ fontSize: 10, color: "var(--text-3)", marginLeft: 5 }}>({v.vendedorCargo})</span>
+                )}</span>
                 <span>{v.itens?.length || 0} item(s)</span>
                 <span className="vd-total">{fmtR$(v.total)}</span>
                 <div className="vd-actions" onClick={e => e.stopPropagation()}>
@@ -2304,8 +2313,10 @@ useEffect(() => {
                   {fmtR$(v.total)}
                 </span>
                 <span style={{ color: "var(--text-2)" }}>
-                  {v.canceladaPor?.nome || "—"}
-                  {v.canceladaPor?.cargo && (
+                  {typeof v.canceladaPor === "string"
+                    ? v.canceladaPor
+                    : (v.canceladaPor?.nome || "—")}
+                  {typeof v.canceladaPor !== "string" && v.canceladaPor?.cargo && (
                     <span style={{ fontSize: 10, color: "var(--text-3)", marginLeft: 5 }}>
                       ({v.canceladaPor.cargo})
                     </span>
