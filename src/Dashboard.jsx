@@ -66,7 +66,7 @@ const KEY_MAP = {
   "Clientes":           "clientes",
   "Produtos":           "produtos",
   "Serviços":           "servicos",
-  "Entrada de Estoque": "entrada_estoque",
+  "Estoque": "entrada_estoque",
   "Vendas":             "vendas",
   "Fiado / A Receber":  "fiado",
   "Caixa Diário":       "caixa",
@@ -86,7 +86,7 @@ const ATALHOS_TECLADO = [
   { code: "KeyC", label: "Clientes",            dbKey: "clientes"        },
   { code: "KeyP", label: "Produtos",            dbKey: "produtos"        },
   { code: "KeyS", label: "Serviços",            dbKey: "servicos"        },
-  { code: "KeyE", label: "Entrada de Estoque",  dbKey: "entrada_estoque" },
+  { code: "KeyE", label: "Estoque",  dbKey: "entrada_estoque" },
   { code: "KeyV", label: "Vendas",              dbKey: "vendas"          },
   { code: "KeyF", label: "A Receber",           dbKey: "fiado"           },
   { code: "KeyX", label: "Caixa Diário",        dbKey: "caixa"           },
@@ -111,7 +111,7 @@ const NAV = [
     { label: "Serviços",        modulo: "servicos",         icone: Wrench,           secao: "ESTOQUE"   },
   ]},
   { section: "OPERAÇÕES", items: [
-    { label: "Entrada de Estoque", modulo: "entradaEstoque",   icone: ArrowDownToLine,  secao: "ESTOQUE"   },
+    { label: "Estoque", modulo: "entradaEstoque",   icone: ArrowDownToLine,  secao: "ESTOQUE"   },
     { label: "Vendas",          modulo: "vendas",           icone: TrendingDown,       secao: "COMERCIAL" },
     { label: "A Receber",       modulo: "aReceber",         icone: Clock,            secao: "FINANCEIRO"},
    { label: "Compras",         modulo: "compras",          icone: ShoppingCart,     secao: "COMERCIAL" },
@@ -1280,7 +1280,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             <Vendedores />
           </RotaProtegida>
         );
-      case "Entrada de Estoque":
+      case "Estoque":
         return (
           <RotaProtegida modulo="entradaEstoque" label="Entrada de Estoque">
             <EntradaEstoque />
