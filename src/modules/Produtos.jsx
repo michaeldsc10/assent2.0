@@ -608,17 +608,15 @@ function ModalNovoProduto({ produto, produtos, onSave, onClose }) {
 
           {/* ── Estoque ── */}
           <div className="form-group" style={{ maxWidth: 180 }}>
-            <label className="form-label">{editando ? "Estoque (somente leitura)" : "Estoque Inicial"}</label>
+            <label className="form-label">Estoque Inicial</label>
             <input
               className={`form-input ${erros.estoque ? "err" : ""}`}
               type="number"
               min="0"
               value={form.estoque}
-              readOnly={!!editando}
-              onChange={(e) => !editando && set("estoque", e.target.value)}
+              onChange={(e) => set("estoque", e.target.value)}
               placeholder="0"
-              title={editando ? "Use Entrada de Estoque para alterar o saldo" : ""}
-              />
+            />
             {erros.estoque && <div className="form-error">{erros.estoque}</div>}
           </div>
 
