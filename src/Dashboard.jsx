@@ -49,7 +49,7 @@ import { usePermissao } from "./hooks/usePermissao";
 /* ── Firebase ──────────────────────────────────── */
 import { db, logout } from "./lib/firebase";
 import { useAuth } from "./contexts/AuthContext";
-import { doc, onSnapshot }       from "firebase/firestore";
+import { doc, onSnapshot, collection, query, orderBy, limit } from "firebase/firestore";
 
 /* ── Hooks de dados ────────────────────────────── */
 import { useDashboardData, fmtR$, fmtData } from "./hooks/useDashboardData";
@@ -609,9 +609,57 @@ const CSS = `
     background: var(--s2); border: 1px solid var(--border);
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; transition: border-color .15s;
-    color: var(--text-2); flex-shrink: 0;
+    color: var(--text-2); flex-shrink: 0; position: relative;
   }
   .ag-notif:hover { border-color: var(--border-h); color: var(--text); }
+
+  .ag-notif-badge {
+    position: absolute; top: -5px; right: -5px;
+    background: var(--red); color: #fff;
+    border-radius: 10px; font-size: 9px; font-weight: 700;
+    padding: 1px 5px; font-family: 'IBM Plex Mono', monospace;
+    line-height: 1.6; pointer-events: none;
+    border: 2px solid var(--bg);
+  }
+
+  .ag-notif-panel {
+    position: absolute; top: calc(100% + 10px); right: 0;
+    width: 340px; max-height: 420px;
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,.35);
+    z-index: 200; overflow: hidden; display: flex; flex-direction: column;
+  }
+  .ag-notif-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--text-2);
+  }
+  .ag-notif-list {
+    overflow-y: auto; flex: 1;
+    max-height: 360px;
+  }
+  .ag-notif-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .ag-notif-item:last-child { border-bottom: none; }
+  .ag-notif-item-title {
+    font-size: 13px; font-weight: 600; color: var(--text);
+  }
+  .ag-notif-item-body {
+    font-size: 12px; color: var(--text-2); line-height: 1.5;
+  }
+  .ag-notif-item-meta {
+    font-size: 10px; color: var(--text-3);
+    font-family: 'IBM Plex Mono', monospace; margin-top: 3px;
+  }
+  .ag-notif-empty {
+    padding: 32px 16px; text-align: center;
+    font-size: 12px; color: var(--text-3);
+  }
 
   .ag-user-area { position: relative; display: flex; align-items: center; margin-left: 10px; }
   .ag-user-trigger {
@@ -1073,6 +1121,12 @@ export default function Dashboard() {
   );
   const [dropdownOpen,  setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notifOpen,     setNotifOpen]    = useState(false);
+  const [notificacoes,  setNotificacoes] = useState([]);
+  const [notifLidas,    setNotifLidas]   = useState(
+    () => { try { return JSON.parse(localStorage.getItem("ag_notif_lidas") || "[]"); } catch { return []; } }
+  );
+  const notifRef = useRef(null);
   const [theme, setTheme] = useState(
     () => localStorage.getItem("ag_theme") || "dark"
   );
@@ -1097,6 +1151,47 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     });
   };
   const dropdownRef = useRef(null);
+
+  /* ── Notificações AG — listener em tempo real ── */
+  useEffect(() => {
+    if (!tenantUid) return;
+    const q = collection(db, "notificacoesAG");
+    const qOrdered = query(q, orderBy("criadoEm", "desc"), limit(30));
+    const unsub = onSnapshot(qOrdered, (snap) => {
+      const todas = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const filtradas = todas.filter((n) => {
+        if (n.destinatario === "todos") return true;
+        if (n.destinatario === "pro")  return isPro;
+        if (n.destinatario === "free") return !isPro;
+        return false;
+      });
+      setNotificacoes(filtradas);
+    }, () => {/* silencia erros de permissão */});
+    return unsub;
+  }, [tenantUid, isPro]);
+
+  /* ── Fecha painel de notificações ao clicar fora ── */
+  useEffect(() => {
+    if (!notifOpen) return;
+    const handler = (e) => {
+      if (!notifRef.current?.contains(e.target)) setNotifOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [notifOpen]);
+
+  const notifNaoLidas = notificacoes.filter((n) => !notifLidas.includes(n.id)).length;
+
+  const marcarTodasLidas = () => {
+    const ids = notificacoes.map((n) => n.id);
+    setNotifLidas(ids);
+    localStorage.setItem("ag_notif_lidas", JSON.stringify(ids));
+  };
+
+  const abrirNotif = () => {
+    setNotifOpen((v) => !v);
+    if (!notifOpen) marcarTodasLidas();
+  };
 
   /* ── Injeta CSS responsivo global após todos os estilos ── */
   useEffect(() => {
@@ -1652,7 +1747,49 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
           <div className="ag-header-spacer" />
 
-          <div className="ag-notif" title="Notificações"><Bell size={15} /></div>
+          <div style={{ position: "relative" }} ref={notifRef}>
+            <div
+              className="ag-notif"
+              title="Notificações"
+              onClick={abrirNotif}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && abrirNotif()}
+            >
+              <Bell size={15} />
+              {notifNaoLidas > 0 && (
+                <span className="ag-notif-badge">{notifNaoLidas > 9 ? "9+" : notifNaoLidas}</span>
+              )}
+            </div>
+
+            {notifOpen && (
+              <div className="ag-notif-panel">
+                <div className="ag-notif-header">
+                  <span>Notificações</span>
+                  <span style={{ color: "var(--text-3)", fontWeight: 400, letterSpacing: 0, textTransform: "none", fontSize: 11 }}>
+                    {notificacoes.length} mensage{notificacoes.length !== 1 ? "ns" : "m"}
+                  </span>
+                </div>
+                <div className="ag-notif-list">
+                  {notificacoes.length === 0 ? (
+                    <div className="ag-notif-empty">Nenhuma notificação no momento</div>
+                  ) : (
+                    notificacoes.map((n) => (
+                      <div key={n.id} className="ag-notif-item">
+                        <div className="ag-notif-item-title">{n.titulo}</div>
+                        <div className="ag-notif-item-body">{n.mensagem}</div>
+                        <div className="ag-notif-item-meta">
+                          {n.criadoEm?.toDate
+                            ? n.criadoEm.toDate().toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                            : "—"}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           <div
             className="ag-theme-btn"
