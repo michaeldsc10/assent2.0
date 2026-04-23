@@ -42,6 +42,7 @@ import Orcamentos    from "./modules/Orcamentos.jsx";
 import Usuarios      from "./modules/Usuarios.jsx";
 import Compras       from "./modules/Compras.jsx";
 import Mesas         from "./modules/Mesas.jsx";
+import Alunos        from "./modules/Alunos";
 
 import RotaProtegida from "./contexts/RotaProtegida";
 import { usePermissao } from "./hooks/usePermissao";
@@ -91,6 +92,7 @@ const ATALHOS_TECLADO = [
   { code: "KeyE", label: "Estoque",  dbKey: "entrada_estoque" },
   { code: "KeyV", label: "Vendas",              dbKey: "vendas"          },
   { code: "KeyF", label: "A Receber",           dbKey: "fiado"           },
+  { code: "KeyU", label: "Matriculas",           dbKey: "matriculas"           },
   { code: "KeyX", label: "Caixa Diário",        dbKey: "caixa"           },
   { code: "KeyZ", label: "Despesas",            dbKey: "despesas"        },
   { code: "KeyN", label: "Fornecedores",        dbKey: "fornecedores"    },
@@ -1540,6 +1542,13 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       case "Configurações":
         // Configurações não precisa de RotaProtegida (acesso controlado pelo cargo admin)
         return <Configuracoes menuVisivel={menuVisivel} />;
+        case "matriculas":
+        return (
+          <RotaProtegida modulo="alunos" label="Alunos">
+            <Alunos />
+          </RotaProtegida>
+        );
+        
       default:
         return renderDashboard();
     }
