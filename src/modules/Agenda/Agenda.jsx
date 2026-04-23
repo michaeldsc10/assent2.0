@@ -7,6 +7,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { CalendarDays, List, Plus, X, CheckCircle2, Edit2, Trash2 } from "lucide-react";
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../contexts/AuthContext";
+import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../../lib/logAction";
 import {  LIMITES_FREE } from "../../hooks/useLicenca";
 import { BannerLimite } from "../../hooks/LicencaUI";
 import {
@@ -643,7 +644,7 @@ const FILTROS = ["Próximos", "Hoje", "Esta semana", "Todos"];
 
 export default function Agenda({ isPro = false }) {
   // ── Multi-tenant ──
-  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+  const { tenantUid, cargo, nomeUsuario, podeCriar, podeEditar, podeExcluir } = useAuth();
 
   // ── Flags de permissão ──
   const podeCriarV   = podeCriar("agenda");
@@ -704,12 +705,14 @@ export default function Agenda({ isPro = false }) {
       status: "pendente",
       dataCriacao: new Date().toISOString(),
     });
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.AGENDA, descricao: montarDescricao("criar", "Agendamento", dados.titulo || dados.descricao || "Evento", id) });
     setFormEvt(null);
   }, [tenantUid]);
 
   const handleEdit = useCallback(async (dados) => {
     if (!tenantUid || !formEvt || formEvt === "novo") return;
     await updateDoc(doc(db, "users", tenantUid, "eventos", formEvt.id), dados);
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.AGENDA, descricao: montarDescricao("editar", "Agendamento", dados.titulo || dados.descricao || "Evento", formEvt.id) });
     setFormEvt(null);
     if (detalhes?.id === formEvt.id) setDetalhes(prev => ({ ...prev, ...dados }));
   }, [tenantUid, formEvt, detalhes]);
@@ -724,6 +727,7 @@ export default function Agenda({ isPro = false }) {
   const handleExcluir = useCallback(async () => {
     if (!tenantUid || !deletando) return;
     await deleteDoc(doc(db, "users", tenantUid, "eventos", deletando.id));
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.AGENDA, descricao: montarDescricao("excluir", "Agendamento", deletando.titulo || deletando.descricao || "Evento", deletando.id) });
     if (detalhes?.id === deletando.id) setDetalhes(null);
     setDeletando(null);
   }, [tenantUid, deletando, detalhes]);
