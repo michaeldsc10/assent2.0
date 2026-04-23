@@ -1443,85 +1443,108 @@ function RelatorioDespesas({ despesas, intervalo }) {
 }
 
 /* ══════════════════════════════════════════════════════
-   RELATÓRIO: VENDAS — helpers de gráfico (SVG puro, sem lib)
+   RELATÓRIO: VENDAS — helpers de gráfico (CSS puro, sem lib)
    ══════════════════════════════════════════════════════ */
 
-function BarChartSVG({ dados, altura = 160 }) {
+/* Gráfico de barras verticais em CSS — totalmente responsivo e interativo */
+function BarChartCSS({ dados, altura = 160, cor = "#F5A623", fmtVal }) {
   const [hover, setHover] = useState(null);
   if (!dados || dados.length === 0) return null;
 
-  const W = 100;
-  const H = altura;
   const maxVal = Math.max(...dados.map((d) => d.val), 1);
-  const barW = (W / dados.length) * 0.6;
-  const gap  = (W / dados.length) * 0.4;
+  const fmt = fmtVal || fmtR$;
 
   return (
     <div style={{ position: "relative" }}>
-      <svg
-        viewBox={`0 0 ${W} ${H}`}
-        className="rv-bar-chart"
-        style={{ height: altura }}
-        preserveAspectRatio="none"
-      >
-        {[0.25, 0.5, 0.75, 1].map((frac) => (
-          <line key={frac} x1={0} x2={W}
-            y1={H - H * frac} y2={H - H * frac}
-            stroke="rgba(255,255,255,0.05)" strokeWidth={0.4}
-          />
-        ))}
-        {dados.map((d, i) => {
-          const x    = i * (W / dados.length) + gap / 2;
-          const barH = Math.max((d.val / maxVal) * (H - 12), 2);
-          const y    = H - barH;
-          const isLast = i === dados.length - 1;
-          return (
-            <g key={d.label}
-               onMouseEnter={() => setHover(i)}
-               onMouseLeave={() => setHover(null)}
-               style={{ cursor: "default" }}
-            >
-              <rect x={x} y={y} width={barW} height={barH} rx={1.5}
-                fill={hover === i ? "#F5A623" : isLast ? "#F5A623" : "rgba(200,165,94,0.35)"}
-                style={{ transition: "fill .15s" }}
-              />
-              <text x={x + barW / 2} y={H + 10}
-                textAnchor="middle" fontSize={5}
-                fill="rgba(255,255,255,0.35)"
-                fontFamily="DM Sans, sans-serif"
-              >
-                {d.label}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
+      {/* Tooltip */}
       {hover !== null && dados[hover] && (
         <div style={{
-          position: "absolute", top: 4, left: "50%", transform: "translateX(-50%)",
+          position: "absolute", top: -36, left: "50%", transform: "translateX(-50%)",
           background: "var(--s1)", border: "1px solid var(--border-h)",
-          borderRadius: 8, padding: "6px 12px",
+          borderRadius: 8, padding: "5px 12px",
           fontSize: 12, fontFamily: "'DM Sans', sans-serif",
           color: "var(--text)", whiteSpace: "nowrap",
-          boxShadow: "0 4px 16px rgba(0,0,0,0.3)", pointerEvents: "none", zIndex: 10,
+          boxShadow: "0 4px 16px rgba(0,0,0,0.35)",
+          pointerEvents: "none", zIndex: 20,
         }}>
-          <span style={{ color: "var(--gold)", fontWeight: 700 }}>{dados[hover].label}</span>
-          {" · "}
-          <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 600 }}>
-            {fmtR$(dados[hover].val)}
+          <span style={{ color: "var(--gold)", fontWeight: 700, marginRight: 6 }}>
+            {dados[hover].label}
           </span>
-          {dados[hover].qtd != null && (
+          <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 600 }}>
+            {fmt(dados[hover].val)}
+          </span>
+          {dados[hover].qtd != null && dados[hover].qtd > 0 && (
             <span style={{ color: "var(--text-3)", marginLeft: 6, fontSize: 11 }}>
-              ({dados[hover].qtd} venda{dados[hover].qtd !== 1 ? "s" : ""})
+              · {dados[hover].qtd} venda{dados[hover].qtd !== 1 ? "s" : ""}
             </span>
           )}
         </div>
       )}
+
+      {/* Grade de referência + barras */}
+      <div style={{ position: "relative", height: altura }}>
+        {/* Linhas de guia horizontais */}
+        {[0.25, 0.5, 0.75, 1].map((frac) => (
+          <div key={frac} style={{
+            position: "absolute", left: 0, right: 0,
+            bottom: `${frac * 100}%`,
+            borderTop: "1px solid rgba(255,255,255,0.05)",
+            pointerEvents: "none",
+          }} />
+        ))}
+
+        {/* Barras */}
+        <div style={{
+          display: "flex",
+          alignItems: "flex-end",
+          gap: dados.length > 14 ? 3 : dados.length > 8 ? 6 : 10,
+          height: "100%",
+          padding: "0 4px",
+        }}>
+          {dados.map((d, i) => {
+            const pct = Math.max((d.val / maxVal) * 100, d.val > 0 ? 2 : 0);
+            const isHover = hover === i;
+            const isLast  = i === dados.length - 1;
+            const barCor  = isHover ? "#F5A623" : isLast && cor === "#F5A623" ? "#F5A623" : cor;
+            const opacity = isHover ? 1 : isLast && cor === "#F5A623" ? 1 : 0.45;
+
+            return (
+              <div
+                key={d.label}
+                style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end", gap: 4, cursor: "default" }}
+                onMouseEnter={() => setHover(i)}
+                onMouseLeave={() => setHover(null)}
+              >
+                <div style={{
+                  width: "100%", maxWidth: 40,
+                  height: `${pct}%`,
+                  minHeight: d.val > 0 ? 3 : 0,
+                  background: barCor,
+                  opacity,
+                  borderRadius: "4px 4px 0 0",
+                  transition: "height .3s ease, opacity .15s, background .15s",
+                }} />
+                <span style={{
+                  fontSize: dados.length > 10 ? 9 : 10,
+                  color: isHover ? "var(--gold)" : "rgba(255,255,255,0.3)",
+                  fontFamily: "'DM Sans', sans-serif",
+                  whiteSpace: "nowrap",
+                  transition: "color .15s",
+                  userSelect: "none",
+                }}>
+                  {d.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
 
 function VendaGraficos({ dados }) {
+  /* ── Faturamento por mês ── */
   const porMes = useMemo(() => {
     const map = {};
     dados.filtradas.forEach((v) => {
@@ -1540,10 +1563,12 @@ function VendaGraficos({ dados }) {
       });
   }, [dados.filtradas]);
 
+  /* ── Ticket médio por mês ── */
   const ticketPorMes = useMemo(() =>
     porMes.map((m) => ({ label: m.label, val: m.qtd > 0 ? m.val / m.qtd : 0 })),
   [porMes]);
 
+  /* ── Formas de pagamento ── */
   const fpEntries = useMemo(() => {
     const total = Object.values(dados.porFP).reduce((s, v) => s + v, 0) || 1;
     const CORES = ["#F5A623","#5B8EF0","#44D186","#E05252","#9B8AFA","#F0A05B"];
@@ -1552,12 +1577,13 @@ function VendaGraficos({ dados }) {
       .map(([fp, qtd], i) => ({ fp, qtd, pct: (qtd / total) * 100, cor: CORES[i % CORES.length] }));
   }, [dados.porFP]);
 
+  /* ── Top produtos ── */
   const topProd = useMemo(() =>
-    [...dados.maisPedidos].slice(0, 7).map((p) => ({ label: p.nome, val: p.total, qtd: p.qtd })),
+    [...dados.maisPedidos].slice(0, 7),
   [dados.maisPedidos]);
+  const maxProd = topProd.length > 0 ? Math.max(...topProd.map((p) => p.total), 1) : 1;
 
-  const maxProd = topProd.length > 0 ? Math.max(...topProd.map((p) => p.val), 1) : 1;
-
+  /* ── Por dia da semana ── */
   const porDia = useMemo(() => {
     const dias = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
     const map  = { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 };
@@ -1579,12 +1605,13 @@ function VendaGraficos({ dados }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
       {/* KPIs rápidos */}
       <div className="rv-kpi-row">
         <div className="rv-kpi-mini">
           <div className="rv-kpi-mini-label">Total Vendido</div>
           <div className="rv-kpi-mini-val" style={{ color: "var(--gold)" }}>{fmtR$(dados.total)}</div>
-          <div className="rv-kpi-mini-sub">{dados.filtradas.length} vendas</div>
+          <div className="rv-kpi-mini-sub">{dados.filtradas.length} vendas no período</div>
         </div>
         <div className="rv-kpi-mini">
           <div className="rv-kpi-mini-label">Ticket Médio</div>
@@ -1592,14 +1619,15 @@ function VendaGraficos({ dados }) {
           <div className="rv-kpi-mini-sub">por venda</div>
         </div>
         <div className="rv-kpi-mini">
-          <div className="rv-kpi-mini-label">Meses Ativos</div>
+          <div className="rv-kpi-mini-label">Meses com Vendas</div>
           <div className="rv-kpi-mini-val" style={{ color: "var(--green)" }}>{porMes.length}</div>
-          <div className="rv-kpi-mini-sub">com vendas</div>
+          <div className="rv-kpi-mini-sub">{porMes.length === 1 ? "mês ativo" : "meses ativos"}</div>
         </div>
       </div>
 
       <div className="rv-charts-grid">
-        {/* Faturamento por mês */}
+
+        {/* ── Faturamento por mês ── */}
         {porMes.length > 0 && (
           <div className="rv-chart-card full">
             <div className="rv-chart-header">
@@ -1608,16 +1636,16 @@ function VendaGraficos({ dados }) {
                 Faturamento por Mês
               </span>
               <span style={{ fontSize: 11, color: "var(--text-3)" }}>
-                {porMes.length} {porMes.length === 1 ? "mês" : "meses"}
+                {porMes.length} {porMes.length === 1 ? "mês" : "meses"} · hover para detalhes
               </span>
             </div>
-            <div className="rv-chart-body" style={{ paddingBottom: 28 }}>
-              <BarChartSVG dados={porMes} altura={160} />
+            <div className="rv-chart-body" style={{ paddingTop: 40 }}>
+              <BarChartCSS dados={porMes} altura={160} cor="#F5A623" />
             </div>
           </div>
         )}
 
-        {/* Formas de pagamento */}
+        {/* ── Formas de Pagamento ── */}
         {fpEntries.length > 0 && (
           <div className="rv-chart-card">
             <div className="rv-chart-header">
@@ -1632,11 +1660,11 @@ function VendaGraficos({ dados }) {
                   <div key={e.fp} className="rv-fp-item">
                     <span className="rv-fp-color" style={{ background: e.cor }} />
                     <span className="rv-fp-name">{e.fp}</span>
-                    <div className="rv-fp-bar-bg">
+                    <div className="rv-fp-bar-bg" style={{ flex: 1, maxWidth: 160 }}>
                       <div className="rv-fp-bar-fill" style={{ width: `${e.pct}%`, background: e.cor }} />
                     </div>
                     <span className="rv-fp-pct">{e.pct.toFixed(1)}%</span>
-                    <span style={{ fontSize: 11, color: "var(--text-3)", minWidth: 60, textAlign: "right" }}>
+                    <span style={{ fontSize: 11, color: "var(--text-3)", minWidth: 56, textAlign: "right" }}>
                       {e.qtd} venda{e.qtd !== 1 ? "s" : ""}
                     </span>
                   </div>
@@ -1646,7 +1674,7 @@ function VendaGraficos({ dados }) {
           </div>
         )}
 
-        {/* Ticket médio por mês */}
+        {/* ── Ticket Médio por Mês ── */}
         {ticketPorMes.length > 0 && (
           <div className="rv-chart-card">
             <div className="rv-chart-header">
@@ -1655,13 +1683,13 @@ function VendaGraficos({ dados }) {
                 Ticket Médio por Mês
               </span>
             </div>
-            <div className="rv-chart-body" style={{ paddingBottom: 28 }}>
-              <BarChartSVG dados={ticketPorMes} altura={130} />
+            <div className="rv-chart-body" style={{ paddingTop: 40 }}>
+              <BarChartCSS dados={ticketPorMes} altura={130} cor="var(--green)" />
             </div>
           </div>
         )}
 
-        {/* Top produtos — barras horizontais */}
+        {/* ── Top Produtos ── */}
         {topProd.length > 0 && (
           <div className="rv-chart-card full">
             <div className="rv-chart-header">
@@ -1671,34 +1699,34 @@ function VendaGraficos({ dados }) {
               </span>
             </div>
             <div className="rv-chart-body">
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {topProd.map((p, i) => (
-                  <div key={p.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div key={p.nome} style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <span style={{
                       fontFamily: "'Sora', sans-serif", fontSize: 11,
-                      fontWeight: 700, color: "var(--gold)", width: 20, flexShrink: 0,
+                      fontWeight: 700, color: "var(--gold)", width: 22, flexShrink: 0,
                     }}>#{i + 1}</span>
                     <span style={{
-                      flex: 1, fontSize: 13, color: "var(--text)",
+                      width: 180, flexShrink: 0,
+                      fontSize: 13, color: "var(--text)", fontWeight: 500,
                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    }} title={p.label}>{p.label}</span>
-                    <div style={{ width: 160, flexShrink: 0 }}>
-                      <div style={{ height: 5, borderRadius: 3, background: "var(--s3)", overflow: "hidden" }}>
-                        <div style={{
-                          width: `${(p.val / maxProd) * 100}%`,
-                          height: "100%", borderRadius: 3,
-                          background: "linear-gradient(90deg, var(--gold), rgba(200,165,94,0.5))",
-                          transition: "width .4s ease",
-                        }} />
-                      </div>
+                    }} title={p.nome}>{p.nome}</span>
+                    <div style={{ flex: 1, height: 6, borderRadius: 3, background: "var(--s3)", overflow: "hidden" }}>
+                      <div style={{
+                        width: `${(p.total / maxProd) * 100}%`,
+                        height: "100%", borderRadius: 3,
+                        background: "linear-gradient(90deg, #F5A623, rgba(245,166,35,0.4))",
+                        transition: "width .5s ease",
+                      }} />
                     </div>
                     <span style={{
                       fontFamily: "'Sora', sans-serif", fontSize: 12, fontWeight: 600,
-                      color: "var(--text)", minWidth: 90, textAlign: "right",
-                    }}>{fmtR$(p.val)}</span>
-                    <span style={{ fontSize: 11, color: "var(--text-3)", minWidth: 44, textAlign: "right" }}>
-                      {p.qtd} un.
-                    </span>
+                      color: "var(--text)", minWidth: 100, textAlign: "right",
+                    }}>{fmtR$(p.total)}</span>
+                    <span style={{
+                      fontSize: 11, color: "var(--text-3)",
+                      minWidth: 48, textAlign: "right",
+                    }}>{p.qtd} un.</span>
                   </div>
                 ))}
               </div>
@@ -1706,18 +1734,20 @@ function VendaGraficos({ dados }) {
           </div>
         )}
 
-        {/* Vendas por dia da semana */}
+        {/* ── Faturamento por Dia da Semana ── */}
         <div className="rv-chart-card full">
           <div className="rv-chart-header">
             <span className="rv-chart-title">
               <span className="rv-chart-title-dot" style={{ background: "#9B8AFA" }} />
               Faturamento por Dia da Semana
             </span>
+            <span style={{ fontSize: 11, color: "var(--text-3)" }}>hover para detalhes</span>
           </div>
-          <div className="rv-chart-body" style={{ paddingBottom: 28 }}>
-            <BarChartSVG dados={porDia} altura={110} />
+          <div className="rv-chart-body" style={{ paddingTop: 40 }}>
+            <BarChartCSS dados={porDia} altura={120} cor="#9B8AFA" />
           </div>
         </div>
+
       </div>
     </div>
   );
