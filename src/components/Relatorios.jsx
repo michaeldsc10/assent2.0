@@ -1996,12 +1996,13 @@ const PERMISSOES_RELATORIO = {
 const MENU = [
   { key: "dre",        label: "DRE",          icon: <LayoutDashboard size={15} /> },
   { key: "financeiro", label: "Financeiro",   icon: <Wallet size={15} />         },
+  { key: "lucro_ps",   label: "Lucro P/S",    icon: <DollarSign size={15} />     },
   { key: "vendas",     label: "Vendas",       icon: <ShoppingCart size={15} />   },
+  { key: "clientes",   label: "Clientes",     icon: <Users size={15} />          },
   { key: "despesas",   label: "Despesas",     icon: <Receipt size={15} />        },
   { key: "estoque",    label: "Estoque",      icon: <Package size={15} />        },
-  { key: "clientes",   label: "Clientes",     icon: <Users size={15} />          },
   { key: "agenda",     label: "Agenda",       icon: <Calendar size={15} />       },
-  { key: "lucro_ps",   label: "Lucro P/S",    icon: <DollarSign size={15} />     },
+ 
 ];
 
 const TITULO_RELATORIO = {
