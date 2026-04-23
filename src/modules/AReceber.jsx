@@ -826,15 +826,81 @@ export default function AReceber() {
            como receita de venda, mantendo a consistência atual.
          Garantia anti-duplicação: cada chamada a handlePagamento representa
          um evento de pagamento distinto (data e valor diferentes do sinal
-         original), nunca é a mesma operação executada duas vezes. */
-      try {
-        const ehVenda = conta.origem === "venda";
+         original), nunca é a mesma operação executada duas vezes. */  
+
+       
+       try {
+        /* ─── REGIME DE CAIXA ─────────────────────────────────────────────
+           Determina origem da entrada de caixa conforme o tipo da conta:
+             · origem "venda"       → entrada no caixa linkada à venda original
+             · origem "mensalidade" → cria venda sintética (categoria "Mensalidade")
+                                      e linka caixa a ela para fluir ao DRE
+             · origem manual        → caixa com origem "a_receber"
+                                      (DRE ignora — mantém comportamento atual)
+        ───────────────────────────────────────────────────────────────────── */
+        const ehVenda       = conta.origem === "venda";
+        const ehMensalidade = conta.origem === "mensalidade";
+
+        let origemCaixa;
+        let referenciaCaixa;
+
+        if (ehVenda) {
+          origemCaixa     = "venda";
+          referenciaCaixa = conta.referenciaId || null;
+        } else if (ehMensalidade) {
+          /* Cria venda sintética para que mensalidade recebida apareça em
+             /vendas (Relatório de Vendas) e seja reconhecida pelo DRE via
+             caixa origem="venda" + referenciaId existente. */
+          const vendaMensalidade = {
+            tipoVenda:     "mensalidade",
+            categoria:     "Mensalidade",
+            cliente:       conta.clienteNome || conta.alunoNome || "—",
+            clienteNome:   conta.clienteNome || conta.alunoNome || "—",
+            alunoId:       conta.alunoId || null,
+            alunoIdSeq:    conta.alunoIdSeq ?? null,
+            mesReferencia: conta.mesReferencia || null,
+            total:         valorRecebido,
+            valorRecebido,
+            itens: [{
+              nome:          `Mensalidade ${conta.mesReferencia || ""} — ${conta.clienteNome || conta.alunoNome || ""}`.trim(),
+              produto:       "Mensalidade",
+              qtd:           1,
+              quantidade:    1,
+              preco:         valorRecebido,
+              valorUnitario: valorRecebido,
+              total:         valorRecebido,
+              subtotal:      valorRecebido,
+              tipo:          "mensalidade",
+              custo:         0,
+            }],
+            formaPagamento: "Mensalidade",
+            data:           agora,
+            criadoEm:       agora,
+            origem:         "mensalidade",
+            referenciaAluno: conta.alunoId || null,
+            descontos:      0,
+            valorTaxa:      0,
+          };
+          const vendaRef = await addDoc(
+            collection(db, "users", tenantUid, "vendas"),
+            vendaMensalidade
+          );
+          origemCaixa     = "venda";
+          referenciaCaixa = vendaRef.id;
+        } else {
+          origemCaixa     = "a_receber";
+          referenciaCaixa = conta.id;
+        }
+
         await addDoc(collection(db, "users", tenantUid, "caixa"), {
           tipo:         "entrada",
-          origem:       ehVenda ? "venda" : "a_receber",
-          referenciaId: ehVenda ? (conta.referenciaId || null) : conta.id,
+          origem:       origemCaixa,
+          referenciaId: referenciaCaixa,
           valor:        valorRecebido,
-          descricao:    `Recebimento — ${conta.clienteNome || ""}${conta.descricao ? ` · ${conta.descricao}` : ""}`,
+          descricao:    ehMensalidade
+            ? `Mensalidade recebida — ${conta.clienteNome || conta.alunoNome || ""}${conta.mesReferencia ? ` · ${conta.mesReferencia}` : ""}`
+            : `Recebimento — ${conta.clienteNome || ""}${conta.descricao ? ` · ${conta.descricao}` : ""}`,
+          categoria:    ehMensalidade ? "Mensalidade" : (ehVenda ? "Venda" : "A Receber"),
           data:         agora,
           criadoEm:     agora,
         });
