@@ -460,7 +460,7 @@ const CSS = `
 
 .lps-row {
   display: grid;
-  grid-template-columns: 1fr 160px 160px 180px;
+  grid-template-columns: 1fr 60px 140px 140px 180px;
   padding: 11px 18px; gap: 8px;
   border-bottom: 1px solid var(--border);
   align-items: center; font-size: 13px; color: var(--text-2);
@@ -1788,7 +1788,8 @@ function RelatorioAgenda({ agenda, intervalo }) {
    RELATÓRIO: LUCRO POR PRODUTO / SERVIÇO
    ══════════════════════════════════════════════════════ */
 function RelatorioLucroPorPS({ vendas, produtos, servicos, intervalo }) {
-  const [aba, setAba] = useState("produtos");
+  const [aba, setAba]         = useState("produtos");
+  const [filtroOrdem, setFiltroOrdem] = useState("padrao"); // "padrao" | "mais" | "menos"
 
   const dados = useMemo(() => {
     const vendasPeriodo = vendas.filter((v) => dentroDoIntervalo(v.data, intervalo));
@@ -1816,10 +1817,11 @@ function RelatorioLucroPorPS({ vendas, produtos, servicos, intervalo }) {
           const custoU  = Number(item.custo || item.custoUnit || nocat.custo || 0);
 
           if (!nomesMap[nomeLower]) {
-            nomesMap[nomeLower] = { nome: nocat.nome || nomeItem, fat: 0, custo: 0 };
+            nomesMap[nomeLower] = { nome: nocat.nome || nomeItem, fat: 0, custo: 0, qtd: 0 };
           }
           nomesMap[nomeLower].fat   += preco  * qtd;
           nomesMap[nomeLower].custo += custoU * qtd;
+          nomesMap[nomeLower].qtd   += qtd;
         });
       });
 
@@ -1853,7 +1855,12 @@ function RelatorioLucroPorPS({ vendas, produtos, servicos, intervalo }) {
     return <span className={`lps-pct-badge ${cls}`}>{pct.toFixed(2)}%</span>;
   };
 
-  const lista   = aba === "produtos" ? dados.listaProdutos  : dados.listaServicos;
+  const lista   = (() => {
+    const base = aba === "produtos" ? dados.listaProdutos : dados.listaServicos;
+    if (filtroOrdem === "mais")  return [...base].sort((a, b) => b.qtd - a.qtd);
+    if (filtroOrdem === "menos") return [...base].sort((a, b) => a.qtd - b.qtd);
+    return base; // padrão: maior faturamento
+  })();
   const totais  = aba === "produtos" ? dados.totaisProdutos : dados.totaisServicos;
   const label   = aba === "produtos" ? "Produto" : "Serviço";
 
@@ -1905,6 +1912,37 @@ function RelatorioLucroPorPS({ vendas, produtos, servicos, intervalo }) {
         </button>
       </div>
 
+      {/* Filtros de ordenação */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".07em", color: "var(--text-3)" }}>
+          Ordenar por:
+        </span>
+        {[
+          { key: "padrao", label: "Maior Faturamento" },
+          { key: "mais",   label: "Mais Vendidos"     },
+          { key: "menos",  label: "Menos Vendidos"    },
+        ].map(({ key, label: lbl }) => (
+          <button
+            key={key}
+            onClick={() => setFiltroOrdem(key)}
+            style={{
+              padding: "5px 13px",
+              borderRadius: 6,
+              fontSize: 11,
+              fontWeight: 500,
+              fontFamily: "'DM Sans', sans-serif",
+              cursor: "pointer",
+              border: filtroOrdem === key ? "1px solid var(--gold)" : "1px solid var(--border)",
+              background: filtroOrdem === key ? "rgba(200,165,94,0.15)" : "var(--s3)",
+              color: filtroOrdem === key ? "var(--gold)" : "var(--text-2)",
+              transition: "all .13s",
+            }}
+          >
+            {lbl}
+          </button>
+        ))}
+      </div>
+
       {/* Cards de totais */}
       <div className="cr-grid">
         <CardResumo
@@ -1945,6 +1983,7 @@ function RelatorioLucroPorPS({ vendas, produtos, servicos, intervalo }) {
         {/* Cabeçalho */}
         <div className="lps-row lps-row-head">
           <span>{label}</span>
+          <span>Qtd.</span>
           <span>Faturamento</span>
           <span>Custo</span>
           <span>Lucro</span>
@@ -1958,6 +1997,7 @@ function RelatorioLucroPorPS({ vendas, produtos, servicos, intervalo }) {
           lista.map((r, i) => (
             <div key={r.nome + i} className="lps-row">
               <span className="lps-nome">{r.nome}</span>
+              <span style={{ fontFamily: "'Sora', sans-serif", fontSize: 12, color: "var(--text-2)" }}>{r.qtd}</span>
               <span className="lps-fat">{fmtR$(r.fat)}</span>
               <span className="lps-custo">{fmtR$(r.custo)}</span>
               <div className="lps-lucro-cell">
@@ -1996,7 +2036,7 @@ const PERMISSOES_RELATORIO = {
 const MENU = [
   { key: "dre",        label: "DRE",          icon: <LayoutDashboard size={15} /> },
   { key: "financeiro", label: "Financeiro",   icon: <Wallet size={15} />         },
-  { key: "lucro_ps",   label: "Lucro P/S",    icon: <DollarSign size={15} />     },
+  { key: "lucro_ps",   label: "Produtos & Serviços", icon: <DollarSign size={15} />     },
   { key: "vendas",     label: "Vendas",       icon: <ShoppingCart size={15} />   },
   { key: "clientes",   label: "Clientes",     icon: <Users size={15} />          },
   { key: "despesas",   label: "Despesas",     icon: <Receipt size={15} />        },
@@ -2013,7 +2053,7 @@ const TITULO_RELATORIO = {
   estoque:    "Relatório de Estoque",
   clientes:   "Relatório de Clientes",
   agenda:     "Relatório de Agenda",
-  lucro_ps:   "Lucro por Produto / Serviço",
+  lucro_ps:   "Produtos & Serviços",
 };
 
 /* ══════════════════════════════════════════════════════
