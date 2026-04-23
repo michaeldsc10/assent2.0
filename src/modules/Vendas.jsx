@@ -1925,9 +1925,17 @@ useEffect(() => {
     }
 
     /* NOVA VENDA */
-    const novoId = gerarIdVenda(vendaIdCnt);
+    /* ── IMPORTANTE: o contador é lido do Firestore DENTRO da transação,
+       de forma atômica, para evitar que um estado React desatualizado
+       gere um ID já existente e sobrescreva uma venda cancelada. ── */
+    let novoId;
     try {
       await runTransaction(db, async (tx) => {
+        /* Ler o contador diretamente do Firestore (valor sempre atual) */
+        const userSnap = await tx.get(doc(db, "users", tenantUid));
+        const currentCnt = userSnap.data()?.vendaIdCnt || 0;
+        novoId = gerarIdVenda(currentCnt);
+
         /* Descontar estoque */
         for (const item of (payload.itens || [])) {
           if (item.produtoId && item.tipo === "produto") {
@@ -1937,8 +1945,8 @@ useEffect(() => {
         }
         /* Criar venda */
         tx.set(doc(db, "users", tenantUid, "vendas", novoId), { ...payload, criadoEm: new Date().toISOString() });
-        /* Incrementar contador */
-        tx.set(doc(db, "users", tenantUid), { vendaIdCnt: vendaIdCnt + 1 }, { merge: true });
+        /* Incrementar contador usando o valor lido do Firestore, não do estado React */
+        tx.set(doc(db, "users", tenantUid), { vendaIdCnt: currentCnt + 1 }, { merge: true });
       });
     } catch (err) {
       console.error("[Vendas] Erro ao criar venda:", err);
