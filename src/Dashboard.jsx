@@ -1540,16 +1540,15 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             <Usuarios />
           </RotaProtegida>
         );
-      case "Configurações":
-        // Configurações não precisa de RotaProtegida (acesso controlado pelo cargo admin)
-        return <Configuracoes menuVisivel={menuVisivel} />;
         case "matriculas":
         return (
           <RotaProtegida modulo="alunos" label="Matriculas">
             <Alunos />
           </RotaProtegida>
-        );
-        
+            );
+      case "Configurações":
+        // Configurações não precisa de RotaProtegida (acesso controlado pelo cargo admin)
+        return <Configuracoes menuVisivel={menuVisivel} />;       
       default:
         return renderDashboard();
     }
