@@ -17,6 +17,7 @@ import {
 
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
+import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
 import {
   collection,
   doc,
@@ -583,7 +584,7 @@ export default function Fornecedores() {
 
   /* Modais */
   // ── Multi-tenant ──
-  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+  const { tenantUid, cargo, nomeUsuario, podeCriar, podeEditar, podeExcluir } = useAuth();
 
   // ── Flags de permissão ──
   const podeCriarV   = podeCriar("fornecedores");
@@ -631,11 +632,13 @@ export default function Fornecedores() {
         /* EDITAR: atualizar documento existente via doc.id interno */
         const ref = doc(db, "users", tenantUid, "fornecedores", fornecedorExistente.id);
         await updateDoc(ref, payload);
+        await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.FORNECEDORES, descricao: montarDescricao("editar", "Fornecedor", payload.nome || fornecedorExistente.nome, fornecedorExistente.id) });
         setEditando(null);
       } else {
         /* CRIAR: Firestore gera doc.id automaticamente */
         const col = collection(db, "users", tenantUid, "fornecedores");
-        await addDoc(col, payload);
+        const docRef = await addDoc(col, payload);
+        await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.FORNECEDORES, descricao: montarDescricao("criar", "Fornecedor", payload.nome, docRef.id) });
         setModalNovo(false);
       }
     } catch (error) {
