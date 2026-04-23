@@ -413,11 +413,101 @@ const CSS = `
   .dre-row-cat { background: #f5f5f5 !important; }
   .dre-row-result { background: #ebebeb !important; }
 
-  * { color: #111 !important; }
+  /* Cores de texto — evitar sobreescrever backgrounds */
+  body, p, span, div, h1, h2, h3, label {
+    color: #111 !important;
+  }
   .dre-positivo { color: #1a7a3c !important; }
   .dre-negativo { color: #c0392b !important; }
   .val-pos { color: #1a7a3c !important; }
   .val-neg { color: #c0392b !important; }
+
+  /* ── Gráficos: forçar visibilidade no print ── */
+  .rv-charts-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 14px !important;
+    break-inside: avoid;
+  }
+  .rv-chart-card {
+    background: #fff !important;
+    border: 1px solid #ddd !important;
+    break-inside: avoid;
+    overflow: visible !important;
+  }
+  .rv-chart-card::before { display: none !important; }
+  .rv-chart-header {
+    border-bottom: 1px solid #eee !important;
+    padding: 10px 14px !important;
+  }
+  .rv-chart-title { color: #111 !important; }
+  .rv-chart-title-dot { box-shadow: none !important; }
+  .rv-chart-body { padding: 14px !important; overflow: visible !important; }
+
+  /* Barras dos gráficos — forçar altura e cor visível */
+  .rv-kpi-row {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 10px !important;
+    break-inside: avoid;
+  }
+  .rv-kpi-mini {
+    background: #f9f9f9 !important;
+    border: 1px solid #ddd !important;
+    break-inside: avoid;
+    transform: none !important;
+  }
+  .rv-kpi-mini-accent { display: none !important; }
+  .rv-kpi-mini-label { color: #666 !important; }
+  .rv-kpi-mini-val { color: #111 !important; }
+  .rv-kpi-mini-sub { color: #888 !important; }
+
+  /* Container das barras verticais — altura explícita */
+  .rv-bar-tooltip { display: none !important; }
+
+  /* Barras — forçar background a imprimir (Chrome bloqueia por padrão) */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Formas de pagamento */
+  .rv-fp-list { gap: 10px !important; }
+  .rv-fp-color {
+    background: #999 !important;
+    print-color-adjust: exact !important;
+  }
+  .rv-fp-bar-bg { background: #eee !important; }
+  .rv-fp-bar-fill {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+  .rv-fp-name, .rv-fp-pct { color: #111 !important; }
+
+  /* Top produtos */
+  .rv-prod-row { border-bottom: 1px solid #eee !important; }
+  .rv-prod-name, .rv-prod-val { color: #111 !important; }
+  .rv-prod-qtd { color: #666 !important; }
+  .rv-prod-bar-bg { background: #eee !important; }
+  .rv-prod-bar-fill {
+    background: #C8A55E !important;
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+  .rv-prod-rank { color: #C8A55E !important; }
+  .rv-prod-rank.top { color: #996600 !important; }
+
+  /* Barras verticais — forçar renderização no print */
+  .rv-chart-body > div { overflow: visible !important; }
+  .rv-chart-body [style*="position: relative"][style*="height"] {
+    overflow: visible !important;
+  }
+  /* Forçar os elementos de barra a terem background visível */
+  .rv-chart-body [style*="border-radius: 5px 5px"] {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
 
   .rel-print-header {
     display: flex !important; justify-content: space-between;
@@ -1619,7 +1709,7 @@ function BarChartCSS({ dados, altura = 160, cor = "#C8A55E", fmtVal }) {
       )}
 
       {/* Grade + Barras */}
-      <div style={{ position: "relative", height: altura, paddingTop: 8 }}>
+      <div style={{ position: "relative", height: altura, minHeight: altura, paddingTop: 8 }}>
         {/* SVG para gradient definitions */}
         <svg width="0" height="0" style={{ position: "absolute" }}>
           <defs>
@@ -1636,8 +1726,8 @@ function BarChartCSS({ dados, altura = 160, cor = "#C8A55E", fmtVal }) {
             position: "absolute", left: 0, right: 0,
             bottom: `${frac * 100}%`,
             borderTop: frac === 1
-              ? "1px solid rgba(255,255,255,0.08)"
-              : "1px dashed rgba(255,255,255,0.04)",
+              ? "1px solid rgba(0,0,0,0.08)"
+              : "1px dashed rgba(0,0,0,0.04)",
             pointerEvents: "none",
           }} />
         ))}
