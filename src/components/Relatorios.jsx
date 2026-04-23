@@ -2383,14 +2383,29 @@ function RelatorioVendedores({ vendas, vendedores, intervalo }) {
     [vendas, intervalo]
   );
 
-  /* ── Mapa: vendedorId → { nome, comissao } ── */
+  /* ── Mapa: vendedorId → { nome, comissao }
+        também indexado por nome_lower para resolver vendas antigas ── */
   const vendedoresMap = useMemo(() => {
-    const m = {};
+    const byId   = {};
+    const byNome = {};
     vendedores.forEach((v) => {
-      m[v.id] = { nome: v.nome, comissao: parseFloat(v.comissao) || 0 };
+      const entry = { id: v.id, nome: v.nome, comissao: parseFloat(v.comissao) || 0 };
+      byId[v.id] = entry;
+      if (v.nome) byNome[(v.nome || "").trim().toLowerCase()] = entry;
     });
-    return m;
+    return { byId, byNome };
   }, [vendedores]);
+
+  /* Resolve a chave canônica de um vendedor numa venda:
+     - Prefere vendedorId (novo)
+     - Fallback: busca no mapa de nomes (dados antigos sem vendedorId) */
+  const resolverVendedorKey = useCallback((v) => {
+    if (v.vendedorId && vendedoresMap.byId[v.vendedorId]) return v.vendedorId;
+    const nomeLower = (v.vendedor || "").trim().toLowerCase();
+    if (nomeLower && vendedoresMap.byNome[nomeLower]) return vendedoresMap.byNome[nomeLower].id;
+    // vendas sem vínculo cadastrado: usa o nome bruto como chave (agrupa pelo nome)
+    return v.vendedorId || v.vendedor || "—";
+  }, [vendedoresMap]);
 
   /* ─────────────────────────────────────────────────
      CÁLCULO POR VENDEDOR
@@ -2401,9 +2416,10 @@ function RelatorioVendedores({ vendas, vendedores, intervalo }) {
     const m = {};
 
     vendasPeriodo.forEach((v) => {
-      const vid   = v.vendedorId || v.vendedor || "—";
-      const nome  = vendedoresMap[vid]?.nome || v.vendedor || vid;
-      const pct   = vendedoresMap[vid]?.comissao ?? 0;
+      const vid  = resolverVendedorKey(v);
+      const reg  = vendedoresMap.byId[vid];
+      const nome = reg?.nome || v.vendedor || vid;
+      const pct  = reg?.comissao ?? 0;
       const fat   = Number(v.total || 0);
       const custo = Number(v.custoTotal || 0);
       const lucroBase = v.lucroEstimado != null
@@ -2422,7 +2438,7 @@ function RelatorioVendedores({ vendas, vendedores, intervalo }) {
     });
 
     return m;
-  }, [vendasPeriodo, vendedoresMap]);
+  }, [vendasPeriodo, vendedoresMap, resolverVendedorKey]);
 
   /* ── Ranking por faturamento ── */
   const ranking = useMemo(() =>
@@ -2442,13 +2458,13 @@ function RelatorioVendedores({ vendas, vendedores, intervalo }) {
   const transacoes = useMemo(() => {
     if (vendedorSel === "todos") return [];
     return vendasPeriodo
-      .filter((v) => (v.vendedorId || v.vendedor || "—") === vendedorSel)
+      .filter((v) => resolverVendedorKey(v) === vendedorSel)
       .sort((a, b) => {
         const da  = parseDate(a.data);
         const db2 = parseDate(b.data);
         return (db2 || 0) - (da || 0);
       });
-  }, [vendasPeriodo, vendedorSel]);
+  }, [vendasPeriodo, vendedorSel, resolverVendedorKey]);
 
   const selStats = statsMap[vendedorSel];
 
