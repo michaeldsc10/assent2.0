@@ -562,85 +562,6 @@ const CSS = `
   .ext-col-entrada, .ext-col-saida { display: none; }
   .ext-cell { padding: 10px 8px 10px 0; }
 }
-
-/* ── Relatório Vendedores ── */
-.vd-dropdown-wrap {
-  position: relative; width: fit-content; min-width: 220px;
-}
-.vd-dropdown-btn {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  padding: 8px 14px; border-radius: 8px; min-width: 220px;
-  background: var(--s2); border: 1px solid var(--border);
-  color: var(--text); cursor: pointer;
-  font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 500;
-  transition: border-color .13s;
-}
-.vd-dropdown-btn:hover, .vd-dropdown-btn.open { border-color: var(--gold); }
-.vd-dropdown-btn svg { color: var(--text-3); transition: transform .15s; flex-shrink: 0; }
-.vd-dropdown-btn.open svg { transform: rotate(180deg); color: var(--gold); }
-.vd-dropdown-menu {
-  position: absolute; top: calc(100% + 6px); left: 0; right: 0;
-  background: var(--s1); border: 1px solid var(--border-h);
-  border-radius: 10px; overflow: hidden;
-  box-shadow: 0 8px 28px rgba(0,0,0,0.35);
-  z-index: 50;
-  animation: vd-fade-in .12s ease;
-}
-@keyframes vd-fade-in { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:none; } }
-.vd-dropdown-item {
-  display: flex; align-items: center; gap: 9px;
-  padding: 10px 14px; cursor: pointer;
-  font-size: 13px; font-family: 'DM Sans', sans-serif;
-  color: var(--text-2); transition: background .1s;
-  border-bottom: 1px solid var(--border);
-}
-.vd-dropdown-item:last-child { border-bottom: none; }
-.vd-dropdown-item:hover { background: var(--s2); color: var(--text); }
-.vd-dropdown-item.selected { color: var(--gold); background: rgba(200,165,94,0.07); }
-.vd-dropdown-item .vd-dot {
-  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-  background: var(--gold); opacity: 0; transition: opacity .1s;
-}
-.vd-dropdown-item.selected .vd-dot { opacity: 1; }
-
-.vd-ranking-row {
-  display: grid;
-  grid-template-columns: 32px 1fr 130px 130px 130px 130px;
-  padding: 11px 18px; gap: 8px;
-  border-bottom: 1px solid var(--border);
-  align-items: center; font-size: 13px; color: var(--text-2);
-  transition: background .1s;
-}
-.vd-ranking-row:last-child { border-bottom: none; }
-.vd-ranking-row:hover { background: rgba(255,255,255,0.02); }
-.vd-ranking-head {
-  background: var(--s2);
-  font-size: 9px; font-weight: 600; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--text-3);
-}
-.vd-ranking-head:hover { background: var(--s2); }
-.vd-rank-pos {
-  font-family: 'Sora', sans-serif; font-size: 12px;
-  font-weight: 700; color: var(--gold);
-}
-.vd-rank-name { color: var(--text); font-weight: 500; }
-
-.vd-tx-row {
-  display: grid;
-  grid-template-columns: 90px 1fr 120px 120px 120px;
-  padding: 10px 18px; gap: 8px;
-  border-bottom: 1px solid var(--border);
-  align-items: center; font-size: 12px; color: var(--text-2);
-  transition: background .1s;
-}
-.vd-tx-row:last-child { border-bottom: none; }
-.vd-tx-row:hover { background: rgba(255,255,255,0.02); }
-.vd-tx-head {
-  background: var(--s2);
-  font-size: 9px; font-weight: 600; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--text-3);
-}
-.vd-tx-head:hover { background: var(--s2); }
 `;
 
 
@@ -2406,387 +2327,6 @@ function RelatorioLucroPorPS({ vendas, produtos, servicos, vendedores, intervalo
 }
 
 /* ══════════════════════════════════════════════════════
-   RELATÓRIO: VENDEDORES
-   ══════════════════════════════════════════════════════ */
-function RelatorioVendedores({ vendas, produtos, servicos, vendedores, intervalo }) {
-  const [vendedorSel, setVendedorSel] = useState("todos");
-  const [dropOpen,    setDropOpen]    = useState(false);
-
-  /* ── Cálculo de comissão idêntico ao RelatorioLucroPorPS ── */
-  const calcComissaoVenda = (venda, pct) => {
-    if (!pct || pct <= 0) return 0;
-    const itens = venda.itens || [];
-    const total = typeof venda.total === "number"
-      ? venda.total
-      : itens.reduce((s, i) => s + (Number(i.preco || 0) * Number(i.qtd || 1)), 0);
-    const custoTotal = itens.reduce((s, i) => s + (Number(i.custo || 0) * Number(i.qtd || 1)), 0);
-    const lucro = total - custoTotal;
-    return lucro > 0 ? lucro * (pct / 100) : 0;
-  };
-
-  /* ── Mapas de comissão por id e por nome ── */
-  const comissaoMapId   = useMemo(() => {
-    const m = {};
-    vendedores.forEach((vd) => {
-      m[vd.id] = { id: vd.id, nome: vd.nome || "—", pct: Number(vd.comissao || 0) };
-    });
-    return m;
-  }, [vendedores]);
-
-  const comissaoMapNome = useMemo(() => {
-    const m = {};
-    vendedores.forEach((vd) => {
-      if (vd.nome) m[(vd.nome || "").trim().toLowerCase()] =
-        { id: vd.id, nome: vd.nome, pct: Number(vd.comissao || 0) };
-    });
-    return m;
-  }, [vendedores]);
-
-  const resolverVendedor = useCallback((v) => {
-    if (v.vendedorId && comissaoMapId[v.vendedorId]) return comissaoMapId[v.vendedorId];
-    const nomeCampo = (v.vendedor || v.vendedorNome || "").trim().toLowerCase();
-    if (nomeCampo && comissaoMapNome[nomeCampo]) return comissaoMapNome[nomeCampo];
-    /* fallback: vendedor sem cadastro, usa o nome do campo */
-    const nome = (v.vendedor || v.vendedorNome || "").trim();
-    if (nome) return { id: nome, nome, pct: 0 };
-    return null;
-  }, [comissaoMapId, comissaoMapNome]);
-
-  /* ── Dados agregados por vendedor ── */
-  const dadosPorVendedor = useMemo(() => {
-    const vendasPeriodo = vendas.filter((v) => dentroDoIntervalo(v.data, intervalo));
-    const mapa = {}; // id → { nome, pct, faturamento, custo, comissao, lucro, vendas: [] }
-
-    vendasPeriodo.forEach((v) => {
-      const vdEntry = resolverVendedor(v);
-      if (!vdEntry) return;
-
-      const total   = Number(v.total || 0);
-      const itens   = v.itens || [];
-      const custo   = itens.reduce((s, i) => s + Number(i.custo || 0) * Number(i.qtd || 1), 0);
-      const comissao = calcComissaoVenda(v, vdEntry.pct);
-      const lucro    = total - custo - comissao;
-
-      if (!mapa[vdEntry.id]) {
-        mapa[vdEntry.id] = {
-          id: vdEntry.id,
-          nome: vdEntry.nome,
-          pct: vdEntry.pct,
-          faturamento: 0, custo: 0, comissao: 0, lucro: 0,
-          vendas: [],
-        };
-      }
-      mapa[vdEntry.id].faturamento += total;
-      mapa[vdEntry.id].custo       += custo;
-      mapa[vdEntry.id].comissao    += comissao;
-      mapa[vdEntry.id].lucro       += lucro;
-      mapa[vdEntry.id].vendas.push({
-        ...v,
-        _custo: custo,
-        _comissao: comissao,
-        _lucro: lucro,
-      });
-    });
-
-    return Object.values(mapa).sort((a, b) => b.faturamento - a.faturamento);
-  }, [vendas, intervalo, resolverVendedor]);
-
-  /* Lista para o dropdown */
-  const opcoesDropdown = useMemo(() => [
-    { id: "todos", nome: "Todos os Vendedores" },
-    ...dadosPorVendedor,
-  ], [dadosPorVendedor]);
-
-  const vendedorAtual = opcoesDropdown.find((o) => o.id === vendedorSel) || opcoesDropdown[0];
-
-  /* ── Dados do vendedor selecionado ── */
-  const dadosSel = useMemo(() => {
-    if (vendedorSel === "todos") return null;
-    return dadosPorVendedor.find((v) => v.id === vendedorSel) || null;
-  }, [vendedorSel, dadosPorVendedor]);
-
-  /* Totais globais (todos) */
-  const totaisGlobais = useMemo(() => dadosPorVendedor.reduce(
-    (acc, v) => ({
-      faturamento: acc.faturamento + v.faturamento,
-      custo:       acc.custo       + v.custo,
-      comissao:    acc.comissao    + v.comissao,
-      lucro:       acc.lucro       + v.lucro,
-    }),
-    { faturamento: 0, custo: 0, comissao: 0, lucro: 0 }
-  ), [dadosPorVendedor]);
-
-  const handleExport = () => {
-    if (vendedorSel === "todos") {
-      exportarExcel("vendedores", [{
-        nome: "Ranking",
-        colunas: ["#", "Vendedor", "Comissão (%)", "Faturamento (R$)", "Custo (R$)", "Comissão (R$)", "Lucro (R$)"],
-        dados: dadosPorVendedor.map((v, i) => [
-          i + 1, v.nome, v.pct ? `${v.pct}%` : "—",
-          v.faturamento.toFixed(2), v.custo.toFixed(2),
-          v.comissao.toFixed(2), v.lucro.toFixed(2),
-        ]),
-      }]);
-    } else if (dadosSel) {
-      exportarExcel(`vendedor-${dadosSel.nome}`, [{
-        nome: "Transações",
-        colunas: ["Data", "Cliente", "Forma Pagto.", "Faturamento (R$)", "Custo (R$)", "Comissão (R$)", "Lucro (R$)"],
-        dados: dadosSel.vendas.map((v) => [
-          fmtData(v.data),
-          v.clienteNome || v.cliente || "—",
-          v.formaPagamento || "—",
-          Number(v.total || 0).toFixed(2),
-          v._custo.toFixed(2),
-          v._comissao.toFixed(2),
-          v._lucro.toFixed(2),
-        ]),
-      }]);
-    }
-  };
-
-  /* ── Dropdown de seleção ── */
-  const Dropdown = () => (
-    <div className="vd-dropdown-wrap">
-      <button
-        className={`vd-dropdown-btn${dropOpen ? " open" : ""}`}
-        onClick={() => setDropOpen((o) => !o)}
-      >
-        <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <Users size={14} style={{ color: "var(--gold)", flexShrink: 0 }} />
-          {vendedorAtual.nome}
-        </span>
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </button>
-
-      {dropOpen && (
-        <div className="vd-dropdown-menu">
-          {opcoesDropdown.map((op) => (
-            <div
-              key={op.id}
-              className={`vd-dropdown-item${vendedorSel === op.id ? " selected" : ""}`}
-              onClick={() => { setVendedorSel(op.id); setDropOpen(false); }}
-            >
-              <span className="vd-dot" />
-              <span style={{ flex: 1 }}>{op.nome}</span>
-              {op.pct > 0 && (
-                <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'Sora', sans-serif" }}>
-                  {op.pct}%
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-
-  /* ── VIEW: Ranking (Todos) ── */
-  if (vendedorSel === "todos") {
-    return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-        {/* Filtro dropdown */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "space-between" }}>
-          <Dropdown />
-          <button className="btn-secondary" onClick={handleExport} style={{ fontSize: 12, padding: "6px 14px" }}>
-            <Download size={13} /> Exportar Excel
-          </button>
-        </div>
-
-        {/* KPIs globais */}
-        <div className="cr-grid">
-          <CardResumo
-            icon={<Users size={18} />}
-            label="Vendedores Ativos"
-            value={String(dadosPorVendedor.length)}
-            sub="no período"
-            trend="neutral" colorVar="var(--gold)"
-          />
-          <CardResumo
-            icon={<ShoppingCart size={18} />}
-            label="Faturamento Total"
-            value={fmtR$(totaisGlobais.faturamento)}
-            sub="todas as vendas"
-            trend="up" colorVar="var(--blue)"
-          />
-          <CardResumo
-            icon={<DollarSign size={18} />}
-            label="Comissões Totais"
-            value={fmtR$(totaisGlobais.comissao)}
-            sub="a pagar no período"
-            trend="neutral" colorVar="var(--gold)"
-          />
-          <CardResumo
-            icon={<TrendingUp size={18} />}
-            label="Lucro Gerado"
-            value={fmtR$(totaisGlobais.lucro)}
-            sub={totaisGlobais.faturamento > 0 ? `Margem: ${fmtPct((totaisGlobais.lucro / totaisGlobais.faturamento) * 100)}` : "—"}
-            trend={totaisGlobais.lucro >= 0 ? "up" : "down"}
-            colorVar={totaisGlobais.lucro >= 0 ? "var(--green)" : "var(--red)"}
-          />
-        </div>
-
-        {/* Tabela de ranking */}
-        <div className="tr-wrap">
-          <div className="tr-header">
-            <span className="tr-title">Ranking de Vendedores</span>
-            <span className="tr-badge">{dadosPorVendedor.length}</span>
-          </div>
-
-          {/* Cabeçalho */}
-          <div className="vd-ranking-row vd-ranking-head">
-            <span>#</span>
-            <span>Vendedor</span>
-            <span style={{ textAlign: "right" }}>Faturamento</span>
-            <span style={{ textAlign: "right" }}>Custo</span>
-            <span style={{ textAlign: "right" }}>Comissão</span>
-            <span style={{ textAlign: "right" }}>Lucro Gerado</span>
-          </div>
-
-          {dadosPorVendedor.length === 0 ? (
-            <div className="tr-state">Nenhum vendedor com vendas no período.</div>
-          ) : (
-            dadosPorVendedor.map((v, i) => (
-              <div
-                key={v.id}
-                className="vd-ranking-row"
-                style={{ cursor: "pointer" }}
-                onClick={() => setVendedorSel(v.id)}
-                title={`Ver transações de ${v.nome}`}
-              >
-                <span className="vd-rank-pos">#{i + 1}</span>
-                <span className="vd-rank-name">
-                  {v.nome}
-                  {v.pct > 0 && (
-                    <span style={{ fontSize: 10, color: "var(--text-3)", marginLeft: 6, fontFamily: "'Sora', sans-serif" }}>
-                      {v.pct}% comissão
-                    </span>
-                  )}
-                </span>
-                <span style={{ textAlign: "right", fontFamily: "'Sora', sans-serif", fontSize: 12, fontWeight: 600, color: "var(--blue)" }}>
-                  {fmtR$(v.faturamento)}
-                </span>
-                <span style={{ textAlign: "right", fontFamily: "'Sora', sans-serif", fontSize: 12, fontWeight: 600, color: "var(--red)" }}>
-                  {v.custo > 0 ? fmtR$(v.custo) : <span style={{ color: "var(--text-3)" }}>—</span>}
-                </span>
-                <span style={{ textAlign: "right", fontFamily: "'Sora', sans-serif", fontSize: 12, fontWeight: 600, color: "var(--gold)" }}>
-                  {v.comissao > 0 ? fmtR$(v.comissao) : <span style={{ color: "var(--text-3)" }}>—</span>}
-                </span>
-                <span style={{ textAlign: "right" }}>
-                  <span className={v.lucro >= 0 ? "val-pos" : "val-neg"}>{fmtR$(v.lucro)}</span>
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  /* ── VIEW: Transações do vendedor selecionado ── */
-  if (!dadosSel) return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <Dropdown />
-      <div className="rel-empty"><p>Vendedor sem vendas no período.</p></div>
-    </div>
-  );
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Filtro dropdown + export */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", justifyContent: "space-between" }}>
-        <Dropdown />
-        <button className="btn-secondary" onClick={handleExport} style={{ fontSize: 12, padding: "6px 14px" }}>
-          <Download size={13} /> Exportar Excel
-        </button>
-      </div>
-
-      {/* KPIs do vendedor */}
-      <div className="cr-grid">
-        <CardResumo
-          icon={<ShoppingCart size={18} />}
-          label="Faturamento"
-          value={fmtR$(dadosSel.faturamento)}
-          sub={`${dadosSel.vendas.length} venda(s) no período`}
-          trend="up" colorVar="var(--blue)"
-        />
-        <CardResumo
-          icon={<TrendingDown size={18} />}
-          label="Custo"
-          value={fmtR$(dadosSel.custo)}
-          sub="custo dos produtos/serviços"
-          trend="down" colorVar="var(--red)"
-        />
-        <CardResumo
-          icon={<DollarSign size={18} />}
-          label="Comissão"
-          value={fmtR$(dadosSel.comissao)}
-          sub={dadosSel.pct > 0 ? `${dadosSel.pct}% sobre lucro bruto` : "Sem comissão cadastrada"}
-          trend="neutral" colorVar="var(--gold)"
-        />
-        <CardResumo
-          icon={<TrendingUp size={18} />}
-          label="Lucro Gerado"
-          value={fmtR$(dadosSel.lucro)}
-          sub={dadosSel.faturamento > 0
-            ? `Margem: ${fmtPct((dadosSel.lucro / dadosSel.faturamento) * 100)}`
-            : "—"}
-          trend={dadosSel.lucro >= 0 ? "up" : "down"}
-          colorVar={dadosSel.lucro >= 0 ? "var(--green)" : "var(--red)"}
-        />
-      </div>
-
-      {/* Tabela de transações */}
-      <div className="tr-wrap">
-        <div className="tr-header">
-          <span className="tr-title">Transações de {dadosSel.nome}</span>
-          <span className="tr-badge">{dadosSel.vendas.length}</span>
-        </div>
-
-        {/* Cabeçalho */}
-        <div className="vd-tx-row vd-tx-head">
-          <span>Data</span>
-          <span>Cliente</span>
-          <span style={{ textAlign: "right" }}>Faturamento</span>
-          <span style={{ textAlign: "right" }}>Comissão</span>
-          <span style={{ textAlign: "right" }}>Lucro</span>
-        </div>
-
-        {dadosSel.vendas.length === 0 ? (
-          <div className="tr-state">Nenhuma venda no período.</div>
-        ) : (
-          [...dadosSel.vendas]
-            .sort((a, b) => {
-              const da = parseDate(a.data), db2 = parseDate(b.data);
-              return (db2 || 0) - (da || 0);
-            })
-            .map((v) => (
-              <div key={v.id} className="vd-tx-row">
-                <span style={{ fontFamily: "'Sora', sans-serif", fontSize: 11, fontWeight: 600, color: "var(--text-2)" }}>
-                  {fmtData(v.data)}
-                </span>
-                <span style={{ color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {v.clienteNome || v.cliente || <span style={{ color: "var(--text-3)" }}>—</span>}
-                </span>
-                <span style={{ textAlign: "right", fontFamily: "'Sora', sans-serif", fontSize: 12, fontWeight: 600, color: "var(--blue)" }}>
-                  {fmtR$(v.total)}
-                </span>
-                <span style={{ textAlign: "right", fontFamily: "'Sora', sans-serif", fontSize: 12, fontWeight: 600, color: v._comissao > 0 ? "var(--gold)" : "var(--text-3)" }}>
-                  {v._comissao > 0 ? fmtR$(v._comissao) : "—"}
-                </span>
-                <span style={{ textAlign: "right" }}>
-                  <span className={v._lucro >= 0 ? "val-pos" : "val-neg"}>{fmtR$(v._lucro)}</span>
-                </span>
-              </div>
-            ))
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════
    MENU DE NAVEGAÇÃO — configuração
    ══════════════════════════════════════════════════════ */
 const PERMISSOES_RELATORIO = {
@@ -2826,6 +2366,525 @@ const TITULO_RELATORIO = {
   lucro_ps:   "Produtos & Serviços",
   vendedores: "Relatório de Vendedores",
 };
+
+
+/* ══════════════════════════════════════════════════════
+   RELATÓRIO: VENDEDORES
+   ══════════════════════════════════════════════════════ */
+function RelatorioVendedores({ vendas, vendedores, intervalo }) {
+  const [vendedorSel, setVendedorSel] = useState("todos");
+
+  /* ── Vendas ativas do período (excluir canceladas) ── */
+  const vendasPeriodo = useMemo(() =>
+    vendas.filter((v) =>
+      v.status !== "cancelada" &&
+      dentroDoIntervalo(v.data, intervalo)
+    ),
+    [vendas, intervalo]
+  );
+
+  /* ── Mapa: vendedorId → { nome, comissao } ── */
+  const vendedoresMap = useMemo(() => {
+    const m = {};
+    vendedores.forEach((v) => {
+      m[v.id] = { nome: v.nome, comissao: parseFloat(v.comissao) || 0 };
+    });
+    return m;
+  }, [vendedores]);
+
+  /* ─────────────────────────────────────────────────
+     CÁLCULO POR VENDEDOR
+     Regra de comissão: (lucroEstimado OU total - custo) × (% / 100)
+     Lucro gerado: lucroEstimado quando disponível, senão total - custoTotal
+  ───────────────────────────────────────────────── */
+  const statsMap = useMemo(() => {
+    const m = {};
+
+    vendasPeriodo.forEach((v) => {
+      const vid   = v.vendedorId || v.vendedor || "—";
+      const nome  = vendedoresMap[vid]?.nome || v.vendedor || vid;
+      const pct   = vendedoresMap[vid]?.comissao ?? 0;
+      const fat   = Number(v.total || 0);
+      const custo = Number(v.custoTotal || 0);
+      const lucroBase = v.lucroEstimado != null
+        ? Number(v.lucroEstimado)
+        : fat - custo;
+      const comissao = lucroBase * (pct / 100);
+
+      if (!m[vid]) {
+        m[vid] = { id: vid, nome, pct, faturamento: 0, custo: 0, lucro: 0, comissao: 0, qtd: 0 };
+      }
+      m[vid].faturamento += fat;
+      m[vid].custo       += custo;
+      m[vid].lucro       += lucroBase;
+      m[vid].comissao    += comissao;
+      m[vid].qtd         += 1;
+    });
+
+    return m;
+  }, [vendasPeriodo, vendedoresMap]);
+
+  /* ── Ranking por faturamento ── */
+  const ranking = useMemo(() =>
+    Object.values(statsMap).sort((a, b) => b.faturamento - a.faturamento),
+    [statsMap]
+  );
+
+  /* ── Totais globais ── */
+  const totais = useMemo(() => ({
+    faturamento: ranking.reduce((s, r) => s + r.faturamento, 0),
+    lucro:       ranking.reduce((s, r) => s + r.lucro,       0),
+    comissao:    ranking.reduce((s, r) => s + r.comissao,    0),
+    qtd:         ranking.reduce((s, r) => s + r.qtd,         0),
+  }), [ranking]);
+
+  /* ── Transações do vendedor selecionado ── */
+  const transacoes = useMemo(() => {
+    if (vendedorSel === "todos") return [];
+    return vendasPeriodo
+      .filter((v) => (v.vendedorId || v.vendedor || "—") === vendedorSel)
+      .sort((a, b) => {
+        const da  = parseDate(a.data);
+        const db2 = parseDate(b.data);
+        return (db2 || 0) - (da || 0);
+      });
+  }, [vendasPeriodo, vendedorSel]);
+
+  const selStats = statsMap[vendedorSel];
+
+  /* ── Export Excel ── */
+  const handleExport = () => {
+    if (vendedorSel === "todos") {
+      exportarExcel("vendedores", [{
+        nome: "Ranking Vendedores",
+        colunas: ["Pos.", "Vendedor", "Qtd Vendas", "Faturamento (R$)", "Lucro Gerado (R$)", "Comissão %", "Comissão (R$)"],
+        dados: ranking.map((r, i) => [
+          `#${i + 1}`, r.nome, r.qtd,
+          r.faturamento.toFixed(2),
+          r.lucro.toFixed(2),
+          `${r.pct}%`,
+          r.comissao.toFixed(2),
+        ]),
+      }]);
+    } else {
+      exportarExcel(`vendedor-${selStats?.nome || vendedorSel}`, [{
+        nome: "Transações",
+        colunas: ["Data", "Cliente", "Produto/Serviço", "Forma Pgto", "Total (R$)", "Lucro (R$)", "Comissão (R$)"],
+        dados: transacoes.map((v) => {
+          const custo     = Number(v.custoTotal || 0);
+          const lucroBase = v.lucroEstimado != null ? Number(v.lucroEstimado) : Number(v.total || 0) - custo;
+          const comissao  = lucroBase * ((selStats?.pct || 0) / 100);
+          return [
+            fmtData(v.data),
+            v.cliente || "—",
+            v.itens?.map(i => i.nome).filter(Boolean).join(", ") || v.livreNome || "—",
+            v.formaPagamento || "—",
+            Number(v.total || 0).toFixed(2),
+            lucroBase.toFixed(2),
+            comissao.toFixed(2),
+          ];
+        }),
+      }]);
+    }
+  };
+
+  /* ══════════ RENDER ══════════ */
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* ── Filtro de vendedor ── */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+        padding: "11px 16px",
+        background: "var(--s1)", border: "1px solid var(--border)", borderRadius: 10,
+      }}>
+        <span style={{
+          fontSize: 10, fontWeight: 600, textTransform: "uppercase",
+          letterSpacing: ".07em", color: "var(--text-3)", flexShrink: 0,
+        }}>
+          Vendedor
+        </span>
+
+        <button
+          className={`fp-btn ${vendedorSel === "todos" ? "active" : ""}`}
+          onClick={() => setVendedorSel("todos")}
+        >
+          Todos (Ranking)
+        </button>
+
+        {ranking.map((r) => (
+          <button
+            key={r.id}
+            className={`fp-btn ${vendedorSel === r.id ? "active" : ""}`}
+            onClick={() => setVendedorSel(r.id)}
+          >
+            {r.nome}
+          </button>
+        ))}
+
+        {vendedores
+          .filter((v) => !statsMap[v.id])
+          .map((v) => (
+            <button
+              key={v.id}
+              className="fp-btn"
+              style={{ opacity: 0.45 }}
+              onClick={() => setVendedorSel(v.id)}
+            >
+              {v.nome}
+            </button>
+          ))
+        }
+      </div>
+
+      {/* ══════════════════════════════════
+          VIEW: TODOS — Ranking
+         ══════════════════════════════════ */}
+      {vendedorSel === "todos" && (
+        <>
+          {/* KPIs globais */}
+          <div className="cr-grid">
+            <CardResumo
+              icon={<Users size={18} />}
+              label="Vendedores Ativos"
+              value={String(ranking.length)}
+              sub="no período"
+              trend="neutral"
+              colorVar="var(--gold)"
+            />
+            <CardResumo
+              icon={<DollarSign size={18} />}
+              label="Faturamento Total"
+              value={fmtR$(totais.faturamento)}
+              sub={`${totais.qtd} vendas`}
+              trend="up"
+              colorVar="var(--green)"
+            />
+            <CardResumo
+              icon={<TrendingUp size={18} />}
+              label="Lucro Total Gerado"
+              value={fmtR$(totais.lucro)}
+              sub={totais.faturamento > 0
+                ? `${fmtPct((totais.lucro / totais.faturamento) * 100)} margem`
+                : "—"}
+              trend={totais.lucro >= 0 ? "up" : "down"}
+              colorVar={totais.lucro >= 0 ? "var(--green)" : "var(--red)"}
+            />
+            <CardResumo
+              icon={<Receipt size={18} />}
+              label="Total em Comissões"
+              value={fmtR$(totais.comissao)}
+              sub="a pagar"
+              trend="neutral"
+              colorVar="var(--text-2)"
+            />
+          </div>
+
+          {/* Ranking table */}
+          {ranking.length === 0 ? (
+            <div className="rel-empty">
+              <Users size={32} color="var(--text-3)" />
+              <p>Nenhuma venda registrada no período.</p>
+            </div>
+          ) : (
+            <div className="tr-wrap">
+              <div className="tr-header">
+                <span className="tr-title">Ranking de Vendedores</span>
+                <span className="tr-badge">{ranking.length}</span>
+              </div>
+
+              {/* Cabeçalho */}
+              <div className="tr-head" style={{
+                gridTemplateColumns: "36px 1fr 72px 140px 140px 80px 130px",
+                display: "grid", padding: "9px 18px", gap: 8,
+              }}>
+                <span>Pos.</span>
+                <span>Vendedor</span>
+                <span style={{ textAlign: "right" }}>Vendas</span>
+                <span style={{ textAlign: "right" }}>Faturamento</span>
+                <span style={{ textAlign: "right" }}>Lucro Gerado</span>
+                <span style={{ textAlign: "right" }}>Com.%</span>
+                <span style={{ textAlign: "right" }}>Comissão R$</span>
+              </div>
+
+              {ranking.map((r, i) => {
+                const barPct = totais.faturamento > 0
+                  ? (r.faturamento / totais.faturamento) * 100
+                  : 0;
+                return (
+                  <div
+                    key={r.id}
+                    className="tr-row"
+                    style={{
+                      gridTemplateColumns: "36px 1fr 72px 140px 140px 80px 130px",
+                      cursor: "pointer",
+                    }}
+                    onClick={() => setVendedorSel(r.id)}
+                    title="Clique para ver as transações deste vendedor"
+                  >
+                    <span style={{
+                      fontFamily: "'Sora', sans-serif", fontWeight: 700,
+                      color: i === 0 ? "var(--gold)" : "var(--text-3)", fontSize: 13,
+                    }}>
+                      #{i + 1}
+                    </span>
+
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 4,
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>
+                        {r.nome}
+                      </div>
+                      <div style={{ height: 3, borderRadius: 2, background: "var(--s3)", overflow: "hidden", width: "80%" }}>
+                        <div style={{
+                          height: "100%", borderRadius: 2,
+                          background: i === 0 ? "var(--gold)" : "var(--blue)",
+                          width: `${barPct.toFixed(1)}%`,
+                          transition: "width .4s ease",
+                        }} />
+                      </div>
+                    </div>
+
+                    <span style={{ textAlign: "right", fontFamily: "'Sora', sans-serif", fontSize: 13 }}>
+                      {r.qtd}
+                    </span>
+
+                    <span style={{ textAlign: "right" }} className="val-pos">
+                      {fmtR$(r.faturamento)}
+                    </span>
+
+                    <span style={{ textAlign: "right" }} className={r.lucro >= 0 ? "val-pos" : "val-neg"}>
+                      {fmtR$(r.lucro)}
+                    </span>
+
+                    <span style={{
+                      textAlign: "right", fontSize: 12,
+                      color: "var(--text-2)", fontFamily: "'Sora', sans-serif",
+                    }}>
+                      {r.pct}%
+                    </span>
+
+                    <span style={{ textAlign: "right" }} className="val-neu">
+                      {fmtR$(r.comissao)}
+                    </span>
+                  </div>
+                );
+              })}
+
+              {/* Linha de totais */}
+              <div
+                className="tr-row"
+                style={{
+                  gridTemplateColumns: "36px 1fr 72px 140px 140px 80px 130px",
+                  background: "rgba(0,0,0,0.15)",
+                  borderTop: "1px solid var(--border-h)",
+                  fontWeight: 700,
+                }}
+              >
+                <span />
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>TOTAL</span>
+                <span style={{ textAlign: "right", fontFamily: "'Sora', sans-serif", fontSize: 13 }}>
+                  {totais.qtd}
+                </span>
+                <span style={{ textAlign: "right" }} className="val-pos">
+                  {fmtR$(totais.faturamento)}
+                </span>
+                <span style={{ textAlign: "right" }} className={totais.lucro >= 0 ? "val-pos" : "val-neg"}>
+                  {fmtR$(totais.lucro)}
+                </span>
+                <span />
+                <span style={{ textAlign: "right" }} className="val-neu">
+                  {fmtR$(totais.comissao)}
+                </span>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ══════════════════════════════════
+          VIEW: VENDEDOR INDIVIDUAL
+         ══════════════════════════════════ */}
+      {vendedorSel !== "todos" && (
+        <>
+          {/* Botão voltar */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button
+              className="btn-secondary"
+              style={{ fontSize: 11, padding: "5px 12px" }}
+              onClick={() => setVendedorSel("todos")}
+            >
+              ← Voltar ao ranking
+            </button>
+            <span style={{ fontSize: 13, color: "var(--text-2)" }}>
+              Transações de{" "}
+              <strong style={{ color: "var(--text)" }}>
+                {selStats?.nome || vendedorSel}
+              </strong>{" "}
+              no período
+            </span>
+          </div>
+
+          {/* KPIs do vendedor */}
+          {selStats ? (
+            <div className="cr-grid">
+              <CardResumo
+                icon={<ShoppingCart size={18} />}
+                label="Vendas no Período"
+                value={String(selStats.qtd)}
+                sub="transações"
+                trend="neutral"
+                colorVar="var(--gold)"
+              />
+              <CardResumo
+                icon={<DollarSign size={18} />}
+                label="Faturamento"
+                value={fmtR$(selStats.faturamento)}
+                sub="total bruto"
+                trend="up"
+                colorVar="var(--green)"
+              />
+              <CardResumo
+                icon={<TrendingUp size={18} />}
+                label="Lucro Gerado"
+                value={fmtR$(selStats.lucro)}
+                sub={selStats.faturamento > 0
+                  ? `${fmtPct((selStats.lucro / selStats.faturamento) * 100)} margem`
+                  : "—"}
+                trend={selStats.lucro >= 0 ? "up" : "down"}
+                colorVar={selStats.lucro >= 0 ? "var(--green)" : "var(--red)"}
+              />
+              <CardResumo
+                icon={<Receipt size={18} />}
+                label={`Comissão (${selStats.pct}%)`}
+                value={fmtR$(selStats.comissao)}
+                sub="sobre lucro gerado"
+                trend="neutral"
+                colorVar="var(--text-2)"
+              />
+            </div>
+          ) : (
+            <div className="rel-empty">
+              <Users size={32} color="var(--text-3)" />
+              <p>Nenhuma venda registrada para este vendedor no período.</p>
+            </div>
+          )}
+
+          {/* Tabela de transações */}
+          {transacoes.length > 0 && (
+            <div className="tr-wrap">
+              <div className="tr-header">
+                <span className="tr-title">Transações</span>
+                <span className="tr-badge">{transacoes.length}</span>
+              </div>
+
+              {/* Cabeçalho */}
+              <div className="tr-head" style={{
+                gridTemplateColumns: "88px 1fr 1fr 110px 110px 110px 110px",
+                display: "grid", padding: "9px 18px", gap: 8,
+              }}>
+                <span>Data</span>
+                <span>Cliente</span>
+                <span>Produto / Serviço</span>
+                <span>Forma Pgto</span>
+                <span style={{ textAlign: "right" }}>Total</span>
+                <span style={{ textAlign: "right" }}>Lucro</span>
+                <span style={{ textAlign: "right" }}>Comissão</span>
+              </div>
+
+              {transacoes.map((v) => {
+                const custo     = Number(v.custoTotal || 0);
+                const lucroBase = v.lucroEstimado != null
+                  ? Number(v.lucroEstimado)
+                  : Number(v.total || 0) - custo;
+                const comissao  = lucroBase * ((selStats?.pct || 0) / 100);
+                const descItens = v.itens?.map(i => i.nome).filter(Boolean).join(", ")
+                  || v.livreNome || "—";
+
+                return (
+                  <div
+                    key={v.id}
+                    className="tr-row"
+                    style={{ gridTemplateColumns: "88px 1fr 1fr 110px 110px 110px 110px" }}
+                  >
+                    <span style={{
+                      fontFamily: "'Sora', sans-serif", fontSize: 11, color: "var(--text-3)",
+                    }}>
+                      {fmtData(v.data)}
+                    </span>
+
+                    <span style={{
+                      fontWeight: 500, color: "var(--text)",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>
+                      {v.cliente || "—"}
+                    </span>
+
+                    <span style={{
+                      overflow: "hidden", textOverflow: "ellipsis",
+                      whiteSpace: "nowrap", color: "var(--text-2)",
+                    }}>
+                      {descItens}
+                    </span>
+
+                    <span style={{ fontSize: 11, color: "var(--text-3)" }}>
+                      {v.formaPagamento || "—"}
+                    </span>
+
+                    <span style={{ textAlign: "right" }} className="val-pos">
+                      {fmtR$(v.total || 0)}
+                    </span>
+
+                    <span style={{ textAlign: "right" }} className={lucroBase >= 0 ? "val-pos" : "val-neg"}>
+                      {fmtR$(lucroBase)}
+                    </span>
+
+                    <span style={{ textAlign: "right" }} className="val-neu">
+                      {fmtR$(comissao)}
+                    </span>
+                  </div>
+                );
+              })}
+
+              {/* Subtotais */}
+              {selStats && (
+                <div
+                  className="tr-row"
+                  style={{
+                    gridTemplateColumns: "88px 1fr 1fr 110px 110px 110px 110px",
+                    background: "rgba(0,0,0,0.15)",
+                    borderTop: "1px solid var(--border-h)",
+                    fontWeight: 700,
+                  }}
+                >
+                  <span /><span /><span />
+                  <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text)" }}>SUBTOTAL</span>
+                  <span style={{ textAlign: "right" }} className="val-pos">
+                    {fmtR$(selStats.faturamento)}
+                  </span>
+                  <span style={{ textAlign: "right" }} className={selStats.lucro >= 0 ? "val-pos" : "val-neg"}>
+                    {fmtR$(selStats.lucro)}
+                  </span>
+                  <span style={{ textAlign: "right" }} className="val-neu">
+                    {fmtR$(selStats.comissao)}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Export ── */}
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="btn-secondary" onClick={handleExport}>
+          <Download size={13} /> Exportar Excel
+        </button>
+      </div>
+    </div>
+  );
+}
 
 /* ══════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL: Relatorios
@@ -2930,7 +2989,7 @@ export default function Relatorios() {
       case "clientes":   return <RelatorioClientes clientes={clientes} vendas={vendas} intervalo={intervalo} aReceber={aReceber} />;
       case "agenda":     return <RelatorioAgenda agenda={agenda} intervalo={intervalo} />;
       case "lucro_ps":   return <RelatorioLucroPorPS vendas={vendas} produtos={produtos} servicos={servicos} vendedores={vendedores} intervalo={intervalo} />;
-      case "vendedores": return <RelatorioVendedores vendas={vendas} produtos={produtos} servicos={servicos} vendedores={vendedores} intervalo={intervalo} />;
+      case "vendedores": return <RelatorioVendedores vendas={vendas} vendedores={vendedores} intervalo={intervalo} />;
       default:           return null;
     }
   };
