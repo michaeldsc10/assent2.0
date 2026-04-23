@@ -73,6 +73,13 @@ const hojeISO = () => {
   return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`;
 };
 
+/** Adiciona N dias a uma data YYYY-MM-DD */
+const addDias = (dateISO, dias) => {
+  const [ano, mes, dia] = dateISO.split("-").map(Number);
+  const d = new Date(ano, mes - 1, dia + dias);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+};
+
 /** Adiciona N meses a uma data YYYY-MM-DD, respeitando fim de mês */
 const addMeses = (dateISO, meses) => {
   const [ano, mes, dia] = dateISO.split("-").map(Number);
@@ -525,6 +532,8 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
     cartaoPago:      compra?.cartaoPago      ?? true,
     /* boleto/cartão: parcelado ou à vista */
     modoParcelamento: compra?.modoParcelamento || "avista",
+    /* boleto parcelado: vencimento de cada parcela individualmente */
+    vencimentosParcelas: compra?.vencimentosParcelas || [],
   });
 
   const [itens, setItens] = useState(
@@ -560,8 +569,17 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
           /* outros métodos: mantém status atual */
         }
       }
+      if (campo === "numParcelas" && f.metodoPagamento === "boleto" && f.modoParcelamento === "parcelado") {
+        const n = Number(valor);
+        const arr = Array.from({ length: n }, (_, i) => (f.vencimentosParcelas || [])[i] || "");
+        novo.vencimentosParcelas = arr;
+      }
       if (campo === "modoParcelamento") {
         novo.status = valor === "parcelado" ? "pendente" : (isCartao ? (f.cartaoPago ? "pago" : "pendente") : "pendente");
+        if (valor === "parcelado" && f.metodoPagamento === "boleto") {
+          const n = Number(f.numParcelas) || 2;
+          novo.vencimentosParcelas = Array.from({ length: n }, () => "");
+        }
       }
       if (campo === "cartaoPago") {
         novo.status = valor ? "pago" : "pendente";
@@ -570,6 +588,15 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
     });
     setErros(e => ({ ...e, [campo]: "" }));
   }, [isCartao]);
+
+  const setVencParcela = useCallback((idx, valor) => {
+    setForm(f => {
+      const arr = [...(f.vencimentosParcelas || [])];
+      arr[idx] = valor;
+      return { ...f, vencimentosParcelas: arr };
+    });
+    setErros(e => ({ ...e, [`vencParc_${idx}`]: "" }));
+  }, []);
 
   const setItem = useCallback((idx, campo, valor) => {
     setItens(prev => {
@@ -598,8 +625,11 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
 
   const valorTotal = itens.reduce((s, it) => s + calcSubtotal(it), 0);
 
-  /* Precisa de vencimento se: pendente sem parcelamento, ou parcelado, ou boleto à vista */
-  const precisaVencimento = (form.status === "pendente" && !isParcelado) || isParcelado || (isBoleto && !isParcelado);
+  /* Boleto parcelado usa vencimentos individuais por parcela */
+  const isBoletoParcelado = isBoleto && isParcelado;
+  /* Precisa de vencimento único se: pendente sem parcelamento, cartão parcelado, ou boleto à vista */
+  const precisaVencimento = (!isBoletoParcelado && !isCartaoPagoAgora) &&
+    ((form.status === "pendente" && !isParcelado) || (isParcelado && !isBoleto) || (isBoleto && !isParcelado));
 
   const validar = () => {
     const e = {};
@@ -609,6 +639,15 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
     if (precisaVencimento && !form.vencimento) e.vencimento = "Informe o vencimento.";
     if (isParcelado && (isNaN(form.numParcelas) || form.numParcelas < 2))
       e.numParcelas = "Mínimo 2 parcelas.";
+
+    /* Boleto parcelado: cada parcela precisa de vencimento individual */
+    if (isBoletoParcelado) {
+      const n = Number(form.numParcelas);
+      for (let i = 0; i < n; i++) {
+        if (!form.vencimentosParcelas?.[i])
+          e[`vencParc_${i}`] = "Informe o vencimento.";
+      }
+    }
 
     itens.forEach((it, i) => {
       if (!it.insumoId)        e[`item_ins_${i}`] = "Selecione o insumo.";
@@ -650,6 +689,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
         modoParcelamento:form.modoParcelamento,
         cartaoPago:      isCartao ? form.cartaoPago : null,
         vencimento:      precisaVencimento ? form.vencimento : null,
+        vencimentosParcelas: isBoletoParcelado ? form.vencimentosParcelas : null,
         observacao:      form.observacao.trim(),
         criadoEm:        isEdit ? (compra.criadoEm || now) : now,
         atualizadoEm:    now,
@@ -725,6 +765,10 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
             const docId   = `${gerarIdBase(cnt)}-${i + 1}-${Date.now()}-${i}`;
             const despRef = doc(db, "users", uid, "despesas", docId);
             const metodoLabel = form.metodoPagamento === "cartao_credito" ? "Cartão de Crédito" : "Boleto";
+            /* Boleto parcelado usa data individual; cartão usa addMeses */
+            const vencParcela = isBoleto
+              ? (form.vencimentosParcelas?.[i] || form.vencimento)
+              : addMeses(form.vencimento, i);
             batch.set(despRef, {
               ...despesaBase,
               idShow,
@@ -734,8 +778,8 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
               valorTotal:     vlParcela,
               data:           form.data,
               dataCompetencia:form.data,
-              vencimento:     addMeses(form.vencimento, i),
-              dataVencimento: addMeses(form.vencimento, i),
+              vencimento:     vencParcela,
+              dataVencimento: vencParcela,
               status:         "pendente",
               parcelaAtual:   i + 1,
               totalParcelas:  nParc,
@@ -929,7 +973,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
               <div style={{fontSize:11,fontWeight:600,letterSpacing:".06em",textTransform:"uppercase",color:"var(--text-3)",marginBottom:12}}>
                 Opções — Boleto
               </div>
-              <div className="form-group" style={{marginBottom:0}}>
+              <div className="form-group" style={{marginBottom: form.modoParcelamento === "parcelado" ? 12 : 0}}>
                 <label className="form-label">Forma de Pagamento</label>
                 <select className="form-input" value={form.modoParcelamento}
                   onChange={e => set("modoParcelamento", e.target.value)}>
@@ -937,6 +981,67 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
                   <option value="parcelado">Parcelado</option>
                 </select>
               </div>
+
+              {/* Boleto à vista: atalhos + campo de data */}
+              {form.modoParcelamento === "avista" && (
+                <div className="form-group" style={{marginBottom:0}}>
+                  <label className="form-label">Vencimento <span className="form-label-req">*</span></label>
+                  <div style={{display:"flex",gap:6,marginBottom:6,flexWrap:"wrap"}}>
+                    {[15,30,45].map(dias => (
+                      <button key={dias} type="button"
+                        style={{
+                          padding:"4px 12px",borderRadius:6,fontSize:11,fontWeight:600,cursor:"pointer",
+                          fontFamily:"'DM Sans',sans-serif",transition:"all .13s",
+                          background: form.vencimento === addDias(form.data || hojeISO(), dias)
+                            ? "rgba(200,165,94,.2)" : "var(--s3)",
+                          border: form.vencimento === addDias(form.data || hojeISO(), dias)
+                            ? "1px solid var(--gold)" : "1px solid var(--border)",
+                          color: form.vencimento === addDias(form.data || hojeISO(), dias)
+                            ? "var(--gold)" : "var(--text-2)",
+                        }}
+                        onClick={() => set("vencimento", addDias(form.data || hojeISO(), dias))}>
+                        +{dias} dias
+                      </button>
+                    ))}
+                  </div>
+                  <input type="date" className={`form-input${erros.vencimento?" err":""}`}
+                    value={form.vencimento} onChange={e => set("vencimento", e.target.value)} />
+                  {erros.vencimento && <div className="form-error">{erros.vencimento}</div>}
+                </div>
+              )}
+
+              {/* Boleto parcelado: nº parcelas + vencimento individual de cada uma */}
+              {form.modoParcelamento === "parcelado" && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">Nº de Parcelas <span className="form-label-req">*</span></label>
+                    <input type="number" min="2" max="60" className={`form-input${erros.numParcelas?" err":""}`}
+                      value={form.numParcelas}
+                      onChange={e => set("numParcelas", Number(e.target.value))} />
+                    {erros.numParcelas && <div className="form-error">{erros.numParcelas}</div>}
+                  </div>
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    <div style={{fontSize:10,fontWeight:600,letterSpacing:".06em",textTransform:"uppercase",color:"var(--text-3)"}}>
+                      Vencimento de cada parcela <span style={{color:"var(--gold)"}}>*</span>
+                    </div>
+                    {Array.from({ length: Number(form.numParcelas) || 0 }, (_, i) => (
+                      <div key={i} style={{display:"flex",alignItems:"center",gap:10}}>
+                        <span style={{
+                          fontSize:11,fontWeight:600,color:"var(--text-3)",
+                          minWidth:60,flexShrink:0
+                        }}>Parcela {i+1}</span>
+                        <div style={{flex:1}}>
+                          <input type="date"
+                            className={`form-input${erros[`vencParc_${i}`]?" err":""}`}
+                            value={form.vencimentosParcelas?.[i] || ""}
+                            onChange={e => setVencParcela(i, e.target.value)} />
+                          {erros[`vencParc_${i}`] && <div className="form-error">{erros[`vencParc_${i}`]}</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -952,8 +1057,8 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
             </div>
           )}
 
-          {/* Campos de parcelamento */}
-          {isParcelado && (
+          {/* Campos de parcelamento — apenas Cartão de Crédito (boleto tem UI própria acima) */}
+          {isParcelado && isCartao && (
             <div className="form-row">
               <div className="form-group">
                 <label className="form-label">Vencimento da 1ª Parcela <span className="form-label-req">*</span></label>
@@ -971,8 +1076,8 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
             </div>
           )}
 
-          {/* Vencimento para pendente à vista (boleto ou outros) */}
-          {!isParcelado && !isCartaoPagoAgora && (form.status === "pendente" || isBoleto) && (
+          {/* Vencimento para pendente à vista — não boleto (boleto tem UI própria) e não cartão pago agora */}
+          {!isParcelado && !isCartaoPagoAgora && !isBoleto && form.status === "pendente" && (
             <div className="form-group">
               <label className="form-label">Vencimento <span className="form-label-req">*</span></label>
               <input type="date" className={`form-input${erros.vencimento?" err":""}`}
@@ -981,12 +1086,21 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
             </div>
           )}
 
-          {/* Preview parcelamento */}
-          {isParcelado && form.vencimento && form.numParcelas >= 2 && valorTotal > 0 && (
+          {/* Preview parcelamento cartão */}
+          {isParcelado && isCartao && form.vencimento && form.numParcelas >= 2 && valorTotal > 0 && (
             <div className="cp-parcel-info">
               <strong>{form.numParcelas}×</strong> de{" "}
               <strong>{fmtR$(valorTotal / form.numParcelas)}</strong>
               {" "}— 1ª em {fmtData(form.vencimento)}, última em {fmtData(addMeses(form.vencimento, form.numParcelas - 1))}
+            </div>
+          )}
+
+          {/* Preview parcelamento boleto — resumo de valor por parcela */}
+          {isBoletoParcelado && form.numParcelas >= 2 && valorTotal > 0 && (
+            <div className="cp-parcel-info">
+              <strong>{form.numParcelas}×</strong> de{" "}
+              <strong>{fmtR$(valorTotal / form.numParcelas)}</strong>
+              {" "}— informe o vencimento de cada parcela acima
             </div>
           )}
 
