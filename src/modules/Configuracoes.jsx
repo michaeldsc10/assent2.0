@@ -13,7 +13,7 @@ import {
 
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
-import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, startAfter, where } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, startAfter } from "firebase/firestore";
 import {
   reauthenticateWithCredential,
   EmailAuthProvider,
@@ -1054,15 +1054,19 @@ function fmtDataLog(iso) {
 }
 
 function SecaoLog({ tenantUid }) {
-  const [logs, setLogs]               = useState([]);
+  // Todos os logs brutos do Firestore — sem where, sem índice composto
+  const [todosLogs, setTodosLogs]     = useState([]);
   const [carregando, setCarregando]   = useState(true);
   const [carregandoMais, setCarregandoMais] = useState(false);
   const [ultimoDoc, setUltimoDoc]     = useState(null);
   const [temMais, setTemMais]         = useState(false);
+
+  // Filtros e busca — todos aplicados no cliente
   const [busca, setBusca]             = useState("");
   const [filtroAcao, setFiltroAcao]   = useState("Todas");
   const [filtroModulo, setFiltroModulo] = useState("Todos");
 
+  // Busca apenas por criadoEm desc — sem where, sem índice composto
   const carregarLogs = useCallback(async (resetar = true) => {
     if (!tenantUid) return;
     resetar ? setCarregando(true) : setCarregandoMais(true);
@@ -1074,26 +1078,13 @@ function SecaoLog({ tenantUid }) {
         limit(PAGE_SIZE + 1)
       );
 
-      // Filtros server-side (Firestore exige índice composto para combinações)
-      // Para evitar necessidade de índices compostos, filtramos um campo por vez
-      if (filtroAcao !== "Todas") {
-        q = query(
-          collection(db, "users", tenantUid, "logs"),
-          where("acao", "==", filtroAcao),
-          orderBy("criadoEm", "desc"),
-          limit(PAGE_SIZE + 1)
-        );
-      } else if (filtroModulo !== "Todos") {
-        q = query(
-          collection(db, "users", tenantUid, "logs"),
-          where("modulo", "==", filtroModulo),
-          orderBy("criadoEm", "desc"),
-          limit(PAGE_SIZE + 1)
-        );
-      }
-
       if (!resetar && ultimoDoc) {
-        q = query(q, startAfter(ultimoDoc));
+        q = query(
+          collection(db, "users", tenantUid, "logs"),
+          orderBy("criadoEm", "desc"),
+          limit(PAGE_SIZE + 1),
+          startAfter(ultimoDoc)
+        );
       }
 
       const snap = await getDocs(q);
@@ -1102,7 +1093,7 @@ function SecaoLog({ tenantUid }) {
       const fatia = temProximo ? docs.slice(0, PAGE_SIZE) : docs;
       const dados = fatia.map(d => ({ id: d.id, ...d.data() }));
 
-      setLogs(prev => resetar ? dados : [...prev, ...dados]);
+      setTodosLogs(prev => resetar ? dados : [...prev, ...dados]);
       setUltimoDoc(fatia[fatia.length - 1] ?? null);
       setTemMais(temProximo);
     } catch (err) {
@@ -1111,26 +1102,38 @@ function SecaoLog({ tenantUid }) {
       setCarregando(false);
       setCarregandoMais(false);
     }
-  }, [tenantUid, filtroAcao, filtroModulo, ultimoDoc]);
+  }, [tenantUid, ultimoDoc]);
 
-  // Recarrega quando filtros mudam
   useEffect(() => {
     setUltimoDoc(null);
     carregarLogs(true);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantUid, filtroAcao, filtroModulo]);
+  }, [tenantUid]);
 
-  // Filtro client-side por texto (busca em descrição, nome, módulo)
+  // Todos os filtros aplicados no cliente — sem índice necessário
   const logsFiltrados = useMemo(() => {
-    if (!busca.trim()) return logs;
-    const q = busca.toLowerCase();
-    return logs.filter(l =>
-      l.descricao?.toLowerCase().includes(q) ||
-      l.nomeUsuario?.toLowerCase().includes(q) ||
-      l.modulo?.toLowerCase().includes(q) ||
-      l.cargo?.toLowerCase().includes(q)
-    );
-  }, [logs, busca]);
+    let lista = todosLogs;
+
+    if (filtroAcao !== "Todas") {
+      lista = lista.filter(l => l.acao === filtroAcao);
+    }
+
+    if (filtroModulo !== "Todos") {
+      lista = lista.filter(l => l.modulo === filtroModulo);
+    }
+
+    if (busca.trim()) {
+      const q = busca.toLowerCase();
+      lista = lista.filter(l =>
+        l.descricao?.toLowerCase().includes(q) ||
+        l.nomeUsuario?.toLowerCase().includes(q) ||
+        l.modulo?.toLowerCase().includes(q) ||
+        l.cargo?.toLowerCase().includes(q)
+      );
+    }
+
+    return lista;
+  }, [todosLogs, filtroAcao, filtroModulo, busca]);
 
   const badgeClass = (acao) => {
     if (acao === "criar")   return "log-acao-badge log-acao-criar";
@@ -1249,6 +1252,9 @@ function SecaoLog({ tenantUid }) {
 
             <div className="log-count-bar">
               {logsFiltrados.length} {logsFiltrados.length === 1 ? "registro" : "registros"} exibidos
+              {(filtroAcao !== "Todas" || filtroModulo !== "Todos" || busca.trim()) && todosLogs.length > 0 &&
+                ` (de ${todosLogs.length} carregados)`
+              }
             </div>
           </>
         )}
