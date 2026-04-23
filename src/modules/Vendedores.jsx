@@ -21,6 +21,7 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 import { useAuth } from "../contexts/AuthContext";
+import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
 
 /* ─────────────────────────────────────────────────────
    CSS — padrão visual ASSENT
@@ -682,7 +683,7 @@ function ModalConfirmDelete({ vendedor, vendasVinculadas, onConfirm, onClose }) 
 ═══════════════════════════════════════════════════ */
 export default function Vendedores() {
   // ── Multi-tenant: tenantUid em vez de user.uid ──
-  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+  const { tenantUid, cargo, nomeUsuario, podeCriar, podeEditar, podeExcluir } = useAuth();
 
   const [vendedores,      setVendedores]      = useState([]);
   const [usuariosSistema, setUsuariosSistema] = useState([]);
@@ -738,18 +739,21 @@ export default function Vendedores() {
       ...form, criadoEm: new Date().toISOString(),
     });
     await setDoc(doc(db, "users", tenantUid), { vendedorIdCnt: vendedorIdCnt + 1 }, { merge: true });
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.VENDEDORES, descricao: montarDescricao("criar", "Vendedor", form.nome, newId) });
     setModalNovo(false);
   };
 
   const handleEdit = async (form) => {
     if (!tenantUid || !editando) return;
     await setDoc(doc(db, "users", tenantUid, "vendedores", editando.id), form, { merge: true });
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.VENDEDORES, descricao: montarDescricao("editar", "Vendedor", form.nome, editando.id) });
     setEditando(null);
   };
 
   const handleDelete = async () => {
     if (!tenantUid || !deletando) return;
     await deleteDoc(doc(db, "users", tenantUid, "vendedores", deletando.id));
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.VENDEDORES, descricao: montarDescricao("excluir", "Vendedor", deletando.nome, deletando.id) });
     setDeletando(null);
   };
 
