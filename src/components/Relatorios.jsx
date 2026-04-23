@@ -596,60 +596,124 @@ const CSS = `
 }
 .rv-chart-card {
   background: var(--s1); border: 1px solid var(--border);
-  border-radius: 12px; overflow: hidden;
+  border-radius: 14px; overflow: hidden;
+  position: relative;
+}
+.rv-chart-card::before {
+  content: ''; position: absolute; inset: 0; border-radius: 14px;
+  background: linear-gradient(135deg, rgba(200,165,94,0.04) 0%, transparent 60%);
+  pointer-events: none;
 }
 .rv-chart-card.full { grid-column: 1 / -1; }
 .rv-chart-header {
-  padding: 13px 18px; border-bottom: 1px solid var(--border);
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between;
 }
 .rv-chart-title {
-  font-family: 'Sora', sans-serif; font-size: 13px;
+  font-family: 'Sora', sans-serif; font-size: 12px;
   font-weight: 600; color: var(--text);
   display: flex; align-items: center; gap: 8px;
+  text-transform: uppercase; letter-spacing: .04em;
 }
 .rv-chart-title-dot {
-  width: 8px; height: 8px; border-radius: 50%;
+  width: 6px; height: 6px; border-radius: 50%;
   background: var(--gold); flex-shrink: 0;
+  box-shadow: 0 0 8px var(--gold);
 }
-.rv-chart-body { padding: 18px; }
+.rv-chart-body { padding: 20px; }
 
 /* Gráfico de barras SVG */
 .rv-bar-chart { width: 100%; overflow: visible; display: block; }
 
 /* Formas de pagamento */
-.rv-fp-list { display: flex; flex-direction: column; gap: 10px; }
-.rv-fp-item { display: flex; align-items: center; gap: 10px; }
-.rv-fp-color { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
-.rv-fp-name { flex: 1; font-size: 13px; color: var(--text-2); }
+.rv-fp-list { display: flex; flex-direction: column; gap: 13px; }
+.rv-fp-item { display: flex; align-items: center; gap: 12px; }
+.rv-fp-color { width: 3px; height: 26px; border-radius: 2px; flex-shrink: 0; }
+.rv-fp-name { flex: 1; font-size: 13px; color: var(--text-2); font-weight: 500; }
 .rv-fp-bar-bg {
-  width: 100px; height: 5px; border-radius: 3px;
-  background: var(--s3); overflow: hidden; flex-shrink: 0;
+  width: 120px; height: 4px; border-radius: 4px;
+  background: rgba(255,255,255,0.06); overflow: hidden; flex-shrink: 0;
 }
-.rv-fp-bar-fill { height: 100%; border-radius: 3px; }
+.rv-fp-bar-fill { height: 100%; border-radius: 4px; transition: width .6s cubic-bezier(.25,.8,.25,1); }
 .rv-fp-pct {
   font-family: 'Sora', sans-serif; font-size: 12px;
-  font-weight: 600; color: var(--text); min-width: 38px; text-align: right;
+  font-weight: 700; color: var(--text); min-width: 40px; text-align: right;
 }
 
-/* KPI mini cards */
+/* KPI mini cards — premium */
 .rv-kpi-row {
   display: grid; grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 .rv-kpi-mini {
-  background: var(--s2); border: 1px solid var(--border);
-  border-radius: 10px; padding: 14px 16px;
+  position: relative; overflow: hidden;
+  background: var(--s1); border: 1px solid var(--border);
+  border-radius: 14px; padding: 18px 20px;
+  transition: border-color .2s, transform .2s;
+}
+.rv-kpi-mini:hover { border-color: rgba(200,165,94,0.3); transform: translateY(-1px); }
+.rv-kpi-mini-accent {
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  border-radius: 14px 14px 0 0;
 }
 .rv-kpi-mini-label {
   font-size: 10px; font-weight: 600; text-transform: uppercase;
-  letter-spacing: .07em; color: var(--text-3); margin-bottom: 6px;
+  letter-spacing: .08em; color: var(--text-3); margin-bottom: 8px;
 }
 .rv-kpi-mini-val {
-  font-family: 'Sora', sans-serif; font-size: 17px;
-  font-weight: 700; color: var(--text);
+  font-family: 'Sora', sans-serif; font-size: 19px;
+  font-weight: 700; color: var(--text); line-height: 1;
+  margin-bottom: 5px;
 }
-.rv-kpi-mini-sub { font-size: 11px; color: var(--text-3); margin-top: 3px; }
+.rv-kpi-mini-sub { font-size: 11px; color: var(--text-3); margin-top: 4px; }
+
+/* ── Bar chart premium tooltip ── */
+.rv-bar-tooltip {
+  position: absolute;
+  background: rgba(10,10,14,0.95);
+  border: 1px solid rgba(200,165,94,0.35);
+  border-radius: 10px; padding: 8px 14px;
+  font-size: 12px; font-family: 'DM Sans', sans-serif;
+  color: var(--text); white-space: nowrap;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(200,165,94,0.1);
+  pointer-events: none; z-index: 30;
+  transform: translateX(-50%) translateY(-100%);
+  margin-top: -10px;
+}
+
+/* ── Top produtos premium ── */
+.rv-prod-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.rv-prod-row:last-child { border-bottom: none; }
+.rv-prod-rank {
+  font-family: 'Sora', sans-serif; font-size: 10px; font-weight: 700;
+  color: rgba(200,165,94,0.5); width: 22px; flex-shrink: 0; text-align: center;
+}
+.rv-prod-rank.top { color: var(--gold); }
+.rv-prod-name {
+  width: 170px; flex-shrink: 0;
+  font-size: 13px; color: var(--text); font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.rv-prod-bar-bg {
+  flex: 1; height: 5px; border-radius: 5px;
+  background: rgba(255,255,255,0.05); overflow: hidden;
+}
+.rv-prod-bar-fill {
+  height: 100%; border-radius: 5px;
+  background: linear-gradient(90deg, rgba(200,165,94,0.9), rgba(200,165,94,0.3));
+  transition: width .7s cubic-bezier(.25,.8,.25,1);
+}
+.rv-prod-val {
+  font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 700;
+  color: var(--text); min-width: 96px; text-align: right;
+}
+.rv-prod-qtd {
+  font-size: 11px; color: var(--text-3);
+  min-width: 44px; text-align: right;
+}
 `;
 
 
@@ -1446,28 +1510,34 @@ function RelatorioDespesas({ despesas, intervalo }) {
    RELATÓRIO: VENDAS — helpers de gráfico (CSS puro, sem lib)
    ══════════════════════════════════════════════════════ */
 
-/* Gráfico de barras verticais em CSS — totalmente responsivo e interativo */
-function BarChartCSS({ dados, altura = 160, cor = "#F5A623", fmtVal }) {
+/* Gráfico de barras verticais premium — gradiente, glow, tooltip elegante */
+function BarChartCSS({ dados, altura = 160, cor = "#C8A55E", fmtVal }) {
   const [hover, setHover] = useState(null);
+  const [tooltipX, setTooltipX] = useState(0);
+  const containerRef = React.useRef(null);
+
   if (!dados || dados.length === 0) return null;
 
   const maxVal = Math.max(...dados.map((d) => d.val), 1);
   const fmt = fmtVal || fmtR$;
 
+  // Deriva variante de cor para gradient
+  const isGold   = cor === "#C8A55E" || cor === "#F5A623" || cor === "var(--gold)";
+  const isGreen  = cor === "var(--green)" || cor === "#44D186";
+  const isPurple = cor === "#9B8AFA" || cor === "var(--purple)";
+
+  const gradTop    = isGold ? "#D4A84B" : isGreen ? "#44D186" : isPurple ? "#9B8AFA" : cor;
+  const gradBottom = isGold ? "rgba(180,130,40,0.25)" : isGreen ? "rgba(68,209,134,0.2)" : isPurple ? "rgba(155,138,250,0.2)" : cor + "33";
+  const glowColor  = isGold ? "rgba(200,165,94,0.35)" : isGreen ? "rgba(68,209,134,0.3)" : isPurple ? "rgba(155,138,250,0.3)" : cor + "55";
+
+  const gradId = `bar-grad-${cor.replace(/[^a-z0-9]/gi,'')}`;
+
   return (
-    <div style={{ position: "relative" }}>
+    <div ref={containerRef} style={{ position: "relative", userSelect: "none" }}>
       {/* Tooltip */}
       {hover !== null && dados[hover] && (
-        <div style={{
-          position: "absolute", top: -36, left: "50%", transform: "translateX(-50%)",
-          background: "var(--s1)", border: "1px solid var(--border-h)",
-          borderRadius: 8, padding: "5px 12px",
-          fontSize: 12, fontFamily: "'DM Sans', sans-serif",
-          color: "var(--text)", whiteSpace: "nowrap",
-          boxShadow: "0 4px 16px rgba(0,0,0,0.35)",
-          pointerEvents: "none", zIndex: 20,
-        }}>
-          <span style={{ color: "var(--gold)", fontWeight: 700, marginRight: 6 }}>
+        <div className="rv-bar-tooltip" style={{ left: `${tooltipX}px`, top: 0 }}>
+          <span style={{ color: isGold ? "var(--gold)" : isGreen ? "var(--green)" : "#9B8AFA", fontWeight: 700, marginRight: 8, fontFamily: "'Sora', sans-serif" }}>
             {dados[hover].label}
           </span>
           <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 600 }}>
@@ -1481,56 +1551,89 @@ function BarChartCSS({ dados, altura = 160, cor = "#F5A623", fmtVal }) {
         </div>
       )}
 
-      {/* Grade de referência + barras */}
-      <div style={{ position: "relative", height: altura }}>
-        {/* Linhas de guia horizontais */}
+      {/* Grade + Barras */}
+      <div style={{ position: "relative", height: altura, paddingTop: 8 }}>
+        {/* SVG para gradient definitions */}
+        <svg width="0" height="0" style={{ position: "absolute" }}>
+          <defs>
+            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={gradTop} stopOpacity="1" />
+              <stop offset="100%" stopColor={gradBottom} stopOpacity="1" />
+            </linearGradient>
+          </defs>
+        </svg>
+
+        {/* Linhas guia */}
         {[0.25, 0.5, 0.75, 1].map((frac) => (
           <div key={frac} style={{
             position: "absolute", left: 0, right: 0,
             bottom: `${frac * 100}%`,
-            borderTop: "1px solid rgba(255,255,255,0.05)",
+            borderTop: frac === 1
+              ? "1px solid rgba(255,255,255,0.08)"
+              : "1px dashed rgba(255,255,255,0.04)",
             pointerEvents: "none",
           }} />
         ))}
 
-        {/* Barras */}
+        {/* Container das barras */}
         <div style={{
-          display: "flex",
-          alignItems: "flex-end",
-          gap: dados.length > 14 ? 3 : dados.length > 8 ? 6 : 10,
+          display: "flex", alignItems: "flex-end",
+          gap: dados.length > 14 ? 3 : dados.length > 8 ? 6 : 12,
           height: "100%",
-          padding: "0 4px",
+          padding: "0 2px",
         }}>
           {dados.map((d, i) => {
-            const pct = Math.max((d.val / maxVal) * 100, d.val > 0 ? 2 : 0);
-            const isHover = hover === i;
-            const isLast  = i === dados.length - 1;
-            const barCor  = isHover ? "#F5A623" : isLast && cor === "#F5A623" ? "#F5A623" : cor;
-            const opacity = isHover ? 1 : isLast && cor === "#F5A623" ? 1 : 0.45;
+            const pctH = Math.max((d.val / maxVal) * 100, d.val > 0 ? 2 : 0);
+            const isHov = hover === i;
+            const isLast = i === dados.length - 1;
+            const highlighted = isHov || isLast;
 
             return (
               <div
                 key={d.label}
-                style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end", gap: 4, cursor: "default" }}
-                onMouseEnter={() => setHover(i)}
+                style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", height: "100%", justifyContent: "flex-end", gap: 6, cursor: "default" }}
+                onMouseEnter={(e) => {
+                  setHover(i);
+                  if (containerRef.current) {
+                    const rect = containerRef.current.getBoundingClientRect();
+                    const elRect = e.currentTarget.getBoundingClientRect();
+                    setTooltipX(elRect.left - rect.left + elRect.width / 2);
+                  }
+                }}
                 onMouseLeave={() => setHover(null)}
               >
+                {/* Barra */}
                 <div style={{
-                  width: "100%", maxWidth: 40,
-                  height: `${pct}%`,
-                  minHeight: d.val > 0 ? 3 : 0,
-                  background: barCor,
-                  opacity,
-                  borderRadius: "4px 4px 0 0",
-                  transition: "height .3s ease, opacity .15s, background .15s",
-                }} />
+                  position: "relative",
+                  width: "100%", maxWidth: 44,
+                  height: `${pctH}%`,
+                  minHeight: d.val > 0 ? 4 : 0,
+                  borderRadius: "5px 5px 0 0",
+                  background: `url('#') linear-gradient(180deg, ${gradTop}, ${gradBottom})`,
+                  backgroundImage: `linear-gradient(180deg, ${highlighted ? gradTop : gradTop + "aa"}, ${gradBottom})`,
+                  opacity: highlighted ? 1 : 0.42,
+                  transition: "height .4s cubic-bezier(.25,.8,.25,1), opacity .2s",
+                  boxShadow: isHov ? `0 -4px 18px ${glowColor}, 0 0 8px ${glowColor}` : "none",
+                }}>
+                  {/* Topo brilhante */}
+                  {d.val > 0 && (
+                    <div style={{
+                      position: "absolute", top: 0, left: "15%", right: "15%",
+                      height: 2, borderRadius: 2,
+                      background: highlighted ? gradTop : "transparent",
+                      boxShadow: isHov ? `0 0 8px ${gradTop}` : "none",
+                      transition: "all .2s",
+                    }} />
+                  )}
+                </div>
+                {/* Label */}
                 <span style={{
                   fontSize: dados.length > 10 ? 9 : 10,
-                  color: isHover ? "var(--gold)" : "rgba(255,255,255,0.3)",
+                  fontWeight: highlighted ? 600 : 400,
+                  color: highlighted ? (isGold ? "var(--gold)" : isGreen ? "var(--green)" : "#9B8AFA") : "rgba(255,255,255,0.28)",
                   fontFamily: "'DM Sans', sans-serif",
                   whiteSpace: "nowrap",
                   transition: "color .15s",
-                  userSelect: "none",
                 }}>
                   {d.label}
                 </span>
@@ -1604,21 +1707,24 @@ function VendaGraficos({ dados }) {
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
 
       {/* KPIs rápidos */}
       <div className="rv-kpi-row">
         <div className="rv-kpi-mini">
+          <div className="rv-kpi-mini-accent" style={{ background: "linear-gradient(90deg, var(--gold), transparent)" }} />
           <div className="rv-kpi-mini-label">Total Vendido</div>
           <div className="rv-kpi-mini-val" style={{ color: "var(--gold)" }}>{fmtR$(dados.total)}</div>
           <div className="rv-kpi-mini-sub">{dados.filtradas.length} vendas no período</div>
         </div>
         <div className="rv-kpi-mini">
+          <div className="rv-kpi-mini-accent" style={{ background: "linear-gradient(90deg, var(--blue), transparent)" }} />
           <div className="rv-kpi-mini-label">Ticket Médio</div>
           <div className="rv-kpi-mini-val" style={{ color: "var(--blue)" }}>{fmtR$(dados.ticket)}</div>
           <div className="rv-kpi-mini-sub">por venda</div>
         </div>
         <div className="rv-kpi-mini">
+          <div className="rv-kpi-mini-accent" style={{ background: "linear-gradient(90deg, var(--green), transparent)" }} />
           <div className="rv-kpi-mini-label">Meses com Vendas</div>
           <div className="rv-kpi-mini-val" style={{ color: "var(--green)" }}>{porMes.length}</div>
           <div className="rv-kpi-mini-sub">{porMes.length === 1 ? "mês ativo" : "meses ativos"}</div>
@@ -1639,8 +1745,8 @@ function VendaGraficos({ dados }) {
                 {porMes.length} {porMes.length === 1 ? "mês" : "meses"} · hover para detalhes
               </span>
             </div>
-            <div className="rv-chart-body" style={{ paddingTop: 40 }}>
-              <BarChartCSS dados={porMes} altura={160} cor="#F5A623" />
+            <div className="rv-chart-body" style={{ paddingTop: 44 }}>
+              <BarChartCSS dados={porMes} altura={170} cor="#C8A55E" />
             </div>
           </div>
         )}
@@ -1660,11 +1766,11 @@ function VendaGraficos({ dados }) {
                   <div key={e.fp} className="rv-fp-item">
                     <span className="rv-fp-color" style={{ background: e.cor }} />
                     <span className="rv-fp-name">{e.fp}</span>
-                    <div className="rv-fp-bar-bg" style={{ flex: 1, maxWidth: 160 }}>
-                      <div className="rv-fp-bar-fill" style={{ width: `${e.pct}%`, background: e.cor }} />
+                    <div className="rv-fp-bar-bg" style={{ flex: 1, maxWidth: 180 }}>
+                      <div className="rv-fp-bar-fill" style={{ width: `${e.pct}%`, background: `linear-gradient(90deg, ${e.cor}, ${e.cor}55)` }} />
                     </div>
                     <span className="rv-fp-pct">{e.pct.toFixed(1)}%</span>
-                    <span style={{ fontSize: 11, color: "var(--text-3)", minWidth: 56, textAlign: "right" }}>
+                    <span style={{ fontSize: 11, color: "var(--text-3)", minWidth: 58, textAlign: "right" }}>
                       {e.qtd} venda{e.qtd !== 1 ? "s" : ""}
                     </span>
                   </div>
@@ -1683,8 +1789,8 @@ function VendaGraficos({ dados }) {
                 Ticket Médio por Mês
               </span>
             </div>
-            <div className="rv-chart-body" style={{ paddingTop: 40 }}>
-              <BarChartCSS dados={ticketPorMes} altura={130} cor="var(--green)" />
+            <div className="rv-chart-body" style={{ paddingTop: 44 }}>
+              <BarChartCSS dados={ticketPorMes} altura={140} cor="var(--green)" />
             </div>
           </div>
         )}
@@ -1699,34 +1805,16 @@ function VendaGraficos({ dados }) {
               </span>
             </div>
             <div className="rv-chart-body">
-              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div style={{ display: "flex", flexDirection: "column" }}>
                 {topProd.map((p, i) => (
-                  <div key={p.nome} style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <span style={{
-                      fontFamily: "'Sora', sans-serif", fontSize: 11,
-                      fontWeight: 700, color: "var(--gold)", width: 22, flexShrink: 0,
-                    }}>#{i + 1}</span>
-                    <span style={{
-                      width: 180, flexShrink: 0,
-                      fontSize: 13, color: "var(--text)", fontWeight: 500,
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                    }} title={p.nome}>{p.nome}</span>
-                    <div style={{ flex: 1, height: 6, borderRadius: 3, background: "var(--s3)", overflow: "hidden" }}>
-                      <div style={{
-                        width: `${(p.total / maxProd) * 100}%`,
-                        height: "100%", borderRadius: 3,
-                        background: "linear-gradient(90deg, #F5A623, rgba(245,166,35,0.4))",
-                        transition: "width .5s ease",
-                      }} />
+                  <div key={p.nome} className="rv-prod-row">
+                    <span className={`rv-prod-rank${i < 3 ? " top" : ""}`}>#{i + 1}</span>
+                    <span className="rv-prod-name" title={p.nome}>{p.nome}</span>
+                    <div className="rv-prod-bar-bg">
+                      <div className="rv-prod-bar-fill" style={{ width: `${(p.total / maxProd) * 100}%` }} />
                     </div>
-                    <span style={{
-                      fontFamily: "'Sora', sans-serif", fontSize: 12, fontWeight: 600,
-                      color: "var(--text)", minWidth: 100, textAlign: "right",
-                    }}>{fmtR$(p.total)}</span>
-                    <span style={{
-                      fontSize: 11, color: "var(--text-3)",
-                      minWidth: 48, textAlign: "right",
-                    }}>{p.qtd} un.</span>
+                    <span className="rv-prod-val">{fmtR$(p.total)}</span>
+                    <span className="rv-prod-qtd">{p.qtd} un.</span>
                   </div>
                 ))}
               </div>
@@ -1743,8 +1831,8 @@ function VendaGraficos({ dados }) {
             </span>
             <span style={{ fontSize: 11, color: "var(--text-3)" }}>hover para detalhes</span>
           </div>
-          <div className="rv-chart-body" style={{ paddingTop: 40 }}>
-            <BarChartCSS dados={porDia} altura={120} cor="#9B8AFA" />
+          <div className="rv-chart-body" style={{ paddingTop: 44 }}>
+            <BarChartCSS dados={porDia} altura={130} cor="#9B8AFA" />
           </div>
         </div>
 
