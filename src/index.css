@@ -101,3 +101,59 @@ button:focus-visible {
   outline: none;
   transform: none;
 }
+
+
+/* ══════════════════════════════════════════════════════════════
+   IMPRESSÃO GLOBAL — fundo branco, tinta zero
+   Exceção: .print-preserve-bg (Orçamento) mantém visual dark
+   ══════════════════════════════════════════════════════════════ */
+@media print {
+
+  /* Fundo branco e texto escuro em tudo */
+  *:not(.print-preserve-bg):not(.print-preserve-bg *) {
+    background: #fff !important;
+    background-color: #fff !important;
+    background-image: none !important;
+    color: #111 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Forçar impressão de backgrounds coloridos (barras de gráfico) */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Bordas sutis no lugar dos fundos escuros */
+  *:not(.print-preserve-bg):not(.print-preserve-bg *) {
+    border-color: #ddd !important;
+  }
+
+  /* Cores semânticas que devem sobreviver */
+  .dre-positivo, .val-pos { color: #1a7a3c !important; }
+  .dre-negativo, .val-neg { color: #c0392b !important; }
+
+  /* Cabeçalhos de tabela com fundo levemente cinza */
+  .tr-head, .dre-row-cat, .ext-row-head,
+  .lps-row.lps-row-head, .vdh-row.vdh-row-head {
+    background: #f5f5f5 !important;
+  }
+  .dre-row-result { background: #ebebeb !important; }
+
+  /* Ocultar UI que não faz sentido no papel */
+  [data-print-hide], nav, aside,
+  .rel-nav, .rel-topbar, .fp-wrap,
+  .rel-actions, .btn-primary, .btn-secondary,
+  .rv-bar-tooltip { display: none !important; }
+
+  /* Layout */
+  .rel-body  { display: block !important; }
+  .rel-content { padding: 0 !important; overflow: visible !important; }
+
+  /* Evitar corte de cards entre páginas */
+  .cr-card, .tr-wrap, .dre-wrap,
+  .rv-chart-card, .rv-kpi-mini, .ext-wrap { break-inside: avoid; }
+
+  @page { size: A4; margin: 18mm 15mm; }
+}
