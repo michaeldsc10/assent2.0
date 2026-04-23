@@ -487,6 +487,81 @@ const CSS = `
 .lps-pct-green { background: rgba(68,209,134,.12); color: var(--green); border: 1px solid rgba(68,209,134,.2); }
 .lps-pct-gold  { background: rgba(200,165,94,.12);  color: var(--gold);  border: 1px solid rgba(200,165,94,.2); }
 .lps-pct-red   { background: rgba(224,82,82,.12);   color: var(--red);   border: 1px solid rgba(224,82,82,.2); }
+
+/* ── Extrato Financeiro ── */
+.ext-wrap {
+  background: var(--s1); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+}
+.ext-header {
+  padding: 13px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.ext-title {
+  font-family: 'Sora', sans-serif; font-size: 13px;
+  font-weight: 600; color: var(--text);
+}
+.ext-badge {
+  font-size: 11px; font-weight: 600;
+  background: var(--s3); border: 1px solid var(--border-h);
+  color: var(--text-2); padding: 2px 10px; border-radius: 20px;
+}
+.ext-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 114px 114px 114px;
+  gap: 0; padding: 0 18px;
+  border-bottom: 1px solid var(--border);
+  align-items: center;
+  min-width: 0;
+}
+.ext-row:last-child { border-bottom: none; }
+.ext-row-head {
+  background: var(--s2);
+  font-size: 9px; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-3);
+  padding: 9px 18px;
+}
+.ext-row-body { transition: background .1s; min-height: 52px; }
+.ext-row-body:hover { background: rgba(255,255,255,0.02); }
+.ext-cell {
+  padding: 10px 12px 10px 0;
+  font-size: 12px; color: var(--text-2);
+  min-width: 0; overflow: hidden;
+}
+.ext-cell:last-child { padding-right: 0; }
+.ext-cell-r { text-align: right; padding-right: 0; padding-left: 0; }
+.ext-date {
+  font-family: 'Sora', sans-serif; font-size: 11px;
+  font-weight: 600; color: var(--text-2); white-space: nowrap;
+}
+.ext-desc-main {
+  font-size: 12px; font-weight: 500; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  display: block;
+}
+.ext-desc-tag {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .05em; margin-top: 2px; display: block;
+}
+.ext-tag-in  { color: var(--green); }
+.ext-tag-out { color: var(--red); }
+.ext-val {
+  font-family: 'Sora', sans-serif; font-size: 12px;
+  font-weight: 600; white-space: nowrap;
+}
+.ext-empty {
+  padding: 48px 20px; text-align: center;
+  font-size: 13px; color: var(--text-3);
+}
+@media (max-width: 640px) {
+  .ext-row {
+    grid-template-columns: 76px 1fr 90px;
+    padding: 0 14px;
+  }
+  .ext-row-head { padding: 9px 14px; }
+  .ext-col-entrada, .ext-col-saida { display: none; }
+  .ext-cell { padding: 10px 8px 10px 0; }
+}
 `;
 
 
@@ -1056,67 +1131,69 @@ function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], in
         </div>
       )}
 
-      {/* ── Extrato com descrição ── */}
-      <TabelaRelatorio
-        title="Extrato Financeiro"
-        count={transacoesFiltradas.length}
-        empty="Nenhuma movimentação no período."
-        data={transacoesFiltradas}
-        columns={[
-          {
-            key: "data",
-            label: "Data",
-            render: (v) => (
-              <span style={{ whiteSpace: "nowrap" }}>{fmtData(v)}</span>
-            ),
-          },
-          {
-            key: "descricao",
-            label: "Descrição",
-            render: (v, row) => (
-              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                <span style={{
-                  fontSize: 12, color: "var(--text)", fontWeight: 500,
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  maxWidth: 360,
-                }}>
-                  {v}
-                </span>
-                <span style={{
-                  fontSize: 10, color: row.tipo === "entrada" ? "var(--green)" : "var(--red)",
-                  textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600,
-                }}>
-                  {row.tipo === "entrada" ? "▲ Entrada" : "▼ Saída"}
-                </span>
+      {/* ── Extrato com descrição (tabela manual com grid controlado) ── */}
+      <div className="ext-wrap">
+        <div className="ext-header">
+          <span className="ext-title">Extrato Financeiro</span>
+          <span className="ext-badge">{transacoesFiltradas.length}</span>
+        </div>
+
+        {transacoesFiltradas.length === 0 ? (
+          <div className="ext-empty">Nenhuma movimentação no período.</div>
+        ) : (
+          <>
+            {/* Cabeçalho */}
+            <div className="ext-row ext-row-head">
+              <span>Data</span>
+              <span>Descrição</span>
+              <span className="ext-col-entrada" style={{ textAlign: "right" }}>Entrada</span>
+              <span className="ext-col-saida"   style={{ textAlign: "right" }}>Saída</span>
+              <span style={{ textAlign: "right" }}>Saldo</span>
+            </div>
+
+            {/* Linhas */}
+            {transacoesFiltradas.map((t) => (
+              <div key={t._id} className="ext-row ext-row-body">
+                {/* Data */}
+                <div className="ext-cell">
+                  <span className="ext-date">{fmtData(t.data)}</span>
+                </div>
+
+                {/* Descrição */}
+                <div className="ext-cell" style={{ minWidth: 0 }}>
+                  <span className="ext-desc-main" title={t.descricao}>{t.descricao}</span>
+                  <span className={`ext-desc-tag ${t.tipo === "entrada" ? "ext-tag-in" : "ext-tag-out"}`}>
+                    {t.tipo === "entrada" ? "▲ Entrada" : "▼ Saída"}
+                  </span>
+                </div>
+
+                {/* Entrada */}
+                <div className="ext-cell ext-cell-r ext-col-entrada">
+                  {t.entrada > 0
+                    ? <span className="ext-val val-pos">{fmtR$(t.entrada)}</span>
+                    : <span style={{ color: "var(--text-3)", fontFamily: "'Sora',sans-serif" }}>—</span>
+                  }
+                </div>
+
+                {/* Saída */}
+                <div className="ext-cell ext-cell-r ext-col-saida">
+                  {t.saida > 0
+                    ? <span className="ext-val val-neg">{fmtR$(t.saida)}</span>
+                    : <span style={{ color: "var(--text-3)", fontFamily: "'Sora',sans-serif" }}>—</span>
+                  }
+                </div>
+
+                {/* Saldo acumulado */}
+                <div className="ext-cell ext-cell-r">
+                  <span className={`ext-val ${(t.saldoAcumulado || 0) >= 0 ? "val-pos" : "val-neg"}`}>
+                    {fmtR$(t.saldoAcumulado || 0)}
+                  </span>
+                </div>
               </div>
-            ),
-          },
-          {
-            key: "entrada",
-            label: "Entrada",
-            align: "right",
-            render: (v) => v > 0
-              ? <span className="val-pos">{fmtR$(v)}</span>
-              : <span style={{ color: "var(--text-3)" }}>—</span>,
-          },
-          {
-            key: "saida",
-            label: "Saída",
-            align: "right",
-            render: (v) => v > 0
-              ? <span className="val-neg">{fmtR$(v)}</span>
-              : <span style={{ color: "var(--text-3)" }}>—</span>,
-          },
-          {
-            key: "saldoAcumulado",
-            label: "Saldo",
-            align: "right",
-            render: (v) => (
-              <span className={v >= 0 ? "val-pos" : "val-neg"}>{fmtR$(v || 0)}</span>
-            ),
-          },
-        ]}
-      />
+            ))}
+          </>
+        )}
+      </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button className="btn-secondary" onClick={handleExport}>
