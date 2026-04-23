@@ -17,6 +17,7 @@ import {
 
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
+import { logAction, LOG_ACAO, LOG_MODULO } from "../lib/logAction";
 import {
   collection,
   doc,
@@ -1534,7 +1535,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
   const [loadingCaixa, setLoadingCaixa] = useState(true);
 
   // ── Multi-tenant ──
-  const { user, tenantUid, podeCriar, podeEditar } = useAuth();
+  const { user, tenantUid, cargo, nomeUsuario, podeCriar, podeEditar } = useAuth();
   const uid       = user?.uid || null;   // usuário logado (audit trail)
   const empresaId = tenantUid;           // tenant = empresa
 
@@ -1631,6 +1632,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
     if (!uid || !empresaId) return;
     try {
       await criarLancamentoCaixa({ ...dados, empresaId, usuarioId: uid });
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.CAIXA_DIARIO, descricao: `Lançamento ${dados.tipo === "entrada" ? "de entrada" : "de saída"}: ${dados.descricao || ""}${dados.valor ? ` — R$ ${Number(dados.valor).toFixed(2)}` : ""}` });
       setModalNovo(false);
       showToast("Lançamento registrado com sucesso!");
     } catch (err) {
@@ -1645,6 +1647,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
     if (!uid || !empresaId) return;
     try {
       await abrirCaixa(empresaId, uid, saldoAbertura);
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.CAIXA_DIARIO, descricao: `Abriu o caixa com saldo inicial de R$ ${Number(saldoAbertura||0).toFixed(2)}` });
       setModalAbrir(false);
       showToast("Caixa aberto com sucesso!");
     } catch (err) {
@@ -1663,6 +1666,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
         return d >= hoje;
       });
       await fecharCaixa(empresaId, uid, lancHoje, resumo.saldoAtual);
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.CAIXA_DIARIO, descricao: `Fechou o caixa com saldo de R$ ${Number(resumo.saldoAtual||0).toFixed(2)}` });
       setModalFechar(false);
       showToast("Caixa fechado com sucesso!");
     } catch (err) {
