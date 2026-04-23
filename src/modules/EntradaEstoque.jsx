@@ -14,6 +14,7 @@ import {
   serverTimestamp, runTransaction,
 } from "firebase/firestore";
 import { useAuth } from "../contexts/AuthContext"; // ← usa o contexto correto
+import { logAction, LOG_ACAO, LOG_MODULO } from "../lib/logAction";
 
 /* ══════════════════════════════════════════════════════
    CSS
@@ -530,6 +531,7 @@ function ModalEntrada({ tenantUid, produtos, fornecedores, movimentacao, onSalvo
             estoqueNovo:     novoEst,
           });
         });
+        await logAction({ tenantUid, nomeUsuario: "—", cargo: "—", acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.ENTRADA_ESTOQUE, descricao: `Editou entrada de ${form.quantidade} un. de ${produtos.find(p=>p._docId===form.produtoId||p.id===form.produtoId)?.nome||form.produtoId}` });
         onSalvo("Entrada atualizada com sucesso!");
       } else {
         const movRef = doc(collection(db, "users", tenantUid, "movimentacoes_estoque"));
@@ -560,6 +562,7 @@ function ModalEntrada({ tenantUid, produtos, fornecedores, movimentacao, onSalvo
             estoqueNovo:     qtdN,
           });
         });
+        await logAction({ tenantUid, nomeUsuario: "—", cargo: "—", acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.ENTRADA_ESTOQUE, descricao: `Registrou entrada de ${form.quantidade} un. de ${produtos.find(p=>p._docId===form.produtoId||p.id===form.produtoId)?.nome||form.produtoId}` });
         onSalvo("Entrada registrada com sucesso!");
       }
       onClose();
@@ -840,6 +843,7 @@ function ModalSaida({ tenantUid, nomeUsuario, cargo, produtos, onSalvo, onClose 
         });
       });
 
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.ENTRADA_ESTOQUE, descricao: `Registrou saída de ${form.quantidade} un. de ${produtos.find(p=>p._docId===form.produtoId||p.id===form.produtoId)?.nome||form.produtoId}` });
       onSalvo("Saída registrada com sucesso!");
       onClose();
     } catch (err) {
@@ -1039,6 +1043,7 @@ function ModalConfirmDelete({ tenantUid, movimentacao, produtos, onSalvo, onClos
         tx.delete(movRef);
       });
 
+      await logAction({ tenantUid, nomeUsuario: "—", cargo: "—", acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.ENTRADA_ESTOQUE, descricao: `Excluiu entrada de ${movimentacao.quantidade} un. de ${movimentacao.produtoNome||movimentacao.produtoId}` });
       onSalvo("Entrada excluída e estoque revertido.");
       onClose();
     } catch (err) {
