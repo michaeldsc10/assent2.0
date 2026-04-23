@@ -1131,6 +1131,7 @@ export default function Dashboard() {
   const [notifLidas,    setNotifLidas]   = useState(
     () => { try { return JSON.parse(localStorage.getItem("ag_notif_lidas") || "[]"); } catch { return []; } }
   );
+  const [notifDespesas, setNotifDespesas] = useState([]);
   const notifRef = useRef(null);
   const [theme, setTheme] = useState(
     () => localStorage.getItem("ag_theme") || "dark"
@@ -1190,6 +1191,78 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     return unsub;
   }, [tenantUid, isPro]);
 
+  /* ── Notificações automáticas de despesas próximas do vencimento ── */
+  useEffect(() => {
+    if (!uid) return;
+    const q = query(
+      collection(db, "users", uid, "despesas"),
+      orderBy("vencimento", "asc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+
+      const alertas = [];
+      snap.docs.forEach((docSnap) => {
+        const d = { id: docSnap.id, ...docSnap.data() };
+
+        // Ignora despesas já pagas ou canceladas
+        if (d.status === "pago" || d.status === "cancelado") return;
+        if (!d.vencimento) return;
+
+        // Parse da data de vencimento (YYYY-MM-DD ou Timestamp)
+        let venc;
+        if (d.vencimento?.toDate) {
+          venc = d.vencimento.toDate();
+        } else if (typeof d.vencimento === "string") {
+          const [y, m, dia] = d.vencimento.split("-").map(Number);
+          venc = new Date(y, m - 1, dia);
+        } else {
+          return;
+        }
+        venc.setHours(0, 0, 0, 0);
+
+        const diffMs   = venc - hoje;
+        const diffDias = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+        if (diffDias < 0 || diffDias > 3) return; // só 0, 1, 2, 3 dias
+
+        const idShow = d.idShow || d.id.slice(0, 6).toUpperCase();
+        const nome   = d.descricao || "Sem descrição";
+
+        let titulo, urgencia;
+        if (diffDias === 0) {
+          titulo   = `⚠️ Vence hoje — #${idShow}`;
+          urgencia = "hoje";
+        } else if (diffDias === 1) {
+          titulo   = `🔔 Vence amanhã — #${idShow}`;
+          urgencia = "1dia";
+        } else if (diffDias === 2) {
+          titulo   = `📅 Vence em 2 dias — #${idShow}`;
+          urgencia = "2dias";
+        } else {
+          titulo   = `📅 Vence em 3 dias — #${idShow}`;
+          urgencia = "3dias";
+        }
+
+        alertas.push({
+          id:        `desp-${d.id}-${urgencia}`,
+          titulo,
+          mensagem:  nome,
+          despesaId: d.id,
+          diffDias,
+          urgencia,
+          tipo:      "despesa",
+        });
+      });
+
+      // Ordena: vence hoje → 1 dia → 2 dias → 3 dias
+      alertas.sort((a, b) => a.diffDias - b.diffDias);
+      setNotifDespesas(alertas);
+    }, () => {});
+    return unsub;
+  }, [uid]);
+
   /* ── Fecha painel de notificações ao clicar fora ── */
   useEffect(() => {
     if (!notifOpen) return;
@@ -1200,10 +1273,26 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     return () => document.removeEventListener("mousedown", handler);
   }, [notifOpen]);
 
-  const notifNaoLidas = notificacoes.filter((n) => !notifLidas.includes(n.id)).length;
+  /* Normaliza despesas: quanto mais urgente (diffDias menor), mais no topo */
+  const notifDespesasNorm = notifDespesas.map((n) => ({
+    ...n,
+    _ts: Date.now() - n.diffDias * 86400000,
+  }));
+
+  /* Notificações AG do sistema têm criadoEm (Firestore Timestamp) */
+  const notifSistemaNorm = notificacoes.map((n) => ({
+    ...n,
+    _ts: n.criadoEm?.toDate ? n.criadoEm.toDate().getTime() : 0,
+  }));
+
+  /* Merge cronológico: mais recente/urgente primeiro */
+  const todasNotif = [...notifDespesasNorm, ...notifSistemaNorm]
+    .sort((a, b) => b._ts - a._ts);
+
+  const notifNaoLidas = todasNotif.filter((n) => !notifLidas.includes(n.id)).length;
 
   const marcarTodasLidas = () => {
-    const ids = notificacoes.map((n) => n.id);
+    const ids = todasNotif.map((n) => n.id);
     setNotifLidas(ids);
     localStorage.setItem("ag_notif_lidas", JSON.stringify(ids));
   };
@@ -1779,41 +1868,94 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 <div className="ag-notif-header">
                   <span>Notificações</span>
                   <span style={{ color: "var(--text-3)", fontWeight: 400, letterSpacing: 0, textTransform: "none", fontSize: 11 }}>
-                    {notificacoes.length} mensage{notificacoes.length !== 1 ? "ns" : "m"}
+                    {todasNotif.length} mensage{todasNotif.length !== 1 ? "ns" : "m"}
                   </span>
                 </div>
                 <div className="ag-notif-list">
-                  {notificacoes.length === 0 ? (
+                  {todasNotif.length === 0 ? (
                     <div className="ag-notif-empty">Nenhuma notificação no momento</div>
                   ) : (
-                    notificacoes.map((n) => (
-                      <div key={n.id} className="ag-notif-item">
-                        <div className="ag-notif-item-title">{n.titulo}</div>
-                        <div className="ag-notif-item-body">{n.mensagem}</div>
-                        {n.btnUrl && (
-                          <a
-                            href={n.btnUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                    todasNotif.map((n) => {
+                      /* ── Alerta de despesa próxima do vencimento ── */
+                      if (n.tipo === "despesa") {
+                        const corUrgencia =
+                          n.diffDias === 0 ? "var(--red)"   :
+                          n.diffDias === 1 ? "var(--amber)" :
+                                            "var(--blue)";
+                        const bgUrgencia =
+                          n.diffDias === 0 ? "rgba(224,82,82,0.07)"   :
+                          n.diffDias === 1 ? "rgba(245,158,11,0.07)"  :
+                                            "rgba(91,142,240,0.05)";
+                        const labelUrgencia =
+                          n.diffDias === 0 ? "Vence hoje"   :
+                          n.diffDias === 1 ? "Amanhã"       :
+                          `${n.diffDias} dias`;
+                        return (
+                          <div
+                            key={n.id}
+                            className="ag-notif-item"
                             style={{
-                              display: "inline-block", marginTop: 8,
-                              padding: "5px 12px", borderRadius: 6,
-                              background: "linear-gradient(135deg,#B8860B,#D4AF37)",
-                              color: "#050505", fontSize: 11, fontWeight: 700,
-                              letterSpacing: "0.8px", textDecoration: "none",
-                              fontFamily: "'IBM Plex Mono', monospace",
+                              cursor: "pointer",
+                              background: bgUrgencia,
+                              borderLeft: `2px solid ${corUrgencia}`,
+                              paddingLeft: 14,
                             }}
+                            onClick={() => { setModule("Despesas"); setNotifOpen(false); }}
                           >
-                            {n.btnTexto || "Ver mais"} ↗
-                          </a>
-                        )}
-                        <div className="ag-notif-item-meta">
-                          {n.criadoEm?.toDate
-                            ? n.criadoEm.toDate().toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
-                            : "—"}
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 2 }}>
+                              <div className="ag-notif-item-title" style={{ fontSize: 12 }}>{n.mensagem}</div>
+                              <span style={{
+                                fontSize: 9, fontWeight: 700, letterSpacing: "0.06em",
+                                textTransform: "uppercase", color: corUrgencia,
+                                background: bgUrgencia, border: `1px solid ${corUrgencia}40`,
+                                borderRadius: 20, padding: "2px 7px", flexShrink: 0,
+                              }}>{labelUrgencia}</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'IBM Plex Mono', monospace" }}>
+                              Despesa {n.titulo.split("—")[1]?.trim() || ""} · Ir para Despesas →
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      /* ── Anúncio do sistema ── */
+                      return (
+                        <div key={n.id} className="ag-notif-item">
+                          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
+                            <span style={{
+                              fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
+                              textTransform: "uppercase", color: "var(--gold)",
+                              background: "var(--gold-d)", border: "1px solid rgba(200,165,94,0.2)",
+                              borderRadius: 20, padding: "2px 8px", flexShrink: 0,
+                            }}>Sistema</span>
+                            <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'IBM Plex Mono', monospace" }}>
+                              {n.criadoEm?.toDate
+                                ? n.criadoEm.toDate().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+                                : "—"}
+                            </span>
+                          </div>
+                          <div className="ag-notif-item-title">{n.titulo}</div>
+                          <div className="ag-notif-item-body" style={{ marginTop: 4 }}>{n.mensagem}</div>
+                          {n.btnUrl && (
+                            <a
+                              href={n.btnUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                display: "inline-block", marginTop: 8,
+                                padding: "5px 12px", borderRadius: 6,
+                                background: "linear-gradient(135deg,#B8860B,#D4AF37)",
+                                color: "#050505", fontSize: 11, fontWeight: 700,
+                                letterSpacing: "0.8px", textDecoration: "none",
+                                fontFamily: "'IBM Plex Mono', monospace",
+                              }}
+                            >
+                              {n.btnTexto || "Ver mais"} ↗
+                            </a>
+                          )}
                         </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
