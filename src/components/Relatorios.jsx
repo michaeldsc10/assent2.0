@@ -14,7 +14,7 @@ import {
   ShoppingCart, Package, Users, Calendar, FileText,
   Download, Printer, AlertCircle, Loader2,
   ArrowUpRight, ArrowDownRight, Minus,
-  ChevronRight, Receipt, Wallet, LayoutDashboard, X,
+  ChevronRight, CreditCard, Clock, Receipt, Wallet, LayoutDashboard, X,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
@@ -3000,6 +3000,298 @@ function RelatorioLucroPorPS({ vendas, produtos, servicos, vendedores, intervalo
 }
 
 /* ══════════════════════════════════════════════════════
+   RELATÓRIO: ALUNOS
+   Lista com situação de pagamento, totais e ticket médio
+   ══════════════════════════════════════════════════════ */
+function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
+  const dados = useMemo(() => {
+    /* Mensalidades em aberto (a_receber origem=mensalidade) */
+    const mensAbertas = aReceber.filter(ar => ar.origem === "mensalidade");
+    const mensPorAluno = mensAbertas.reduce((acc, m) => {
+      (acc[m.alunoId] = acc[m.alunoId] || []).push(m);
+      return acc;
+    }, {});
+
+    /* Vendas de mensalidade pagas no período */
+    const vendasMens = vendas.filter(v =>
+      v.tipoVenda === "mensalidade" &&
+      v.status !== "cancelada" &&
+      dentroDoIntervalo(v.data, intervalo)
+    );
+
+    const hoje = new Date().toISOString().slice(0, 10);
+
+    const linhas = alunos.map(a => {
+      const abertas = mensPorAluno[a.docId] || [];
+      const totalAberto = abertas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
+      const vencidas = abertas.filter(m => (m.dataVencimento || "") < hoje).length;
+      const pagasPeriodo = vendasMens.filter(v => v.alunoId === a.docId);
+      const recebidoPeriodo = pagasPeriodo.reduce((s, v) => s + Number(v.total || 0), 0);
+
+      let situacao = "Em dia";
+      if (a.status !== "ativo") situacao = a.status === "trancado" ? "Trancado" : "Inativo";
+      else if (vencidas > 0)    situacao = "Vencido";
+      else if (abertas.length)  situacao = "Pendente";
+
+      return {
+        id:        a.idSeq ? `A${String(a.idSeq).padStart(4, "0")}` : "—",
+        nome:      a.nome || "—",
+        documento: a.documento || "—",
+        telefone:  a.telefone || "—",
+        mensalidade: Number(a.valorMensalidade || 0),
+        situacao,
+        abertas:     abertas.length,
+        vencidas,
+        totalAberto,
+        recebidoPeriodo,
+        pagasPeriodo: pagasPeriodo.length,
+      };
+    });
+
+    const totalAtivos   = alunos.filter(a => a.status === "ativo").length;
+    const totalInativos = alunos.filter(a => a.status !== "ativo").length;
+    const ticketMedio = totalAtivos > 0
+      ? alunos.filter(a => a.status === "ativo").reduce((s, a) => s + Number(a.valorMensalidade || 0), 0) / totalAtivos
+      : 0;
+    const emDia    = linhas.filter(l => l.situacao === "Em dia").length;
+    const vencidos = linhas.filter(l => l.situacao === "Vencido").length;
+
+    return { linhas, totalAtivos, totalInativos, ticketMedio, emDia, vencidos };
+  }, [alunos, aReceber, vendas, intervalo]);
+
+  const handleExport = () => {
+    exportarExcel("alunos", [{
+      nome: "Alunos",
+      colunas: ["ID", "Nome", "Documento", "Telefone", "Mensalidade", "Situação", "Mens. Abertas", "Vencidas", "Total em Aberto", "Recebido no Período"],
+      dados: dados.linhas.map(l => [
+        l.id, l.nome, l.documento, l.telefone,
+        l.mensalidade.toFixed(2), l.situacao,
+        l.abertas, l.vencidas,
+        l.totalAberto.toFixed(2), l.recebidoPeriodo.toFixed(2),
+      ]),
+    }]);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="btn-secondary" onClick={handleExport} data-print-hide
+          style={{ fontSize: 12, padding: "6px 14px" }}>
+          <Download size={13} /> Exportar Excel
+        </button>
+      </div>
+
+      <div className="cr-grid">
+        <CardResumo icon={<Users size={18} />} label="Alunos Ativos"
+          value={String(dados.totalAtivos)}
+          sub={`${dados.totalInativos} inativos/trancados`}
+          trend="neutral" colorVar="var(--gold)" />
+        <CardResumo icon={<DollarSign size={18} />} label="Ticket Médio"
+          value={fmtR$(dados.ticketMedio)} sub="mensalidade"
+          trend="neutral" colorVar="var(--blue)" />
+        <CardResumo icon={<TrendingUp size={18} />} label="Em Dia"
+          value={String(dados.emDia)} sub="alunos em dia"
+          trend="up" colorVar="var(--green)" />
+        <CardResumo icon={<AlertCircle size={18} />} label="Vencidos"
+          value={String(dados.vencidos)} sub="alunos inadimplentes"
+          trend="down" colorVar="var(--red)" />
+      </div>
+
+      <TabelaRelatorio
+        titulo="Alunos matriculados"
+        colunas={[
+          { key: "id",         label: "ID" },
+          { key: "nome",       label: "Nome" },
+          { key: "documento",  label: "Documento" },
+          { key: "mensalidade",label: "Mensalidade", format: (v) => fmtR$(v) },
+          { key: "situacao",   label: "Situação" },
+          { key: "abertas",    label: "Mens. Abertas" },
+          { key: "totalAberto",label: "Total Aberto", format: (v) => fmtR$(v) },
+          { key: "recebidoPeriodo", label: "Recebido Período", format: (v) => fmtR$(v) },
+        ]}
+        dados={dados.linhas}
+      />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   RELATÓRIO: MENSALIDADES
+   Recebidas, pendentes e inadimplência — todas derivadas
+   dos mesmos lançamentos que alimentam o DRE e Vendas
+   ══════════════════════════════════════════════════════ */
+function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
+  const dados = useMemo(() => {
+    /* Mensalidades recebidas no período — origem real = vendas sintéticas */
+    const recebidas = vendas.filter(v =>
+      v.tipoVenda === "mensalidade" &&
+      v.status !== "cancelada" &&
+      dentroDoIntervalo(v.data, intervalo)
+    );
+
+    /* Mensalidades em aberto — snapshot atual (não filtra por período) */
+    const mensAbertas = aReceber.filter(ar =>
+      ar.origem === "mensalidade" && Number(ar.valorRestante || 0) > 0
+    );
+
+    const hoje = new Date().toISOString().slice(0, 10);
+    const vencidas = mensAbertas.filter(m => (m.dataVencimento || "") < hoje);
+
+    const totalRecebido   = recebidas.reduce((s, v) => s + Number(v.total || 0), 0);
+    const totalPendente   = mensAbertas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
+    const totalVencido    = vencidas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
+    const ticketMedio     = recebidas.length > 0 ? totalRecebido / recebidas.length : 0;
+
+    /* Linhas — recebidas no período */
+    const linhasRecebidas = recebidas
+      .sort((a, b) => (parseDate(b.data) || 0) - (parseDate(a.data) || 0))
+      .map(v => ({
+        data:     v.data,
+        aluno:    v.clienteNome || v.cliente || "—",
+        mes:      v.mesReferencia || "—",
+        valor:    Number(v.total || 0),
+        forma:    v.formaPagamento || "—",
+      }));
+
+    /* Linhas — pendentes (ordenadas por vencimento) */
+    const linhasPendentes = mensAbertas
+      .sort((a, b) => (a.dataVencimento || "").localeCompare(b.dataVencimento || ""))
+      .map(m => ({
+        aluno:         m.clienteNome || m.alunoNome || "—",
+        mes:           m.mesReferencia || "—",
+        vencimento:    m.dataVencimento || "",
+        valor:         Number(m.valorRestante || 0),
+        status:        (m.dataVencimento || "") < hoje ? "Vencida" : "Pendente",
+      }));
+
+    /* Inadimplência por aluno */
+    const porAluno = {};
+    mensAbertas.forEach(m => {
+      const id = m.alunoId || m.clienteNome;
+      if (!porAluno[id]) porAluno[id] = { aluno: m.clienteNome || m.alunoNome || "—", qtd: 0, total: 0 };
+      porAluno[id].qtd   += 1;
+      porAluno[id].total += Number(m.valorRestante || 0);
+    });
+    const rankingInadimplencia = Object.values(porAluno)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+
+    return {
+      linhasRecebidas, linhasPendentes, rankingInadimplencia,
+      totalRecebido, totalPendente, totalVencido, ticketMedio,
+      qtdRecebidas: recebidas.length,
+      qtdPendentes: mensAbertas.length,
+      qtdVencidas:  vencidas.length,
+      taxaInadimplencia: (totalRecebido + totalVencido) > 0
+        ? (totalVencido / (totalRecebido + totalVencido)) * 100
+        : 0,
+    };
+  }, [alunos, aReceber, vendas, caixa, intervalo]);
+
+  const handleExport = () => {
+    exportarExcel("mensalidades", [
+      {
+        nome: "Recebidas no período",
+        colunas: ["Data", "Aluno", "Mês Ref.", "Forma Pag.", "Valor (R$)"],
+        dados: dados.linhasRecebidas.map(l => [
+          fmtData(l.data), l.aluno, l.mes, l.forma, l.valor.toFixed(2),
+        ]),
+      },
+      {
+        nome: "Pendentes (snapshot atual)",
+        colunas: ["Aluno", "Mês Ref.", "Vencimento", "Status", "Valor (R$)"],
+        dados: dados.linhasPendentes.map(l => [
+          l.aluno, l.mes, fmtData(l.vencimento), l.status, l.valor.toFixed(2),
+        ]),
+      },
+      {
+        nome: "Ranking Inadimplência",
+        colunas: ["Aluno", "Qtd Mens. Abertas", "Total Devido (R$)"],
+        dados: dados.rankingInadimplencia.map(l => [l.aluno, l.qtd, l.total.toFixed(2)]),
+      },
+    ]);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="btn-secondary" onClick={handleExport} data-print-hide
+          style={{ fontSize: 12, padding: "6px 14px" }}>
+          <Download size={13} /> Exportar Excel
+        </button>
+      </div>
+
+      <div className="cr-grid">
+        <CardResumo icon={<CreditCard size={18} />} label="Recebido no Período"
+          value={fmtR$(dados.totalRecebido)}
+          sub={`${dados.qtdRecebidas} mensalidade(s)`}
+          trend="up" colorVar="var(--green)" />
+        <CardResumo icon={<DollarSign size={18} />} label="Ticket Médio"
+          value={fmtR$(dados.ticketMedio)} sub="por mensalidade"
+          trend="neutral" colorVar="var(--blue)" />
+        <CardResumo icon={<Clock size={18} />} label="Pendente Total"
+          value={fmtR$(dados.totalPendente)}
+          sub={`${dados.qtdPendentes} aberta(s)`}
+          trend="neutral" colorVar="var(--gold)" />
+        <CardResumo icon={<AlertCircle size={18} />} label="Inadimplência"
+          value={fmtR$(dados.totalVencido)}
+          sub={`${dados.qtdVencidas} vencida(s) · ${dados.taxaInadimplencia.toFixed(1)}%`}
+          trend="down" colorVar="var(--red)" />
+      </div>
+
+      {dados.linhasRecebidas.length > 0 && (
+        <TabelaRelatorio
+          titulo="Mensalidades Recebidas no Período"
+          colunas={[
+            { key: "data",  label: "Data", format: (v) => fmtData(v) },
+            { key: "aluno", label: "Aluno" },
+            { key: "mes",   label: "Mês Ref." },
+            { key: "forma", label: "Pagamento" },
+            { key: "valor", label: "Valor", format: (v) => fmtR$(v) },
+          ]}
+          dados={dados.linhasRecebidas}
+        />
+      )}
+
+      {dados.linhasPendentes.length > 0 && (
+        <TabelaRelatorio
+          titulo="Mensalidades Pendentes (atual)"
+          colunas={[
+            { key: "aluno",      label: "Aluno" },
+            { key: "mes",        label: "Mês Ref." },
+            { key: "vencimento", label: "Vencimento", format: (v) => fmtData(v) },
+            { key: "status",     label: "Status" },
+            { key: "valor",      label: "Valor", format: (v) => fmtR$(v) },
+          ]}
+          dados={dados.linhasPendentes}
+        />
+      )}
+
+      {dados.rankingInadimplencia.length > 0 && (
+        <div className="tr-wrap">
+          <div className="tr-header">
+            <span className="tr-title">Top 10 — Inadimplência por Aluno</span>
+          </div>
+          {dados.rankingInadimplencia.map((l, i) => (
+            <div key={l.aluno + i} className="rank-item">
+              <span className="rank-num">#{i + 1}</span>
+              <span className="rank-label">{l.aluno}</span>
+              <span style={{ fontSize: 11, color: "var(--text-3)", marginLeft: "auto" }}>
+                {l.qtd} mens.
+              </span>
+              <span className="rank-val" style={{ color: "var(--red)" }}>{fmtR$(l.total)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+
+
+/* ══════════════════════════════════════════════════════
    MENU DE NAVEGAÇÃO — configuração
    ══════════════════════════════════════════════════════ */
 const PERMISSOES_RELATORIO = {
@@ -3010,6 +3302,8 @@ const PERMISSOES_RELATORIO = {
   estoque:    ["financeiro", "comercial", "compras", "operacional", "vendedor"],
   vendas:     ["financeiro", "comercial", "vendedor", "suporte"],
   clientes:   ["comercial", "vendedor", "suporte"],
+  alunos:        ["financeiro", "comercial", "vendedor", "suporte"],  // ← NOVO
+  mensalidades:  ["financeiro", "comercial"],       
   agenda:     ["comercial", "vendedor", "suporte"],
   lucro_ps:   ["financeiro", "comercial"],
   vendedores: ["financeiro", "comercial"],
@@ -3022,6 +3316,8 @@ const MENU = [
   { key: "vendas",     label: "Vendas",       icon: <ShoppingCart size={15} />   },
   { key: "vendedores", label: "Vendedores",   icon: <Users size={15} />          },
   { key: "clientes",   label: "Clientes",     icon: <Users size={15} />          },
+   { key: "alunos",       label: "Alunos",         icon: <Users size={15} />        },  // ← NOVO
+  { key: "mensalidades", label: "Mensalidades",   icon: <CreditCard size={15} />   },  // ← NOVO
   { key: "despesas",   label: "Despesas",     icon: <Receipt size={15} />        },
   { key: "estoque",    label: "Estoque",      icon: <Package size={15} />        },
   { key: "agenda",     label: "Agenda",       icon: <Calendar size={15} />       },
@@ -3035,6 +3331,8 @@ const TITULO_RELATORIO = {
   despesas:   "Relatório de Despesas",
   estoque:    "Relatório de Estoque",
   clientes:   "Relatório de Clientes",
+   alunos:       "Relatório de Alunos",              // ← NOVO
+  mensalidades: "Relatório de Mensalidades", 
   agenda:     "Relatório de Agenda",
   lucro_ps:   "Produtos & Serviços",
   vendedores: "Relatório de Vendedores",
@@ -3589,6 +3887,7 @@ export default function Relatorios() {
   const [caixa,      setCaixa]      = useState([]);
   const [aReceber,   setAReceber]   = useState([]);
   const [vendedores, setVendedores] = useState([]);
+   const [alunos,     setAlunos]     = useState([]);
 
   // Permissão por sub-relatório
   const temAcesso = (id) => {
@@ -3611,6 +3910,8 @@ export default function Relatorios() {
         /* Ignorar erro se collection não existir */ () => {}),
       onSnapshot(col("servicos"), (s) => setServicos(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => {}),
+       onSnapshot(col("alunos"),     (s) => setAlunos(s.docs.map((d) => ({ docId: d.id, ...d.data() }))),
+        () => {}),  // ← NOVO
       onSnapshot(col("eventos"),   (s) => setAgenda(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => {}),
       onSnapshot(col("caixa"),    (s) => setCaixa(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
@@ -3668,6 +3969,8 @@ export default function Relatorios() {
       case "agenda":     return <RelatorioAgenda agenda={agenda} intervalo={intervalo} />;
       case "lucro_ps":   return <RelatorioLucroPorPS vendas={vendas} produtos={produtos} servicos={servicos} vendedores={vendedores} intervalo={intervalo} />;
       case "vendedores": return <RelatorioVendedores vendas={vendas} vendedores={vendedores} intervalo={intervalo} />;
+      case "alunos":       return <RelatorioAlunos alunos={alunos} aReceber={aReceber} vendas={vendas} intervalo={intervalo} />;           // ← NOVO
+      case "mensalidades": return <RelatorioMensalidades alunos={alunos} aReceber={aReceber} vendas={vendas} caixa={caixa} intervalo={intervalo} />;
       default:           return null;
     }
   };
