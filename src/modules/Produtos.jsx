@@ -10,6 +10,7 @@ import {
 
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
+import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
 import { LIMITES_FREE } from "../hooks/useLicenca";
 import {BannerLimite} from "../hooks/LicencaUI.jsx";
 import {
@@ -778,7 +779,7 @@ export default function Produtos({ isPro = false }) {
   const [produtos, setProdutos] = useState([]);
   const [vendas,   setVendas]   = useState([]);
   // ── Multi-tenant ──
-  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+  const { tenantUid, cargo, nomeUsuario, podeCriar, podeEditar, podeExcluir } = useAuth();
 
   // ── Flags de permissão ──
   const podeCriarV  = podeCriar("produtos");
@@ -841,6 +842,7 @@ export default function Produtos({ isPro = false }) {
       { produtoIdCnt: produtoIdCnt + 1 },
       { merge: true }
     );
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.PRODUTOS, descricao: montarDescricao("criar", "Produto", formData.nome, newId) });
     setModalNovo(false);
   };
 
@@ -851,12 +853,14 @@ export default function Produtos({ isPro = false }) {
       formData,
       { merge: true }
     );
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.PRODUTOS, descricao: montarDescricao("editar", "Produto", formData.nome, editando.id) });
     setEditando(null);
   };
 
   const handleDelete = async () => {
     if (!tenantUid || !deletando) return;
     await deleteDoc(doc(db, "users", tenantUid, "produtos", deletando.id));
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.PRODUTOS, descricao: montarDescricao("excluir", "Produto", deletando.nome, deletando.id) });
     setDeletando(null);
   };
 
