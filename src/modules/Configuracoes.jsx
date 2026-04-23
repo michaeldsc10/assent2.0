@@ -3,16 +3,17 @@
    Estrutura: users/{uid}/config/geral (doc único, merge)
    ═══════════════════════════════════════════════════ */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Building2, Lock, CreditCard, LayoutDashboard, Package,
   Eye, EyeOff, Check, AlertCircle, Save,
-  ChevronRight, Camera, Shield, Keyboard,
+  ChevronRight, Camera, Shield, Keyboard, Activity,
+  Filter, RefreshCw, Search, ChevronDown,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, startAfter, where } from "firebase/firestore";
 import {
   reauthenticateWithCredential,
   EmailAuthProvider,
@@ -90,12 +91,13 @@ const TAXAS_DEFAULT = {
 };
 
 const NAV = [
-  { id: "empresa",    label: "Empresa",         icon: Building2      },
-  { id: "seguranca",  label: "Segurança",        icon: Shield         },
-  { id: "financeiro", label: "Financeiro",       icon: CreditCard     },
-  { id: "menu",       label: "Menu do Sistema",  icon: LayoutDashboard},
-  { id: "estoque",    label: "Estoque",          icon: Package        },
-  { id: "atalhos",    label: "Atalhos",          icon: Keyboard       },
+  { id: "empresa",    label: "Empresa",             icon: Building2      },
+  { id: "seguranca",  label: "Segurança",            icon: Shield         },
+  { id: "financeiro", label: "Financeiro",           icon: CreditCard     },
+  { id: "menu",       label: "Menu do Sistema",      icon: LayoutDashboard},
+  { id: "estoque",    label: "Estoque",              icon: Package        },
+  { id: "atalhos",    label: "Atalhos",              icon: Keyboard       },
+  { id: "log",        label: "Log de Atividades",    icon: Activity       },
 ];
 
 /* ══════════════════════════════════════════════════════
@@ -462,6 +464,100 @@ const CSS = `
     font-size: 10px; color: var(--text-3); background: var(--s3);
     border: 1px solid var(--border); border-radius: 20px;
     padding: 2px 8px; white-space: nowrap; flex-shrink: 0;
+  }
+
+  /* ── Seção Log de Atividades ── */
+  .log-toolbar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+  .log-search-wrap {
+    flex: 1; min-width: 160px; position: relative;
+    display: flex; align-items: center;
+  }
+  .log-search-wrap svg { position: absolute; left: 11px; pointer-events: none; }
+  .log-search-input {
+    width: 100%; background: var(--s2); border: 1px solid var(--border);
+    border-radius: 9px; padding: 8px 12px 8px 34px;
+    color: var(--text); font-size: 13px;
+    font-family: 'DM Sans', sans-serif; outline: none;
+    transition: border-color .15s;
+  }
+  .log-search-input:focus { border-color: var(--gold); }
+
+  .log-select {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 9px; padding: 8px 32px 8px 12px;
+    color: var(--text); font-size: 12px;
+    font-family: 'DM Sans', sans-serif; outline: none;
+    appearance: none; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 10px center;
+    min-width: 130px;
+  }
+  .log-select:focus { border-color: var(--gold); }
+
+  .log-btn-refresh {
+    padding: 8px 14px; border-radius: 9px; background: var(--s2);
+    border: 1px solid var(--border); color: var(--text-2);
+    cursor: pointer; display: flex; align-items: center; gap: 6px;
+    font-size: 12px; font-family: 'DM Sans', sans-serif;
+    transition: background .13s, color .13s; flex-shrink: 0;
+  }
+  .log-btn-refresh:hover { background: var(--s3); color: var(--text); }
+  .log-btn-refresh:disabled { opacity: .5; cursor: not-allowed; }
+
+  .log-list { display: flex; flex-direction: column; gap: 6px; }
+  .log-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 14px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--s2);
+    transition: border-color .13s;
+  }
+  .log-item:hover { border-color: var(--border-h); }
+
+  .log-acao-badge {
+    flex-shrink: 0; padding: 3px 9px; border-radius: 20px;
+    font-size: 10px; font-weight: 700; letter-spacing: .04em;
+    text-transform: uppercase; white-space: nowrap; margin-top: 1px;
+  }
+  .log-acao-criar   { background: rgba(72,187,120,0.12); color: #48bb78; border: 1px solid rgba(72,187,120,0.25); }
+  .log-acao-editar  { background: rgba(200,165,94,0.12); color: var(--gold); border: 1px solid rgba(200,165,94,0.25); }
+  .log-acao-excluir { background: rgba(224,82,82,0.12);  color: var(--red);  border: 1px solid rgba(224,82,82,0.25); }
+
+  .log-info { flex: 1; min-width: 0; }
+  .log-desc {
+    font-size: 13px; color: var(--text); font-family: 'DM Sans', sans-serif;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .log-meta {
+    display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap;
+  }
+  .log-meta-item { font-size: 11px; color: var(--text-3); }
+  .log-meta-dot { font-size: 11px; color: var(--text-3); }
+  .log-modulo-badge {
+    font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 20px;
+    background: var(--s3); border: 1px solid var(--border); color: var(--text-2);
+  }
+
+  .log-empty {
+    padding: 56px 20px; text-align: center; color: var(--text-3); font-size: 13px;
+  }
+  .log-loading {
+    padding: 48px 20px; text-align: center; color: var(--text-3); font-size: 13px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .log-load-more {
+    padding: 9px 20px; border-radius: 9px; background: var(--s2);
+    border: 1px solid var(--border); color: var(--text-2);
+    cursor: pointer; font-size: 12px; font-family: 'DM Sans', sans-serif;
+    transition: all .13s; display: flex; align-items: center; justify-content: center; gap: 6px;
+    width: 100%; margin-top: 4px;
+  }
+  .log-load-more:hover { background: var(--s3); color: var(--text); }
+  .log-load-more:disabled { opacity: .5; cursor: not-allowed; }
+  .log-count-bar {
+    font-size: 11px; color: var(--text-3); text-align: right; padding-top: 4px;
   }
 `;
 
@@ -932,13 +1028,243 @@ function SecaoAtalhos({ menuVisivel = {} }) {
 }
 
 /* ══════════════════════════════════════════════════════
+   SEÇÃO LOG DE ATIVIDADES — somente admin
+   Firestore: users/{tenantUid}/logs (orderBy criadoEm desc)
+   ══════════════════════════════════════════════════════ */
+const PAGE_SIZE = 30;
+
+const MODULOS_LOG = [
+  "Todos", "Agenda", "A Receber", "Caixa Diário", "Clientes",
+  "Compras", "Configurações", "Despesas", "Entrada de Estoque",
+  "Fornecedores", "Mesas", "Orçamentos", "Produtos",
+  "Serviços", "Usuários", "Vendas", "Vendedores",
+];
+
+const ACOES_LOG = ["Todas", "criar", "editar", "excluir"];
+
+function fmtDataLog(iso) {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString("pt-BR", {
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  } catch { return iso; }
+}
+
+function SecaoLog({ tenantUid }) {
+  const [logs, setLogs]               = useState([]);
+  const [carregando, setCarregando]   = useState(true);
+  const [carregandoMais, setCarregandoMais] = useState(false);
+  const [ultimoDoc, setUltimoDoc]     = useState(null);
+  const [temMais, setTemMais]         = useState(false);
+  const [busca, setBusca]             = useState("");
+  const [filtroAcao, setFiltroAcao]   = useState("Todas");
+  const [filtroModulo, setFiltroModulo] = useState("Todos");
+
+  const carregarLogs = useCallback(async (resetar = true) => {
+    if (!tenantUid) return;
+    resetar ? setCarregando(true) : setCarregandoMais(true);
+
+    try {
+      let q = query(
+        collection(db, "users", tenantUid, "logs"),
+        orderBy("criadoEm", "desc"),
+        limit(PAGE_SIZE + 1)
+      );
+
+      // Filtros server-side (Firestore exige índice composto para combinações)
+      // Para evitar necessidade de índices compostos, filtramos um campo por vez
+      if (filtroAcao !== "Todas") {
+        q = query(
+          collection(db, "users", tenantUid, "logs"),
+          where("acao", "==", filtroAcao),
+          orderBy("criadoEm", "desc"),
+          limit(PAGE_SIZE + 1)
+        );
+      } else if (filtroModulo !== "Todos") {
+        q = query(
+          collection(db, "users", tenantUid, "logs"),
+          where("modulo", "==", filtroModulo),
+          orderBy("criadoEm", "desc"),
+          limit(PAGE_SIZE + 1)
+        );
+      }
+
+      if (!resetar && ultimoDoc) {
+        q = query(q, startAfter(ultimoDoc));
+      }
+
+      const snap = await getDocs(q);
+      const docs = snap.docs;
+      const temProximo = docs.length > PAGE_SIZE;
+      const fatia = temProximo ? docs.slice(0, PAGE_SIZE) : docs;
+      const dados = fatia.map(d => ({ id: d.id, ...d.data() }));
+
+      setLogs(prev => resetar ? dados : [...prev, ...dados]);
+      setUltimoDoc(fatia[fatia.length - 1] ?? null);
+      setTemMais(temProximo);
+    } catch (err) {
+      console.error("[SecaoLog] Erro ao carregar logs:", err);
+    } finally {
+      setCarregando(false);
+      setCarregandoMais(false);
+    }
+  }, [tenantUid, filtroAcao, filtroModulo, ultimoDoc]);
+
+  // Recarrega quando filtros mudam
+  useEffect(() => {
+    setUltimoDoc(null);
+    carregarLogs(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantUid, filtroAcao, filtroModulo]);
+
+  // Filtro client-side por texto (busca em descrição, nome, módulo)
+  const logsFiltrados = useMemo(() => {
+    if (!busca.trim()) return logs;
+    const q = busca.toLowerCase();
+    return logs.filter(l =>
+      l.descricao?.toLowerCase().includes(q) ||
+      l.nomeUsuario?.toLowerCase().includes(q) ||
+      l.modulo?.toLowerCase().includes(q) ||
+      l.cargo?.toLowerCase().includes(q)
+    );
+  }, [logs, busca]);
+
+  const badgeClass = (acao) => {
+    if (acao === "criar")   return "log-acao-badge log-acao-criar";
+    if (acao === "editar")  return "log-acao-badge log-acao-editar";
+    if (acao === "excluir") return "log-acao-badge log-acao-excluir";
+    return "log-acao-badge log-acao-editar";
+  };
+
+  return (
+    <div className="cfg-card">
+      <div className="cfg-card-header">
+        <div className="cfg-card-header-icon"><Activity size={15} /></div>
+        <div>
+          <div className="cfg-card-title">Log de Atividades</div>
+          <div className="cfg-card-sub">Histórico de ações realizadas no sistema</div>
+        </div>
+      </div>
+
+      <div className="cfg-card-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {/* Toolbar */}
+        <div className="log-toolbar">
+          <div className="log-search-wrap">
+            <Search size={13} color="var(--text-3)" />
+            <input
+              className="log-search-input"
+              placeholder="Buscar por ação, usuário ou módulo..."
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+            />
+          </div>
+
+          <select
+            className="log-select"
+            value={filtroAcao}
+            onChange={e => { setFiltroAcao(e.target.value); setUltimoDoc(null); }}
+          >
+            {ACOES_LOG.map(a => (
+              <option key={a} value={a}>
+                {a === "Todas" ? "Todas as ações" : a.charAt(0).toUpperCase() + a.slice(1)}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="log-select"
+            value={filtroModulo}
+            onChange={e => { setFiltroModulo(e.target.value); setUltimoDoc(null); }}
+          >
+            {MODULOS_LOG.map(m => (
+              <option key={m} value={m}>
+                {m === "Todos" ? "Todos os módulos" : m}
+              </option>
+            ))}
+          </select>
+
+          <button
+            className="log-btn-refresh"
+            onClick={() => { setUltimoDoc(null); carregarLogs(true); }}
+            disabled={carregando}
+          >
+            <RefreshCw size={13} style={carregando ? { animation: "spin .8s linear infinite" } : {}} />
+            Atualizar
+          </button>
+        </div>
+
+        {/* Lista */}
+        {carregando ? (
+          <div className="log-loading">
+            <span className="cfg-spinner" style={{ border: "2px solid rgba(200,165,94,0.2)", borderTopColor: "var(--gold)" }} />
+            Carregando logs...
+          </div>
+        ) : logsFiltrados.length === 0 ? (
+          <div className="log-empty">
+            {busca.trim() ? "Nenhum resultado para esta busca." : "Nenhuma atividade registrada ainda."}
+          </div>
+        ) : (
+          <>
+            <div className="log-list">
+              {logsFiltrados.map(log => (
+                <div key={log.id} className="log-item">
+                  <span className={badgeClass(log.acao)}>
+                    {log.acao || "—"}
+                  </span>
+                  <div className="log-info">
+                    <div className="log-desc">{log.descricao || "—"}</div>
+                    <div className="log-meta">
+                      <span className="log-modulo-badge">{log.modulo || "—"}</span>
+                      <span className="log-meta-dot">·</span>
+                      <span className="log-meta-item">{log.nomeUsuario || "—"}</span>
+                      {log.cargo && (
+                        <>
+                          <span className="log-meta-dot">·</span>
+                          <span className="log-meta-item" style={{ textTransform: "capitalize" }}>{log.cargo}</span>
+                        </>
+                      )}
+                      <span className="log-meta-dot">·</span>
+                      <span className="log-meta-item">{fmtDataLog(log.timestamp)}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {temMais && !busca.trim() && (
+              <button
+                className="log-load-more"
+                onClick={() => carregarLogs(false)}
+                disabled={carregandoMais}
+              >
+                {carregandoMais
+                  ? <><span className="cfg-spinner" style={{ border: "2px solid rgba(200,165,94,0.2)", borderTopColor: "var(--gold)" }} />Carregando...</>
+                  : <>Carregar mais</>
+                }
+              </button>
+            )}
+
+            <div className="log-count-bar">
+              {logsFiltrados.length} {logsFiltrados.length === 1 ? "registro" : "registros"} exibidos
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════ */
 /* ─────────────────────────────────────────────
    Seções visíveis por cargo
 ───────────────────────────────────────────── */
 const SECOES_POR_CARGO = {
-  admin:       ["empresa", "seguranca", "financeiro", "menu", "estoque", "atalhos"],
+  admin:       ["empresa", "seguranca", "financeiro", "menu", "estoque", "atalhos", "log"],
   financeiro:  ["seguranca", "financeiro", "atalhos"],
   comercial:   ["seguranca", "atalhos"],
   compras:     ["seguranca", "estoque", "atalhos"],
@@ -985,6 +1311,7 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
       case "menu":       return <SecaoMenu       config={config} onSave={handleSave} />;
       case "estoque":    return <SecaoEstoque    config={config} onSave={handleSave} />;
       case "atalhos":    return <SecaoAtalhos    menuVisivel={menuVisivelProp ?? config?.menuVisivel ?? {}} />;
+      case "log":        return <SecaoLog        tenantUid={uid} />;
       default:           return null;
     }
   };
@@ -1003,13 +1330,23 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
         <div className="cfg-body">
           <nav className="cfg-nav">
             <span className="cfg-nav-group-label">Configurações</span>
-            {navFiltrado.map(({ id, label, icon: Icon }) => (
+            {navFiltrado.filter(n => n.id !== "log").map(({ id, label, icon: Icon }) => (
               <button key={id} className={`cfg-nav-item ${secao === id ? "active" : ""}`} onClick={() => setSecao(id)}>
                 <Icon size={15} className="cfg-nav-icon" />
                 <span className="cfg-nav-label">{label}</span>
                 {secao === id && <ChevronRight size={13} color="var(--text-3)" />}
               </button>
             ))}
+            {navFiltrado.some(n => n.id === "log") && (
+              <>
+                <span className="cfg-nav-group-label" style={{ marginTop: 14 }}>Auditoria</span>
+                <button className={`cfg-nav-item ${secao === "log" ? "active" : ""}`} onClick={() => setSecao("log")}>
+                  <Activity size={15} className="cfg-nav-icon" />
+                  <span className="cfg-nav-label">Log de Atividades</span>
+                  {secao === "log" && <ChevronRight size={13} color="var(--text-3)" />}
+                </button>
+              </>
+            )}
           </nav>
 
           <main className="cfg-panel" key={secao}>
