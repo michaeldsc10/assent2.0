@@ -1808,27 +1808,43 @@ function RelatorioLucroPorPS({ vendas, produtos, servicos, vendedores, intervalo
   const dados = useMemo(() => {
     const vendasPeriodo = vendas.filter((v) => dentroDoIntervalo(v.data, intervalo));
 
-    /* Mapa vendedorId → percentual de comissão (só com comissao > 0) */
-    const comissaoMap = {};
+    /* ── Mapas duplos: por ID e por nome (lower) ──
+       A venda pode gravar o vendedor de formas diferentes:
+       - v.vendedorId   → "V0001" (ID do cadastro)
+       - v.vendedor     → "João"  (nome direto)
+       - v.vendedorNome → "João"  (nome alternativo)
+       Construímos dois mapas para cobrir todos os casos. */
+    const comissaoMapId   = {}; // id → { id, nome, pct }
+    const comissaoMapNome = {}; // nome_lower → { id, nome, pct }
     vendedores.forEach((vd) => {
-      if (vd.comissao != null && Number(vd.comissao) > 0)
-        comissaoMap[vd.id] = Number(vd.comissao);
+      if (vd.comissao != null && Number(vd.comissao) > 0) {
+        const entry = { id: vd.id, nome: vd.nome, pct: Number(vd.comissao) };
+        comissaoMapId[vd.id] = entry;
+        if (vd.nome) comissaoMapNome[(vd.nome || "").trim().toLowerCase()] = entry;
+      }
     });
 
-    /* Comissão total do período (soma de todas as vendas com vendedor comissionado) */
+    /* Resolve o vendedor de uma venda tentando todos os campos possíveis */
+    const resolverVendedor = (v) => {
+      if (v.vendedorId && comissaoMapId[v.vendedorId]) return comissaoMapId[v.vendedorId];
+      const nomeCampo = (v.vendedor || v.vendedorNome || "").trim().toLowerCase();
+      if (nomeCampo && comissaoMapNome[nomeCampo]) return comissaoMapNome[nomeCampo];
+      return null;
+    };
+
+    /* Comissão total do período */
     let totalComissoesPeriodo = 0;
-    const comissaoPorVendedor = {}; // vendedorId → { nome, pct, valor }
+    const comissaoPorVendedor = {}; // chave → { nome, pct, valor }
 
     vendasPeriodo.forEach((v) => {
-      const pct = v.vendedorId ? comissaoMap[v.vendedorId] : undefined;
-      if (!pct) return;
-      const val = calcComissaoVenda(v, pct);
+      const vdEntry = resolverVendedor(v);
+      if (!vdEntry) return;
+      const val   = calcComissaoVenda(v, vdEntry.pct);
+      const chave = vdEntry.id;
       totalComissoesPeriodo += val;
-      if (!comissaoPorVendedor[v.vendedorId]) {
-        const vd = vendedores.find((x) => x.id === v.vendedorId);
-        comissaoPorVendedor[v.vendedorId] = { nome: vd?.nome || v.vendedorId, pct, valor: 0 };
-      }
-      comissaoPorVendedor[v.vendedorId].valor += val;
+      if (!comissaoPorVendedor[chave])
+        comissaoPorVendedor[chave] = { nome: vdEntry.nome, pct: vdEntry.pct, valor: 0 };
+      comissaoPorVendedor[chave].valor += val;
     });
 
     /* Proporção da comissão por item: distribui a comissão de cada venda
@@ -1838,8 +1854,8 @@ function RelatorioLucroPorPS({ vendas, produtos, servicos, vendedores, intervalo
       const nomesMap = {}; // nome_lower → { nome, fat, custo, comissao, qtd }
 
       vendasPeriodo.forEach((v) => {
-        const pct = v.vendedorId ? comissaoMap[v.vendedorId] : undefined;
-        const comissaoVenda = pct ? calcComissaoVenda(v, pct) : 0;
+        const vdEntry = resolverVendedor(v);
+        const comissaoVenda = vdEntry ? calcComissaoVenda(v, vdEntry.pct) : 0;
 
         /* Faturamento total da venda (para distribuição proporcional) */
         const fatVendaTotal = (v.itens || []).reduce((s, i) => {
