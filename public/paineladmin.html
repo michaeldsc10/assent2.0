@@ -854,6 +854,61 @@ tbody tr:hover { background: var(--surface2); }
   </div>
 </div>
 
+<!-- CONFIRM MODAL -->
+<div id="confirmModal" style="
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,.7); backdrop-filter:blur(8px);
+  z-index:300; align-items:center; justify-content:center;
+">
+  <div style="
+    background:var(--surface); border:1px solid var(--border2);
+    border-radius:16px; width:360px; max-width:90vw;
+    box-shadow:0 24px 60px rgba(0,0,0,.5); position:relative; overflow:hidden;
+  ">
+    <!-- linha dourada no topo -->
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;
+      background:linear-gradient(90deg,transparent,var(--gold),transparent)"></div>
+
+    <div style="padding:28px 28px 20px; text-align:center">
+      <!-- ícone -->
+      <div style="
+        width:48px; height:48px; border-radius:12px; margin:0 auto 16px;
+        background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.25);
+        display:flex; align-items:center; justify-content:center;
+        font-size:20px;
+      " id="confirmIcon">🗑</div>
+
+      <div style="font-size:16px; font-weight:700; color:var(--text); margin-bottom:8px"
+           id="confirmTitle">Excluir notificação?</div>
+      <div style="font-size:13px; color:var(--text2); line-height:1.6"
+           id="confirmMsg">Esta ação não pode ser desfeita.</div>
+    </div>
+
+    <div style="
+      display:flex; gap:10px; padding:0 28px 24px;
+    ">
+      <button id="confirmCancel" style="
+        flex:1; padding:10px; border-radius:9px;
+        background:var(--surface2); border:1px solid var(--border2);
+        color:var(--text2); font-size:13px; font-weight:600;
+        cursor:pointer; transition:all .15s; font-family:inherit;
+      "
+        onmouseover="this.style.borderColor='var(--gold)';this.style.color='var(--gold)'"
+        onmouseout="this.style.borderColor='var(--border2)';this.style.color='var(--text2)'"
+      >Cancelar</button>
+      <button id="confirmOk" style="
+        flex:1; padding:10px; border-radius:9px;
+        background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.35);
+        color:#ef4444; font-size:13px; font-weight:700;
+        cursor:pointer; transition:all .15s; font-family:inherit;
+      "
+        onmouseover="this.style.background='rgba(239,68,68,0.22)'"
+        onmouseout="this.style.background='rgba(239,68,68,0.12)'"
+      >Excluir</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ══════════════════════════════════════════════
 //  ⚙️  FIREBASE CONFIG — carregado via Vercel API
@@ -1389,19 +1444,47 @@ function renderNotifList(list) {
     </div>`).join('');
 }
 
+/* ── Modal de confirmação customizado ── */
+function showConfirm({ title, msg, icon = '🗑', okLabel = 'Excluir', onOk }) {
+  const modal = document.getElementById('confirmModal');
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMsg').textContent   = msg;
+  document.getElementById('confirmIcon').textContent  = icon;
+  document.getElementById('confirmOk').textContent    = okLabel;
+  modal.style.display = 'flex';
+
+  const close = () => { modal.style.display = 'none'; cleanup(); };
+  const ok    = () => { close(); onOk(); };
+
+  const btnOk     = document.getElementById('confirmOk');
+  const btnCancel = document.getElementById('confirmCancel');
+  const cleanup = () => {
+    btnOk.removeEventListener('click', ok);
+    btnCancel.removeEventListener('click', close);
+    modal.removeEventListener('click', backdropClose);
+  };
+  const backdropClose = (e) => { if (e.target === modal) close(); };
+
+  btnOk.addEventListener('click', ok);
+  btnCancel.addEventListener('click', close);
+  modal.addEventListener('click', backdropClose);
+}
+
 async function deleteNotif(id) {
-  if (!confirm('Excluir esta notificação? Ela sumirá imediatamente para todos os usuários.')) return;
-  try {
-    await db.collection('notificacoesAG').doc(id).delete();
-    const row = document.getElementById('notif-row-' + id);
-    if (row) row.remove();
-    // Se a lista ficou vazia, mostra o estado vazio
-    if (!document.querySelector('.notif-item')) {
-      document.getElementById('notifList').innerHTML = '<div class="empty">Nenhuma notificação enviada ainda</div>';
+  showConfirm({
+    title: 'Excluir notificação?',
+    msg: 'Ela sumirá imediatamente para todos os usuários. Esta ação não pode ser desfeita.',
+    onOk: async () => {
+      try {
+        await db.collection('notificacoesAG').doc(id).delete();
+        const row = document.getElementById('notif-row-' + id);
+        if (row) row.remove();
+        if (!document.querySelector('.notif-item')) {
+          document.getElementById('notifList').innerHTML = '<div class="empty">Nenhuma notificação enviada ainda</div>';
+        }
+      } catch(e) { alert('Erro ao excluir notificação.'); }
     }
-  } catch(e) {
-    alert('Erro ao excluir notificação.');
-  }
+  });
 }
 
 async function cleanupOldNotifs() {
@@ -1410,15 +1493,21 @@ async function cleanupOldNotifs() {
     const snap = await db.collection('notificacoesAG')
       .where('criadoEm', '<', seteDiasAtras).get();
     if (snap.empty) { alert('Nenhuma notificação com mais de 7 dias encontrada.'); return; }
-    if (!confirm(`Excluir ${snap.size} notificação(ões) com mais de 7 dias? Elas serão removidas para todos os usuários.`)) return;
-    const batch = db.batch();
-    snap.docs.forEach(d => batch.delete(d.ref));
-    await batch.commit();
-    alert(`✓ ${snap.size} notificação(ões) excluída(s).`);
-    loadNotifications();
-  } catch(e) {
-    alert('Erro ao limpar notificações antigas.');
-  }
+    showConfirm({
+      title: `Limpar ${snap.size} notificação(ões)?`,
+      msg: `Todas com mais de 7 dias serão removidas permanentemente para todos os usuários.`,
+      icon: '🧹',
+      okLabel: 'Limpar',
+      onOk: async () => {
+        try {
+          const batch = db.batch();
+          snap.docs.forEach(d => batch.delete(d.ref));
+          await batch.commit();
+          loadNotifications();
+        } catch(e) { alert('Erro ao limpar notificações antigas.'); }
+      }
+    });
+  } catch(e) { alert('Erro ao buscar notificações antigas.'); }
 }
 
 document.getElementById('btnSendNotif').addEventListener('click', async () => {
