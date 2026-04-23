@@ -438,7 +438,57 @@ const CSS = `
 }
 /* Ocultar no print por padrão */
 .rel-print-header { display: none; }
+
+/* ── Lucro por P/S ── */
+.lps-tabs {
+  display: flex; gap: 4px;
+  background: var(--s2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 4px; width: fit-content;
+}
+.lps-tab {
+  padding: 7px 20px; border-radius: 7px; font-size: 13px; font-weight: 500;
+  background: transparent; border: none; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; color: var(--text-2);
+  transition: all .13s;
+}
+.lps-tab.active {
+  background: var(--s1); color: var(--text);
+  border: 1px solid var(--border-h);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+}
+.lps-tab:not(.active):hover { color: var(--text); }
+
+.lps-row {
+  display: grid;
+  grid-template-columns: 1fr 160px 160px 180px;
+  padding: 11px 18px; gap: 8px;
+  border-bottom: 1px solid var(--border);
+  align-items: center; font-size: 13px; color: var(--text-2);
+  transition: background .1s;
+}
+.lps-row:last-child { border-bottom: none; }
+.lps-row:hover { background: rgba(255,255,255,0.02); }
+.lps-row-head {
+  background: var(--s2);
+  font-size: 10px; font-weight: 600; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--text-3);
+}
+.lps-row-head:hover { background: var(--s2); }
+.lps-nome { color: var(--text); font-weight: 500; }
+.lps-fat  { color: var(--blue);  font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 600; }
+.lps-custo { color: var(--red);  font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 600; }
+.lps-lucro-cell { display: flex; align-items: center; gap: 8px; }
+.lps-lucro { color: var(--green); font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 700; }
+.lps-pct-badge {
+  font-size: 10px; font-weight: 600; padding: 2px 7px;
+  border-radius: 20px; font-family: 'Sora', sans-serif;
+  white-space: nowrap;
+}
+.lps-pct-green { background: rgba(68,209,134,.12); color: var(--green); border: 1px solid rgba(68,209,134,.2); }
+.lps-pct-gold  { background: rgba(200,165,94,.12);  color: var(--gold);  border: 1px solid rgba(200,165,94,.2); }
+.lps-pct-red   { background: rgba(224,82,82,.12);   color: var(--red);   border: 1px solid rgba(224,82,82,.2); }
 `;
+
 
 /* ══════════════════════════════════════════════════════
    HELPERS GLOBAIS
@@ -1735,6 +1785,200 @@ function RelatorioAgenda({ agenda, intervalo }) {
 }
 
 /* ══════════════════════════════════════════════════════
+   RELATÓRIO: LUCRO POR PRODUTO / SERVIÇO
+   ══════════════════════════════════════════════════════ */
+function RelatorioLucroPorPS({ vendas, produtos, servicos, intervalo }) {
+  const [aba, setAba] = useState("produtos");
+
+  const dados = useMemo(() => {
+    const vendasPeriodo = vendas.filter((v) => dentroDoIntervalo(v.data, intervalo));
+
+    /* Agrega faturamento e custo por nome de item nas vendas do período */
+    const agregar = (tipo) => {
+      /* tipo: "produto" | "servico" — tenta detectar pelo catálogo */
+      const catalogo = tipo === "produto" ? produtos : servicos;
+      const nomesMap = {}; // nome_lower → { nome, fat, custo, qtd }
+
+      vendasPeriodo.forEach((v) => {
+        (v.itens || []).forEach((item) => {
+          const nomeItem = (item.nome || item.produto || item.servico || "").trim();
+          if (!nomeItem) return;
+          const nomeLower = nomeItem.toLowerCase();
+
+          /* Verifica se pertence ao catálogo correto */
+          const nocat = catalogo.find(
+            (c) => (c.nome || "").trim().toLowerCase() === nomeLower
+          );
+          if (!nocat) return;
+
+          const qtd     = Number(item.qtd || item.quantidade || 1);
+          const preco   = Number(item.preco || item.precoUnit || item.valor || nocat.preco || 0);
+          const custoU  = Number(item.custo || item.custoUnit || nocat.custo || 0);
+
+          if (!nomesMap[nomeLower]) {
+            nomesMap[nomeLower] = { nome: nocat.nome || nomeItem, fat: 0, custo: 0 };
+          }
+          nomesMap[nomeLower].fat   += preco  * qtd;
+          nomesMap[nomeLower].custo += custoU * qtd;
+        });
+      });
+
+      return Object.values(nomesMap)
+        .map((r) => ({ ...r, lucro: r.fat - r.custo }))
+        .sort((a, b) => b.fat - a.fat);
+    };
+
+    const listaProdutos  = agregar("produto");
+    const listaServicos  = agregar("servico");
+
+    const totais = (lista) => lista.reduce(
+      (acc, r) => ({ fat: acc.fat + r.fat, custo: acc.custo + r.custo, lucro: acc.lucro + r.lucro }),
+      { fat: 0, custo: 0, lucro: 0 }
+    );
+
+    return {
+      listaProdutos,
+      listaServicos,
+      totaisProdutos: totais(listaProdutos),
+      totaisServicos: totais(listaServicos),
+    };
+  }, [vendas, produtos, servicos, intervalo]);
+
+  const pctMargem = (fat, lucro) =>
+    fat > 0 ? (lucro / fat) * 100 : 0;
+
+  const PctBadge = ({ fat, lucro }) => {
+    const pct = pctMargem(fat, lucro);
+    const cls = pct >= 40 ? "lps-pct-green" : pct >= 15 ? "lps-pct-gold" : "lps-pct-red";
+    return <span className={`lps-pct-badge ${cls}`}>{pct.toFixed(2)}%</span>;
+  };
+
+  const lista   = aba === "produtos" ? dados.listaProdutos  : dados.listaServicos;
+  const totais  = aba === "produtos" ? dados.totaisProdutos : dados.totaisServicos;
+  const label   = aba === "produtos" ? "Produto" : "Serviço";
+
+  const handleExport = () => {
+    exportarExcel("lucro_por_ps", [
+      {
+        nome: "Produtos",
+        colunas: ["Produto", "Faturamento (R$)", "Custo (R$)", "Lucro (R$)", "Margem (%)"],
+        dados: dados.listaProdutos.map((r) => [
+          r.nome,
+          r.fat.toFixed(2),
+          r.custo.toFixed(2),
+          r.lucro.toFixed(2),
+          pctMargem(r.fat, r.lucro).toFixed(2) + "%",
+        ]),
+      },
+      {
+        nome: "Serviços",
+        colunas: ["Serviço", "Faturamento (R$)", "Custo (R$)", "Lucro (R$)", "Margem (%)"],
+        dados: dados.listaServicos.map((r) => [
+          r.nome,
+          r.fat.toFixed(2),
+          r.custo.toFixed(2),
+          r.lucro.toFixed(2),
+          pctMargem(r.fat, r.lucro).toFixed(2) + "%",
+        ]),
+      },
+    ]);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* Abas */}
+      <div className="lps-tabs">
+        <button
+          className={`lps-tab${aba === "produtos" ? " active" : ""}`}
+          onClick={() => setAba("produtos")}
+        >
+          <Package size={13} style={{ display: "inline", marginRight: 5, verticalAlign: "middle" }} />
+          Produtos
+        </button>
+        <button
+          className={`lps-tab${aba === "servicos" ? " active" : ""}`}
+          onClick={() => setAba("servicos")}
+        >
+          <FileText size={13} style={{ display: "inline", marginRight: 5, verticalAlign: "middle" }} />
+          Serviços
+        </button>
+      </div>
+
+      {/* Cards de totais */}
+      <div className="cr-grid">
+        <CardResumo
+          icon={<TrendingUp size={18} />}
+          label="Faturamento"
+          value={fmtR$(totais.fat)}
+          sub={`${lista.length} ${label.toLowerCase()}(s) vendido(s)`}
+          trend="neutral"
+          colorVar="var(--blue)"
+        />
+        <CardResumo
+          icon={<TrendingDown size={18} />}
+          label="Custo"
+          value={fmtR$(totais.custo)}
+          sub="custo total dos itens"
+          trend="down"
+          colorVar="var(--red)"
+        />
+        <CardResumo
+          icon={<DollarSign size={18} />}
+          label="Lucro"
+          value={fmtR$(totais.lucro)}
+          sub={`Margem: ${fmtPct(pctMargem(totais.fat, totais.lucro))}`}
+          trend={totais.lucro >= 0 ? "up" : "down"}
+          colorVar={totais.lucro >= 0 ? "var(--green)" : "var(--red)"}
+        />
+      </div>
+
+      {/* Tabela */}
+      <div className="tr-wrap">
+        <div className="tr-header">
+          <span className="tr-title">
+            {aba === "produtos" ? "Lucro por Produto" : "Lucro por Serviço"}
+          </span>
+          <span className="tr-badge">{lista.length}</span>
+        </div>
+
+        {/* Cabeçalho */}
+        <div className="lps-row lps-row-head">
+          <span>{label}</span>
+          <span>Faturamento</span>
+          <span>Custo</span>
+          <span>Lucro</span>
+        </div>
+
+        {lista.length === 0 ? (
+          <div className="tr-state">
+            Nenhum {label.toLowerCase()} vendido no período selecionado.
+          </div>
+        ) : (
+          lista.map((r, i) => (
+            <div key={r.nome + i} className="lps-row">
+              <span className="lps-nome">{r.nome}</span>
+              <span className="lps-fat">{fmtR$(r.fat)}</span>
+              <span className="lps-custo">{fmtR$(r.custo)}</span>
+              <div className="lps-lucro-cell">
+                <span className="lps-lucro">{fmtR$(r.lucro)}</span>
+                <PctBadge fat={r.fat} lucro={r.lucro} />
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="btn-secondary" onClick={handleExport}>
+          <Download size={13} /> Exportar Excel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
    MENU DE NAVEGAÇÃO — configuração
    ══════════════════════════════════════════════════════ */
 const PERMISSOES_RELATORIO = {
@@ -1746,16 +1990,18 @@ const PERMISSOES_RELATORIO = {
   vendas:     ["financeiro", "comercial", "vendedor", "suporte"],
   clientes:   ["comercial", "vendedor", "suporte"],
   agenda:     ["comercial", "vendedor", "suporte"],
+  lucro_ps:   ["financeiro", "comercial"],
 };
 
 const MENU = [
-  { key: "dre",        label: "DRE",        icon: <LayoutDashboard size={15} /> },
-  { key: "financeiro", label: "Financeiro", icon: <Wallet size={15} />         },
-  { key: "vendas",     label: "Vendas",     icon: <ShoppingCart size={15} />   },
-  { key: "despesas",   label: "Despesas",   icon: <Receipt size={15} />        },
-  { key: "estoque",    label: "Estoque",    icon: <Package size={15} />        },
-  { key: "clientes",   label: "Clientes",   icon: <Users size={15} />          },
-  { key: "agenda",     label: "Agenda",     icon: <Calendar size={15} />       },
+  { key: "dre",        label: "DRE",          icon: <LayoutDashboard size={15} /> },
+  { key: "financeiro", label: "Financeiro",   icon: <Wallet size={15} />         },
+  { key: "vendas",     label: "Vendas",       icon: <ShoppingCart size={15} />   },
+  { key: "despesas",   label: "Despesas",     icon: <Receipt size={15} />        },
+  { key: "estoque",    label: "Estoque",      icon: <Package size={15} />        },
+  { key: "clientes",   label: "Clientes",     icon: <Users size={15} />          },
+  { key: "agenda",     label: "Agenda",       icon: <Calendar size={15} />       },
+  { key: "lucro_ps",   label: "Lucro P/S",    icon: <DollarSign size={15} />     },
 ];
 
 const TITULO_RELATORIO = {
@@ -1766,6 +2012,7 @@ const TITULO_RELATORIO = {
   estoque:    "Relatório de Estoque",
   clientes:   "Relatório de Clientes",
   agenda:     "Relatório de Agenda",
+  lucro_ps:   "Lucro por Produto / Serviço",
 };
 
 /* ══════════════════════════════════════════════════════
@@ -1788,6 +2035,7 @@ export default function Relatorios() {
   const [clientes,  setClientes]  = useState([]);
   const [despesas,  setDespesas]  = useState([]);
   const [produtos,  setProdutos]  = useState([]);
+  const [servicos,  setServicos]  = useState([]);
   const [agenda,    setAgenda]    = useState([]);
   const [caixa,     setCaixa]     = useState([]);
   const [aReceber,  setAReceber]  = useState([]);
@@ -1811,6 +2059,8 @@ export default function Relatorios() {
       onSnapshot(col("despesas"), (s) => { setDespesas(s.docs.map((d) => ({ id: d.id, ...d.data() }))); setLoading(false); }),
       onSnapshot(col("produtos"), (s) => setProdutos(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         /* Ignorar erro se collection não existir */ () => {}),
+      onSnapshot(col("servicos"), (s) => setServicos(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        () => {}),
       onSnapshot(col("eventos"),   (s) => setAgenda(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => {}),
       onSnapshot(col("caixa"),    (s) => setCaixa(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
@@ -1864,6 +2114,7 @@ export default function Relatorios() {
       case "estoque":    return <RelatorioEstoque produtos={produtos} />;
       case "clientes":   return <RelatorioClientes clientes={clientes} vendas={vendas} intervalo={intervalo} aReceber={aReceber} />;
       case "agenda":     return <RelatorioAgenda agenda={agenda} intervalo={intervalo} />;
+      case "lucro_ps":   return <RelatorioLucroPorPS vendas={vendas} produtos={produtos} servicos={servicos} intervalo={intervalo} />;
       default:           return null;
     }
   };
