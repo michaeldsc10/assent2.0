@@ -21,6 +21,7 @@ import {
 
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
+import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
 import {
   collection,
   doc,
@@ -724,7 +725,7 @@ export default function AReceber() {
   const [filtroStatus, setFiltroStatus] = useState("Todos");
 
   // ── Multi-tenant ──
-  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+  const { tenantUid, cargo, nomeUsuario, podeCriar, podeEditar, podeExcluir } = useAuth();
 
   // ── Flags de permissão ──
   const podeCriarV   = podeCriar("aReceber");
@@ -767,11 +768,12 @@ export default function AReceber() {
     if (!tenantUid) return;
     try {
       const now = new Date().toISOString();
-      await addDoc(collection(db, "users", tenantUid, "a_receber"), {
+      const arRef = await addDoc(collection(db, "users", tenantUid, "a_receber"), {
         ...dados,
         dataCriacao:     now,
         dataAtualizacao: now,
       });
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.A_RECEBER, descricao: montarDescricao("criar", "Conta a Receber", dados.clienteNome || dados.descricao, arRef.id) });
       setModalNovo(false);
     } catch (err) {
       console.error("[AReceber] Erro ao criar conta:", err);
@@ -788,6 +790,7 @@ export default function AReceber() {
         ...dados,
         dataAtualizacao: new Date().toISOString(),
       });
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.A_RECEBER, descricao: montarDescricao("editar", "Conta a Receber", dados.clienteNome || dados.descricao || editando.clienteNome, editando.id) });
       setEditando(null);
     } catch (err) {
       console.error("[AReceber] Erro ao editar conta:", err);
@@ -853,6 +856,7 @@ export default function AReceber() {
     if (!tenantUid || !deletando) return;
     try {
       await deleteDoc(doc(db, "users", tenantUid, "a_receber", deletando.id));
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.A_RECEBER, descricao: montarDescricao("excluir", "Conta a Receber", deletando.clienteNome || deletando.descricao, deletando.id) });
       setDeletando(null);
     } catch (err) {
       console.error("[AReceber] Erro ao excluir conta:", err);
