@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import AuthContext from "../contexts/AuthContext";
+import { logAction, LOG_ACAO, LOG_MODULO } from "../lib/logAction";
 import { db, auth } from "../lib/firebase";
 
 import {
@@ -1917,6 +1918,7 @@ useEffect(() => {
         );
       }
 
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.VENDAS, descricao: `Editou Venda ${vendaExistente.id} — ${payload.cliente || "Consumidor Final"}` });
       setEditando(null);
       setDetalhe(null);
       return;
@@ -2009,6 +2011,7 @@ useEffect(() => {
 
     /* Imprimir recibo após criar */
     imprimirRecibo({ ...payload, id: novoId });
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.VENDAS, descricao: `Criou Venda ${novoId} — ${payload.cliente || "Consumidor Final"} — R$ ${Number(payload.total||0).toFixed(2)}` });
     setModalNova(false);
   };
 
@@ -2060,6 +2063,7 @@ useEffect(() => {
       console.error("[Vendas] Venda cancelada, mas erro ao remover A Receber:", err);
     }
 
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.VENDAS, descricao: `Cancelou Venda ${vendaId}` });
     setDeletando(null);
     setDetalhe(null);
   };
@@ -2108,6 +2112,7 @@ useEffect(() => {
       console.error("[Vendas] Venda excluída, mas erro ao remover A Receber:", err);
     }
 
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.VENDAS, descricao: `Excluiu Venda ${vendaId} definitivamente` });
     setExcluindoDef(null);
     setDetalhe(null);
   };
