@@ -1545,7 +1545,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         return <Configuracoes menuVisivel={menuVisivel} />;
         case "matriculas":
         return (
-          <RotaProtegida modulo="alunos" label="Alunos">
+          <RotaProtegida modulo="alunos" label="Matriculas">
             <Alunos />
           </RotaProtegida>
         );
