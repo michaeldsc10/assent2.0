@@ -10,6 +10,7 @@ import { Search, Plus, Edit2, Trash2, X, Tag, Settings, AlertTriangle } from "lu
 
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
+import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
 import {LIMITES_FREE } from "../hooks/useLicenca";
 import {  BannerLimite  } from  "../hooks/LicencaUI.jsx";
 import {
@@ -796,7 +797,7 @@ function ModalConfirmDelete({ servico, vendas, onConfirm, onClose }) {
    ════════════════════════════════════════════════════ */
 export default function Servicos({ isPro = false }) {
   // ── Multi-tenant ──
-  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+  const { tenantUid, cargo, nomeUsuario, podeCriar, podeEditar, podeExcluir } = useAuth();
 
   // ── Flags de permissão ──
   const podeCriarV  = podeCriar("servicos");
@@ -858,6 +859,7 @@ export default function Servicos({ isPro = false }) {
       criadoEm: new Date().toISOString(),
     });
     await setDoc(doc(db, "users", tenantUid), { servicoIdCnt: servicoIdCnt + 1 }, { merge: true });
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.SERVICOS, descricao: montarDescricao("criar", "Serviço", form.nome, newId) });
     setModalNovo(false);
   };
 
@@ -867,12 +869,14 @@ export default function Servicos({ isPro = false }) {
       ...form,
       atualizadoEm: new Date().toISOString(),
     }, { merge: true });
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.SERVICOS, descricao: montarDescricao("editar", "Serviço", form.nome, editando.id) });
     setEditando(null);
   };
 
   const handleDelete = async () => {
     if (!tenantUid || !deletando) return;
     await deleteDoc(doc(db, "users", tenantUid, "servicos", deletando.id));
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.SERVICOS, descricao: montarDescricao("excluir", "Serviço", deletando.nome, deletando.id) });
     setDeletando(null);
   };
 
