@@ -6,7 +6,7 @@
      npm install xlsx
    ═══════════════════════════════════════════════════ */
 
-import { useState, useEffect, useMemo, useCallback, useContext } from "react";
+import { useState, useEffect, useMemo, useCallback, useContext, useRef } from "react";
 import * as XLSX from "xlsx";
 
 import {
@@ -1514,7 +1514,7 @@ function RelatorioDespesas({ despesas, intervalo }) {
 function BarChartCSS({ dados, altura = 160, cor = "#C8A55E", fmtVal }) {
   const [hover, setHover] = useState(null);
   const [tooltipX, setTooltipX] = useState(0);
-  const containerRef = React.useRef(null);
+  const containerRef = useRef(null);
 
   if (!dados || dados.length === 0) return null;
 
