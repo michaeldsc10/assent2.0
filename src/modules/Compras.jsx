@@ -30,12 +30,11 @@ const LIMITE_FREE_INSUMOS = 10;
 const UNIDADES = ["kg", "g", "L", "ml", "un", "cx", "m", "cm", "pç", "sc", "fd"];
 
 const METODOS_PAG = [
-  { value: "dinheiro",     label: "Dinheiro" },
-  { value: "pix",          label: "PIX" },
-  { value: "boleto",       label: "Boleto" },
-  { value: "cartao",       label: "Cartão" },
-  { value: "transferencia",label: "Transferência" },
-  { value: "parcelado",    label: "Parcelado" },
+  { value: "dinheiro",       label: "Dinheiro" },
+  { value: "pix",            label: "PIX" },
+  { value: "transferencia",  label: "Transferência" },
+  { value: "boleto",         label: "Boleto" },
+  { value: "cartao_credito", label: "Cartão de Crédito" },
 ];
 
 const MOTIVOS_SAIDA = [
@@ -477,6 +476,14 @@ const CSS = `
   }
 `;
 
+const fmtMetodoPag = (v) => {
+  const mapa = {
+    cartao:    "Cartão",
+    parcelado: "Parcelado (legado)",
+  };
+  return METODOS_PAG.find(m => m.value === v)?.label || mapa[v] || v || "—";
+};
+
 /* ═══════════════════════════════════════════════════
    COMPONENTES AUXILIARES
    ═══════════════════════════════════════════════════ */
@@ -514,6 +521,10 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
     numParcelas:     compra?.numParcelas     || 2,
     vencimento:      compra?.vencimento      || "",
     observacao:      compra?.observacao      || "",
+    /* cartão de crédito: se já está pago na hora */
+    cartaoPago:      compra?.cartaoPago      ?? true,
+    /* boleto/cartão: parcelado ou à vista */
+    modoParcelamento: compra?.modoParcelamento || "avista",
   });
 
   const [itens, setItens] = useState(
@@ -525,20 +536,40 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
   const [erros,    setErros]    = useState({});
   const [salvando, setSalvando] = useState(false);
 
-  /* Parcelado é derivado do método de pagamento selecionado */
-  const isParcelado = form.metodoPagamento === "parcelado";
+  /* Derived flags */
+  const isCartao   = form.metodoPagamento === "cartao_credito";
+  const isBoleto   = form.metodoPagamento === "boleto";
+  const isParcelado = (isCartao || isBoleto) && form.modoParcelamento === "parcelado";
+  /* Cartão pago na hora: só aplica quando cartão E não parcelado */
+  const isCartaoPagoAgora = isCartao && !isParcelado && form.cartaoPago;
 
-  /* Quando seleciona parcelado, força status para pendente */
+  /* Quando muda método de pagamento, ajusta defaults */
   const set = useCallback((campo, valor) => {
     setForm(f => {
       const novo = { ...f, [campo]: valor };
-      if (campo === "metodoPagamento" && valor === "parcelado") {
-        novo.status = "pendente";
+      if (campo === "metodoPagamento") {
+        /* Reseta modo parcelamento ao trocar método */
+        novo.modoParcelamento = "avista";
+        if (valor === "cartao_credito") {
+          novo.cartaoPago = true;
+          novo.status = "pago";
+        } else if (valor === "boleto") {
+          novo.cartaoPago = false;
+          novo.status = "pendente";
+        } else {
+          /* outros métodos: mantém status atual */
+        }
+      }
+      if (campo === "modoParcelamento") {
+        novo.status = valor === "parcelado" ? "pendente" : (isCartao ? (f.cartaoPago ? "pago" : "pendente") : "pendente");
+      }
+      if (campo === "cartaoPago") {
+        novo.status = valor ? "pago" : "pendente";
       }
       return novo;
     });
     setErros(e => ({ ...e, [campo]: "" }));
-  }, []);
+  }, [isCartao]);
 
   const setItem = useCallback((idx, campo, valor) => {
     setItens(prev => {
@@ -567,8 +598,8 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
 
   const valorTotal = itens.reduce((s, it) => s + calcSubtotal(it), 0);
 
-  /* Precisa de vencimento se pendente (sem parcelamento) ou se parcelado */
-  const precisaVencimento = form.status === "pendente" || isParcelado;
+  /* Precisa de vencimento se: pendente sem parcelamento, ou parcelado, ou boleto à vista */
+  const precisaVencimento = (form.status === "pendente" && !isParcelado) || isParcelado || (isBoleto && !isParcelado);
 
   const validar = () => {
     const e = {};
@@ -616,6 +647,8 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
         metodoPagamento: form.metodoPagamento,
         parcelado:       isParcelado,
         numParcelas:     isParcelado ? Number(form.numParcelas) : 1,
+        modoParcelamento:form.modoParcelamento,
+        cartaoPago:      isCartao ? form.cartaoPago : null,
         vencimento:      precisaVencimento ? form.vencimento : null,
         observacao:      form.observacao.trim(),
         criadoEm:        isEdit ? (compra.criadoEm || now) : now,
@@ -683,7 +716,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
         };
 
         if (isParcelado) {
-          /* Parcelado → N docs pendentes, todos sob o mesmo número base */
+          /* Parcelado (boleto ou cartão) → N docs pendentes */
           const nParc     = Number(form.numParcelas);
           const vlParcela = Number((valorTotal / nParc).toFixed(2));
 
@@ -691,11 +724,12 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
             const idShow  = gerarIdShow(cnt, i + 1, nParc);
             const docId   = `${gerarIdBase(cnt)}-${i + 1}-${Date.now()}-${i}`;
             const despRef = doc(db, "users", uid, "despesas", docId);
+            const metodoLabel = form.metodoPagamento === "cartao_credito" ? "Cartão de Crédito" : "Boleto";
             batch.set(despRef, {
               ...despesaBase,
               idShow,
               parcelado:      true,
-              descricao:      `Compra ${forn?.nome || ""} — parcela ${i + 1}/${nParc}`,
+              descricao:      `Compra ${forn?.nome || ""} — parcela ${i + 1}/${nParc} (${metodoLabel})`,
               valor:          vlParcela,
               valorTotal:     vlParcela,
               data:           form.data,
@@ -707,10 +741,33 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
               totalParcelas:  nParc,
             });
           }
-          cnt++; /* grupo inteiro consome 1 número sequencial */
+          cnt++;
+
+        } else if (isCartaoPagoAgora) {
+          /* Cartão de crédito pago na hora → 1 doc PAGO com dataPagamento = data da compra */
+          const idShow  = gerarIdShow(cnt);
+          const docId   = `${gerarIdBase(cnt)}-${Date.now()}`;
+          const despRef = doc(db, "users", uid, "despesas", docId);
+          batch.set(despRef, {
+            ...despesaBase,
+            idShow,
+            descricao:      `Compra — ${forn?.nome || "Fornecedor"} (Cartão de Crédito)`,
+            valor:          valorTotal,
+            valorTotal,
+            data:           form.data,
+            dataCompetencia:form.data,
+            dataPagamento:  form.data,
+            vencimento:     form.data,
+            dataVencimento: form.data,
+            status:         "pago",
+            parcelado:      false,
+            parcelaAtual:   null,
+            totalParcelas:  null,
+          });
+          cnt++;
 
         } else if (form.status === "pago") {
-          /* Pago à vista → 1 doc pago */
+          /* Pago à vista (dinheiro, pix, transferência) → 1 doc pago */
           const idShow  = gerarIdShow(cnt);
           const docId   = `${gerarIdBase(cnt)}-${Date.now()}`;
           const despRef = doc(db, "users", uid, "despesas", docId);
@@ -733,7 +790,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
           cnt++;
 
         } else {
-          /* Pendente à vista → 1 doc pendente */
+          /* Pendente à vista (boleto à vista, cartão não pago, etc.) → 1 doc pendente */
           const idShow  = gerarIdShow(cnt);
           const docId   = `${gerarIdBase(cnt)}-${Date.now()}`;
           const despRef = doc(db, "users", uid, "despesas", docId);
@@ -774,9 +831,11 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
   /* Label do info DRE na parte inferior do form */
   const dreInfoMsg = isParcelado
     ? `${form.numParcelas >= 2 ? form.numParcelas : "N"}× de ${fmtR$(form.numParcelas >= 2 ? valorTotal / form.numParcelas : 0)} lançadas em Despesas (pendente)`
-    : form.status === "pago"
-      ? `${fmtR$(valorTotal)} lançado no DRE como despesa paga`
-      : `${fmtR$(valorTotal)} lançado em Despesas como pendente`;
+    : isCartaoPagoAgora
+      ? `${fmtR$(valorTotal)} lançado no DRE como despesa paga (Cartão — data da compra)`
+      : form.status === "pago"
+        ? `${fmtR$(valorTotal)} lançado no DRE como despesa paga`
+        : `${fmtR$(valorTotal)} lançado em Despesas como pendente`;
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -811,35 +870,89 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
             </div>
           </div>
 
-          {/* Status + Método */}
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Status do Pagamento <span className="form-label-req">*</span></label>
-              <select className="form-input"
-                value={isParcelado ? "pendente" : form.status}
-                disabled={isParcelado}
-                onChange={e => set("status", e.target.value)}>
-                {/* Apenas pago/pendente no formulário de criação */}
-                <option value="pago">Pago</option>
-                <option value="pendente">Pendente</option>
-              </select>
-              {isParcelado && (
-                <div style={{fontSize:11,color:"var(--text-3)",marginTop:4}}>
-                  Compras parceladas são sempre pendentes.
+          {/* Método de Pagamento */}
+          <div className="form-group">
+            <label className="form-label">Método de Pagamento <span className="form-label-req">*</span></label>
+            <select className={`form-input${erros.metodoPagamento?" err":""}`}
+              value={form.metodoPagamento} onChange={e => set("metodoPagamento", e.target.value)}>
+              {METODOS_PAG.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+            {erros.metodoPagamento && <div className="form-error">{erros.metodoPagamento}</div>}
+          </div>
+
+          {/* ── Cartão de Crédito ── */}
+          {isCartao && (
+            <div style={{background:"var(--s2)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 16px",marginBottom:14}}>
+              <div style={{fontSize:11,fontWeight:600,letterSpacing:".06em",textTransform:"uppercase",color:"var(--text-3)",marginBottom:12}}>
+                Opções — Cartão de Crédito
+              </div>
+
+              {/* Pago agora? */}
+              <label className="form-check-row" style={{marginBottom:12}}
+                onClick={() => set("cartaoPago", !form.cartaoPago)}>
+                <input type="checkbox" checked={form.cartaoPago} readOnly />
+                <span className="form-check-label">
+                  Já pago na hora (lançar como <strong style={{color:"var(--green)"}}>pago</strong> com data de hoje)
+                </span>
+              </label>
+
+              {/* Parcelado ou à vista */}
+              {!form.cartaoPago && (
+                <div className="form-row" style={{marginBottom:0}}>
+                  <div className="form-group" style={{marginBottom:0}}>
+                    <label className="form-label">Forma</label>
+                    <select className="form-input" value={form.modoParcelamento}
+                      onChange={e => set("modoParcelamento", e.target.value)}>
+                      <option value="avista">À Vista (pendente)</option>
+                      <option value="parcelado">Parcelado</option>
+                    </select>
+                  </div>
+                  {/* Se não parcelado, mostra status */}
+                  {form.modoParcelamento === "avista" && (
+                    <div className="form-group" style={{marginBottom:0}}>
+                      <label className="form-label">Status</label>
+                      <select className="form-input" value={form.status}
+                        onChange={e => set("status", e.target.value)}>
+                        <option value="pendente">Pendente</option>
+                        <option value="pago">Pago</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-            <div className="form-group">
-              <label className="form-label">Método de Pagamento <span className="form-label-req">*</span></label>
-              <select className={`form-input${erros.metodoPagamento?" err":""}`}
-                value={form.metodoPagamento} onChange={e => set("metodoPagamento", e.target.value)}>
-                {METODOS_PAG.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
-              {erros.metodoPagamento && <div className="form-error">{erros.metodoPagamento}</div>}
-            </div>
-          </div>
+          )}
 
-          {/* Campos de parcelamento — aparecem quando método = Parcelado */}
+          {/* ── Boleto ── */}
+          {isBoleto && (
+            <div style={{background:"var(--s2)",border:"1px solid var(--border)",borderRadius:10,padding:"14px 16px",marginBottom:14}}>
+              <div style={{fontSize:11,fontWeight:600,letterSpacing:".06em",textTransform:"uppercase",color:"var(--text-3)",marginBottom:12}}>
+                Opções — Boleto
+              </div>
+              <div className="form-group" style={{marginBottom:0}}>
+                <label className="form-label">Forma de Pagamento</label>
+                <select className="form-input" value={form.modoParcelamento}
+                  onChange={e => set("modoParcelamento", e.target.value)}>
+                  <option value="avista">À Vista (com vencimento)</option>
+                  <option value="parcelado">Parcelado</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* ── Status para métodos simples (dinheiro, pix, transferência) ── */}
+          {!isCartao && !isBoleto && (
+            <div className="form-group">
+              <label className="form-label">Status do Pagamento <span className="form-label-req">*</span></label>
+              <select className="form-input" value={form.status}
+                onChange={e => set("status", e.target.value)}>
+                <option value="pago">Pago</option>
+                <option value="pendente">Pendente</option>
+              </select>
+            </div>
+          )}
+
+          {/* Campos de parcelamento */}
           {isParcelado && (
             <div className="form-row">
               <div className="form-group">
@@ -858,8 +971,8 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
             </div>
           )}
 
-          {/* Vencimento para pendente NÃO parcelado */}
-          {form.status === "pendente" && !isParcelado && (
+          {/* Vencimento para pendente à vista (boleto ou outros) */}
+          {!isParcelado && !isCartaoPagoAgora && (form.status === "pendente" || isBoleto) && (
             <div className="form-group">
               <label className="form-label">Vencimento <span className="form-label-req">*</span></label>
               <input type="date" className={`form-input${erros.vencimento?" err":""}`}
@@ -932,7 +1045,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
 
           {/* Info DRE — apenas em criação */}
           {!isEdit && valorTotal > 0 && (
-            <div className={`cp-dre-info${form.status !== "pago" || isParcelado ? " pendente" : ""}`}
+            <div className={`cp-dre-info${(!isCartaoPagoAgora && form.status !== "pago") || isParcelado ? " pendente" : ""}`}
               style={{marginTop:14}}>
               <CheckCircle size={12}/>
               <span>{dreInfoMsg}</span>
@@ -1021,7 +1134,7 @@ function ModalDetalheCompra({ compra, onClose }) {
             <div className="cp-detalhe-row"><span>Fornecedor</span><strong>{compra.fornecedorNome}</strong></div>
             <div className="cp-detalhe-row"><span>Data</span><strong>{fmtData(compra.data)}</strong></div>
             <div className="cp-detalhe-row"><span>Status</span><StatusBadgeCompra status={compra.status}/></div>
-            <div className="cp-detalhe-row"><span>Método</span><strong>{METODOS_PAG.find(m=>m.value===compra.metodoPagamento)?.label || compra.metodoPagamento}</strong></div>
+            <div className="cp-detalhe-row"><span>Método</span><strong>{fmtMetodoPag(compra.metodoPagamento)}</strong></div>
             {compra.parcelado && <div className="cp-detalhe-row"><span>Parcelas</span><strong>{compra.numParcelas}×</strong></div>}
             {compra.vencimento && <div className="cp-detalhe-row"><span>Vencimento</span><strong>{fmtData(compra.vencimento)}</strong></div>}
             {compra.observacao && <div className="cp-detalhe-row"><span>Obs.</span><span style={{textAlign:"right",maxWidth:"60%"}}>{compra.observacao}</span></div>}
@@ -1422,7 +1535,7 @@ function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEdita
               <span style={{fontFamily:"'Sora',sans-serif",fontWeight:600,color:"var(--gold)"}}>{fmtR$(c.valorTotal)}</span>
               <StatusBadgeCompra status={c.status}/>
               <span style={{color:"var(--text-3)"}}>
-                {METODOS_PAG.find(m=>m.value===c.metodoPagamento)?.label || c.metodoPagamento}
+                {fmtMetodoPag(c.metodoPagamento)}
                 {c.parcelado && c.numParcelas > 1 && (
                   <span style={{marginLeft:4,fontSize:10,color:"var(--text-3)"}}>({c.numParcelas}×)</span>
                 )}
