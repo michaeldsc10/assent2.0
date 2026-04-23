@@ -14,7 +14,7 @@ import {
   ShoppingCart, Package, Users, Calendar, FileText,
   Download, Printer, AlertCircle, Loader2,
   ArrowUpRight, ArrowDownRight, Minus,
-  ChevronRight, Receipt, Wallet, LayoutDashboard,
+  ChevronRight, Receipt, Wallet, LayoutDashboard, X,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
@@ -620,17 +620,7 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
 
     const receitaLiquida = receitaBruta - descontosTotais - taxasCartao;
 
-    /* Custo dos produtos */
-    const custoTotal = todasVendasReceita.reduce((s, v) => {
-      if (v.custoTotal != null) return s + Number(v.custoTotal);
-      if (v.itens?.length) {
-        return s + v.itens.reduce((si, it) =>
-          si + (Number(it.custo || 0) * Number(it.qtd || it.quantidade || 1)), 0);
-      }
-      return s + Number(v.custo || 0);
-    }, 0);
-
-    const lucroBruto    = receitaLiquida - custoTotal;
+    const lucroBruto    = receitaLiquida;
     const totalDespesas = dFiltradas.reduce((s, d) => s + Number(d.valor || 0), 0);
     const lucroLiquido  = lucroBruto - totalDespesas;
     const margem        = receitaBruta > 0 ? (lucroLiquido / receitaBruta) * 100 : 0;
@@ -645,7 +635,7 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
 
     return {
       receitaBruta, receitaLiquida, descontosTotais,
-      taxasCartao, custoTotal, lucroBruto,
+      taxasCartao, lucroBruto,
       totalDespesas, lucroLiquido, margem,
       qtdeVendas: todasVendasReceita.length,
       porCategoria,
@@ -668,8 +658,6 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
         ["Receita Bruta (Vendas)", dados.receitaBruta.toFixed(2), pct(dados.receitaBruta)],
         ["(-) Taxas de Cartão",   `-${dados.taxasCartao.toFixed(2)}`, pct(dados.taxasCartao)],
         ["= Receita Líquida",     dados.receitaLiquida.toFixed(2), pct(dados.receitaLiquida)],
-        ["(-) Custos de Produtos",  `-${dados.custoTotal.toFixed(2)}`, pct(dados.custoTotal)],
-        ["= Lucro Bruto",          dados.lucroBruto.toFixed(2),  pct(dados.lucroBruto)],
         ["(-) Despesas Totais",    `-${dados.totalDespesas.toFixed(2)}`, pct(dados.totalDespesas)],
         ...Object.entries(dados.porCategoria).map(([k, v]) => [`  · ${k}`, `-${v.toFixed(2)}`, pct(v)]),
         ["= Lucro Líquido",        dados.lucroLiquido.toFixed(2), fmtPct(dados.margem)],
@@ -688,22 +676,6 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
           sub={`${dados.qtdeVendas} venda(s)`}
           trend="neutral"
           colorVar="var(--gold)"
-        />
-        <CardResumo
-          icon={<Package size={18} />}
-          label="Custos (Produtos)"
-          value={fmtR$(dados.custoTotal)}
-          sub={pct(dados.custoTotal) + " da receita"}
-          trend="down"
-          colorVar="var(--text-2)"
-        />
-        <CardResumo
-          icon={<BarChart2 size={18} />}
-          label="Lucro Bruto"
-          value={fmtR$(dados.lucroBruto)}
-          sub={pct(dados.lucroBruto) + " da receita"}
-          trend={dados.lucroBruto >= 0 ? "up" : "down"}
-          colorVar={dados.lucroBruto >= 0 ? "var(--green)" : "var(--red)"}
         />
         <CardResumo
           icon={<Receipt size={18} />}
@@ -766,23 +738,6 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
             <span className="dre-pct">{pct(dados.receitaLiquida)}</span>
           </div>
         )}
-
-        {/* Custos */}
-        <div className="dre-row dre-row-cat">CUSTOS</div>
-        <div className="dre-row">
-          <span className="dre-sub-label">(-) Custo dos Produtos Vendidos</span>
-          <span className="dre-val dre-negativo">- {fmtR$(dados.custoTotal)}</span>
-          <span className="dre-pct">{pct(dados.custoTotal)}</span>
-        </div>
-
-        {/* Lucro Bruto */}
-        <div className={`dre-row dre-row-result`}>
-          <span className="dre-label" style={{ fontFamily: "'Sora', sans-serif" }}>= LUCRO BRUTO</span>
-          <span className={`dre-val ${dados.lucroBruto >= 0 ? "dre-positivo" : "dre-negativo"}`}>
-            {fmtR$(dados.lucroBruto)}
-          </span>
-          <span className="dre-pct" style={{ fontWeight: 700 }}>{pct(dados.lucroBruto)}</span>
-        </div>
 
         {/* Despesas */}
         <div className="dre-row dre-row-cat">DESPESAS OPERACIONAIS</div>
@@ -850,17 +805,26 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
 /* ══════════════════════════════════════════════════════
    RELATÓRIO: FINANCEIRO (CAIXA)
    ══════════════════════════════════════════════════════ */
-function RelatorioFinanceiro({ caixa, intervalo }) {
+function RelatorioFinanceiro({ caixa, despesas, intervalo }) {
   const dados = useMemo(() => {
     const filtrado = caixa.filter((c) => dentroDoIntervalo(c.data, intervalo));
     const entradas = filtrado.filter((c) =>
       (c.tipo || "").toLowerCase().includes("entrada") || Number(c.valor || 0) > 0 && !c.tipo
     );
-    const saidas = filtrado.filter((c) =>
+    const saidasCaixa = filtrado.filter((c) =>
       (c.tipo || "").toLowerCase().includes("saida") || (c.tipo || "").toLowerCase().includes("saída")
     );
-    const totalEntradas = entradas.reduce((s, c) => s + Number(c.valor || 0), 0);
-    const totalSaidas   = saidas.reduce((s, c) => s + Number(c.valor || 0), 0);
+
+    // Despesas pagas no período (herdadas como saídas)
+    const despesasPagas = despesas.filter((d) =>
+      d.status === "pago" &&
+      dentroDoIntervalo(d.dataPagamentoTs || d.dataPagamento || d.vencimento, intervalo)
+    );
+
+    const totalEntradas  = entradas.reduce((s, c) => s + Number(c.valor || 0), 0);
+    const totalSaidasCaixa = saidasCaixa.reduce((s, c) => s + Number(c.valor || 0), 0);
+    const totalDespesas  = despesasPagas.reduce((s, d) => s + Number(d.valor || 0), 0);
+    const totalSaidas    = totalSaidasCaixa + totalDespesas;
     const saldo = totalEntradas - totalSaidas;
 
     /* Agrupar por dia para caixa diário */
@@ -873,6 +837,15 @@ function RelatorioFinanceiro({ caixa, intervalo }) {
       const isEntrada = (c.tipo || "").toLowerCase().includes("entrada");
       if (isEntrada) porDia[key].entradas += Number(c.valor || 0);
       else            porDia[key].saidas  += Number(c.valor || 0);
+    });
+    // Adicionar despesas pagas por dia
+    despesasPagas.forEach((d) => {
+      const rawDate = d.dataPagamentoTs || d.dataPagamento || d.vencimento;
+      const dt = parseDate(rawDate);
+      if (!dt) return;
+      const key = dt.toLocaleDateString("pt-BR");
+      if (!porDia[key]) porDia[key] = { data: rawDate, entradas: 0, saidas: 0 };
+      porDia[key].saidas += Number(d.valor || 0);
     });
 
     const linhasDiarias = Object.entries(porDia)
@@ -888,8 +861,8 @@ function RelatorioFinanceiro({ caixa, intervalo }) {
         saldo: v.entradas - v.saidas,
       }));
 
-    return { totalEntradas, totalSaidas, saldo, linhasDiarias, qtde: filtrado.length };
-  }, [caixa, intervalo]);
+    return { totalEntradas, totalSaidas, saldo, linhasDiarias, qtde: filtrado.length + despesasPagas.length };
+  }, [caixa, despesas, intervalo]);
 
   const handleExport = () => {
     exportarExcel("financeiro", [{
@@ -1406,7 +1379,9 @@ function RelatorioEstoque({ produtos }) {
 /* ══════════════════════════════════════════════════════
    RELATÓRIO: CLIENTES
    ══════════════════════════════════════════════════════ */
-function RelatorioClientes({ clientes, vendas, intervalo }) {
+function RelatorioClientes({ clientes, vendas, intervalo, aReceber = [] }) {
+  const [filtroPendentes, setFiltroPendentes] = useState(false);
+
   const dados = useMemo(() => {
     const total = clientes.length;
 
@@ -1430,7 +1405,30 @@ function RelatorioClientes({ clientes, vendas, intervalo }) {
     );
 
 
-    /* Clientes com fiado */
+    /* Clientes com pagamentos pendentes (a_receber com valorRestante > 0) */
+    const pendentesAReceber = aReceber.filter(
+      (r) => Number(r.valorRestante || 0) > 0 && r.status !== "pago"
+    );
+
+    /* Agrupa valor em aberto por nome do cliente */
+    const valorEmAbertoPorNome = {};
+    pendentesAReceber.forEach((r) => {
+      const nome = (r.clienteNome || "").trim().toLowerCase();
+      if (!nome) return;
+      valorEmAbertoPorNome[nome] = (valorEmAbertoPorNome[nome] || 0) + Number(r.valorRestante || 0);
+    });
+
+    /* Clientes que têm entradas em aberto no AReceber */
+    const clientesPendentes = clientes.filter((c) =>
+      (c.nome || "").trim().toLowerCase() in valorEmAbertoPorNome
+    ).map((c) => ({
+      ...c,
+      _valorEmAberto: valorEmAbertoPorNome[(c.nome || "").trim().toLowerCase()] || 0,
+    }));
+
+    const totalEmAberto = Object.values(valorEmAbertoPorNome).reduce((s, v) => s + v, 0);
+
+    /* Manter compatibilidade legada */
     const comFiado = clientes.filter((c) => Number(c.fiado || c.debito || 0) > 0);
     const totalFiado = comFiado.reduce((s, c) => s + Number(c.fiado || c.debito || 0), 0);
 
@@ -1444,6 +1442,7 @@ function RelatorioClientes({ clientes, vendas, intervalo }) {
     });
 
     const topClientes = Object.entries(gastosPorCliente)
+      .filter(([, totalGasto]) => totalGasto > 0)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
       .map(([chave, totalGasto]) => {
@@ -1458,8 +1457,8 @@ function RelatorioClientes({ clientes, vendas, intervalo }) {
       (a.nome || "").localeCompare(b.nome || "", "pt-BR")
     );
 
-    return { total, ativos, comFiado, totalFiado, topClientes, listaCompleta };
-  }, [clientes, vendas, intervalo]);
+    return { total, ativos, comFiado, totalFiado, topClientes, listaCompleta, gastosPorCliente, clientesPendentes, totalEmAberto };
+  }, [clientes, vendas, intervalo, aReceber]);
 
   const handleExport = () => {
     exportarExcel("clientes", [{
@@ -1487,14 +1486,20 @@ function RelatorioClientes({ clientes, vendas, intervalo }) {
           value={String(dados.ativos.length)}
           sub="compraram no período" trend="up" colorVar="var(--green)"
         />
-        <CardResumo
-          icon={<Receipt size={18} />}
-          label="Clientes c/ Fiado"
-          value={String(dados.comFiado.length)}
-          sub={fmtR$(dados.totalFiado) + " em aberto"}
-          trend={dados.comFiado.length > 0 ? "down" : "neutral"}
-          colorVar={dados.comFiado.length > 0 ? "var(--red)" : "var(--text-2)"}
-        />
+        <div
+          onClick={() => setFiltroPendentes((f) => !f)}
+          style={{ cursor: "pointer" }}
+          title="Clique para ver clientes com pagamento pendente"
+        >
+          <CardResumo
+            icon={<Receipt size={18} />}
+            label="Clientes c/ Pagamentos Pendentes"
+            value={String(dados.clientesPendentes.length)}
+            sub={fmtR$(dados.totalEmAberto) + " em aberto"}
+            trend={dados.clientesPendentes.length > 0 ? "down" : "neutral"}
+            colorVar={dados.clientesPendentes.length > 0 ? "var(--red)" : "var(--text-2)"}
+          />
+        </div>
       </div>
 
       {dados.topClientes.length > 0 && (
@@ -1512,23 +1517,36 @@ function RelatorioClientes({ clientes, vendas, intervalo }) {
         </div>
       )}
 
-      {dados.comFiado.length > 0 && (
-        <TabelaRelatorio
-          title="Clientes com Fiado em Aberto"
-          count={dados.comFiado.length}
-          empty=""
-          data={dados.comFiado}
-          columns={[
-            { key: "id",   label: "ID", render: (v) => <span style={{ color: "var(--gold)", fontFamily: "'Sora', sans-serif", fontSize: 11 }}>{v}</span> },
-            { key: "nome", label: "Nome" },
-            { key: "telefone", label: "Telefone" },
-            { key: "fiado", label: "Fiado", align: "right",
-              render: (v, row) => <span className="val-neg">{fmtR$(v || row.debito)}</span> },
-          ]}
-        />
+      {filtroPendentes && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0 6px" }}>
+            <span style={{ fontSize: 12, color: "var(--text-3)" }}>
+              Mostrando apenas clientes com pagamentos pendentes
+            </span>
+            <button
+              className="btn-secondary"
+              style={{ fontSize: 11, padding: "4px 12px" }}
+              onClick={() => setFiltroPendentes(false)}
+            >
+              <X size={11} /> Limpar filtro
+            </button>
+          </div>
+          <TabelaRelatorio
+            title="Clientes com Pagamentos Pendentes"
+            count={dados.clientesPendentes.length}
+            empty="Nenhum cliente com pagamento pendente."
+            data={dados.clientesPendentes}
+            columns={[
+              { key: "id",   label: "ID", render: (v) => <span style={{ color: "var(--gold)", fontFamily: "'Sora', sans-serif", fontSize: 11 }}>{v}</span> },
+              { key: "nome", label: "Nome" },
+              { key: "telefone", label: "Telefone" },
+              { key: "_valorEmAberto", label: "Em Aberto", align: "right",
+                render: (v) => <span className="val-neg">{fmtR$(v || 0)}</span> },
+            ]}
+          />
+        </div>
       )}
 
-      {/* CORREÇÃO 5: Lista completa de todos os clientes — estava ausente */}
       <TabelaRelatorio
         title="Todos os Clientes"
         count={dados.total}
@@ -1540,6 +1558,16 @@ function RelatorioClientes({ clientes, vendas, intervalo }) {
           { key: "telefone", label: "Telefone" },
           { key: "cpf",      label: "CPF / CNPJ" },
           { key: "email",    label: "E-mail" },
+          { key: "nome",     label: "Valor Gasto", align: "right",
+            render: (nome, row) => {
+              const chave = row.id || (nome || "").trim().toLowerCase();
+              const val = dados.gastosPorCliente[chave]
+                ?? dados.gastosPorCliente[(nome || "").trim().toLowerCase()]
+                ?? 0;
+              return val > 0
+                ? <span className="val-pos">{fmtR$(val)}</span>
+                : <span style={{ color: "var(--text-3)" }}>—</span>;
+            }},
           { key: "fiado",    label: "Fiado", align: "right",
             render: (v, row) => {
               const val = Number(v || row.debito || 0);
@@ -1762,6 +1790,7 @@ export default function Relatorios() {
   const [produtos,  setProdutos]  = useState([]);
   const [agenda,    setAgenda]    = useState([]);
   const [caixa,     setCaixa]     = useState([]);
+  const [aReceber,  setAReceber]  = useState([]);
 
   // Permissão por sub-relatório
   const temAcesso = (id) => {
@@ -1785,6 +1814,8 @@ export default function Relatorios() {
       onSnapshot(col("eventos"),   (s) => setAgenda(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => {}),
       onSnapshot(col("caixa"),    (s) => setCaixa(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        () => {}),
+      onSnapshot(col("a_receber"), (s) => setAReceber(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => {}),
     ];
 
@@ -1827,11 +1858,11 @@ export default function Relatorios() {
     }
     switch (ativo) {
       case "dre":        return <RelatorioDRE vendas={vendas} despesas={despesas} caixa={caixa} intervalo={intervalo} uid={tenantUid} />;
-      case "financeiro": return <RelatorioFinanceiro caixa={caixa} intervalo={intervalo} />;
+      case "financeiro": return <RelatorioFinanceiro caixa={caixa} despesas={despesas} intervalo={intervalo} />;
       case "vendas":     return <RelatorioVendas vendas={vendas} intervalo={intervalo} />;
       case "despesas":   return <RelatorioDespesas despesas={despesas} intervalo={intervalo} />;
       case "estoque":    return <RelatorioEstoque produtos={produtos} />;
-      case "clientes":   return <RelatorioClientes clientes={clientes} vendas={vendas} intervalo={intervalo} />;
+      case "clientes":   return <RelatorioClientes clientes={clientes} vendas={vendas} intervalo={intervalo} aReceber={aReceber} />;
       case "agenda":     return <RelatorioAgenda agenda={agenda} intervalo={intervalo} />;
       default:           return null;
     }
