@@ -62,6 +62,7 @@ const MENU_SECTIONS = [
   { key: "servicos",        label: "Serviços",           sub: "Catálogo de serviços",     icon: "🔧", locked: false },
   { key: "entrada_estoque", label: "Estoque",             sub: "Movimentação de entrada",  icon: "📥", locked: false },
   { key: "vendas",          label: "Vendas",             sub: "PDV e registro de vendas", icon: "🛒", locked: false },
+  { key: "matriculas",      label: "Matrículas",         sub: "Alunos e mensalidades",    icon: "🎓", locked: false },
   { key: "fiado",           label: "A Receber",           sub: "Contas a receber",         icon: "💳", locked: false },
   { key: "caixa",           label: "Caixa Diário",       sub: "Abertura e fechamento",    icon: "💰", locked: false },
   { key: "despesas",        label: "Despesas",           sub: "Controle de saídas",       icon: "📉", locked: false },
@@ -70,6 +71,7 @@ const MENU_SECTIONS = [
   { key: "agenda",          label: "Agenda",             sub: "Compromissos e tarefas",   icon: "📅", locked: false },
   { key: "orcamentos",         label: "Orçamentos",      sub: "Orçamentos",            icon: "⚡", locked: false },
   { key: "vendedores",      label: "Vendedores",         sub: "Equipe de vendas",         icon: "👔", locked: false },
+   
   { key: "config",          label: "Configurações",      sub: "Esta tela",                icon: "⚙️", locked: true  },
 ];
 
@@ -111,6 +113,7 @@ export const ATALHOS_MAP = [
   { code: "KeyS", display: "Alt + S", key: "servicos",        hint: "Serviços"             },
   { code: "KeyE", display: "Alt + E", key: "entrada_estoque", hint: "Entrada"              },
   { code: "KeyV", display: "Alt + V", key: "vendas",          hint: "Vendas"               },
+   { code: "KeyU", display: "Alt + U", key: "matriculas",      hint: "matrícUlas (alunos)" },
   { code: "KeyF", display: "Alt + F", key: "fiado",           hint: "Fiado (F de Fiado)"   },
   { code: "KeyX", display: "Alt + X", key: "caixa",           hint: "Caixa (Cx)"           },
   { code: "KeyZ", display: "Alt + Z", key: "despesas",        hint: "Despesas"             },
@@ -1036,7 +1039,7 @@ const PAGE_SIZE = 30;
 const MODULOS_LOG = [
   "Todos", "Agenda", "A Receber", "Caixa Diário", "Clientes",
   "Compras", "Configurações", "Despesas", "Entrada de Estoque",
-  "Fornecedores", "Mesas", "Orçamentos", "Produtos",
+  "Fornecedores", "Matrículas", "Mesas", "Orçamentos", "Produtos",
   "Serviços", "Usuários", "Vendas", "Vendedores",
 ];
 
