@@ -1933,8 +1933,27 @@ useEffect(() => {
       await runTransaction(db, async (tx) => {
         /* Ler o contador diretamente do Firestore (valor sempre atual) */
         const userSnap = await tx.get(doc(db, "users", tenantUid));
-        const currentCnt = userSnap.data()?.vendaIdCnt || 0;
-        novoId = gerarIdVenda(currentCnt);
+        let currentCnt = userSnap.data()?.vendaIdCnt || 0;
+
+        /* ── PROTEÇÃO ANTI-COLISÃO ─────────────────────────────────────────
+           Outros módulos (ex: Mesas) podem usar um contador desatualizado e
+           criar uma venda com o mesmo ID que geraríamos agora. Para garantir
+           que nunca sobrescrevemos uma venda existente, verificamos se o ID
+           candidato já existe no Firestore e avançamos o contador até
+           encontrar um slot livre. Isso também corrige automaticamente o
+           contador caso ele tenha sido corrompido por outro módulo.
+        ─────────────────────────────────────────────────────────────────── */
+        let vendaRef;
+        let vendaSnap;
+        let tentativas = 0;
+        do {
+          novoId    = gerarIdVenda(currentCnt);
+          vendaRef  = doc(db, "users", tenantUid, "vendas", novoId);
+          vendaSnap = await tx.get(vendaRef);
+          if (vendaSnap.exists()) currentCnt++;
+          tentativas++;
+          if (tentativas > 200) throw new Error("Não foi possível encontrar um ID disponível para a venda.");
+        } while (vendaSnap.exists());
 
         /* Descontar estoque */
         for (const item of (payload.itens || [])) {
@@ -1943,9 +1962,10 @@ useEffect(() => {
             tx.update(ref, { estoque: increment(-(item.qtd || 1)) });
           }
         }
-        /* Criar venda */
-        tx.set(doc(db, "users", tenantUid, "vendas", novoId), { ...payload, criadoEm: new Date().toISOString() });
-        /* Incrementar contador usando o valor lido do Firestore, não do estado React */
+        /* Criar venda no slot confirmadamente livre */
+        tx.set(vendaRef, { ...payload, criadoEm: new Date().toISOString() });
+        /* Atualizar contador para além do ID recém-usado, corrigindo qualquer
+           valor corrompido que outro módulo possa ter deixado para trás. */
         tx.set(doc(db, "users", tenantUid), { vendaIdCnt: currentCnt + 1 }, { merge: true });
       });
     } catch (err) {
