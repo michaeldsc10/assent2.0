@@ -13,6 +13,7 @@ import {
 
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
+import { logAction, LOG_ACAO, LOG_MODULO } from "../lib/logAction";
 import {
   collection, doc, onSnapshot, writeBatch, updateDoc, deleteDoc, getDoc,
 } from "firebase/firestore";
@@ -624,6 +625,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved 
       if (isEdit) {
         /* Edição: atualiza apenas a doc de compra (sem recriar movimentações/despesas) */
         await updateDoc(doc(collection(db, "users", uid, "compras"), compra.id), compraData);
+        await logAction({ tenantUid: uid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.COMPRAS, descricao: `Editou Compra de ${compraData.fornecedorNome}` });
       } else {
         /* Criação: writeBatch atômico */
         const batch = writeBatch(db);
@@ -1342,7 +1344,7 @@ function ModalConfirmDelete({ titulo, subtitulo, onConfirm, onClose }) {
 /* ═══════════════════════════════════════════════════
    TAB: Compras
    ═══════════════════════════════════════════════════ */
-function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEditarV, podeExcluirV }) {
+function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEditarV, podeExcluirV, nomeUsuario, cargo }) {
   const [search,       setSearch]       = useState("");
   const [filtroStatus, setFiltroStatus] = useState("Todos");
   const [modalNova,    setModalNova]    = useState(false);
@@ -1363,6 +1365,7 @@ function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEdita
   const handleDeletar = async () => {
     if (!deletando) return;
     await deleteDoc(doc(collection(db, "users", uid, "compras"), deletando.id));
+    await logAction({ tenantUid: uid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.COMPRAS, descricao: `Excluiu Compra de ${deletando.fornecedorNome || "Fornecedor"}` });
     setDeletando(null);
   };
 
@@ -1686,7 +1689,7 @@ function TabEstoque({ uid, insumos, movimentacoes, estoquePorInsumo }) {
 export default function Compras() {
   const [tab,  setTab]  = useState("compras");
 
-  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+  const { tenantUid, cargo, nomeUsuario, podeCriar, podeEditar, podeExcluir } = useAuth();
   const uid = tenantUid;
 
   const podeCriarV   = podeCriar("compras");
@@ -1732,11 +1735,13 @@ export default function Compras() {
 
       {tab === "compras" && (
         <TabCompras uid={uid} compras={compras} fornecedores={fornecedores} insumos={insumos}
-          podeCriarV={podeCriarV} podeEditarV={podeEditarV} podeExcluirV={podeExcluirV} />
+          podeCriarV={podeCriarV} podeEditarV={podeEditarV} podeExcluirV={podeExcluirV}
+          nomeUsuario={nomeUsuario} cargo={cargo} />
       )}
       {tab === "insumos" && (
         <TabInsumos uid={uid} insumos={insumos} isPro={isPro && licAtivo}
-          podeCriarV={podeCriarV} podeEditarV={podeEditarV} podeExcluirV={podeExcluirV} />
+          podeCriarV={podeCriarV} podeEditarV={podeEditarV} podeExcluirV={podeExcluirV}
+          nomeUsuario={nomeUsuario} cargo={cargo} />
       )}
       {tab === "estoque" && (
         <TabEstoque uid={uid} insumos={insumos} movimentacoes={movimentacoes} estoquePorInsumo={estoquePorInsumo} />
