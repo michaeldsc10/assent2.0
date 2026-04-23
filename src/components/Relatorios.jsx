@@ -855,94 +855,172 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
 /* ══════════════════════════════════════════════════════
    RELATÓRIO: FINANCEIRO (CAIXA)
    ══════════════════════════════════════════════════════ */
-function RelatorioFinanceiro({ caixa, despesas, intervalo }) {
+function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], intervalo }) {
+  const [filtroTipo, setFiltroTipo] = useState(null); // null | "entrada" | "saida"
+
   const dados = useMemo(() => {
     const filtrado = caixa.filter((c) => dentroDoIntervalo(c.data, intervalo));
-    const entradas = filtrado.filter((c) =>
-      (c.tipo || "").toLowerCase().includes("entrada") || Number(c.valor || 0) > 0 && !c.tipo
+    const entradasCaixa = filtrado.filter((c) =>
+      (c.tipo || "").toLowerCase().includes("entrada") || (Number(c.valor || 0) > 0 && !c.tipo)
     );
     const saidasCaixa = filtrado.filter((c) =>
-      (c.tipo || "").toLowerCase().includes("saida") || (c.tipo || "").toLowerCase().includes("saída")
+      (c.tipo || "").toLowerCase().includes("saida") ||
+      (c.tipo || "").toLowerCase().includes("saída")
     );
 
-    // Despesas pagas no período (herdadas como saídas)
     const despesasPagas = despesas.filter((d) =>
       d.status === "pago" &&
       dentroDoIntervalo(d.dataPagamentoTs || d.dataPagamento || d.vencimento, intervalo)
     );
 
-    const totalEntradas  = entradas.reduce((s, c) => s + Number(c.valor || 0), 0);
+    const totalEntradas    = entradasCaixa.reduce((s, c) => s + Number(c.valor || 0), 0);
     const totalSaidasCaixa = saidasCaixa.reduce((s, c) => s + Number(c.valor || 0), 0);
-    const totalDespesas  = despesasPagas.reduce((s, d) => s + Number(d.valor || 0), 0);
-    const totalSaidas    = totalSaidasCaixa + totalDespesas;
-    const saldo = totalEntradas - totalSaidas;
+    const totalDespesas    = despesasPagas.reduce((s, d) => s + Number(d.valor || 0), 0);
+    const totalSaidas      = totalSaidasCaixa + totalDespesas;
+    const saldo            = totalEntradas - totalSaidas;
 
-    /* Agrupar por dia para caixa diário */
-    const porDia = {};
-    filtrado.forEach((c) => {
-      const dt = parseDate(c.data);
-      if (!dt) return;
-      const key = dt.toLocaleDateString("pt-BR");
-      if (!porDia[key]) porDia[key] = { data: c.data, entradas: 0, saidas: 0 };
-      const isEntrada = (c.tipo || "").toLowerCase().includes("entrada");
-      if (isEntrada) porDia[key].entradas += Number(c.valor || 0);
-      else            porDia[key].saidas  += Number(c.valor || 0);
+    /* Mapa de vendas para enriquecer descrição */
+    const vendasMap = Object.fromEntries((vendas || []).map((v) => [v.id, v]));
+
+    /* ── Montar extrato unificado ── */
+    const transacoes = [];
+
+    entradasCaixa.forEach((c) => {
+      const venda = c.referenciaId ? vendasMap[c.referenciaId] : null;
+      const clienteNome  = c.clienteNome  || venda?.clienteNome  || venda?.cliente  || null;
+      const vendedorNome = c.vendedorNome || venda?.vendedorNome || venda?.vendedor || null;
+
+      let descricao;
+      if (c.origem === "venda") {
+        const partes = ["Venda"];
+        if (clienteNome)  partes.push(`Cliente: ${clienteNome}`);
+        if (vendedorNome) partes.push(`Vendedor: ${vendedorNome}`);
+        descricao = partes.join(" · ");
+      } else {
+        descricao = c.descricao || c.origem || "Entrada de caixa";
+      }
+
+      transacoes.push({
+        _id: `c-${c.id}`,
+        data: c.data,
+        dataTs: parseDate(c.data),
+        tipo: "entrada",
+        descricao,
+        entrada: Number(c.valor || 0),
+        saida: 0,
+      });
     });
-    // Adicionar despesas pagas por dia
+
+    saidasCaixa.forEach((c) => {
+      transacoes.push({
+        _id: `cs-${c.id}`,
+        data: c.data,
+        dataTs: parseDate(c.data),
+        tipo: "saida",
+        descricao: c.descricao || "Saída de caixa",
+        entrada: 0,
+        saida: Number(c.valor || 0),
+      });
+    });
+
     despesasPagas.forEach((d) => {
       const rawDate = d.dataPagamentoTs || d.dataPagamento || d.vencimento;
-      const dt = parseDate(rawDate);
-      if (!dt) return;
-      const key = dt.toLocaleDateString("pt-BR");
-      if (!porDia[key]) porDia[key] = { data: rawDate, entradas: 0, saidas: 0 };
-      porDia[key].saidas += Number(d.valor || 0);
+      const partes = [d.descricao || "Despesa"];
+      if (d.categoria) partes.push(`Categoria: ${d.categoria}`);
+      partes.push(`Status: ${d.status === "pago" ? "Pago" : "Pendente"}`);
+
+      transacoes.push({
+        _id: `d-${d.id}`,
+        data: rawDate,
+        dataTs: parseDate(rawDate),
+        tipo: "saida",
+        descricao: partes.join(" · "),
+        entrada: 0,
+        saida: Number(d.valor || 0),
+      });
     });
 
-    const linhasDiarias = Object.entries(porDia)
-      .sort((a, b) => {
-        const da = parseDate(porDia[a[0]].data);
-        const db2 = parseDate(porDia[b[0]].data);
-        return (db2 || 0) - (da || 0);
-      })
-      .map(([dia, v]) => ({
-        dia,
-        entradas: v.entradas,
-        saidas: v.saidas,
-        saldo: v.entradas - v.saidas,
-      }));
+    /* Calcular saldo acumulado (do mais antigo para o mais novo) */
+    transacoes.sort((a, b) => (a.dataTs || 0) - (b.dataTs || 0));
+    let acc = 0;
+    transacoes.forEach((t) => {
+      acc += t.entrada - t.saida;
+      t.saldoAcumulado = acc;
+    });
+    /* Exibir do mais recente para o mais antigo */
+    transacoes.reverse();
 
-    return { totalEntradas, totalSaidas, saldo, linhasDiarias, qtde: filtrado.length + despesasPagas.length };
-  }, [caixa, despesas, intervalo]);
+    return {
+      totalEntradas,
+      totalSaidas,
+      saldo,
+      transacoes,
+      qtde: filtrado.length + despesasPagas.length,
+    };
+  }, [caixa, despesas, vendas, vendedores, intervalo]);
+
+  const handleCardClick = (tipo) =>
+    setFiltroTipo((prev) => (prev === tipo ? null : tipo));
+
+  const transacoesFiltradas = useMemo(() => {
+    if (!filtroTipo) return dados.transacoes;
+    return dados.transacoes.filter((t) => t.tipo === filtroTipo);
+  }, [dados.transacoes, filtroTipo]);
 
   const handleExport = () => {
     exportarExcel("financeiro", [{
-      nome: "Caixa Diário",
-      colunas: ["Data", "Entradas (R$)", "Saídas (R$)", "Saldo Dia (R$)"],
-      dados: dados.linhasDiarias.map((r) => [
-        r.dia,
-        r.entradas.toFixed(2),
-        r.saidas.toFixed(2),
-        r.saldo.toFixed(2),
+      nome: "Extrato Financeiro",
+      colunas: ["Data", "Descrição", "Entrada (R$)", "Saída (R$)", "Saldo (R$)"],
+      dados: transacoesFiltradas.map((t) => [
+        fmtData(t.data),
+        t.descricao,
+        t.entrada > 0 ? t.entrada.toFixed(2) : "",
+        t.saida   > 0 ? t.saida.toFixed(2)   : "",
+        t.saldoAcumulado?.toFixed(2) ?? "",
       ]),
     }]);
   };
 
+  const cardStyle = (tipo, cor) => ({
+    cursor: "pointer",
+    borderRadius: 12,
+    outline: filtroTipo === tipo ? `2px solid ${cor}` : "2px solid transparent",
+    outlineOffset: 2,
+    transition: "outline 0.15s",
+  });
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* ── Cards clicáveis ── */}
       <div className="cr-grid">
-        <CardResumo
-          icon={<ArrowUpRight size={18} />}
-          label="Total Entradas"
-          value={fmtR$(dados.totalEntradas)}
-          sub={`${dados.qtde} movimentações`}
-          trend="up" colorVar="var(--green)"
-        />
-        <CardResumo
-          icon={<ArrowDownRight size={18} />}
-          label="Total Saídas"
-          value={fmtR$(dados.totalSaidas)}
-          sub="no período" trend="down" colorVar="var(--red)"
-        />
+        <div
+          onClick={() => handleCardClick("entrada")}
+          style={cardStyle("entrada", "var(--green)")}
+          title="Clique para filtrar apenas entradas"
+        >
+          <CardResumo
+            icon={<ArrowUpRight size={18} />}
+            label="Total Entradas"
+            value={fmtR$(dados.totalEntradas)}
+            sub={`${dados.qtde} movimentações`}
+            trend="up" colorVar="var(--green)"
+          />
+        </div>
+
+        <div
+          onClick={() => handleCardClick("saida")}
+          style={cardStyle("saida", "var(--red)")}
+          title="Clique para filtrar apenas saídas e despesas"
+        >
+          <CardResumo
+            icon={<ArrowDownRight size={18} />}
+            label="Total Saídas"
+            value={fmtR$(dados.totalSaidas)}
+            sub="no período" trend="down" colorVar="var(--red)"
+          />
+        </div>
+
         <CardResumo
           icon={<Wallet size={18} />}
           label="Saldo do Período"
@@ -953,25 +1031,88 @@ function RelatorioFinanceiro({ caixa, despesas, intervalo }) {
         />
       </div>
 
+      {/* ── Indicador de filtro ativo ── */}
+      {filtroTipo && (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "6px 14px", borderRadius: 8,
+          background: filtroTipo === "entrada" ? "rgba(74,222,128,0.07)" : "rgba(224,82,82,0.07)",
+          border: `1px solid ${filtroTipo === "entrada" ? "rgba(74,222,128,0.2)" : "rgba(224,82,82,0.2)"}`,
+        }}>
+          <span style={{ fontSize: 12, color: "var(--text-3)" }}>
+            Mostrando apenas:{" "}
+            <strong style={{ color: filtroTipo === "entrada" ? "var(--green)" : "var(--red)" }}>
+              {filtroTipo === "entrada" ? "Entradas" : "Saídas / Despesas"}
+            </strong>
+            {" "}· {transacoesFiltradas.length} registro{transacoesFiltradas.length !== 1 ? "s" : ""}
+          </span>
+          <button
+            className="btn-secondary"
+            style={{ fontSize: 11, padding: "4px 12px" }}
+            onClick={() => setFiltroTipo(null)}
+          >
+            <X size={11} /> Limpar filtro
+          </button>
+        </div>
+      )}
+
+      {/* ── Extrato com descrição ── */}
       <TabelaRelatorio
-        title="Caixa Diário"
-        count={dados.linhasDiarias.length}
+        title="Extrato Financeiro"
+        count={transacoesFiltradas.length}
         empty="Nenhuma movimentação no período."
-        data={dados.linhasDiarias}
+        data={transacoesFiltradas}
         columns={[
-          { key: "dia", label: "Data" },
           {
-            key: "entradas", label: "Entradas", align: "right",
-            render: (v) => <span className="val-pos">{fmtR$(v)}</span>,
-          },
-          {
-            key: "saidas", label: "Saídas", align: "right",
-            render: (v) => <span className="val-neg">{fmtR$(v)}</span>,
-          },
-          {
-            key: "saldo", label: "Saldo", align: "right",
+            key: "data",
+            label: "Data",
             render: (v) => (
-              <span className={v >= 0 ? "val-pos" : "val-neg"}>{fmtR$(v)}</span>
+              <span style={{ whiteSpace: "nowrap" }}>{fmtData(v)}</span>
+            ),
+          },
+          {
+            key: "descricao",
+            label: "Descrição",
+            render: (v, row) => (
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{
+                  fontSize: 12, color: "var(--text)", fontWeight: 500,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  maxWidth: 360,
+                }}>
+                  {v}
+                </span>
+                <span style={{
+                  fontSize: 10, color: row.tipo === "entrada" ? "var(--green)" : "var(--red)",
+                  textTransform: "uppercase", letterSpacing: "0.05em", fontWeight: 600,
+                }}>
+                  {row.tipo === "entrada" ? "▲ Entrada" : "▼ Saída"}
+                </span>
+              </div>
+            ),
+          },
+          {
+            key: "entrada",
+            label: "Entrada",
+            align: "right",
+            render: (v) => v > 0
+              ? <span className="val-pos">{fmtR$(v)}</span>
+              : <span style={{ color: "var(--text-3)" }}>—</span>,
+          },
+          {
+            key: "saida",
+            label: "Saída",
+            align: "right",
+            render: (v) => v > 0
+              ? <span className="val-neg">{fmtR$(v)}</span>
+              : <span style={{ color: "var(--text-3)" }}>—</span>,
+          },
+          {
+            key: "saldoAcumulado",
+            label: "Saldo",
+            align: "right",
+            render: (v) => (
+              <span className={v >= 0 ? "val-pos" : "val-neg"}>{fmtR$(v || 0)}</span>
             ),
           },
         ]}
@@ -2242,7 +2383,7 @@ export default function Relatorios() {
     }
     switch (ativo) {
       case "dre":        return <RelatorioDRE vendas={vendas} despesas={despesas} caixa={caixa} intervalo={intervalo} uid={tenantUid} />;
-      case "financeiro": return <RelatorioFinanceiro caixa={caixa} despesas={despesas} intervalo={intervalo} />;
+      case "financeiro": return <RelatorioFinanceiro caixa={caixa} despesas={despesas} vendas={vendas} vendedores={vendedores} intervalo={intervalo} />;
       case "vendas":     return <RelatorioVendas vendas={vendas} intervalo={intervalo} />;
       case "despesas":   return <RelatorioDespesas despesas={despesas} intervalo={intervalo} />;
       case "estoque":    return <RelatorioEstoque produtos={produtos} />;
