@@ -1193,7 +1193,7 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
       const payload = {
         cliente: clienteNome.trim() || `Mesa ${mesa.numero}`,
         data: new Date(),
-        vendedor: nomeUsuario,
+        vendedor: cargo ? `${nomeUsuario} (${cargo})` : nomeUsuario,
         formaPagamento: formaPgto === "Em aberto" ? "Dinheiro" : formaPgto,
         observacao: `Mesa ${mesa.numero}`,
         tipo: "produto",
@@ -1307,7 +1307,7 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
       const payload = {
         cliente: clienteNome.trim() || `Mesa ${mesa.numero}`,
         data: new Date(),
-        vendedor: nomeUsuario,
+        vendedor: cargo ? `${nomeUsuario} (${cargo})` : nomeUsuario,
         formaPagamento: "Cancelado",
         observacao: `Mesa ${mesa.numero} — Cancelado: ${motivoCancelamento.trim()}`,
         tipo: "produto",
@@ -1321,11 +1321,14 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
         valorTaxa: 0,
         valorPago: 0,
         valorRestante: 0,
+        status: "cancelada",
         statusPagamento: "cancelado",
         valorRecebido: 0,
         origem: "mesa",
         mesaNumero: mesa.numero,
         motivoCancelamento: motivoCancelamento.trim(),
+        canceladaEm: new Date().toISOString(),
+        canceladaPor: cargo ? `${nomeUsuario} (${cargo})` : nomeUsuario,
         canceladoEm: new Date().toISOString(),
         itens: itens.map(i => ({
           produtoId: i.produtoId || null,
