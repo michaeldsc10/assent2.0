@@ -26,6 +26,7 @@ import {
 
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
+import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
 import { TelaBloqueada } from "../hooks/LicencaUI.jsx";
 import {
   collection, doc, onSnapshot,
@@ -1446,7 +1447,7 @@ export default function Orcamentos({ isPro = false }) {
 
 
   // ── Multi-tenant ──
-  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+  const { tenantUid, cargo, nomeUsuario, podeCriar, podeEditar, podeExcluir } = useAuth();
   const uid = tenantUid; // alias — uid é passado como prop a vários sub-componentes
 
   // ── Flags de permissão ──
@@ -1485,6 +1486,7 @@ export default function Orcamentos({ isPro = false }) {
       await runTransaction(db, async tx=>{
         tx.update(ref,{...payload,interacoes:[...interacoes,{tipo:"edicao",descricao:"Orçamento editado",data:Timestamp.now()}]});
       });
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.ORCAMENTOS, descricao: montarDescricao("editar", "Orçamento", payload.cliente?.nome || "Cliente", orcExistente.id) });
       setEditando(null);
     } else {
       const cntRef = doc(db,"users",uid);
@@ -1508,6 +1510,7 @@ export default function Orcamentos({ isPro = false }) {
           conversao:{convertido:false,vendaId:null,dataConversao:null},
         });
       });
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.ORCAMENTOS, descricao: `Criou Orçamento para ${payload.cliente?.nome || "Cliente"}` });
       setModalNovo(false);
     }
   };
