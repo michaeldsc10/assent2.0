@@ -70,7 +70,7 @@ const KEY_MAP = {
   "Serviços":           "servicos",
   "Estoque": "entrada_estoque",
   "Vendas":             "vendas",
-  "Matriculas"            "alunos"
+  "Matriculas"            "matriculas"
   "Fiado / A Receber":  "fiado",
   "Caixa Diário":       "caixa",
   "Despesas":           "despesas",
