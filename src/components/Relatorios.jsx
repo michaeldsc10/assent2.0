@@ -785,7 +785,7 @@ function exportarExcel(nomeRelatorio, sheets) {
 /* ══════════════════════════════════════════════════════
    RELATÓRIO: DRE
    ══════════════════════════════════════════════════════ */
-function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
+function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], intervalo, uid }) {
   /* Estado para guardar taxas do Firestore (config/geral) — usadas só como fallback */
   const [configTaxas, setConfigTaxas] = useState(null);
 
@@ -897,9 +897,38 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
 
     const receitaLiquida = receitaBruta - descontosTotais - taxasCartao;
 
+    /* ══════════════════════════════════════════════════════════════════
+       COMISSÕES DE VENDEDORES
+       Mesma fórmula do Vendedores.jsx: (total - custoTotal) × (% / 100)
+       Aplicada sobre todas as vendas que compõem a receita do período.
+    ═══════════════════════════════════════════════════════════════════ */
+    const vendedoresMap = Object.fromEntries(vendedores.map((v) => [v.id, v]));
+
+    /* Comissão por vendedor — para exibição detalhada */
+    const comissaoPorVendedor = {};
+    let totalComissoes = 0;
+
+    todasVendasReceita.forEach((v) => {
+      if (!v.vendedorId) return;
+      const vendedor = vendedoresMap[v.vendedorId];
+      if (!vendedor || vendedor.comissao == null || vendedor.comissao <= 0) return;
+
+      const itens = v.itens || [];
+      const total = Number(v.total || 0);
+      const custoTotal = itens.reduce((s, it) => s + Number(it.custo || 0) * Number(it.qtd || it.quantidade || 1), 0);
+      const lucro = total - custoTotal;
+      const comissao = lucro > 0 ? lucro * (vendedor.comissao / 100) : 0;
+
+      if (!comissaoPorVendedor[vendedor.id]) {
+        comissaoPorVendedor[vendedor.id] = { nome: vendedor.nome, pct: vendedor.comissao, valor: 0 };
+      }
+      comissaoPorVendedor[vendedor.id].valor += comissao;
+      totalComissoes += comissao;
+    });
+
     const lucroBruto    = receitaLiquida;
     const totalDespesas = dFiltradas.reduce((s, d) => s + Number(d.valor || 0), 0);
-    const lucroLiquido  = lucroBruto - totalDespesas;
+    const lucroLiquido  = lucroBruto - totalDespesas - totalComissoes;
     const margem        = receitaBruta > 0 ? (lucroLiquido / receitaBruta) * 100 : 0;
 
     /* Despesas por categoria */
@@ -913,14 +942,15 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
     return {
       receitaBruta, receitaLiquida, descontosTotais,
       taxasCartao, lucroBruto,
-      totalDespesas, lucroLiquido, margem,
+      totalDespesas, totalComissoes, comissaoPorVendedor,
+      lucroLiquido, margem,
       qtdeVendas: todasVendasReceita.length,
       porCategoria,
       /* informativo */
       _entradaNovasCaixa: caixaVendas.length,
       _vendasLegadas: vendasLegadas.length,
     };
-  }, [vendas, despesas, caixa, intervalo, calcularTaxaFallback]);
+  }, [vendas, despesas, caixa, vendedores, intervalo, calcularTaxaFallback]);
 
   const pct = (v) =>
     dados.receitaBruta > 0
@@ -937,6 +967,12 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
         ["= Receita Líquida",     dados.receitaLiquida.toFixed(2), pct(dados.receitaLiquida)],
         ["(-) Despesas Totais",    `-${dados.totalDespesas.toFixed(2)}`, pct(dados.totalDespesas)],
         ...Object.entries(dados.porCategoria).map(([k, v]) => [`  · ${k}`, `-${v.toFixed(2)}`, pct(v)]),
+        ...(dados.totalComissoes > 0
+          ? [
+              ["(-) Comissões de Vendedores", `-${dados.totalComissoes.toFixed(2)}`, pct(dados.totalComissoes)],
+              ...Object.values(dados.comissaoPorVendedor).map((c) => [`  · ${c.nome} (${c.pct}%)`, `-${c.valor.toFixed(2)}`, pct(c.valor)]),
+            ]
+          : []),
         ["= Lucro Líquido",        dados.lucroLiquido.toFixed(2), fmtPct(dados.margem)],
       ],
     }]);
@@ -962,6 +998,16 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
           trend="down"
           colorVar="var(--red)"
         />
+        {dados.totalComissoes > 0 && (
+          <CardResumo
+            icon={<Users size={18} />}
+            label="Comissões"
+            value={fmtR$(dados.totalComissoes)}
+            sub={`${Object.keys(dados.comissaoPorVendedor).length} vendedor(es)`}
+            trend="down"
+            colorVar="var(--gold)"
+          />
+        )}
         <CardResumo
           icon={<Wallet size={18} />}
           label="Lucro Líquido"
@@ -1034,6 +1080,27 @@ function RelatorioDRE({ vendas, despesas, caixa = [], intervalo, uid }) {
               <span className="dre-pct">{pct(dados.totalDespesas)}</span>
             </div>
         }
+
+        {/* Comissões de Vendedores */}
+        {dados.totalComissoes > 0 && (
+          <>
+            <div className="dre-row dre-row-cat">COMISSÕES DE VENDEDORES</div>
+            {Object.values(dados.comissaoPorVendedor)
+              .sort((a, b) => b.valor - a.valor)
+              .map((c) => (
+                <div key={c.nome} className="dre-row">
+                  <span className="dre-sub-label">(-) {c.nome}
+                    <span style={{ fontSize: 10, color: "var(--text-3)", marginLeft: 6 }}>
+                      {c.pct}% s/ lucro
+                    </span>
+                  </span>
+                  <span className="dre-val dre-negativo">- {fmtR$(c.valor)}</span>
+                  <span className="dre-pct">{pct(c.valor)}</span>
+                </div>
+              ))
+            }
+          </>
+        )}
 
         {/* Lucro Líquido */}
         <div className="dre-row dre-row-result">
@@ -3502,7 +3569,7 @@ export default function Relatorios() {
       );
     }
     switch (ativo) {
-      case "dre":        return <RelatorioDRE vendas={vendas} despesas={despesas} caixa={caixa} intervalo={intervalo} uid={tenantUid} />;
+      case "dre":        return <RelatorioDRE vendas={vendas} despesas={despesas} caixa={caixa} vendedores={vendedores} intervalo={intervalo} uid={tenantUid} />;
       case "financeiro": return <RelatorioFinanceiro caixa={caixa} despesas={despesas} vendas={vendas} vendedores={vendedores} intervalo={intervalo} />;
       case "vendas":     return <RelatorioVendas vendas={vendas} intervalo={intervalo} />;
       case "despesas":   return <RelatorioDespesas despesas={despesas} intervalo={intervalo} />;
