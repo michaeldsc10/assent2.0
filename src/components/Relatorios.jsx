@@ -1787,64 +1787,131 @@ function RelatorioAgenda({ agenda, intervalo }) {
 /* ══════════════════════════════════════════════════════
    RELATÓRIO: LUCRO POR PRODUTO / SERVIÇO
    ══════════════════════════════════════════════════════ */
-function RelatorioLucroPorPS({ vendas, produtos, servicos, intervalo }) {
+function RelatorioLucroPorPS({ vendas, produtos, servicos, vendedores, intervalo }) {
   const [aba, setAba]         = useState("produtos");
   const [filtroOrdem, setFiltroOrdem] = useState("padrao"); // "padrao" | "mais" | "menos"
+
+  /* Helper: mesma fórmula do Vendedores.jsx
+     Comissão = (total - custo_total_itens) × (% / 100)
+     Só aplica se o vendedor tiver comissao > 0 */
+  const calcComissaoVenda = (venda, pct) => {
+    if (!pct || pct <= 0) return 0;
+    const itens = venda.itens || [];
+    const total = typeof venda.total === "number"
+      ? venda.total
+      : itens.reduce((s, i) => s + (Number(i.preco || 0) * Number(i.qtd || 1)), 0);
+    const custoTotal = itens.reduce((s, i) => s + (Number(i.custo || 0) * Number(i.qtd || 1)), 0);
+    const lucro = total - custoTotal;
+    return lucro > 0 ? lucro * (pct / 100) : 0;
+  };
 
   const dados = useMemo(() => {
     const vendasPeriodo = vendas.filter((v) => dentroDoIntervalo(v.data, intervalo));
 
-    /* Agrega faturamento e custo por nome de item nas vendas do período */
+    /* Mapa vendedorId → percentual de comissão (só com comissao > 0) */
+    const comissaoMap = {};
+    vendedores.forEach((vd) => {
+      if (vd.comissao != null && Number(vd.comissao) > 0)
+        comissaoMap[vd.id] = Number(vd.comissao);
+    });
+
+    /* Comissão total do período (soma de todas as vendas com vendedor comissionado) */
+    let totalComissoesPeriodo = 0;
+    const comissaoPorVendedor = {}; // vendedorId → { nome, pct, valor }
+
+    vendasPeriodo.forEach((v) => {
+      const pct = v.vendedorId ? comissaoMap[v.vendedorId] : undefined;
+      if (!pct) return;
+      const val = calcComissaoVenda(v, pct);
+      totalComissoesPeriodo += val;
+      if (!comissaoPorVendedor[v.vendedorId]) {
+        const vd = vendedores.find((x) => x.id === v.vendedorId);
+        comissaoPorVendedor[v.vendedorId] = { nome: vd?.nome || v.vendedorId, pct, valor: 0 };
+      }
+      comissaoPorVendedor[v.vendedorId].valor += val;
+    });
+
+    /* Proporção da comissão por item: distribui a comissão de cada venda
+       proporcionalmente ao faturamento de cada item naquela venda */
     const agregar = (tipo) => {
-      /* tipo: "produto" | "servico" — tenta detectar pelo catálogo */
       const catalogo = tipo === "produto" ? produtos : servicos;
-      const nomesMap = {}; // nome_lower → { nome, fat, custo, qtd }
+      const nomesMap = {}; // nome_lower → { nome, fat, custo, comissao, qtd }
 
       vendasPeriodo.forEach((v) => {
+        const pct = v.vendedorId ? comissaoMap[v.vendedorId] : undefined;
+        const comissaoVenda = pct ? calcComissaoVenda(v, pct) : 0;
+
+        /* Faturamento total da venda (para distribuição proporcional) */
+        const fatVendaTotal = (v.itens || []).reduce((s, i) => {
+          const nomeI = (i.nome || i.produto || i.servico || "").trim();
+          const nocat = catalogo.find((c) => (c.nome || "").trim().toLowerCase() === nomeI.toLowerCase());
+          if (!nocat) return s;
+          return s + Number(i.preco || i.precoUnit || i.valor || nocat.preco || 0) * Number(i.qtd || i.quantidade || 1);
+        }, 0);
+
         (v.itens || []).forEach((item) => {
           const nomeItem = (item.nome || item.produto || item.servico || "").trim();
           if (!nomeItem) return;
           const nomeLower = nomeItem.toLowerCase();
 
-          /* Verifica se pertence ao catálogo correto */
           const nocat = catalogo.find(
             (c) => (c.nome || "").trim().toLowerCase() === nomeLower
           );
           if (!nocat) return;
 
-          const qtd     = Number(item.qtd || item.quantidade || 1);
-          const preco   = Number(item.preco || item.precoUnit || item.valor || nocat.preco || 0);
-          const custoU  = Number(item.custo || item.custoUnit || nocat.custo || 0);
+          const qtd    = Number(item.qtd || item.quantidade || 1);
+          const preco  = Number(item.preco || item.precoUnit || item.valor || nocat.preco || 0);
+          const custoU = Number(item.custo || item.custoUnit || nocat.custo || 0);
+          const fatItem = preco * qtd;
+
+          /* Comissão proporcional ao peso do item no faturamento da venda */
+          const proporcao       = fatVendaTotal > 0 ? fatItem / fatVendaTotal : 0;
+          const comissaoItem    = comissaoVenda * proporcao;
 
           if (!nomesMap[nomeLower]) {
-            nomesMap[nomeLower] = { nome: nocat.nome || nomeItem, fat: 0, custo: 0, qtd: 0 };
+            nomesMap[nomeLower] = { nome: nocat.nome || nomeItem, fat: 0, custo: 0, comissao: 0, qtd: 0 };
           }
-          nomesMap[nomeLower].fat   += preco  * qtd;
-          nomesMap[nomeLower].custo += custoU * qtd;
-          nomesMap[nomeLower].qtd   += qtd;
+          nomesMap[nomeLower].fat      += fatItem;
+          nomesMap[nomeLower].custo    += custoU * qtd;
+          nomesMap[nomeLower].comissao += comissaoItem;
+          nomesMap[nomeLower].qtd      += qtd;
         });
       });
 
       return Object.values(nomesMap)
-        .map((r) => ({ ...r, lucro: r.fat - r.custo }))
+        .map((r) => ({
+          ...r,
+          lucrobruto: r.fat - r.custo,
+          lucro:      r.fat - r.custo - r.comissao, // lucro líquido após comissão
+        }))
         .sort((a, b) => b.fat - a.fat);
     };
 
-    const listaProdutos  = agregar("produto");
-    const listaServicos  = agregar("servico");
+    const listaProdutos = agregar("produto");
+    const listaServicos = agregar("servico");
 
     const totais = (lista) => lista.reduce(
-      (acc, r) => ({ fat: acc.fat + r.fat, custo: acc.custo + r.custo, lucro: acc.lucro + r.lucro }),
-      { fat: 0, custo: 0, lucro: 0 }
+      (acc, r) => ({
+        fat:      acc.fat      + r.fat,
+        custo:    acc.custo    + r.custo,
+        comissao: acc.comissao + r.comissao,
+        lucro:    acc.lucro    + r.lucro,
+      }),
+      { fat: 0, custo: 0, comissao: 0, lucro: 0 }
     );
+
+    const temComissao = totalComissoesPeriodo > 0;
 
     return {
       listaProdutos,
       listaServicos,
       totaisProdutos: totais(listaProdutos),
       totaisServicos: totais(listaServicos),
+      temComissao,
+      totalComissoesPeriodo,
+      comissaoPorVendedor: Object.values(comissaoPorVendedor),
     };
-  }, [vendas, produtos, servicos, intervalo]);
+  }, [vendas, produtos, servicos, vendedores, intervalo]);
 
   const pctMargem = (fat, lucro) =>
     fat > 0 ? (lucro / fat) * 100 : 0;
@@ -1865,29 +1932,20 @@ function RelatorioLucroPorPS({ vendas, produtos, servicos, intervalo }) {
   const label   = aba === "produtos" ? "Produto" : "Serviço";
 
   const handleExport = () => {
+    const colsProd = dados.temComissao
+      ? ["Produto", "Qtd.", "Faturamento (R$)", "Custo (R$)", "Comissão (R$)", "Lucro Líquido (R$)", "Margem (%)"]
+      : ["Produto", "Qtd.", "Faturamento (R$)", "Custo (R$)", "Lucro (R$)", "Margem (%)"];
+    const colsServ = dados.temComissao
+      ? ["Serviço", "Qtd.", "Faturamento (R$)", "Custo (R$)", "Comissão (R$)", "Lucro Líquido (R$)", "Margem (%)"]
+      : ["Serviço", "Qtd.", "Faturamento (R$)", "Custo (R$)", "Lucro (R$)", "Margem (%)"];
+
+    const mapRow = (r) => dados.temComissao
+      ? [r.nome, r.qtd, r.fat.toFixed(2), r.custo.toFixed(2), r.comissao.toFixed(2), r.lucro.toFixed(2), pctMargem(r.fat, r.lucro).toFixed(2) + "%"]
+      : [r.nome, r.qtd, r.fat.toFixed(2), r.custo.toFixed(2), r.lucro.toFixed(2), pctMargem(r.fat, r.lucro).toFixed(2) + "%"];
+
     exportarExcel("lucro_por_ps", [
-      {
-        nome: "Produtos",
-        colunas: ["Produto", "Faturamento (R$)", "Custo (R$)", "Lucro (R$)", "Margem (%)"],
-        dados: dados.listaProdutos.map((r) => [
-          r.nome,
-          r.fat.toFixed(2),
-          r.custo.toFixed(2),
-          r.lucro.toFixed(2),
-          pctMargem(r.fat, r.lucro).toFixed(2) + "%",
-        ]),
-      },
-      {
-        nome: "Serviços",
-        colunas: ["Serviço", "Faturamento (R$)", "Custo (R$)", "Lucro (R$)", "Margem (%)"],
-        dados: dados.listaServicos.map((r) => [
-          r.nome,
-          r.fat.toFixed(2),
-          r.custo.toFixed(2),
-          r.lucro.toFixed(2),
-          pctMargem(r.fat, r.lucro).toFixed(2) + "%",
-        ]),
-      },
+      { nome: "Produtos", colunas: colsProd, dados: dados.listaProdutos.map(mapRow) },
+      { nome: "Serviços", colunas: colsServ, dados: dados.listaServicos.map(mapRow) },
     ]);
   };
 
@@ -1961,11 +2019,21 @@ function RelatorioLucroPorPS({ vendas, produtos, servicos, intervalo }) {
           trend="down"
           colorVar="var(--red)"
         />
+        {dados.temComissao && (
+          <CardResumo
+            icon={<DollarSign size={18} />}
+            label="Comissões"
+            value={fmtR$(totais.comissao)}
+            sub={dados.comissaoPorVendedor.map(c => `${c.nome} (${c.pct}%)`).join(" · ")}
+            trend="down"
+            colorVar="var(--gold)"
+          />
+        )}
         <CardResumo
           icon={<DollarSign size={18} />}
-          label="Lucro"
+          label={dados.temComissao ? "Lucro Líquido" : "Lucro"}
           value={fmtR$(totais.lucro)}
-          sub={`Margem: ${fmtPct(pctMargem(totais.fat, totais.lucro))}`}
+          sub={`Margem: ${fmtPct(pctMargem(totais.fat, totais.lucro))}${dados.temComissao ? " (após comissões)" : ""}`}
           trend={totais.lucro >= 0 ? "up" : "down"}
           colorVar={totais.lucro >= 0 ? "var(--green)" : "var(--red)"}
         />
@@ -1981,11 +2049,12 @@ function RelatorioLucroPorPS({ vendas, produtos, servicos, intervalo }) {
         </div>
 
         {/* Cabeçalho */}
-        <div className="lps-row lps-row-head">
+        <div className="lps-row lps-row-head" style={{ gridTemplateColumns: dados.temComissao ? "1fr 60px 140px 140px 110px 180px" : "1fr 60px 140px 140px 180px" }}>
           <span>{label}</span>
           <span>Qtd.</span>
           <span>Faturamento</span>
           <span>Custo</span>
+          {dados.temComissao && <span>Comissão</span>}
           <span>Lucro</span>
         </div>
 
@@ -1995,11 +2064,16 @@ function RelatorioLucroPorPS({ vendas, produtos, servicos, intervalo }) {
           </div>
         ) : (
           lista.map((r, i) => (
-            <div key={r.nome + i} className="lps-row">
+            <div key={r.nome + i} className="lps-row" style={{ gridTemplateColumns: dados.temComissao ? "1fr 60px 140px 140px 110px 180px" : "1fr 60px 140px 140px 180px" }}>
               <span className="lps-nome">{r.nome}</span>
               <span style={{ fontFamily: "'Sora', sans-serif", fontSize: 12, color: "var(--text-2)" }}>{r.qtd}</span>
               <span className="lps-fat">{fmtR$(r.fat)}</span>
               <span className="lps-custo">{fmtR$(r.custo)}</span>
+              {dados.temComissao && (
+                <span style={{ fontFamily: "'Sora', sans-serif", fontSize: 12, fontWeight: 600, color: r.comissao > 0 ? "var(--gold)" : "var(--text-3)" }}>
+                  {r.comissao > 0 ? fmtR$(r.comissao) : "—"}
+                </span>
+              )}
               <div className="lps-lucro-cell">
                 <span className="lps-lucro">{fmtR$(r.lucro)}</span>
                 <PctBadge fat={r.fat} lucro={r.lucro} />
@@ -2072,14 +2146,15 @@ export default function Relatorios() {
   const [dataFim,     setDataFim]     = useState("");
 
   /* Dados das collections */
-  const [vendas,    setVendas]    = useState([]);
-  const [clientes,  setClientes]  = useState([]);
-  const [despesas,  setDespesas]  = useState([]);
-  const [produtos,  setProdutos]  = useState([]);
-  const [servicos,  setServicos]  = useState([]);
-  const [agenda,    setAgenda]    = useState([]);
-  const [caixa,     setCaixa]     = useState([]);
-  const [aReceber,  setAReceber]  = useState([]);
+  const [vendas,     setVendas]     = useState([]);
+  const [clientes,   setClientes]   = useState([]);
+  const [despesas,   setDespesas]   = useState([]);
+  const [produtos,   setProdutos]   = useState([]);
+  const [servicos,   setServicos]   = useState([]);
+  const [agenda,     setAgenda]     = useState([]);
+  const [caixa,      setCaixa]      = useState([]);
+  const [aReceber,   setAReceber]   = useState([]);
+  const [vendedores, setVendedores] = useState([]);
 
   // Permissão por sub-relatório
   const temAcesso = (id) => {
@@ -2107,6 +2182,8 @@ export default function Relatorios() {
       onSnapshot(col("caixa"),    (s) => setCaixa(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => {}),
       onSnapshot(col("a_receber"), (s) => setAReceber(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        () => {}),
+      onSnapshot(col("vendedores"), (s) => setVendedores(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => {}),
     ];
 
@@ -2155,7 +2232,7 @@ export default function Relatorios() {
       case "estoque":    return <RelatorioEstoque produtos={produtos} />;
       case "clientes":   return <RelatorioClientes clientes={clientes} vendas={vendas} intervalo={intervalo} aReceber={aReceber} />;
       case "agenda":     return <RelatorioAgenda agenda={agenda} intervalo={intervalo} />;
-      case "lucro_ps":   return <RelatorioLucroPorPS vendas={vendas} produtos={produtos} servicos={servicos} intervalo={intervalo} />;
+      case "lucro_ps":   return <RelatorioLucroPorPS vendas={vendas} produtos={produtos} servicos={servicos} vendedores={vendedores} intervalo={intervalo} />;
       default:           return null;
     }
   };
