@@ -70,7 +70,7 @@ const KEY_MAP = {
   "Serviços":           "servicos",
   "Estoque": "entrada_estoque",
   "Vendas":             "vendas",
-  "Matriculas":            "matriculas"
+  "Matriculas":            "matriculas",
   "Fiado / A Receber":  "fiado",
   "Caixa Diário":       "caixa",
   "Despesas":           "despesas",
@@ -1540,7 +1540,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             <Usuarios />
           </RotaProtegida>
         );
-        case "matriculas":
+        case "Matriculas":
         return (
           <RotaProtegida modulo="alunos" label="Matriculas">
             <Alunos />
