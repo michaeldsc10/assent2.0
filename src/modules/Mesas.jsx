@@ -1160,6 +1160,17 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
         operadorCargo: cargo,
       }, { merge: true });
 
+      await logAction({
+        tenantUid: uid,
+        nomeUsuario,
+        cargo,
+        acao: isOcupada ? "editar" : "criar",
+        modulo: "Mesas",
+        descricao: isOcupada
+          ? `Atualizou comanda — Mesa ${mesa.numero} — ${itens.length} item(s) — R$ ${total.toFixed(2)}`
+          : `Abriu Mesa ${mesa.numero} — ${itens.length} item(s) — R$ ${total.toFixed(2)}`,
+      });
+
       /* ── TICKET DE COZINHA ── */
       const delta = calcularDelta(itens, itensBaseline);
       if (delta.length > 0) {
@@ -1276,7 +1287,7 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
         console.error("[Mesas] Erro ao lançar no caixa:", err);
       }
 
-      await logAction({ tenantUid: uid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.MESAS, descricao: `Fechou Mesa ${mesa.numero} — Venda ${novoId} — R$ ${total.toFixed(2)}` });
+      await logAction({ tenantUid: uid, nomeUsuario, cargo, acao: "criar", modulo: "Mesas", descricao: `Fechou Mesa ${mesa.numero} — Venda ${novoId} — R$ ${total.toFixed(2)}` });
       onVendaSalva({
         id: novoId,
         mesa: mesa.numero,
@@ -1365,6 +1376,14 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
         tx.delete(cmdRef);
       });
 
+      await logAction({
+        tenantUid: uid,
+        nomeUsuario,
+        cargo,
+        acao: "excluir",
+        modulo: "Mesas",
+        descricao: `Cancelou comanda — Mesa ${mesa.numero} — Motivo: ${motivoCancelamento.trim()}`,
+      });
       onVendaSalva(null);
       onClose();
     } catch (err) {
@@ -1775,7 +1794,7 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
 /* ═══════════════════════════════════════════════════
    MODAL: CONFIGURAR MESAS
    ═══════════════════════════════════════════════════ */
-function ModalConfigMesas({ uid, mesas, onClose }) {
+function ModalConfigMesas({ uid, mesas, onClose, nomeUsuario, cargo }) {
   const [qtd, setQtd] = useState(String(mesas.length || 1));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -1814,6 +1833,14 @@ function ModalConfigMesas({ uid, mesas, onClose }) {
         }
       }
 
+      await logAction({
+        tenantUid: uid,
+        nomeUsuario,
+        cargo,
+        acao: "editar",
+        modulo: "Mesas",
+        descricao: `Configurou mesas: ${n} mesa(s)`,
+      });
       onClose();
     } catch (err) {
       console.error("[Mesas] Erro ao configurar:", err);
@@ -2207,6 +2234,8 @@ export default function Mesas() {
           uid={uid}
           mesas={mesas}
           onClose={() => setConfigModal(false)}
+          nomeUsuario={nomeUsuario}
+          cargo={cargo}
         />
       )}
 
