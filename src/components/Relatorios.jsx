@@ -562,6 +562,94 @@ const CSS = `
   .ext-col-entrada, .ext-col-saida { display: none; }
   .ext-cell { padding: 10px 8px 10px 0; }
 }
+
+/* ── View Toggle: Lista / Gráficos ── */
+.rv-view-toggle {
+  display: flex; gap: 4px;
+  background: var(--s2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 4px; width: fit-content;
+}
+.rv-view-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 18px; border-radius: 7px;
+  font-size: 13px; font-weight: 500;
+  background: transparent; border: none; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; color: var(--text-2);
+  transition: all .13s;
+}
+.rv-view-btn:hover { color: var(--text); }
+.rv-view-btn.active {
+  background: var(--s1); color: var(--text);
+  border: 1px solid var(--border-h);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+}
+.rv-view-btn.active svg { color: var(--gold); }
+
+/* ── Charts Container ── */
+.rv-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 780px) {
+  .rv-charts-grid { grid-template-columns: 1fr; }
+}
+.rv-chart-card {
+  background: var(--s1); border: 1px solid var(--border);
+  border-radius: 12px; overflow: hidden;
+}
+.rv-chart-card.full { grid-column: 1 / -1; }
+.rv-chart-header {
+  padding: 13px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.rv-chart-title {
+  font-family: 'Sora', sans-serif; font-size: 13px;
+  font-weight: 600; color: var(--text);
+  display: flex; align-items: center; gap: 8px;
+}
+.rv-chart-title-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--gold); flex-shrink: 0;
+}
+.rv-chart-body { padding: 18px; }
+
+/* Gráfico de barras SVG */
+.rv-bar-chart { width: 100%; overflow: visible; display: block; }
+
+/* Formas de pagamento */
+.rv-fp-list { display: flex; flex-direction: column; gap: 10px; }
+.rv-fp-item { display: flex; align-items: center; gap: 10px; }
+.rv-fp-color { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.rv-fp-name { flex: 1; font-size: 13px; color: var(--text-2); }
+.rv-fp-bar-bg {
+  width: 100px; height: 5px; border-radius: 3px;
+  background: var(--s3); overflow: hidden; flex-shrink: 0;
+}
+.rv-fp-bar-fill { height: 100%; border-radius: 3px; }
+.rv-fp-pct {
+  font-family: 'Sora', sans-serif; font-size: 12px;
+  font-weight: 600; color: var(--text); min-width: 38px; text-align: right;
+}
+
+/* KPI mini cards */
+.rv-kpi-row {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.rv-kpi-mini {
+  background: var(--s2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 16px;
+}
+.rv-kpi-mini-label {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--text-3); margin-bottom: 6px;
+}
+.rv-kpi-mini-val {
+  font-family: 'Sora', sans-serif; font-size: 17px;
+  font-weight: 700; color: var(--text);
+}
+.rv-kpi-mini-sub { font-size: 11px; color: var(--text-3); margin-top: 3px; }
 `;
 
 
@@ -1355,9 +1443,292 @@ function RelatorioDespesas({ despesas, intervalo }) {
 }
 
 /* ══════════════════════════════════════════════════════
+   RELATÓRIO: VENDAS — helpers de gráfico (SVG puro, sem lib)
+   ══════════════════════════════════════════════════════ */
+
+function BarChartSVG({ dados, altura = 160 }) {
+  const [hover, setHover] = useState(null);
+  if (!dados || dados.length === 0) return null;
+
+  const W = 100;
+  const H = altura;
+  const maxVal = Math.max(...dados.map((d) => d.val), 1);
+  const barW = (W / dados.length) * 0.6;
+  const gap  = (W / dados.length) * 0.4;
+
+  return (
+    <div style={{ position: "relative" }}>
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        className="rv-bar-chart"
+        style={{ height: altura }}
+        preserveAspectRatio="none"
+      >
+        {[0.25, 0.5, 0.75, 1].map((frac) => (
+          <line key={frac} x1={0} x2={W}
+            y1={H - H * frac} y2={H - H * frac}
+            stroke="rgba(255,255,255,0.05)" strokeWidth={0.4}
+          />
+        ))}
+        {dados.map((d, i) => {
+          const x    = i * (W / dados.length) + gap / 2;
+          const barH = Math.max((d.val / maxVal) * (H - 12), 2);
+          const y    = H - barH;
+          const isLast = i === dados.length - 1;
+          return (
+            <g key={d.label}
+               onMouseEnter={() => setHover(i)}
+               onMouseLeave={() => setHover(null)}
+               style={{ cursor: "default" }}
+            >
+              <rect x={x} y={y} width={barW} height={barH} rx={1.5}
+                fill={hover === i ? "#F5A623" : isLast ? "#F5A623" : "rgba(200,165,94,0.35)"}
+                style={{ transition: "fill .15s" }}
+              />
+              <text x={x + barW / 2} y={H + 10}
+                textAnchor="middle" fontSize={5}
+                fill="rgba(255,255,255,0.35)"
+                fontFamily="DM Sans, sans-serif"
+              >
+                {d.label}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      {hover !== null && dados[hover] && (
+        <div style={{
+          position: "absolute", top: 4, left: "50%", transform: "translateX(-50%)",
+          background: "var(--s1)", border: "1px solid var(--border-h)",
+          borderRadius: 8, padding: "6px 12px",
+          fontSize: 12, fontFamily: "'DM Sans', sans-serif",
+          color: "var(--text)", whiteSpace: "nowrap",
+          boxShadow: "0 4px 16px rgba(0,0,0,0.3)", pointerEvents: "none", zIndex: 10,
+        }}>
+          <span style={{ color: "var(--gold)", fontWeight: 700 }}>{dados[hover].label}</span>
+          {" · "}
+          <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 600 }}>
+            {fmtR$(dados[hover].val)}
+          </span>
+          {dados[hover].qtd != null && (
+            <span style={{ color: "var(--text-3)", marginLeft: 6, fontSize: 11 }}>
+              ({dados[hover].qtd} venda{dados[hover].qtd !== 1 ? "s" : ""})
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VendaGraficos({ dados }) {
+  const porMes = useMemo(() => {
+    const map = {};
+    dados.filtradas.forEach((v) => {
+      const dt = parseDate(v.data);
+      if (!dt) return;
+      const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+      if (!map[key]) map[key] = { val: 0, qtd: 0 };
+      map[key].val += Number(v.total || 0);
+      map[key].qtd += 1;
+    });
+    return Object.entries(map)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, v]) => {
+        const [ano, mes] = key.split("-");
+        return { label: MESES_CURTOS[Number(mes) - 1] + "/" + ano.slice(2), ...v };
+      });
+  }, [dados.filtradas]);
+
+  const ticketPorMes = useMemo(() =>
+    porMes.map((m) => ({ label: m.label, val: m.qtd > 0 ? m.val / m.qtd : 0 })),
+  [porMes]);
+
+  const fpEntries = useMemo(() => {
+    const total = Object.values(dados.porFP).reduce((s, v) => s + v, 0) || 1;
+    const CORES = ["#F5A623","#5B8EF0","#44D186","#E05252","#9B8AFA","#F0A05B"];
+    return Object.entries(dados.porFP)
+      .sort((a, b) => b[1] - a[1])
+      .map(([fp, qtd], i) => ({ fp, qtd, pct: (qtd / total) * 100, cor: CORES[i % CORES.length] }));
+  }, [dados.porFP]);
+
+  const topProd = useMemo(() =>
+    [...dados.maisPedidos].slice(0, 7).map((p) => ({ label: p.nome, val: p.total, qtd: p.qtd })),
+  [dados.maisPedidos]);
+
+  const maxProd = topProd.length > 0 ? Math.max(...topProd.map((p) => p.val), 1) : 1;
+
+  const porDia = useMemo(() => {
+    const dias = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+    const map  = { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 };
+    dados.filtradas.forEach((v) => {
+      const dt = parseDate(v.data);
+      if (dt) map[dt.getDay()] += Number(v.total || 0);
+    });
+    return Object.entries(map).map(([d, val]) => ({ label: dias[Number(d)], val }));
+  }, [dados.filtradas]);
+
+  if (dados.filtradas.length === 0) {
+    return (
+      <div className="rel-empty">
+        <BarChart2 size={32} />
+        <p>Nenhuma venda no período para exibir gráficos.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      {/* KPIs rápidos */}
+      <div className="rv-kpi-row">
+        <div className="rv-kpi-mini">
+          <div className="rv-kpi-mini-label">Total Vendido</div>
+          <div className="rv-kpi-mini-val" style={{ color: "var(--gold)" }}>{fmtR$(dados.total)}</div>
+          <div className="rv-kpi-mini-sub">{dados.filtradas.length} vendas</div>
+        </div>
+        <div className="rv-kpi-mini">
+          <div className="rv-kpi-mini-label">Ticket Médio</div>
+          <div className="rv-kpi-mini-val" style={{ color: "var(--blue)" }}>{fmtR$(dados.ticket)}</div>
+          <div className="rv-kpi-mini-sub">por venda</div>
+        </div>
+        <div className="rv-kpi-mini">
+          <div className="rv-kpi-mini-label">Meses Ativos</div>
+          <div className="rv-kpi-mini-val" style={{ color: "var(--green)" }}>{porMes.length}</div>
+          <div className="rv-kpi-mini-sub">com vendas</div>
+        </div>
+      </div>
+
+      <div className="rv-charts-grid">
+        {/* Faturamento por mês */}
+        {porMes.length > 0 && (
+          <div className="rv-chart-card full">
+            <div className="rv-chart-header">
+              <span className="rv-chart-title">
+                <span className="rv-chart-title-dot" />
+                Faturamento por Mês
+              </span>
+              <span style={{ fontSize: 11, color: "var(--text-3)" }}>
+                {porMes.length} {porMes.length === 1 ? "mês" : "meses"}
+              </span>
+            </div>
+            <div className="rv-chart-body" style={{ paddingBottom: 28 }}>
+              <BarChartSVG dados={porMes} altura={160} />
+            </div>
+          </div>
+        )}
+
+        {/* Formas de pagamento */}
+        {fpEntries.length > 0 && (
+          <div className="rv-chart-card">
+            <div className="rv-chart-header">
+              <span className="rv-chart-title">
+                <span className="rv-chart-title-dot" style={{ background: "var(--blue)" }} />
+                Formas de Pagamento
+              </span>
+            </div>
+            <div className="rv-chart-body">
+              <div className="rv-fp-list">
+                {fpEntries.map((e) => (
+                  <div key={e.fp} className="rv-fp-item">
+                    <span className="rv-fp-color" style={{ background: e.cor }} />
+                    <span className="rv-fp-name">{e.fp}</span>
+                    <div className="rv-fp-bar-bg">
+                      <div className="rv-fp-bar-fill" style={{ width: `${e.pct}%`, background: e.cor }} />
+                    </div>
+                    <span className="rv-fp-pct">{e.pct.toFixed(1)}%</span>
+                    <span style={{ fontSize: 11, color: "var(--text-3)", minWidth: 60, textAlign: "right" }}>
+                      {e.qtd} venda{e.qtd !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Ticket médio por mês */}
+        {ticketPorMes.length > 0 && (
+          <div className="rv-chart-card">
+            <div className="rv-chart-header">
+              <span className="rv-chart-title">
+                <span className="rv-chart-title-dot" style={{ background: "var(--green)" }} />
+                Ticket Médio por Mês
+              </span>
+            </div>
+            <div className="rv-chart-body" style={{ paddingBottom: 28 }}>
+              <BarChartSVG dados={ticketPorMes} altura={130} />
+            </div>
+          </div>
+        )}
+
+        {/* Top produtos — barras horizontais */}
+        {topProd.length > 0 && (
+          <div className="rv-chart-card full">
+            <div className="rv-chart-header">
+              <span className="rv-chart-title">
+                <span className="rv-chart-title-dot" />
+                Top Produtos por Faturamento
+              </span>
+            </div>
+            <div className="rv-chart-body">
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {topProd.map((p, i) => (
+                  <div key={p.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{
+                      fontFamily: "'Sora', sans-serif", fontSize: 11,
+                      fontWeight: 700, color: "var(--gold)", width: 20, flexShrink: 0,
+                    }}>#{i + 1}</span>
+                    <span style={{
+                      flex: 1, fontSize: 13, color: "var(--text)",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }} title={p.label}>{p.label}</span>
+                    <div style={{ width: 160, flexShrink: 0 }}>
+                      <div style={{ height: 5, borderRadius: 3, background: "var(--s3)", overflow: "hidden" }}>
+                        <div style={{
+                          width: `${(p.val / maxProd) * 100}%`,
+                          height: "100%", borderRadius: 3,
+                          background: "linear-gradient(90deg, var(--gold), rgba(200,165,94,0.5))",
+                          transition: "width .4s ease",
+                        }} />
+                      </div>
+                    </div>
+                    <span style={{
+                      fontFamily: "'Sora', sans-serif", fontSize: 12, fontWeight: 600,
+                      color: "var(--text)", minWidth: 90, textAlign: "right",
+                    }}>{fmtR$(p.val)}</span>
+                    <span style={{ fontSize: 11, color: "var(--text-3)", minWidth: 44, textAlign: "right" }}>
+                      {p.qtd} un.
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Vendas por dia da semana */}
+        <div className="rv-chart-card full">
+          <div className="rv-chart-header">
+            <span className="rv-chart-title">
+              <span className="rv-chart-title-dot" style={{ background: "#9B8AFA" }} />
+              Faturamento por Dia da Semana
+            </span>
+          </div>
+          <div className="rv-chart-body" style={{ paddingBottom: 28 }}>
+            <BarChartSVG dados={porDia} altura={110} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
    RELATÓRIO: VENDAS
    ══════════════════════════════════════════════════════ */
 function RelatorioVendas({ vendas, intervalo }) {
+  const [view, setView] = useState("lista"); // "lista" | "graficos"
+
   const dados = useMemo(() => {
     const filtradas = vendas
       .filter((v) => dentroDoIntervalo(v.data, intervalo))
@@ -1425,69 +1796,96 @@ function RelatorioVendas({ vendas, intervalo }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div className="cr-grid">
-        <CardResumo
-          icon={<ShoppingCart size={18} />}
-          label="Total Vendido"
-          value={fmtR$(dados.total)}
-          sub={`${dados.filtradas.length} vendas`}
-          trend="up" colorVar="var(--gold)"
-        />
-        <CardResumo
-          icon={<BarChart2 size={18} />}
-          label="Ticket Médio"
-          value={fmtR$(dados.ticket)}
-          sub="por venda" trend="neutral" colorVar="var(--blue)"
-        />
-        <CardResumo
-          icon={<TrendingUp size={18} />}
-          label="Qtd. de Vendas"
-          value={String(dados.filtradas.length)}
-          sub="no período" trend="neutral" colorVar="var(--green)"
-        />
+
+      {/* Toggle Lista / Gráficos */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+        <div className="rv-view-toggle" data-print-hide>
+          <button
+            className={`rv-view-btn ${view === "lista" ? "active" : ""}`}
+            onClick={() => setView("lista")}
+          >
+            <FileText size={14} /> Lista
+          </button>
+          <button
+            className={`rv-view-btn ${view === "graficos" ? "active" : ""}`}
+            onClick={() => setView("graficos")}
+          >
+            <BarChart2 size={14} /> Gráficos
+          </button>
+        </div>
+        {view === "lista" && (
+          <button className="btn-secondary" onClick={handleExport} data-print-hide
+            style={{ fontSize: 12, padding: "6px 14px" }}>
+            <Download size={13} /> Exportar Excel
+          </button>
+        )}
       </div>
 
-      {/* Produtos mais vendidos */}
-      {dados.maisPedidos.length > 0 && (
-        <div className="tr-wrap">
-          <div className="tr-header">
-            <span className="tr-title">Produtos Mais Vendidos</span>
+      {/* ── VISTA: GRÁFICOS ── */}
+      {view === "graficos" && <VendaGraficos dados={dados} />}
+
+      {/* ── VISTA: LISTA ── */}
+      {view === "lista" && (
+        <>
+          <div className="cr-grid">
+            <CardResumo
+              icon={<ShoppingCart size={18} />}
+              label="Total Vendido"
+              value={fmtR$(dados.total)}
+              sub={`${dados.filtradas.length} vendas`}
+              trend="up" colorVar="var(--gold)"
+            />
+            <CardResumo
+              icon={<BarChart2 size={18} />}
+              label="Ticket Médio"
+              value={fmtR$(dados.ticket)}
+              sub="por venda" trend="neutral" colorVar="var(--blue)"
+            />
+            <CardResumo
+              icon={<TrendingUp size={18} />}
+              label="Qtd. de Vendas"
+              value={String(dados.filtradas.length)}
+              sub="no período" trend="neutral" colorVar="var(--green)"
+            />
           </div>
-          {dados.maisPedidos.map((p, i) => (
-            <div key={p.nome} className="rank-item">
-              <span className="rank-num">#{i + 1}</span>
-              <span className="rank-label">{p.nome}</span>
-              <span style={{ fontSize: 11, color: "var(--text-3)", marginLeft: "auto" }}>
-                {p.qtd} un.
-              </span>
-              <span className="rank-val">{fmtR$(p.total)}</span>
+
+          {dados.maisPedidos.length > 0 && (
+            <div className="tr-wrap">
+              <div className="tr-header">
+                <span className="tr-title">Produtos Mais Vendidos</span>
+              </div>
+              {dados.maisPedidos.map((p, i) => (
+                <div key={p.nome} className="rank-item">
+                  <span className="rank-num">#{i + 1}</span>
+                  <span className="rank-label">{p.nome}</span>
+                  <span style={{ fontSize: 11, color: "var(--text-3)", marginLeft: "auto" }}>
+                    {p.qtd} un.
+                  </span>
+                  <span className="rank-val">{fmtR$(p.total)}</span>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+
+          <TabelaRelatorio
+            title="Histórico de Vendas"
+            count={dados.filtradas.length}
+            empty="Nenhuma venda no período."
+            data={dados.filtradas}
+            columns={[
+              { key: "id",    label: "ID", render: (v) => <span style={{ color: "var(--gold)", fontFamily: "'Sora', sans-serif", fontSize: 11 }}>{v}</span> },
+              { key: "data",  label: "Data", render: (v) => fmtData(v) },
+              { key: "clienteNome", label: "Cliente", render: (v, row) => v || row.cliente || "—" },
+              { key: "formaPagamento", label: "Pagamento" },
+              {
+                key: "total", label: "Total", align: "right",
+                render: (v) => <span className="val-pos">{fmtR$(v)}</span>,
+              },
+            ]}
+          />
+        </>
       )}
 
-      <TabelaRelatorio
-        title="Histórico de Vendas"
-        count={dados.filtradas.length}
-        empty="Nenhuma venda no período."
-        data={dados.filtradas}
-        columns={[
-          { key: "id",    label: "ID", render: (v) => <span style={{ color: "var(--gold)", fontFamily: "'Sora', sans-serif", fontSize: 11 }}>{v}</span> },
-          { key: "data",  label: "Data", render: (v) => fmtData(v) },
-          { key: "clienteNome", label: "Cliente", render: (v, row) => v || row.cliente || "—" },
-          { key: "formaPagamento", label: "Pagamento" },
-          {
-            key: "total", label: "Total", align: "right",
-            render: (v) => <span className="val-pos">{fmtR$(v)}</span>,
-          },
-        ]}
-      />
-
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button className="btn-secondary" onClick={handleExport}>
-          <Download size={13} /> Exportar Excel
-        </button>
-      </div>
     </div>
   );
 }
