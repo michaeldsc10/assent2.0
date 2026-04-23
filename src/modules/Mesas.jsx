@@ -9,13 +9,20 @@
      users/{uid}/config/geral       → taxas de pagamento
 
    Permissões: admin, comercial, vendedor podem abrir/fechar mesas
+
+   [v2.1] Ticket de Cozinha:
+     - Gerado a cada "Salvar" da comanda
+     - Imprime apenas itens NOVOS ou quantidades aumentadas (delta)
+     - Impressão via Web Bluetooth (impressora térmica BT, Chrome/Android)
+     - Fallback automático para window.print() (impressora WiFi/USB)
    ═══════════════════════════════════════════════════ */
 
-import { useState, useEffect, useContext, useMemo, useCallback } from "react";
+import { useState, useEffect, useContext, useMemo, useCallback, useRef } from "react";
 import {
   Plus, X, Trash2, UtensilsCrossed, CheckCircle2,
   ChevronDown, Edit3, Printer, Settings, Search,
   Clock, User, DollarSign, ShoppingBag, LayoutGrid,
+  Bluetooth, BluetoothConnected, BluetoothOff,
 } from "lucide-react";
 
 import AuthContext from "../contexts/AuthContext";
@@ -66,7 +73,117 @@ const fmtDataHora = (ts) => {
 };
 
 /* ─────────────────────────────────────────────────────
-   RECIBO DE IMPRESSÃO
+   UTILITÁRIOS ESC/POS
+───────────────────────────────────────────────────── */
+
+/** Remove acentos para compatibilidade com impressoras térmicas básicas */
+function removerAcentos(str = "") {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+/** Centraliza texto em largura fixa (padrão 32 colunas para 58mm / 48 para 80mm) */
+function centrar(texto, cols = 32) {
+  const t = removerAcentos(String(texto));
+  if (t.length >= cols) return t.slice(0, cols);
+  const pad = Math.floor((cols - t.length) / 2);
+  return " ".repeat(pad) + t;
+}
+
+/** Linha com texto à esquerda e direita (32 colunas) */
+function linhaDupla(esq, dir, cols = 32) {
+  const e = removerAcentos(String(esq));
+  const d = removerAcentos(String(dir));
+  const espaco = cols - e.length - d.length;
+  if (espaco <= 0) return (e + " " + d).slice(0, cols);
+  return e + " ".repeat(espaco) + d;
+}
+
+/**
+ * Gera array de bytes ESC/POS para o ticket de cozinha.
+ * Compatível com a maioria das impressoras térmicas BT (XPrinter, Elgin, Bematech, etc.)
+ */
+function gerarESCPOS({ mesa, itens, clienteNome, isAdicional = false, horario }) {
+  const ESC = 0x1B;
+  const GS  = 0x1D;
+  const LF  = 0x0A;
+
+  const bytes = [];
+
+  const add = (...b) => bytes.push(...b);
+  const txt = (s) => {
+    const clean = removerAcentos(s);
+    for (let i = 0; i < clean.length; i++) bytes.push(clean.charCodeAt(i) & 0xFF);
+  };
+  const nl  = (n = 1) => { for (let i = 0; i < n; i++) bytes.push(LF); };
+
+  // Inicializar
+  add(ESC, 0x40);
+
+  // Código de página Latin-1 (para acentos em printers que suportam)
+  add(ESC, 0x74, 0x13);
+
+  // === CABEÇALHO ===
+  // Tamanho duplo + bold + centralizado
+  add(ESC, 0x61, 0x01);         // centro
+  add(ESC, 0x21, 0x30);         // duplo H+W
+  add(ESC, 0x45, 0x01);         // bold on
+  txt(isAdicional ? "*** ADICIONAL ***" : "*** COZINHA ***");
+  nl();
+  add(ESC, 0x21, 0x00);         // normal
+  add(ESC, 0x45, 0x00);         // bold off
+
+  // Mesa grande
+  add(ESC, 0x21, 0x10);         // duplo height
+  add(ESC, 0x45, 0x01);
+  txt(`MESA ${mesa}`);
+  nl();
+  add(ESC, 0x21, 0x00);
+  add(ESC, 0x45, 0x00);
+
+  // Hora
+  txt(horario || new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
+  nl();
+
+  if (clienteNome) {
+    txt(`Cliente: ${clienteNome}`);
+    nl();
+  }
+
+  // Separador
+  add(ESC, 0x61, 0x00);         // alinha esquerda
+  txt("--------------------------------");
+  nl();
+
+  // === ITENS ===
+  add(ESC, 0x21, 0x10);         // double height para itens
+  for (const item of itens) {
+    const prefixo = item._adicional ? "[+] " : "";
+    const linha = `${prefixo}${item.qtd}x ${item.nome}`;
+    // Quebrar linhas longas
+    const limpa = removerAcentos(linha);
+    if (limpa.length <= 32) {
+      txt(limpa);
+    } else {
+      txt(limpa.slice(0, 32));
+      nl();
+      txt("    " + limpa.slice(32, 60));
+    }
+    nl();
+  }
+  add(ESC, 0x21, 0x00);         // normal
+
+  // Separador final
+  txt("--------------------------------");
+  nl(2);
+
+  // Corte de papel (full cut)
+  add(GS, 0x56, 0x42, 0x00);
+
+  return new Uint8Array(bytes);
+}
+
+/* ─────────────────────────────────────────────────────
+   RECIBO DE VENDA (impressão via window.print)
 ───────────────────────────────────────────────────── */
 function imprimirRecibo(dados) {
   const { mesa, itens, formaPgto, cliente, total, taxaPerc, valorTaxa, vendaId, parcelas } = dados;
@@ -101,12 +218,44 @@ function imprimirRecibo(dados) {
 }
 
 /* ─────────────────────────────────────────────────────
+   TICKET DE COZINHA — fallback window.print
+───────────────────────────────────────────────────── */
+function imprimirTicketCozinhaFallback({ mesa, itens, clienteNome, isAdicional }) {
+  const el = document.getElementById("coz-ticket-root");
+  if (!el) return;
+
+  const hora = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  el.innerHTML = `
+    <div class="coz-ticket-print">
+      <div class="coz-topo">${isAdicional ? "*** ADICIONAL ***" : "*** COZINHA ***"}</div>
+      <div class="coz-mesa">MESA ${mesa}</div>
+      <div class="coz-hora">${hora}</div>
+      ${clienteNome ? `<div class="coz-cliente">Cliente: ${clienteNome}</div>` : ""}
+      <div class="coz-sep">--------------------------------</div>
+      <div class="coz-itens">
+        ${itens.map(i => `
+          <div class="coz-item">
+            <span class="coz-qtd">${i._adicional ? "[+] " : ""}${i.qtd}x</span>
+            <span class="coz-nome">${i.nome}</span>
+          </div>
+        `).join("")}
+      </div>
+      <div class="coz-sep">--------------------------------</div>
+    </div>
+  `;
+  window.print();
+}
+
+/* ─────────────────────────────────────────────────────
    CSS
 ───────────────────────────────────────────────────── */
 const CSS = `
-  /* ── Print ── */
+  /* ── Print — Recibo de venda ── */
   @media print {
     body { visibility: hidden !important; }
+
+    /* Recibo de venda */
     #mesas-recibo-root {
       visibility: visible !important; display: block !important;
       position: fixed; top: 0; left: 0; width: 100%; z-index: 99999;
@@ -118,8 +267,47 @@ const CSS = `
       font-size: 12px; color: #000 !important; background: #fff;
     }
     .mesas-recibo-print * { color: #000 !important; }
+
+    /* Ticket de cozinha */
+    #coz-ticket-root {
+      visibility: visible !important; display: block !important;
+      position: fixed; top: 0; left: 0; width: 100%; z-index: 99999;
+    }
+    #coz-ticket-root * { visibility: visible !important; }
+    .coz-ticket-print {
+      font-family: 'Courier New', monospace;
+      width: 80mm; margin: 0 auto; padding: 6mm 8mm;
+      font-size: 13px; color: #000 !important; background: #fff;
+      letter-spacing: 0.02em;
+    }
+    .coz-ticket-print * { color: #000 !important; }
+    .coz-topo {
+      text-align: center; font-size: 13px; font-weight: bold;
+      margin-bottom: 4px; letter-spacing: 0.06em;
+    }
+    .coz-mesa {
+      text-align: center; font-size: 28px; font-weight: 900;
+      line-height: 1.1; margin: 4px 0;
+    }
+    .coz-hora {
+      text-align: center; font-size: 12px; margin-bottom: 2px;
+    }
+    .coz-cliente {
+      text-align: center; font-size: 11px; margin-bottom: 4px;
+    }
+    .coz-sep {
+      font-size: 11px; margin: 6px 0;
+    }
+    .coz-item {
+      display: flex; gap: 8px; font-size: 16px;
+      font-weight: bold; margin: 4px 0; line-height: 1.3;
+    }
+    .coz-qtd { flex-shrink: 0; }
+    .coz-nome { flex: 1; }
   }
+
   #mesas-recibo-root { display: none; }
+  #coz-ticket-root   { display: none; }
 
   /* ── Layout geral ── */
   .mesas-page {
@@ -257,6 +445,7 @@ const CSS = `
     padding: 14px 20px; border-top: 1px solid var(--border);
     display: flex; justify-content: flex-end; gap: 10px;
     position: sticky; bottom: 0; background: var(--s1); z-index: 2;
+    flex-wrap: wrap;
   }
 
   /* ── Buttons ── */
@@ -312,6 +501,50 @@ const CSS = `
     color: var(--text-2);
   }
   .btn-icon:hover { background: var(--s2); color: var(--text); }
+
+  /* ── Botão Bluetooth ── */
+  .btn-bt {
+    padding: 9px 14px; border-radius: 9px; font-size: 12px;
+    background: var(--s3); border: 1px solid var(--border);
+    color: var(--text-3); cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    display: flex; align-items: center; gap: 6px;
+    transition: all .15s; white-space: nowrap;
+  }
+  .btn-bt:hover { background: var(--s2); border-color: var(--border-h); color: var(--text-2); }
+  .btn-bt.bt-conectado {
+    background: rgba(94,203,138,.08);
+    border-color: rgba(94,203,138,.35);
+    color: #5ecb8a;
+  }
+  .btn-bt.bt-conectando {
+    background: rgba(200,165,94,.08);
+    border-color: rgba(200,165,94,.35);
+    color: var(--gold);
+    animation: btPulse 1s ease-in-out infinite;
+  }
+  @keyframes btPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+  .btn-bt:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* ── Banner de status da impressora ── */
+  .printer-banner {
+    margin-bottom: 14px; padding: 9px 14px; border-radius: 9px;
+    font-size: 12px; display: flex; align-items: center; gap: 8px;
+    border: 1px solid;
+  }
+  .printer-banner.conectada {
+    background: rgba(94,203,138,.07);
+    border-color: rgba(94,203,138,.25);
+    color: #5ecb8a;
+  }
+  .printer-banner.desconectada {
+    background: rgba(200,165,94,.06);
+    border-color: rgba(200,165,94,.2);
+    color: var(--text-3);
+  }
 
   /* ── Formulário ── */
   .form-group { display: flex; flex-direction: column; gap: 5px; flex: 1; }
@@ -575,8 +808,165 @@ const CSS = `
     .mesas-page { padding: 14px; }
     .mesas-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
     .form-row { flex-direction: column; }
+    .modal-footer { gap: 8px; }
   }
 `;
+
+/* ═══════════════════════════════════════════════════
+   HOOK: WEB BLUETOOTH para impressora térmica
+   ═══════════════════════════════════════════════════ */
+
+/**
+ * UUIDs de serviço/característica comuns em impressoras térmicas Bluetooth.
+ * Ordem de tentativa: mais comuns primeiro.
+ *
+ * Compatível com: XPrinter, Elgin i9, i7, Bematech MP-4200 TH BT,
+ * Daruma DR700, e a maioria dos clones chineses.
+ */
+const BT_SERVICES = [
+  {
+    service:        "000018f0-0000-1000-8000-00805f9b34fb",
+    characteristic: "00002af1-0000-1000-8000-00805f9b34fb",
+  },
+  {
+    service:        "49535343-fe7d-4ae5-8fa9-9fafd205e455",
+    characteristic: "49535343-8841-43f4-a8d4-ecbe34729bb3",
+  },
+  {
+    service:        "0000ff00-0000-1000-8000-00805f9b34fb",
+    characteristic: "0000ff02-0000-1000-8000-00805f9b34fb",
+  },
+];
+
+function useBluetooth() {
+  const [btDevice,    setBtDevice]    = useState(null);
+  const [btChar,      setBtChar]      = useState(null);
+  const [btStatus,    setBtStatus]    = useState("desconectado"); // desconectado | conectando | conectado
+  const [btNome,      setBtNome]      = useState("");
+  const [btSuportado, setBtSuportado] = useState(false);
+
+  useEffect(() => {
+    setBtSuportado(!!navigator.bluetooth);
+  }, []);
+
+  const conectar = useCallback(async () => {
+    if (!navigator.bluetooth) {
+      alert("Web Bluetooth não suportado neste navegador.\nUse Chrome no Android ou Chrome Desktop.");
+      return false;
+    }
+
+    setBtStatus("conectando");
+    try {
+      const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: BT_SERVICES.map(s => s.service),
+      });
+
+      device.addEventListener("gattserverdisconnected", () => {
+        setBtStatus("desconectado");
+        setBtChar(null);
+        setBtDevice(null);
+        setBtNome("");
+      });
+
+      const server = await device.gatt.connect();
+
+      // Testar cada service/characteristic até encontrar um que funcione
+      let charEncontrado = null;
+      for (const pair of BT_SERVICES) {
+        try {
+          const service = await server.getPrimaryService(pair.service);
+          const char    = await service.getCharacteristic(pair.characteristic);
+          // Verificar que é gravável
+          if (char.properties.write || char.properties.writeWithoutResponse) {
+            charEncontrado = char;
+            break;
+          }
+        } catch (_) {
+          // Esse serviço não existe nessa impressora — continuar
+        }
+      }
+
+      if (!charEncontrado) {
+        // Fallback: buscar qualquer característica gravável em qualquer serviço
+        try {
+          const services = await server.getPrimaryServices();
+          for (const svc of services) {
+            const chars = await svc.getCharacteristics();
+            for (const c of chars) {
+              if (c.properties.write || c.properties.writeWithoutResponse) {
+                charEncontrado = c;
+                break;
+              }
+            }
+            if (charEncontrado) break;
+          }
+        } catch (_) {}
+      }
+
+      if (!charEncontrado) {
+        alert("Impressora conectada mas não foi possível encontrar a característica de escrita.\nVerifique se é uma impressora térmica ESC/POS compatível.");
+        setBtStatus("desconectado");
+        return false;
+      }
+
+      setBtDevice(device);
+      setBtChar(charEncontrado);
+      setBtNome(device.name || "Impressora BT");
+      setBtStatus("conectado");
+      return true;
+
+    } catch (err) {
+      if (err.name !== "NotFoundError") { // Usuário cancelou — não alertar
+        console.error("[BT] Erro ao conectar:", err);
+        alert(`Erro ao conectar à impressora: ${err.message}`);
+      }
+      setBtStatus("desconectado");
+      return false;
+    }
+  }, []);
+
+  const desconectar = useCallback(() => {
+    if (btDevice?.gatt?.connected) {
+      btDevice.gatt.disconnect();
+    }
+    setBtDevice(null);
+    setBtChar(null);
+    setBtStatus("desconectado");
+    setBtNome("");
+  }, [btDevice]);
+
+  /**
+   * Envia bytes para a impressora em chunks de 512 bytes
+   * (limite comum do MTU Bluetooth LE)
+   */
+  const enviar = useCallback(async (bytes) => {
+    if (!btChar) return false;
+    try {
+      const CHUNK = 512;
+      for (let i = 0; i < bytes.length; i += CHUNK) {
+        const chunk = bytes.slice(i, i + CHUNK);
+        if (btChar.properties.writeWithoutResponse) {
+          await btChar.writeValueWithoutResponse(chunk);
+        } else {
+          await btChar.writeValue(chunk);
+        }
+        // Pequeno delay entre chunks para não saturar o buffer
+        if (i + CHUNK < bytes.length) {
+          await new Promise(r => setTimeout(r, 50));
+        }
+      }
+      return true;
+    } catch (err) {
+      console.error("[BT] Erro ao enviar dados:", err);
+      setBtStatus("desconectado");
+      setBtChar(null);
+      return false;
+    }
+  }, [btChar]);
+
+  return { btStatus, btNome, btSuportado, conectar, desconectar, enviar };
+}
 
 /* ═══════════════════════════════════════════════════
    MODAL: COMANDA DA MESA
@@ -597,6 +987,15 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
   const [confirmCancelar, setConfirmCancelar] = useState(false);
   const [motivoCancelamento, setMotivoCancelamento] = useState("");
   const [cancelando, setCancelando] = useState(false);
+
+  /**
+   * Baseline de itens já impressos/salvos.
+   * Usado para calcular DELTA a cada "Salvar" — só imprime o que é NOVO.
+   */
+  const [itensBaseline, setItensBaseline] = useState(comanda?.itens || []);
+
+  /* Bluetooth */
+  const { btStatus, btNome, btSuportado, conectar, desconectar, enviar } = useBluetooth();
 
   /* Catálogo unificado */
   const catalogo = useMemo(() => {
@@ -683,8 +1082,67 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
     setItens(prev => prev.filter((_, i) => i !== idx));
   };
 
+  /* ─────────────────────────────────────────────────────
+     TICKET DE COZINHA
+  ───────────────────────────────────────────────────── */
+
+  /**
+   * Calcula o delta entre itens atuais e o baseline (última impressão).
+   * Retorna array com:
+   *  - Itens completamente novos
+   *  - Itens com quantidade aumentada (com campo _adicional: true)
+   * Não inclui itens removidos (cozinha já recebeu o pedido).
+   */
+  const calcularDelta = useCallback((itensAtuais, baseline) => {
+    const delta = [];
+    for (const item of itensAtuais) {
+      const ant = baseline.find(
+        a => a.produtoId === item.produtoId && a._tipo === item._tipo
+      );
+      if (!ant) {
+        // Novo item
+        delta.push({ ...item });
+      } else if (item.qtd > ant.qtd) {
+        // Quantidade aumentou
+        delta.push({ ...item, qtd: item.qtd - ant.qtd, _adicional: true });
+      }
+    }
+    return delta;
+  }, []);
+
+  /**
+   * Gera e envia o ticket de cozinha.
+   * - Se Bluetooth conectado → envia ESC/POS direto
+   * - Senão → abre diálogo de impressão do sistema (window.print)
+   */
+  const imprimirTicketCozinha = useCallback(async (itensParaImprimir, isAdicional = false) => {
+    if (!itensParaImprimir || itensParaImprimir.length === 0) return;
+
+    const dados = {
+      mesa: mesa.numero,
+      itens: itensParaImprimir,
+      clienteNome: clienteNome.trim(),
+      isAdicional,
+      horario: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }),
+    };
+
+    if (btStatus === "conectado") {
+      // Caminho Bluetooth (ESC/POS direto)
+      const bytes = gerarESCPOS(dados);
+      const ok = await enviar(bytes);
+      if (!ok) {
+        // BT falhou — tentar fallback
+        imprimirTicketCozinhaFallback(dados);
+      }
+    } else {
+      // Fallback: window.print
+      imprimirTicketCozinhaFallback(dados);
+    }
+  }, [mesa.numero, clienteNome, btStatus, enviar]);
+
   /* Salvar comanda (manter aberta) */
   const salvarComanda = async () => {
+    if (itens.length === 0) return; // Nada a salvar
     setSalvando(true);
     try {
       const ref = doc(db, "users", uid, "comandas", mesa.id);
@@ -701,6 +1159,16 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
         operadorNome: nomeUsuario,
         operadorCargo: cargo,
       }, { merge: true });
+
+      /* ── TICKET DE COZINHA ── */
+      const delta = calcularDelta(itens, itensBaseline);
+      if (delta.length > 0) {
+        const isAdicional = itensBaseline.length > 0;
+        await imprimirTicketCozinha(delta, isAdicional);
+        // Atualizar baseline para próximo save
+        setItensBaseline([...itens]);
+      }
+
     } catch (err) {
       console.error("[Mesas] Erro ao salvar comanda:", err);
       alert("Erro ao salvar comanda. Tente novamente.");
@@ -871,6 +1339,17 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
     setCancelando(false);
   };
 
+  /* ── Labels do botão Bluetooth ── */
+  const btLabel = btStatus === "conectado"
+    ? (btNome || "Impressora")
+    : btStatus === "conectando"
+    ? "Conectando..."
+    : "Impressora BT";
+
+  const BtIcon = btStatus === "conectado" ? BluetoothConnected
+    : btStatus === "conectando" ? Bluetooth
+    : BluetoothOff;
+
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-box modal-box-lg">
@@ -895,6 +1374,29 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
         </div>
 
         <div className="modal-body">
+
+          {/* Banner status impressora */}
+          {btStatus === "conectado" ? (
+            <div className="printer-banner conectada">
+              <BluetoothConnected size={14} />
+              <span>Impressora conectada: <strong>{btNome}</strong> — ticket enviado automaticamente ao salvar</span>
+              <button
+                onClick={desconectar}
+                style={{ marginLeft: "auto", fontSize: 11, color: "inherit", background: "none", border: "none", cursor: "pointer", opacity: 0.7, textDecoration: "underline" }}
+              >
+                Desconectar
+              </button>
+            </div>
+          ) : (
+            <div className="printer-banner desconectada">
+              <Printer size={14} />
+              <span>
+                {btSuportado
+                  ? "Sem impressora BT — ao salvar, abrirá diálogo de impressão do sistema"
+                  : "Impressão via diálogo do sistema (Chrome Android recomendado para BT)"}
+              </span>
+            </div>
+          )}
 
           {/* Cliente (opcional) */}
           <div className="form-row">
@@ -1063,6 +1565,22 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
 
         {/* FOOTER */}
         <div className="modal-footer">
+
+          {/* Botão impressora Bluetooth — lado esquerdo */}
+          <div style={{ flex: 1, display: "flex", alignItems: "center" }}>
+            {btSuportado && (
+              <button
+                className={`btn-bt ${btStatus === "conectado" ? "bt-conectado" : btStatus === "conectando" ? "bt-conectando" : ""}`}
+                onClick={btStatus === "conectado" ? desconectar : conectar}
+                disabled={btStatus === "conectando"}
+                title={btStatus === "conectado" ? "Clique para desconectar" : "Conectar impressora Bluetooth"}
+              >
+                <BtIcon size={13} />
+                {btLabel}
+              </button>
+            )}
+          </div>
+
           <button className="btn-secondary" onClick={onClose}>Fechar</button>
 
           {/* Cancelar comanda — cliente desistiu */}
@@ -1072,10 +1590,10 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
             </button>
           )}
 
-          {/* Salvar comanda aberta */}
+          {/* Salvar comanda aberta + imprimir ticket cozinha */}
           {(itens.length > 0 || isOcupada) && podeFechar && (
             <button className="btn-secondary" onClick={salvarComanda} disabled={salvando}>
-              {salvando ? "Salvando..." : "💾 Salvar"}
+              {salvando ? "Salvando..." : <><Printer size={13} /> Salvar + Cozinha</>}
             </button>
           )}
 
@@ -1467,7 +1985,9 @@ export default function Mesas() {
   return (
     <>
       <style>{CSS}</style>
+      {/* Roots de impressão (invisíveis na tela) */}
       <div id="mesas-recibo-root" />
+      <div id="coz-ticket-root" />
 
       <div className="mesas-page">
 
