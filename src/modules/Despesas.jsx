@@ -13,6 +13,7 @@ import {
 
 import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
+import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
 import {  LIMITES_FREE } from "../hooks/useLicenca";
 import { BannerLimite } from "../hooks/LicencaUI";
 import {
@@ -1326,7 +1327,7 @@ export default function Despesas({ isPro = false }) {
   const [periodoCustom, setPeriodoCustom] = useState({ inicio: "", fim: "" });
 
   // ── Multi-tenant ──
-  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+  const { tenantUid, cargo, nomeUsuario, podeCriar, podeEditar, podeExcluir } = useAuth();
 
   // ── Flags de permissão ──
   const podeCriarV   = podeCriar("despesas");
@@ -1428,6 +1429,7 @@ export default function Despesas({ isPro = false }) {
       await setDoc(doc(db, "users", tenantUid), { despesaIdCnt: cnt + 1 }, { merge: true });
     }
 
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.DESPESAS, descricao: `Criou Despesa: ${form.descricao}` });
     setModalNovo(false);
   };
 
@@ -1436,6 +1438,7 @@ export default function Despesas({ isPro = false }) {
     if (!tenantUid || !editando) return;
     const status = calcularStatus(form.vencimento, editando.status);
     await setDoc(doc(db, "users", tenantUid, "despesas", editando.id), { ...form, status }, { merge: true });
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.DESPESAS, descricao: montarDescricao("editar", "Despesa", form.descricao, editando.id) });
     setEditando(null);
   };
 
@@ -1511,6 +1514,7 @@ export default function Despesas({ isPro = false }) {
   const handleDelete = async () => {
     if (!tenantUid || !deletando) return;
     await deleteDoc(doc(db, "users", tenantUid, "despesas", deletando.id));
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.DESPESAS, descricao: montarDescricao("excluir", "Despesa", deletando.descricao, deletando.id) });
     setDeletando(null);
   };
 
