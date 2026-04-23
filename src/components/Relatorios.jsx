@@ -2508,9 +2508,9 @@ function RelatorioVendedores({ vendas, vendedores, intervalo }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-      {/* ── Filtro de vendedor ── */}
+      {/* ── Filtro de vendedor — dropdown ── */}
       <div style={{
-        display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+        display: "flex", alignItems: "center", gap: 12,
         padding: "11px 16px",
         background: "var(--s1)", border: "1px solid var(--border)", borderRadius: 10,
       }}>
@@ -2521,36 +2521,25 @@ function RelatorioVendedores({ vendas, vendedores, intervalo }) {
           Vendedor
         </span>
 
-        <button
-          className={`fp-btn ${vendedorSel === "todos" ? "active" : ""}`}
-          onClick={() => setVendedorSel("todos")}
+        <select
+          className="form-input"
+          style={{ maxWidth: 260, padding: "6px 12px", fontSize: 13 }}
+          value={vendedorSel}
+          onChange={e => setVendedorSel(e.target.value)}
         >
-          Todos (Ranking)
-        </button>
-
-        {ranking.map((r) => (
-          <button
-            key={r.id}
-            className={`fp-btn ${vendedorSel === r.id ? "active" : ""}`}
-            onClick={() => setVendedorSel(r.id)}
-          >
-            {r.nome}
-          </button>
-        ))}
-
-        {vendedores
-          .filter((v) => !statsMap[v.id])
-          .map((v) => (
-            <button
-              key={v.id}
-              className="fp-btn"
-              style={{ opacity: 0.45 }}
-              onClick={() => setVendedorSel(v.id)}
-            >
-              {v.nome}
-            </button>
-          ))
-        }
+          <option value="todos">Todos (Ranking)</option>
+          {ranking.map((r) => (
+            <option key={r.id} value={r.id}>{r.nome}</option>
+          ))}
+          {vendedores
+            .filter((v) => !statsMap[v.id])
+            .map((v) => (
+              <option key={v.id} value={v.id} style={{ opacity: 0.5 }}>
+                {v.nome} (sem vendas)
+              </option>
+            ))
+          }
+        </select>
       </div>
 
       {/* ══════════════════════════════════
