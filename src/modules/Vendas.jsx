@@ -702,6 +702,12 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
       ? (vendedorNomeLogado || "")
       : (venda?.vendedor || "")
   );
+  // vendedorId: ID do cadastro (V0001 etc) — usado para relatórios e comissões
+  const [vendedorIdSel, setVendedorIdSel] = useState(
+    isVendedorCargo
+      ? (vendedorIdLogado || "")
+      : (venda?.vendedorId || "")
+  );
   const [vendedorCargo, setVendedorCargo] = useState(
     isVendedorCargo ? cargo : (venda?.vendedorCargo || "")
   );
@@ -890,7 +896,8 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
     const payload = {
       cliente: clienteSearch.trim(),
       data: new Date(dataVenda + "T12:00:00"),
-      vendedor: vendedor.trim(),
+      vendedor:   vendedor.trim(),
+      vendedorId: vendedorIdSel || "",   // ID do cadastro — base para relatórios
       vendedorCargo: vendedorCargo.trim(),
       formaPagamento: formaPgto,
       observacao: observacao.trim(),
@@ -1045,6 +1052,7 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
                   const nome = e.target.value;
                   setVendedor(nome);
                   const found = vendedores.find(v => (v.nome || v) === nome);
+                  setVendedorIdSel(found?.id || "");
                   setVendedorCargo(found?.cargo || "");
                 }}>
                   <option value="">— Nenhum / Não informado —</option>
