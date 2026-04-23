@@ -971,7 +971,7 @@ function useBluetooth() {
 /* ═══════════════════════════════════════════════════
    MODAL: COMANDA DA MESA
    ═══════════════════════════════════════════════════ */
-function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, cargo, nomeUsuario, onClose, onVendaSalva }) {
+function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeUsuario, onClose, onVendaSalva }) {
   const isOcupada = !!comanda;
 
   /* Itens da comanda */
@@ -1190,10 +1190,6 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
         return;
       }
 
-      /* Gerar ID de venda */
-      const gerarId = (cnt) => `V${String(cnt + 1).padStart(4, "0")}`;
-      const novoId = gerarId(vendaIdCnt);
-
       const payload = {
         cliente: clienteNome.trim() || `Mesa ${mesa.numero}`,
         data: new Date(),
@@ -1228,19 +1224,41 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
         criadoEm: new Date().toISOString(),
       };
 
+      /* ── ID gerado DENTRO da transação — leitura atômica do contador ──
+         Nunca usar o prop/estado React (pode estar desatualizado).
+         O loop anti-colisão garante que mesmo que outro módulo tenha
+         corrompido o contador, não sobrescrevemos nenhuma venda existente. */
+      let novoId;
       await runTransaction(db, async (tx) => {
-        /* Descontar estoque de produtos */
+        /* 1. Ler contador atual direto do Firestore */
+        const userSnap = await tx.get(doc(db, "users", uid));
+        let currentCnt = userSnap.data()?.vendaIdCnt || 0;
+
+        /* 2. Anti-colisão: avança até encontrar ID livre */
+        let vendaRef;
+        let vendaSnap;
+        let tentativas = 0;
+        do {
+          novoId   = `V${String(currentCnt + 1).padStart(4, "0")}`;
+          vendaRef = doc(db, "users", uid, "vendas", novoId);
+          vendaSnap = await tx.get(vendaRef);
+          if (vendaSnap.exists()) currentCnt++;
+          tentativas++;
+          if (tentativas > 200) throw new Error("Não foi possível gerar ID de venda.");
+        } while (vendaSnap.exists());
+
+        /* 3. Descontar estoque de produtos */
         for (const item of itens) {
           if (item.produtoId && item._tipo === "produto") {
             const ref = doc(db, "users", uid, "produtos", item.produtoId);
             tx.update(ref, { estoque: increment(-(item.qtd || 1)) });
           }
         }
-        /* Criar venda */
-        tx.set(doc(db, "users", uid, "vendas", novoId), payload);
-        /* Incrementar contador */
-        tx.set(doc(db, "users", uid), { vendaIdCnt: vendaIdCnt + 1 }, { merge: true });
-        /* Remover comanda */
+        /* 4. Criar venda no slot livre */
+        tx.set(vendaRef, payload);
+        /* 5. Atualizar contador corretamente (corrige possível corrupção) */
+        tx.set(doc(db, "users", uid), { vendaIdCnt: currentCnt + 1 }, { merge: true });
+        /* 6. Remover comanda */
         tx.delete(cmdRef);
       });
 
@@ -1286,9 +1304,6 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
     setCancelando(true);
     try {
       const cmdRef = doc(db, "users", uid, "comandas", mesa.id);
-      const gerarId = (cnt) => `V${String(cnt + 1).padStart(4, "0")}`;
-      const novoId = gerarId(vendaIdCnt);
-
       const payload = {
         cliente: clienteNome.trim() || `Mesa ${mesa.numero}`,
         data: new Date(),
@@ -1324,9 +1339,26 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
         criadoEm: new Date().toISOString(),
       };
 
+      /* ── ID gerado DENTRO da transação — mesma lógica anti-colisão do fecharMesa ── */
+      let novoId;
       await runTransaction(db, async (tx) => {
-        tx.set(doc(db, "users", uid, "vendas", novoId), payload);
-        tx.set(doc(db, "users", uid), { vendaIdCnt: vendaIdCnt + 1 }, { merge: true });
+        const userSnap = await tx.get(doc(db, "users", uid));
+        let currentCnt = userSnap.data()?.vendaIdCnt || 0;
+
+        let vendaRef;
+        let vendaSnap;
+        let tentativas = 0;
+        do {
+          novoId    = `V${String(currentCnt + 1).padStart(4, "0")}`;
+          vendaRef  = doc(db, "users", uid, "vendas", novoId);
+          vendaSnap = await tx.get(vendaRef);
+          if (vendaSnap.exists()) currentCnt++;
+          tentativas++;
+          if (tentativas > 200) throw new Error("Não foi possível gerar ID de venda.");
+        } while (vendaSnap.exists());
+
+        tx.set(vendaRef, payload);
+        tx.set(doc(db, "users", uid), { vendaIdCnt: currentCnt + 1 }, { merge: true });
         tx.delete(cmdRef);
       });
 
@@ -1898,7 +1930,6 @@ export default function Mesas() {
   const [produtos, setProdutos] = useState([]);
   const [servicos, setServicos] = useState([]);
   const [taxas, setTaxas] = useState(TAXAS_DEFAULT);
-  const [vendaIdCnt, setVendaIdCnt] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const [mesaModal, setMesaModal] = useState(null);      // mesa selecionada
@@ -1920,8 +1951,10 @@ export default function Mesas() {
     const produtosCol = collection(db, "users", uid, "produtos");
     const servicosCol = collection(db, "users", uid, "servicos");
 
-    const u1 = onSnapshot(userRef, snap => {
-      if (snap.exists()) setVendaIdCnt(snap.data().vendaIdCnt || 0);
+    const u1 = onSnapshot(userRef, (_snap) => {
+      /* Listener mantido para manter a conexão com o doc do usuário ativa,
+         mas o vendaIdCnt não é mais lido do estado React — sempre lemos
+         direto do Firestore dentro das transações. */
     });
 
     const u2 = onSnapshot(mesasCol, snap => {
@@ -2158,7 +2191,6 @@ export default function Mesas() {
           servicos={servicos}
           taxas={taxas}
           uid={uid}
-          vendaIdCnt={vendaIdCnt}
           cargo={cargo}
           nomeUsuario={nomeUsuario}
           onClose={() => setMesaModal(null)}
