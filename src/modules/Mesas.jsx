@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import AuthContext from "../contexts/AuthContext";
+import { logAction, LOG_ACAO, LOG_MODULO } from "../lib/logAction";
 import { db } from "../lib/firebase";
 import {
   collection, doc, setDoc, deleteDoc, updateDoc, getDoc,
@@ -789,6 +790,7 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, vendaIdCnt, 
         console.error("[Mesas] Erro ao lançar no caixa:", err);
       }
 
+      await logAction({ tenantUid: uid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.MESAS, descricao: `Fechou Mesa ${mesa.numero} — Venda ${novoId} — R$ ${total.toFixed(2)}` });
       onVendaSalva({
         id: novoId,
         mesa: mesa.numero,
