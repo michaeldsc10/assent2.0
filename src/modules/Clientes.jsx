@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
+import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
 import { useAuth } from "../contexts/AuthContext";
 import {
   collection,
@@ -784,7 +785,7 @@ function ModalConfirmDelete({ cliente, onConfirm, onClose }) {
 /* ======================= COMPONENTE PRINCIPAL ======================= */
 export default function Clientes() {
   // ── Multi-tenant ──
-  const { tenantUid, podeCriar, podeEditar, podeExcluir } = useAuth();
+  const { tenantUid, cargo, nomeUsuario, podeCriar, podeEditar, podeExcluir } = useAuth();
 
   // ── Flags de permissão ──
   const podeCriarV  = podeCriar("clientes");
@@ -842,18 +843,21 @@ export default function Clientes() {
       criadoEm: new Date().toISOString(),
     });
     await setDoc(doc(db, "users", tenantUid), { clienteIdCnt: clienteIdCnt + 1 }, { merge: true });
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.CLIENTES, descricao: montarDescricao("criar", "Cliente", form.nome, newId) });
     setModalNovo(false);
   };
 
   const handleEdit = async (form) => {
     if (!tenantUid || !editando) return;
     await setDoc(doc(db, "users", tenantUid, "clientes", editando.id), form, { merge: true });
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.CLIENTES, descricao: montarDescricao("editar", "Cliente", form.nome, editando.id) });
     setEditando(null);
   };
 
   const handleDelete = async () => {
     if (!tenantUid || !deletando) return;
     await deleteDoc(doc(db, "users", tenantUid, "clientes", deletando.id));
+    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.CLIENTES, descricao: montarDescricao("excluir", "Cliente", deletando.nome, deletando.id) });
     setDeletando(null);
   };
 
