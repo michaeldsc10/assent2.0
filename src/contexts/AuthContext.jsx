@@ -8,7 +8,7 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
 } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../lib/firebase"; // ajuste o caminho conforme seu projeto
 
 // ─────────────────────────────────────────────
@@ -113,6 +113,31 @@ export function AuthProvider({ children }) {
         setVendedorId(null);
         setVendedorNome(null);
         // Para admin: usa displayName do Firebase Auth ou email
+        setNomeUsuario(firebaseUser.displayName || firebaseUser.email);
+        return;
+      }
+
+      // ── Passo 1.5: users/{uid} não existe — pode ser Admin no primeiro acesso ──
+      // Verifica se existe licença ativa em /licencas/{uid}
+      const licencaDoc = await getDoc(doc(db, "licencas", uid));
+
+      if (licencaDoc.exists()) {
+        if (licencaDoc.data().ativo !== true) {
+          console.warn("[AuthContext] Licença inativa. Acesso bloqueado.");
+          await firebaseSignOut(auth);
+          return;
+        }
+        // Licença ativa — primeiro acesso do Admin: cria o documento raiz do tenant
+        await setDoc(doc(db, "users", uid), {
+          email:    firebaseUser.email,
+          criadoEm: serverTimestamp(),
+        }, { merge: true });
+
+        setUser(firebaseUser);
+        setTenantUid(uid);
+        setCargo(CARGOS.ADMIN);
+        setVendedorId(null);
+        setVendedorNome(null);
         setNomeUsuario(firebaseUser.displayName || firebaseUser.email);
         return;
       }
