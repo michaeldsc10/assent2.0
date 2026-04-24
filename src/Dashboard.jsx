@@ -1583,7 +1583,6 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           <h1>Dashboard</h1>
           <p>Visão geral do negócio</p>
         </div>
-        <div style={{ flex: 1 }} />
 
         {/* Toggle Visão */}
         <div style={{ display: "flex", background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 10, padding: 3, gap: 2, flexShrink: 0 }}>
@@ -1615,6 +1614,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             <BarChart3 size={13} /> Gráficos
           </button>
         </div>
+
+        <div style={{ flex: 1 }} />
         <div className="ag-search">
           <Search size={13} color="var(--text-3)" />
           <input placeholder="Buscar módulos, clientes..." />
