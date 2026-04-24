@@ -484,8 +484,14 @@ const RESPONSIVE_CSS = `
 /* ── DASHBOARD ESPECÍFICO ── */
 @media (max-width: 720px) {
   .ag-search  { display: none !important; }
+  .ag-periods { display: none !important; }
+  .ag-custom-range { display: none !important; }
   .ag-despesa-grid { grid-template-columns: 1fr 1fr !important; }
   .ag-mini-cards-mobile { display: none !important; }
+  .ag-period-mobile { display: flex !important; }
+}
+@media (min-width: 721px) {
+  .ag-period-mobile { display: none !important; }
 }
 @media (max-width: 480px) {
   .ag-despesa-grid { grid-template-columns: 1fr !important; }
@@ -1607,6 +1613,52 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           </div>
         )}
       </header>
+
+      {/* Filtro de período — apenas mobile */}
+      <div className="ag-period-mobile" style={{
+        alignItems: "center", gap: 8,
+        padding: "10px 16px",
+        borderBottom: "1px solid var(--border)",
+        background: "var(--s1)",
+        flexShrink: 0,
+      }}>
+        <select
+          value={period}
+          onChange={(e) => setPeriod(e.target.value)}
+          style={{
+            flex: 1,
+            background: "var(--s2)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            color: "var(--text)",
+            fontSize: 13,
+            padding: "7px 10px",
+            fontFamily: "'DM Sans', sans-serif",
+            outline: "none",
+          }}
+        >
+          {PERIODS.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        {period === "Personalizado" && (
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1, marginTop: 8 }}>
+            <input
+              type="date" className="ag-date-input"
+              value={customRange.from} max={customRange.to || undefined}
+              onChange={(e) => setCustomRange((r) => ({ ...r, from: e.target.value }))}
+              style={{ flex: 1, fontSize: 12 }}
+            />
+            <span style={{ color: "var(--text-3)", fontSize: 12 }}>→</span>
+            <input
+              type="date" className="ag-date-input"
+              value={customRange.to} min={customRange.from || undefined}
+              onChange={(e) => setCustomRange((r) => ({ ...r, to: e.target.value }))}
+              style={{ flex: 1, fontSize: 12 }}
+            />
+          </div>
+        )}
+      </div>
 
       <div className="ag-content">
         {/* Mini Stats */}
