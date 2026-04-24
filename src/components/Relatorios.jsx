@@ -3140,6 +3140,9 @@ function RelatorioLucroPorPS({ vendas, produtos, servicos, vendedores, intervalo
    Lista com situação de pagamento, totais e ticket médio
    ══════════════════════════════════════════════════════ */
 function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
+  /* Filtro de situação ativo — "todos" | "Em dia" | "Vencido" | "Pendente" */
+  const [filtroSit, setFiltroSit] = useState("todos");
+
   const dados = useMemo(() => {
     /* Mensalidades em aberto (a_receber origem=mensalidade) */
     const mensAbertas = aReceber.filter(ar => ar.origem === "mensalidade");
@@ -3164,23 +3167,29 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
       const pagasPeriodo = vendasMens.filter(v => v.clienteId === a.docId);
       const recebidoPeriodo = pagasPeriodo.reduce((s, v) => s + Number(v.total || 0), 0);
 
+      /* Próximo vencimento em aberto */
+      const proxVenc = abertas
+        .map(m => m.dataVencimento).filter(Boolean).sort()[0] || null;
+
       let situacao = "Em dia";
       if (a.status !== "ativo") situacao = a.status === "trancado" ? "Trancado" : "Inativo";
       else if (vencidas > 0)    situacao = "Vencido";
       else if (abertas.length)  situacao = "Pendente";
 
       return {
-        id:        a.idSeq ? `A${String(a.idSeq).padStart(4, "0")}` : "—",
-        nome:      a.nome || "—",
-        documento: a.documento || "—",
-        telefone:  a.telefone || "—",
+        docId:       a.docId,
+        id:          a.idSeq ? `A${String(a.idSeq).padStart(4, "0")}` : "—",
+        nome:        a.nome || "—",
+        documento:   a.documento || "—",
+        telefone:    a.telefone  || "—",
         mensalidade: Number(a.valorMensalidade || 0),
         situacao,
         abertas:     abertas.length,
         vencidas,
         totalAberto,
         recebidoPeriodo,
-        pagasPeriodo: pagasPeriodo.length,
+        proxVenc,
+        statusAluno: a.status || "ativo",
       };
     });
 
@@ -3191,21 +3200,54 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
       : 0;
     const emDia    = linhas.filter(l => l.situacao === "Em dia").length;
     const vencidos = linhas.filter(l => l.situacao === "Vencido").length;
+    const pendentes = linhas.filter(l => l.situacao === "Pendente").length;
 
-    return { linhas, totalAtivos, totalInativos, ticketMedio, emDia, vencidos };
+    return { linhas, totalAtivos, totalInativos, ticketMedio, emDia, vencidos, pendentes };
   }, [alunos, aReceber, vendas, intervalo]);
+
+  /* Aplica filtro de situação */
+  const linhasFiltradas = useMemo(() =>
+    filtroSit === "todos"
+      ? dados.linhas
+      : dados.linhas.filter(l => l.situacao === filtroSit),
+    [dados.linhas, filtroSit]
+  );
 
   const handleExport = () => {
     exportarExcel("alunos", [{
       nome: "Alunos",
       colunas: ["ID", "Nome", "Documento", "Telefone", "Mensalidade", "Situação", "Mens. Abertas", "Vencidas", "Total em Aberto", "Recebido no Período"],
-      dados: dados.linhas.map(l => [
+      dados: linhasFiltradas.map(l => [
         l.id, l.nome, l.documento, l.telefone,
         l.mensalidade.toFixed(2), l.situacao,
         l.abertas, l.vencidas,
         l.totalAberto.toFixed(2), l.recebidoPeriodo.toFixed(2),
       ]),
     }]);
+  };
+
+  /* Helper: pill de situação */
+  const SituacaoPill = ({ sit }) => {
+    const map = {
+      "Em dia":   { bg: "rgba(74,222,128,.12)",  color: "var(--green)", border: "rgba(74,222,128,.2)"  },
+      "Vencido":  { bg: "rgba(224,82,82,.12)",   color: "var(--red)",   border: "rgba(224,82,82,.25)" },
+      "Pendente": { bg: "rgba(245,166,35,.12)",  color: "#F5A623",      border: "rgba(245,166,35,.25)" },
+      "Trancado": { bg: "var(--s3)",             color: "var(--text-3)",border: "var(--border)"        },
+      "Inativo":  { bg: "var(--s3)",             color: "var(--text-3)",border: "var(--border)"        },
+    };
+    const s = map[sit] || map["Inativo"];
+    return (
+      <span style={{
+        display: "inline-flex", alignItems: "center", padding: "3px 9px",
+        borderRadius: 20, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
+        background: s.bg, color: s.color, border: `1px solid ${s.border}`,
+      }}>{sit}</span>
+    );
+  };
+
+  const fmtDataLocal = (iso) => {
+    if (!iso) return "—";
+    try { const [a,m,d] = iso.split("-"); return `${d}/${m}/${a}`; } catch { return "—"; }
   };
 
   return (
@@ -3217,36 +3259,136 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
         </button>
       </div>
 
+      {/* ── KPI cards — clicáveis como filtros ── */}
       <div className="cr-grid">
-        <CardResumo icon={<Users size={18} />} label="Alunos Ativos"
-          value={String(dados.totalAtivos)}
-          sub={`${dados.totalInativos} inativos/trancados`}
-          trend="neutral" colorVar="var(--gold)" />
-        <CardResumo icon={<DollarSign size={18} />} label="Ticket Médio"
-          value={fmtR$(dados.ticketMedio)} sub="mensalidade"
-          trend="neutral" colorVar="var(--blue)" />
-        <CardResumo icon={<TrendingUp size={18} />} label="Em Dia"
-          value={String(dados.emDia)} sub="alunos em dia"
-          trend="up" colorVar="var(--green)" />
-        <CardResumo icon={<AlertCircle size={18} />} label="Vencidos"
-          value={String(dados.vencidos)} sub="alunos inadimplentes"
-          trend="down" colorVar="var(--red)" />
+        {/* Total ativos — clique limpa o filtro */}
+        <div
+          onClick={() => setFiltroSit("todos")}
+          style={{
+            cursor: "pointer", borderRadius: 12,
+            border: `2px solid ${filtroSit === "todos" ? "var(--gold)" : "var(--border)"}`,
+            transition: "border-color .15s",
+          }}
+        >
+          <CardResumo icon={<Users size={18} />} label="Alunos Ativos"
+            value={String(dados.totalAtivos)}
+            sub={`${dados.totalInativos} inativos/trancados`}
+            trend="neutral" colorVar="var(--gold)" />
+        </div>
+
+        <div
+          onClick={() => setFiltroSit(f => f === "Em dia" ? "todos" : "Em dia")}
+          style={{
+            cursor: "pointer", borderRadius: 12,
+            border: `2px solid ${filtroSit === "Em dia" ? "var(--green)" : "var(--border)"}`,
+            transition: "border-color .15s",
+          }}
+        >
+          <CardResumo icon={<TrendingUp size={18} />} label="Em Dia"
+            value={String(dados.emDia)} sub="clique para filtrar"
+            trend="up" colorVar="var(--green)" />
+        </div>
+
+        <div
+          onClick={() => setFiltroSit(f => f === "Pendente" ? "todos" : "Pendente")}
+          style={{
+            cursor: "pointer", borderRadius: 12,
+            border: `2px solid ${filtroSit === "Pendente" ? "#F5A623" : "var(--border)"}`,
+            transition: "border-color .15s",
+          }}
+        >
+          <CardResumo icon={<DollarSign size={18} />} label="Pendentes"
+            value={String(dados.pendentes)} sub="clique para filtrar"
+            trend="neutral" colorVar="#F5A623" />
+        </div>
+
+        <div
+          onClick={() => setFiltroSit(f => f === "Vencido" ? "todos" : "Vencido")}
+          style={{
+            cursor: "pointer", borderRadius: 12,
+            border: `2px solid ${filtroSit === "Vencido" ? "var(--red)" : "var(--border)"}`,
+            transition: "border-color .15s",
+          }}
+        >
+          <CardResumo icon={<AlertCircle size={18} />} label="Vencidos"
+            value={String(dados.vencidos)} sub="clique para filtrar"
+            trend="down" colorVar="var(--red)" />
+        </div>
       </div>
 
-      <TabelaRelatorio
-        titulo="Alunos matriculados"
-        colunas={[
-          { key: "id",         label: "ID" },
-          { key: "nome",       label: "Nome" },
-          { key: "documento",  label: "Documento" },
-          { key: "mensalidade",label: "Mensalidade", format: (v) => fmtR$(v) },
-          { key: "situacao",   label: "Situação" },
-          { key: "abertas",    label: "Mens. Abertas" },
-          { key: "totalAberto",label: "Total Aberto", format: (v) => fmtR$(v) },
-          { key: "recebidoPeriodo", label: "Recebido Período", format: (v) => fmtR$(v) },
-        ]}
-        dados={dados.linhas}
-      />
+      {/* ── Tabela inline de alunos — sem TabelaRelatorio para evitar filtro por período ── */}
+      <div style={{
+        background: "var(--s1)", border: "1px solid var(--border)",
+        borderRadius: 12, overflow: "hidden",
+      }}>
+        {/* Header */}
+        <div style={{
+          padding: "13px 18px", borderBottom: "1px solid var(--border)",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <span style={{ fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600, color: "var(--text)", display: "flex", alignItems: "center", gap: 8 }}>
+            <Users size={14} />
+            Alunos matriculados
+            <span style={{ fontSize: 10, background: "var(--s3)", color: "var(--text-3)", padding: "2px 8px", borderRadius: 20, fontWeight: 600 }}>
+              {linhasFiltradas.length}
+            </span>
+            {filtroSit !== "todos" && (
+              <span style={{ fontSize: 10, padding: "2px 10px", borderRadius: 20, background: "rgba(200,165,94,.12)", border: "1px solid rgba(200,165,94,.25)", color: "var(--gold)" }}>
+                Filtro: {filtroSit} · <span onClick={() => setFiltroSit("todos")} style={{ cursor: "pointer", textDecoration: "underline" }}>Limpar</span>
+              </span>
+            )}
+          </span>
+        </div>
+
+        {/* Cabeçalho das colunas */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "72px 1.4fr 120px 120px 110px 110px 110px",
+          padding: "10px 18px", gap: 8,
+          background: "var(--s2)", borderBottom: "1px solid var(--border)",
+          fontSize: 10, fontWeight: 600, letterSpacing: ".07em",
+          textTransform: "uppercase", color: "var(--text-3)",
+        }}>
+          <span>ID</span>
+          <span>Nome</span>
+          <span>Documento</span>
+          <span>Mensalidade</span>
+          <span>Prox. Venc.</span>
+          <span>Aberto</span>
+          <span>Situação</span>
+        </div>
+
+        {/* Linhas */}
+        {linhasFiltradas.length === 0 ? (
+          <div style={{ padding: "42px 18px", textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>
+            {dados.linhas.length === 0
+              ? "Nenhum aluno matriculado."
+              : `Nenhum aluno com situação "${filtroSit}".`}
+          </div>
+        ) : linhasFiltradas.map((l, i) => (
+          <div key={l.docId || i} style={{
+            display: "grid",
+            gridTemplateColumns: "72px 1.4fr 120px 120px 110px 110px 110px",
+            padding: "11px 18px", gap: 8,
+            borderBottom: i < linhasFiltradas.length - 1 ? "1px solid var(--border)" : "none",
+            alignItems: "center", fontSize: 12, color: "var(--text-2)",
+            transition: "background .13s",
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}
+          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+            <span style={{ fontFamily: "'JetBrains Mono','Courier New',monospace", color: "var(--text-3)", fontSize: 11 }}>{l.id}</span>
+            <span>
+              <div style={{ color: "var(--text)", fontWeight: 500, fontSize: 13 }}>{l.nome}</div>
+              {l.telefone !== "—" && <div style={{ color: "var(--text-3)", fontSize: 11 }}>{l.telefone}</div>}
+            </span>
+            <span>{l.documento}</span>
+            <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: "var(--text)" }}>{fmtR$(l.mensalidade)}</span>
+            <span style={{ color: l.situacao === "Vencido" ? "var(--red)" : "var(--text-2)" }}>{fmtDataLocal(l.proxVenc) || (l.abertas === 0 ? "—" : "Pendente")}</span>
+            <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: l.totalAberto > 0 ? "var(--red)" : "var(--text-3)" }}>{fmtR$(l.totalAberto)}</span>
+            <span><SituacaoPill sit={l.situacao} /></span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -3304,7 +3446,7 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
     const porAluno = {};
     mensAbertas.forEach(m => {
       const id = m.clienteId || m.clienteNome;
-      if (!porAluno[id]) porAluno[id] = { aluno: m.clienteNome || m.alunoNome || "—", qtd: 0, total: 0 };
+      if (!porAluno[id]) porAluno[id] = { aluno: m.clienteNome || "—", qtd: 0, total: 0 };
       porAluno[id].qtd   += 1;
       porAluno[id].total += Number(m.valorRestante || 0);
     });
@@ -3961,7 +4103,7 @@ function RelatorioContasReceber({ aReceber = [], intervalo }) {
   const rankClientes = useMemo(() => {
     const mapa = {};
     filtrados.forEach((item) => {
-      const nome = item.cliente || item.nomeCliente || "Sem cliente";
+      const nome = item.clienteNome || item.cliente || item.nomeCliente || "Sem cliente";
       if (!mapa[nome]) mapa[nome] = { nome, totalPago: 0, totalPendente: 0, qtd: 0 };
       mapa[nome].totalPago     += item._status === "pago"  ? Number(item.valorTotal || item.valor || 0) : 0;
       mapa[nome].totalPendente += item._status !== "pago"  ? Number(item.valorRestante ?? item.valor ?? 0) : 0;
