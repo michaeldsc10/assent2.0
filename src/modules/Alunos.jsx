@@ -1709,6 +1709,7 @@ async function gerarMensalidadeEmAberto({ tenantUid, aluno, mensalidadesDoAluno 
     categoria:       "Mensalidade",
     descricao:       `Mensalidade ${mesRef} — ${aluno.nome}`,
     clienteNome:     aluno.nome,
+    cliente:         aluno.nome,       // campo lido pelo RelatorioContasReceber no ranking
     valorTotal:      valor,
     valorPago:       0,
     valorRestante:   valor,
