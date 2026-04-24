@@ -174,31 +174,18 @@ const CSS = `
   }
   .btn-nova-desp:hover { opacity: .88; }
 
-  /* Container principal — não faz scroll direto.
-     O scroll fica no .desp-body interno, garantindo independência
-     do pai (App.jsx) não precisar ter overflow:hidden). */
+  /* Container principal — mesma abordagem dos outros módulos */
   .desp-container {
-    flex: 1 1 0;
-    min-height: 0;
-    overflow: hidden;          /* NÃO auto — o filho .desp-body faz o scroll */
-    display: flex;
-    flex-direction: column;
-  }
-  .desp-container::-webkit-scrollbar { width: 4px; }
-  .desp-container::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
-
-  /* Área scrollável — contém tudo menos a topbar */
-  .desp-body {
-    flex: 1 1 0;
+    height: 100%;
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    display: flex;
-    flex-direction: column;
+    /* compatibilidade com pai flex */
+    flex: 1 1 auto;
   }
-  .desp-body::-webkit-scrollbar { width: 4px; }
-  .desp-body::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
+  .desp-container::-webkit-scrollbar { width: 4px; }
+  .desp-container::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
 
   /* Topbar */
   .desp-topbar {
@@ -480,7 +467,7 @@ const CSS = `
 
   /* ── Mobile responsive ── */
   @media (max-width: 640px) {
-    .desp-body { padding-bottom: 72px; }
+    .desp-container { padding-bottom: 72px; }
 
     /* Topbar */
     .desp-topbar { padding: 12px 14px; gap: 10px; }
@@ -1704,7 +1691,6 @@ export default function Despesas({ isPro = false }) {
       </header>
 
       {/* Cards de métricas */}
-      <div className="desp-body">
       <BannerLimite total={despesas.length} limite={LIMITES_FREE.despesas} tipo="despesas" isPro={isPro} />
       <div className="desp-metrics">
         <div
@@ -1922,7 +1908,6 @@ export default function Despesas({ isPro = false }) {
           </div>
         ))}
       </div>
-      </div>{/* /desp-body */}
 
       {/* Modais */}
       {viendoDetalhes && (
