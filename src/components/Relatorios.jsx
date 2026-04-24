@@ -531,6 +531,9 @@ const CSS = `
 
   @page { size: A4; margin: 20mm 15mm; }
 }
+/* Label explícito para mobile — oculto no desktop */
+.rel-cell-lbl { display: none; }
+
 /* Ocultar no print por padrão */
 .rel-print-header { display: none; }
 
@@ -557,13 +560,13 @@ const CSS = `
   .rel-mobile-table-scroll::-webkit-scrollbar { height: 3px; }
   .rel-mobile-table-scroll::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
 
-  /* InlineTable mobile: empilha header+valor por coluna → card por linha */
+  /* InlineTable mobile: card por linha */
   .rel-inline-table-head { display: none !important; }
   .rel-inline-table-row {
     display: flex !important;
     flex-direction: column !important;
-    gap: 6px !important;
-    padding: 12px 14px !important;
+    gap: 8px !important;
+    padding: 14px 16px !important;
     border-bottom: 1px solid var(--border);
     grid-template-columns: unset !important;
   }
@@ -571,14 +574,28 @@ const CSS = `
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;
-    font-size: 12px;
+    font-size: 13px;
+    gap: 8px;
+    min-height: 24px;
   }
-  .rel-inline-table-cell::before {
-    content: attr(data-label);
+  /* Desabilita ::before — usamos .rel-cell-lbl explícito no JSX */
+  .rel-inline-table-cell::before { content: none !important; display: none !important; }
+  /* Exibe label explícito no mobile */
+  .rel-cell-lbl {
+    display: block !important;
     font-size: 9px; font-weight: 700;
     text-transform: uppercase; letter-spacing: .06em;
-    color: var(--text-3); flex-shrink: 0; margin-right: 8px;
+    color: var(--text-3); flex-shrink: 0;
+    white-space: nowrap;
   }
+
+  /* KPI cards: 2 colunas no mobile */
+  .cr-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px;
+  }
+  .cr-value { font-size: 16px; }
+  .cr-label { font-size: 9px; }
 }
 
 /* Dropdown wrapper — só visível no mobile */
@@ -3818,7 +3835,7 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
           )}
 
           {/* Tabela inline — desktop: grid; mobile: card por linha */}
-          <div style={{ background: "var(--s1)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+          <div style={{ background: "var(--s1)", border: "1px solid var(--border)", borderRadius: 12, overflow: "visible" }}>
             <div style={{ padding: "13px 18px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span style={{ fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600, color: "var(--text)", display: "flex", alignItems: "center", gap: 8 }}>
                 <Users size={14} /> Alunos matriculados
@@ -3842,18 +3859,37 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
               <div key={l.docId || i} className="rel-inline-table-row" style={{ display: "grid", gridTemplateColumns: "72px 1.4fr 120px 120px 110px 110px 110px", padding: "11px 18px", gap: 8, borderBottom: i < linhasFiltradas.length - 1 ? "1px solid var(--border)" : "none", alignItems: "center", fontSize: 12, color: "var(--text-2)", transition: "background .13s" }}
                 onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                <span className="rel-inline-table-cell" data-label="ID" style={{ fontFamily: "'JetBrains Mono','Courier New',monospace", color: "var(--text-3)", fontSize: 11 }}>{l.id}</span>
-                <span className="rel-inline-table-cell" data-label="Nome">
-                  <span>
-                    <div style={{ color: "var(--text)", fontWeight: 500, fontSize: 13 }}>{l.nome}</div>
-                    {l.telefone !== "—" && <div style={{ color: "var(--text-3)", fontSize: 11 }}>{l.telefone}</div>}
-                  </span>
+              <span className="rel-inline-table-cell" data-label="ID" style={{ fontFamily: "'JetBrains Mono','Courier New',monospace", color: "var(--text-3)", fontSize: 11 }}>
+                <span className="rel-cell-lbl">ID</span>
+                {l.id}
+              </span>
+              <span className="rel-inline-table-cell" data-label="Nome">
+                <span className="rel-cell-lbl">Nome</span>
+                <span>
+                  <div style={{ color: "var(--text)", fontWeight: 500, fontSize: 13 }}>{l.nome}</div>
+                  {l.telefone !== "—" && <div style={{ color: "var(--text-3)", fontSize: 11 }}>{l.telefone}</div>}
                 </span>
-                <span className="rel-inline-table-cell" data-label="Documento">{l.documento}</span>
-                <span className="rel-inline-table-cell" data-label="Mensalidade" style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: "var(--text)" }}>{fmtR$(l.mensalidade)}</span>
-                <span className="rel-inline-table-cell" data-label="Prox. Venc." style={{ color: l.situacao === "Vencido" ? "var(--red)" : "var(--text-2)" }}>{fmtDataLocal(l.proxVenc) || (l.abertas === 0 ? "—" : "Pendente")}</span>
-                <span className="rel-inline-table-cell" data-label="Em Aberto" style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: l.totalAberto > 0 ? "var(--red)" : "var(--text-3)" }}>{fmtR$(l.totalAberto)}</span>
-                <span className="rel-inline-table-cell" data-label="Situação"><SituacaoPill sit={l.situacao} /></span>
+              </span>
+              <span className="rel-inline-table-cell" data-label="Documento">
+                <span className="rel-cell-lbl">Documento</span>
+                {l.documento}
+              </span>
+              <span className="rel-inline-table-cell" data-label="Mensalidade" style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: "var(--text)" }}>
+                <span className="rel-cell-lbl">Mensalidade</span>
+                {fmtR$(l.mensalidade)}
+              </span>
+              <span className="rel-inline-table-cell" data-label="Prox. Venc." style={{ color: l.situacao === "Vencido" ? "var(--red)" : "var(--text-2)" }}>
+                <span className="rel-cell-lbl">Prox. Venc.</span>
+                {fmtDataLocal(l.proxVenc) || (l.abertas === 0 ? "—" : "Pendente")}
+              </span>
+              <span className="rel-inline-table-cell" data-label="Em Aberto" style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: l.totalAberto > 0 ? "var(--red)" : "var(--text-3)" }}>
+                <span className="rel-cell-lbl">Em Aberto</span>
+                {fmtR$(l.totalAberto)}
+              </span>
+              <span className="rel-inline-table-cell" data-label="Situação">
+                <span className="rel-cell-lbl">Situação</span>
+                <SituacaoPill sit={l.situacao} />
+              </span>
               </div>
             ))}
           </div>
@@ -3965,6 +4001,17 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
     try { const [a,m,d] = iso.split("-"); return `${d}/${m}/${a}`; } catch { return "—"; }
   };
 
+  /* Formata "2026-05" ou "2026-05-01" → "Mai/26" */
+  const fmtMesRef = (val) => {
+    if (!val) return "—";
+    const parts = val.split("-");
+    if (parts.length < 2) return val;
+    const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+    const idx = parseInt(parts[1]) - 1;
+    if (idx < 0 || idx > 11) return val;
+    return `${meses[idx]}/${parts[0].slice(2)}`;
+  };
+
   const StatusPill = ({ status }) => {
     const isVenc = status === "Vencida";
     return (
@@ -3982,7 +4029,7 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
   const InlineTable = ({ titulo, colunas, linhas, emptyMsg }) => (
     <div style={{
       background: "var(--s1)", border: "1px solid var(--border)",
-      borderRadius: 12, overflow: "hidden",
+      borderRadius: 12, overflow: "visible",
     }}>
       <div style={{
         padding: "13px 18px", borderBottom: "1px solid var(--border)",
@@ -4024,7 +4071,10 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
         onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
           {colunas.map(c => (
             <span key={c.key} className="rel-inline-table-cell" data-label={c.label}>
-              {c.render ? c.render(row[c.key], row) : (row[c.key] ?? "—")}
+              <span className="rel-cell-lbl">{c.label}</span>
+              <span style={{ textAlign: "right" }}>
+                {c.render ? c.render(row[c.key], row) : (row[c.key] ?? "—")}
+              </span>
             </span>
           ))}
         </div>
@@ -4110,7 +4160,7 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
           colunas={[
             { key: "data",  label: "Data",      render: (v) => fmtDataLocal(typeof v === "string" ? v.slice(0,10) : v) },
             { key: "aluno", label: "Aluno" },
-            { key: "mes",   label: "Mês Ref." },
+            { key: "mes",   label: "Mês Ref.",  render: (v) => fmtMesRef(v) },
             { key: "forma", label: "Pagamento" },
             { key: "valor", label: "Valor",     render: (v) => <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: "var(--green)" }}>{fmtR$(v)}</span> },
           ]}
@@ -4125,7 +4175,7 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
           titulo="Mensalidades Pendentes (atual)"
           colunas={[
             { key: "aluno",      label: "Aluno" },
-            { key: "mes",        label: "Mês Ref." },
+            { key: "mes",        label: "Mês Ref.",   render: (v) => fmtMesRef(v) },
             { key: "vencimento", label: "Vencimento", render: (v) => fmtDataLocal(v) },
             { key: "status",     label: "Status",     render: (v) => <StatusPill status={v} /> },
             { key: "valor",      label: "Valor",      render: (v) => <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: "var(--red)" }}>{fmtR$(v)}</span> },
