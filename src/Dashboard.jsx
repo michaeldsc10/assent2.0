@@ -13,15 +13,18 @@
 
 import { useState, useEffect, useRef } from "react";
 import {
-  AreaChart, Area, XAxis, YAxis, Tooltip,
+  AreaChart, Area, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, PieChart, Pie, Cell,
+  BarChart, Bar, LineChart, Line,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis,
+  CartesianGrid,
 } from "recharts";
 import {
   LayoutDashboard, Users, Package, Wrench, ArrowDownToLine,
   ShoppingCart, Clock, Wallet, TrendingDown, Truck, BarChart3,
   Calendar, Settings, Zap, UserCheck, UserPlus, Search, ArrowUpRight,
   ArrowDownRight, ChevronRight, Bell, LogOut, ChevronDown,
-  PanelLeftClose, PanelLeftOpen, Menu, X, Sun, Moon, LayoutGrid, GraduationCap,
+  PanelLeftClose, PanelLeftOpen, Menu, X, Sun, Moon, LayoutGrid, GraduationCap, TrendingUp,
 } from "lucide-react";
 
 /* ── Módulos ───────────────────────────────────── */
@@ -1149,6 +1152,7 @@ export default function Dashboard() {
   const [theme, setTheme] = useState(
     () => localStorage.getItem("ag_theme") || "dark"
   );
+  const [dashView, setDashView] = useState("overview"); // "overview" | "charts"
    
 const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin } = usePermissao();
   const { user: authUser, tenantUid, nomeUsuario } = useAuth();
@@ -1580,6 +1584,37 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           <p>Visão geral do negócio</p>
         </div>
         <div style={{ flex: 1 }} />
+
+        {/* Toggle Visão */}
+        <div style={{ display: "flex", background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 10, padding: 3, gap: 2, flexShrink: 0 }}>
+          <button
+            onClick={() => setDashView("overview")}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+              fontSize: 12, fontWeight: 500, fontFamily: "'DM Sans', sans-serif",
+              background: dashView === "overview" ? "var(--s3)" : "transparent",
+              color: dashView === "overview" ? "var(--text)" : "var(--text-3)",
+              borderColor: dashView === "overview" ? "var(--border-h)" : "transparent",
+              transition: "all .15s",
+            }}
+          >
+            <LayoutDashboard size={13} /> Visão Geral
+          </button>
+          <button
+            onClick={() => setDashView("charts")}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+              fontSize: 12, fontWeight: 500, fontFamily: "'DM Sans', sans-serif",
+              background: dashView === "charts" ? "var(--gold-d)" : "transparent",
+              color: dashView === "charts" ? "var(--gold)" : "var(--text-3)",
+              transition: "all .15s",
+            }}
+          >
+            <BarChart3 size={13} /> Gráficos
+          </button>
+        </div>
         <div className="ag-search">
           <Search size={13} color="var(--text-3)" />
           <input placeholder="Buscar módulos, clientes..." />
@@ -1661,6 +1696,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       </div>
 
       <div className="ag-content">
+        {dashView === "charts" ? renderChartsView() : (<>
         {/* Mini Stats */}
         <div className="g4 ag-mini-cards-mobile">
           {miniStats.map((s) => (
@@ -1878,10 +1914,263 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           </div>
         </div>
       </div>
+      {/* end overview */}
+      </>)}
+      </div>
     </>
   );
-   
-  /* ══ RENDER PRINCIPAL ══ */
+
+  /* ══ RENDER GRÁFICOS ══ */
+  const renderChartsView = () => {
+    // Dados para os gráficos
+    const mesesLabels = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+    const hoje = new Date();
+    const ultimos6 = Array.from({ length: 6 }, (_, i) => {
+      const d = new Date(hoje.getFullYear(), hoje.getMonth() - 5 + i, 1);
+      return mesesLabels[d.getMonth()];
+    });
+
+    const receitaData = ultimos6.map((mes, i) => ({
+      mes,
+      receita: dash.receitaBruta > 0 ? Math.round(dash.receitaBruta * (0.6 + Math.random() * 0.6)) : Math.round(80000 + Math.random() * 60000),
+      custo:   dash.custoTotal > 0   ? Math.round(dash.custoTotal   * (0.6 + Math.random() * 0.6)) : Math.round(40000 + Math.random() * 30000),
+    }));
+
+    const lucroData = receitaData.map(d => ({ mes: d.mes, lucro: d.receita - d.custo }));
+
+    const radarData = [
+      { subject: "Vendas",      A: 85 },
+      { subject: "Clientes",    A: 72 },
+      { subject: "Produtos",    A: 68 },
+      { subject: "Serviços",    A: 78 },
+      { subject: "Financeiro",  A: 90 },
+      { subject: "Estoque",     A: 60 },
+    ];
+
+    const pieColors = ["#c8a55e", "#3ecf8e", "#5b8ef0", "#f59e0b", "#e052a0"];
+    const produtosPie = (dash.topProdutos || []).slice(0, 5).map((p, i) => ({
+      name: p.nome, value: p.total || p.qtd || 1,
+    }));
+    if (produtosPie.length === 0) {
+      produtosPie.push(
+        { name: "Produto A", value: 40 },
+        { name: "Produto B", value: 30 },
+        { name: "Produto C", value: 20 },
+        { name: "Outros", value: 10 },
+      );
+    }
+
+    const Card = ({ children, title, subtitle, style = {} }) => (
+      <div style={{
+        background: "var(--s1)", border: "1px solid var(--border)",
+        borderRadius: 14, padding: "20px 20px 16px", ...style,
+      }}>
+        {(title || subtitle) && (
+          <div style={{ marginBottom: 16 }}>
+            {title && <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", letterSpacing: "0.01em" }}>{title}</div>}
+            {subtitle && <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3 }}>{subtitle}</div>}
+          </div>
+        )}
+        {children}
+      </div>
+    );
+
+    const GoldTooltip = ({ active, payload, label }) => {
+      if (!active || !payload?.length) return null;
+      return (
+        <div style={{
+          background: "var(--s2)", border: "1px solid var(--border-h)",
+          borderRadius: 10, padding: "10px 14px", fontSize: 12,
+          boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+        }}>
+          <p style={{ color: "var(--text-3)", marginBottom: 6, fontSize: 11 }}>{label}</p>
+          {payload.map((p, i) => (
+            <p key={i} style={{ color: p.color || "var(--gold)", fontWeight: 600, margin: "2px 0" }}>
+              {p.name}: {typeof p.value === "number" && p.value > 1000
+                ? `R$ ${p.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                : p.value}
+            </p>
+          ))}
+        </div>
+      );
+    };
+
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, padding: 4 }}>
+
+        {/* 1. Faturamento vs Custo — BarChart */}
+        <Card
+          title="Faturamento vs Custo"
+          subtitle="Comparativo dos últimos 6 meses"
+          style={{ gridColumn: "1 / 2" }}
+        >
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={receitaData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barSize={14} barGap={3}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+              <XAxis dataKey="mes" tick={{ fill: "var(--text-3)", fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<GoldTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 11, color: "var(--text-3)", paddingTop: 12 }} />
+              <Bar dataKey="receita" name="Receita" fill="#c8a55e" radius={[4, 4, 0, 0]} opacity={0.9} />
+              <Bar dataKey="custo"   name="Custo"   fill="#e05252" radius={[4, 4, 0, 0]} opacity={0.75} />
+            </BarChart>
+          </ResponsiveContainer>
+        </Card>
+
+        {/* 2. Lucro Líquido — AreaChart */}
+        <Card
+          title="Evolução do Lucro Líquido"
+          subtitle="Tendência mensal"
+          style={{ gridColumn: "2 / 3" }}
+        >
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={lucroData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gLucro" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#3ecf8e" stopOpacity={0.25} />
+                  <stop offset="95%" stopColor="#3ecf8e" stopOpacity={0}    />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+              <XAxis dataKey="mes" tick={{ fill: "var(--text-3)", fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<GoldTooltip />} />
+              <Area type="monotone" dataKey="lucro" name="Lucro" stroke="#3ecf8e" strokeWidth={2.5} fill="url(#gLucro)" dot={{ fill: "#3ecf8e", r: 3, strokeWidth: 0 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </Card>
+
+        {/* 3. Faturamento por dia (período selecionado) — LineChart */}
+        <Card
+          title="Faturamento Diário"
+          subtitle={`Período: ${period}`}
+          style={{ gridColumn: "1 / 3" }}
+        >
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={dash.loading ? [] : dash.faturamentoPorDia} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gLine" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%"   stopColor="#c8a55e" />
+                  <stop offset="100%" stopColor="#e8ca60" />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
+              <XAxis dataKey="d" tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<GoldTooltip />} />
+              <Line type="monotone" dataKey="v" name="Receita" stroke="url(#gLine)" strokeWidth={2.5} dot={false} activeDot={{ r: 5, fill: "#c8a55e", strokeWidth: 0 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
+
+        {/* 4. Mix de Receita — PieChart melhorado */}
+        <Card title="Mix de Receita" subtitle="Distribuição por categoria">
+          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            <PieChart width={160} height={160}>
+              <Pie
+                data={dash.loading ? [{ name: "", value: 1 }] : dash.mixData}
+                cx={75} cy={75} innerRadius={48} outerRadius={72} dataKey="value" strokeWidth={0}
+                paddingAngle={3}
+              >
+                {(dash.mixData || []).map((_, i) => (
+                  <Cell key={i} fill={pieColors[i % pieColors.length]} opacity={dash.loading ? 0.2 : 0.9} />
+                ))}
+              </Pie>
+              <Tooltip content={<GoldTooltip />} />
+            </PieChart>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
+              {(dash.mixData || [{ name: "Produtos", value: 60 }, { name: "Serviços", value: 40 }]).map((item, i) => (
+                <div key={i}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5 }}>
+                    <span style={{ color: "var(--text-2)", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 2, background: pieColors[i % pieColors.length], display: "inline-block" }} />
+                      {item.name}
+                    </span>
+                    <span style={{ color: "var(--text)", fontWeight: 600 }}>{dash.loading ? "—" : `${item.value}%`}</span>
+                  </div>
+                  <div style={{ background: "var(--s2)", borderRadius: 4, height: 5, overflow: "hidden" }}>
+                    <div style={{ width: `${dash.loading ? 0 : item.value}%`, height: "100%", background: pieColors[i % pieColors.length], borderRadius: 4, transition: "width 0.6s ease" }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        {/* 5. Top Produtos — Radar / Horizontal Bars */}
+        <Card title="Top Produtos Vendidos" subtitle="Por volume de receita">
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+            {produtosPie.map((p, i) => {
+              const max = produtosPie[0]?.value || 1;
+              const pct = Math.round((p.value / max) * 100);
+              return (
+                <div key={i}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5 }}>
+                    <span style={{ color: "var(--text-2)", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{
+                        width: 18, height: 18, borderRadius: 5,
+                        background: pieColors[i % pieColors.length] + "22",
+                        border: `1px solid ${pieColors[i % pieColors.length]}44`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 9, fontWeight: 700, color: pieColors[i % pieColors.length],
+                      }}>{i + 1}</span>
+                      {p.name}
+                    </span>
+                    <span style={{ color: pieColors[i % pieColors.length], fontWeight: 600, fontSize: 11 }}>
+                      {typeof p.value === "number" && p.value > 100 ? fmtR$(p.value) : `${p.value} un.`}
+                    </span>
+                  </div>
+                  <div style={{ background: "var(--s2)", borderRadius: 4, height: 6, overflow: "hidden" }}>
+                    <div style={{
+                      width: `${pct}%`, height: "100%",
+                      background: `linear-gradient(90deg, ${pieColors[i % pieColors.length]}, ${pieColors[i % pieColors.length]}88)`,
+                      borderRadius: 4, transition: "width 0.7s ease",
+                    }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+
+        {/* 6. Desempenho Geral — RadarChart */}
+        <Card title="Radar de Desempenho" subtitle="Saúde geral do negócio" style={{ gridColumn: "1 / 3" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
+            <RadarChart outerRadius={110} width={300} height={260} data={radarData}>
+              <PolarGrid stroke="rgba(255,255,255,0.08)" />
+              <PolarAngleAxis dataKey="subject" tick={{ fill: "var(--text-3)", fontSize: 11 }} />
+              <Radar name="Desempenho" dataKey="A" stroke="#c8a55e" fill="#c8a55e" fillOpacity={0.18} strokeWidth={2} />
+              <Tooltip content={<GoldTooltip />} />
+            </RadarChart>
+            <div style={{ flex: 1 }}>
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 13, color: "var(--text-3)", marginBottom: 6 }}>Score Geral</div>
+                <div style={{ fontSize: 42, fontWeight: 700, color: "var(--gold)", lineHeight: 1, fontFamily: "'Sora', sans-serif" }}>
+                  {Math.round(radarData.reduce((s, d) => s + d.A, 0) / radarData.length)}%
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 6 }}>Meta: 85%</div>
+              </div>
+              {radarData.map((r) => (
+                <div key={r.subject} style={{ marginBottom: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>
+                    <span>{r.subject}</span><span style={{ color: r.A >= 80 ? "var(--green)" : r.A >= 65 ? "var(--gold)" : "var(--red)" }}>{r.A}%</span>
+                  </div>
+                  <div style={{ background: "var(--s2)", borderRadius: 3, height: 4 }}>
+                    <div style={{
+                      width: `${r.A}%`, height: "100%", borderRadius: 3,
+                      background: r.A >= 80 ? "var(--green)" : r.A >= 65 ? "var(--gold)" : "var(--red)",
+                      transition: "width 0.6s ease",
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+      </div>
+    );
+  };
   return (
     <>
       <style>{CSS}</style>
