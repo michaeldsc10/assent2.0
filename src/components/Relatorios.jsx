@@ -3423,9 +3423,6 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
     </div>
   );
 }
-```
-
-
 
 /* ══════════════════════════════════════════════════════
    HELPERS LOCAIS — Compras & A Receber
