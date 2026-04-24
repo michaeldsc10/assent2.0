@@ -14,7 +14,8 @@ import {
   ShoppingCart, Package, Users, Calendar, FileText,
   Download, Printer, AlertCircle, Loader2,
   ArrowUpRight, ArrowDownRight, Minus,
-  ChevronRight, Receipt, Wallet, LayoutDashboard, X,
+  ChevronRight, CreditCard, Clock, Receipt, Wallet, LayoutDashboard, X,
+  CheckCircle, Zap, Target, Activity, AlertTriangle, Filter, PieChart,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
@@ -528,6 +529,141 @@ const CSS = `
 }
 /* Ocultar no print por padrão */
 .rel-print-header { display: none; }
+
+/* ══════════════════════════════════════════════════════
+   CSS — RELATÓRIO DE COMPRAS & CONTAS A RECEBER
+   ══════════════════════════════════════════════════════ */
+
+/* ── KPI Cards ── */
+.rcr-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+  gap: 14px;
+}
+.rcr-kpi {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  padding: 17px 18px;
+  position: relative;
+  overflow: hidden;
+  transition: border-color .18s, transform .15s;
+}
+.rcr-kpi:hover { border-color: var(--border-h); transform: translateY(-1px); }
+.rcr-kpi::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  opacity: 0; transition: opacity .2s;
+}
+.rcr-kpi:hover::before { opacity: 1; }
+.rcr-kpi.gold::before  { background: linear-gradient(90deg, var(--gold), transparent); }
+.rcr-kpi.green::before { background: linear-gradient(90deg, var(--green), transparent); }
+.rcr-kpi.red::before   { background: linear-gradient(90deg, var(--red), transparent); }
+.rcr-kpi.blue::before  { background: linear-gradient(90deg, var(--blue, #5b8ef0), transparent); }
+.rcr-kpi-icon { width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+.rcr-kpi-icon.gold  { background: rgba(200,165,94,0.14);  color: var(--gold);  }
+.rcr-kpi-icon.green { background: rgba(72,199,142,0.14);  color: var(--green); }
+.rcr-kpi-icon.red   { background: rgba(224,82,82,0.14);   color: var(--red);   }
+.rcr-kpi-icon.blue  { background: rgba(91,142,240,0.14);  color: var(--blue, #5b8ef0); }
+.rcr-kpi-label { font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); margin-bottom: 5px; }
+.rcr-kpi-val { font-family: 'Sora', sans-serif; font-size: 20px; font-weight: 700; color: var(--text); line-height: 1.1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-bottom: 6px; }
+.rcr-kpi-val.gold  { color: var(--gold);  }
+.rcr-kpi-val.green { color: var(--green); }
+.rcr-kpi-val.red   { color: var(--red);   }
+.rcr-kpi-trend { display: flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; }
+.rcr-kpi-trend.up   { color: var(--green); }
+.rcr-kpi-trend.down { color: var(--red);   }
+.rcr-kpi-trend.neu  { color: var(--text-3); }
+.rcr-kpi-sub { font-size: 11px; color: var(--text-3); }
+
+/* ── Charts ── */
+.rcr-charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.rcr-charts-grid.trio { grid-template-columns: 2fr 1fr; }
+@media (max-width: 900px) { .rcr-charts-grid, .rcr-charts-grid.trio { grid-template-columns: 1fr; } }
+.rcr-chart-card { background: var(--s1); border: 1px solid var(--border); border-radius: 13px; overflow: hidden; }
+.rcr-chart-header { padding: 13px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.rcr-chart-title { font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 7px; }
+.rcr-chart-title-dot { width: 6px; height: 6px; border-radius: 50%; box-shadow: 0 0 6px currentColor; }
+.rcr-chart-badge { font-size: 10px; font-weight: 600; background: var(--s3); border: 1px solid var(--border-h); color: var(--text-2); padding: 2px 9px; border-radius: 20px; }
+.rcr-chart-body { padding: 18px; overflow: hidden; }
+
+/* ── Bar chart ── */
+.rcr-bar-chart { display: flex; align-items: flex-end; gap: 6px; padding-bottom: 28px; position: relative; }
+.rcr-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; position: relative; }
+.rcr-bar { width: 100%; border-radius: 4px 4px 0 0; min-height: 3px; transition: opacity .15s; position: relative; cursor: pointer; }
+.rcr-bar:hover { opacity: .8; }
+.rcr-bar-tooltip { position: absolute; bottom: calc(100% + 5px); left: 50%; transform: translateX(-50%); background: var(--s0, #0e0e0e); border: 1px solid var(--border-h); color: var(--text); font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 5px; white-space: nowrap; pointer-events: none; opacity: 0; transition: opacity .15s; z-index: 10; }
+.rcr-bar:hover .rcr-bar-tooltip { opacity: 1; }
+.rcr-bar-label { font-size: 8.5px; color: var(--text-3); text-align: center; position: absolute; bottom: -22px; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Ranking bars ── */
+.rcr-rank-list { display: flex; flex-direction: column; }
+.rcr-rank-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.rcr-rank-item:last-child { border-bottom: none; }
+.rcr-rank-pos { font-family: 'Sora', sans-serif; font-size: 11px; font-weight: 700; color: var(--gold); width: 18px; flex-shrink: 0; text-align: center; }
+.rcr-rank-info { flex: 1; min-width: 0; }
+.rcr-rank-name { font-size: 13px; color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rcr-rank-sub { font-size: 10px; color: var(--text-3); margin-top: 1px; }
+.rcr-rank-bar-wrap { width: 100px; flex-shrink: 0; }
+.rcr-rank-bar-bg { height: 4px; border-radius: 2px; background: var(--s3); overflow: hidden; }
+.rcr-rank-bar-fill { height: 100%; border-radius: 2px; transition: width .5s ease; }
+.rcr-rank-val { font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 600; color: var(--text); min-width: 95px; text-align: right; }
+
+/* ── Donut ── */
+.rcr-donut-wrap { display: flex; align-items: center; gap: 20px; padding: 4px 0; }
+.rcr-donut-legend { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+.rcr-donut-leg-item { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.rcr-donut-leg-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+.rcr-donut-leg-name { flex: 1; color: var(--text); }
+.rcr-donut-leg-pct { font-family: 'Sora', sans-serif; font-size: 11px; font-weight: 600; color: var(--text-2); }
+
+/* ── Insights ── */
+.rcr-insights { display: flex; flex-direction: column; gap: 10px; }
+.rcr-insight { display: flex; align-items: flex-start; gap: 12px; padding: 13px 16px; border-radius: 10px; border: 1px solid transparent; font-size: 12px; line-height: 1.55; }
+.rcr-insight.warn   { background: rgba(200,165,94,0.07);  border-color: rgba(200,165,94,0.22); color: var(--text-2); }
+.rcr-insight.danger { background: rgba(224,82,82,0.06);   border-color: rgba(224,82,82,0.2);   color: var(--text-2); }
+.rcr-insight.good   { background: rgba(72,199,142,0.06);  border-color: rgba(72,199,142,0.2);  color: var(--text-2); }
+.rcr-insight.info   { background: rgba(91,142,240,0.06);  border-color: rgba(91,142,240,0.2);  color: var(--text-2); }
+.rcr-insight-icon { flex-shrink: 0; margin-top: 1px; }
+.rcr-insight-text strong { color: var(--text); }
+
+/* ── Fluxo de caixa ── */
+.rcr-cashflow { display: flex; flex-direction: column; gap: 6px; }
+.rcr-cf-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; background: var(--s2); font-size: 12px; transition: background .13s; }
+.rcr-cf-row:hover { background: var(--s3); }
+.rcr-cf-date { font-weight: 600; color: var(--text); min-width: 80px; }
+.rcr-cf-desc { flex: 1; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rcr-cf-val  { font-family: 'Sora', sans-serif; font-weight: 600; white-space: nowrap; }
+.rcr-cf-val.pendente { color: var(--gold); }
+.rcr-cf-val.vencido  { color: var(--red);  }
+
+/* ── Status badges ── */
+.rcr-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 20px; font-size: 9.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.rcr-badge.pago      { background: rgba(72,199,142,0.12); border: 1px solid rgba(72,199,142,.25); color: var(--green); }
+.rcr-badge.pendente  { background: rgba(200,165,94,0.12); border: 1px solid rgba(200,165,94,.3);  color: var(--gold);  }
+.rcr-badge.vencido   { background: rgba(224,82,82,0.10);  border: 1px solid rgba(224,82,82,.25);  color: var(--red);   }
+.rcr-badge.cancelado { background: var(--s3); border: 1px solid var(--border); color: var(--text-3); }
+
+/* ── Misc ── */
+.rcr-section-title { font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; }
+.rcr-section-title svg { color: var(--gold); }
+.rcr-filters { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rcr-filter-btn { padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 500; background: var(--s3); border: 1px solid var(--border); color: var(--text-2); cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all .13s; }
+.rcr-filter-btn:hover { background: var(--s2); color: var(--text); }
+.rcr-filter-btn.active { background: rgba(200,165,94,0.15); border-color: var(--gold); color: var(--gold); }
+.rcr-filter-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--text-3); }
+.rcr-highlight-row { display: flex; align-items: center; justify-content: space-between; padding: 11px 15px; background: var(--s2); border-radius: 9px; font-size: 12px; color: var(--text-2); }
+.rcr-highlight-row strong { color: var(--text); }
+.rcr-highlight-row .val { font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 700; color: var(--gold); }
+.rcr-table-wrap { background: var(--s1); border: 1px solid var(--border); border-radius: 13px; overflow: hidden; }
+.rcr-table-header { padding: 13px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+.rcr-table-title { font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; color: var(--text); }
+.rcr-table-badge { font-size: 11px; font-weight: 600; background: var(--s3); border: 1px solid var(--border-h); color: var(--text-2); padding: 2px 10px; border-radius: 20px; }
+.rcr-row { display: grid; gap: 8px; padding: 10px 18px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text-2); align-items: center; transition: background .1s; }
+.rcr-row:last-child { border-bottom: none; }
+.rcr-row:hover { background: rgba(255,255,255,0.02); }
+.rcr-row-head { background: var(--s2); font-size: 9px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
+.rcr-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; gap: 10px; color: var(--text-3); text-align: center; font-size: 13px; }
 
 /* ── Lucro por P/S ── */
 .lps-tabs {
@@ -3000,6 +3136,1037 @@ function RelatorioLucroPorPS({ vendas, produtos, servicos, vendedores, intervalo
 }
 
 /* ══════════════════════════════════════════════════════
+   RELATÓRIO: ALUNOS
+   Lista com situação de pagamento, totais e ticket médio
+   ══════════════════════════════════════════════════════ */
+function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
+  const dados = useMemo(() => {
+    /* Mensalidades em aberto (a_receber origem=mensalidade) */
+    const mensAbertas = aReceber.filter(ar => ar.origem === "mensalidade");
+    const mensPorAluno = mensAbertas.reduce((acc, m) => {
+      (acc[m.alunoId] = acc[m.alunoId] || []).push(m);
+      return acc;
+    }, {});
+
+    /* Vendas de mensalidade pagas no período */
+    const vendasMens = vendas.filter(v =>
+      v.tipoVenda === "mensalidade" &&
+      v.status !== "cancelada" &&
+      dentroDoIntervalo(v.data, intervalo)
+    );
+
+    const hoje = new Date().toISOString().slice(0, 10);
+
+    const linhas = alunos.map(a => {
+      const abertas = mensPorAluno[a.docId] || [];
+      const totalAberto = abertas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
+      const vencidas = abertas.filter(m => (m.dataVencimento || "") < hoje).length;
+      const pagasPeriodo = vendasMens.filter(v => v.alunoId === a.docId);
+      const recebidoPeriodo = pagasPeriodo.reduce((s, v) => s + Number(v.total || 0), 0);
+
+      let situacao = "Em dia";
+      if (a.status !== "ativo") situacao = a.status === "trancado" ? "Trancado" : "Inativo";
+      else if (vencidas > 0)    situacao = "Vencido";
+      else if (abertas.length)  situacao = "Pendente";
+
+      return {
+        id:        a.idSeq ? `A${String(a.idSeq).padStart(4, "0")}` : "—",
+        nome:      a.nome || "—",
+        documento: a.documento || "—",
+        telefone:  a.telefone || "—",
+        mensalidade: Number(a.valorMensalidade || 0),
+        situacao,
+        abertas:     abertas.length,
+        vencidas,
+        totalAberto,
+        recebidoPeriodo,
+        pagasPeriodo: pagasPeriodo.length,
+      };
+    });
+
+    const totalAtivos   = alunos.filter(a => a.status === "ativo").length;
+    const totalInativos = alunos.filter(a => a.status !== "ativo").length;
+    const ticketMedio = totalAtivos > 0
+      ? alunos.filter(a => a.status === "ativo").reduce((s, a) => s + Number(a.valorMensalidade || 0), 0) / totalAtivos
+      : 0;
+    const emDia    = linhas.filter(l => l.situacao === "Em dia").length;
+    const vencidos = linhas.filter(l => l.situacao === "Vencido").length;
+
+    return { linhas, totalAtivos, totalInativos, ticketMedio, emDia, vencidos };
+  }, [alunos, aReceber, vendas, intervalo]);
+
+  const handleExport = () => {
+    exportarExcel("alunos", [{
+      nome: "Alunos",
+      colunas: ["ID", "Nome", "Documento", "Telefone", "Mensalidade", "Situação", "Mens. Abertas", "Vencidas", "Total em Aberto", "Recebido no Período"],
+      dados: dados.linhas.map(l => [
+        l.id, l.nome, l.documento, l.telefone,
+        l.mensalidade.toFixed(2), l.situacao,
+        l.abertas, l.vencidas,
+        l.totalAberto.toFixed(2), l.recebidoPeriodo.toFixed(2),
+      ]),
+    }]);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="btn-secondary" onClick={handleExport} data-print-hide
+          style={{ fontSize: 12, padding: "6px 14px" }}>
+          <Download size={13} /> Exportar Excel
+        </button>
+      </div>
+
+      <div className="cr-grid">
+        <CardResumo icon={<Users size={18} />} label="Alunos Ativos"
+          value={String(dados.totalAtivos)}
+          sub={`${dados.totalInativos} inativos/trancados`}
+          trend="neutral" colorVar="var(--gold)" />
+        <CardResumo icon={<DollarSign size={18} />} label="Ticket Médio"
+          value={fmtR$(dados.ticketMedio)} sub="mensalidade"
+          trend="neutral" colorVar="var(--blue)" />
+        <CardResumo icon={<TrendingUp size={18} />} label="Em Dia"
+          value={String(dados.emDia)} sub="alunos em dia"
+          trend="up" colorVar="var(--green)" />
+        <CardResumo icon={<AlertCircle size={18} />} label="Vencidos"
+          value={String(dados.vencidos)} sub="alunos inadimplentes"
+          trend="down" colorVar="var(--red)" />
+      </div>
+
+      <TabelaRelatorio
+        titulo="Alunos matriculados"
+        colunas={[
+          { key: "id",         label: "ID" },
+          { key: "nome",       label: "Nome" },
+          { key: "documento",  label: "Documento" },
+          { key: "mensalidade",label: "Mensalidade", format: (v) => fmtR$(v) },
+          { key: "situacao",   label: "Situação" },
+          { key: "abertas",    label: "Mens. Abertas" },
+          { key: "totalAberto",label: "Total Aberto", format: (v) => fmtR$(v) },
+          { key: "recebidoPeriodo", label: "Recebido Período", format: (v) => fmtR$(v) },
+        ]}
+        dados={dados.linhas}
+      />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   RELATÓRIO: MENSALIDADES
+   Recebidas, pendentes e inadimplência — todas derivadas
+   dos mesmos lançamentos que alimentam o DRE e Vendas
+   ══════════════════════════════════════════════════════ */
+function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
+  const dados = useMemo(() => {
+    /* Mensalidades recebidas no período — origem real = vendas sintéticas */
+    const recebidas = vendas.filter(v =>
+      v.tipoVenda === "mensalidade" &&
+      v.status !== "cancelada" &&
+      dentroDoIntervalo(v.data, intervalo)
+    );
+
+    /* Mensalidades em aberto — snapshot atual (não filtra por período) */
+    const mensAbertas = aReceber.filter(ar =>
+      ar.origem === "mensalidade" && Number(ar.valorRestante || 0) > 0
+    );
+
+    const hoje = new Date().toISOString().slice(0, 10);
+    const vencidas = mensAbertas.filter(m => (m.dataVencimento || "") < hoje);
+
+    const totalRecebido   = recebidas.reduce((s, v) => s + Number(v.total || 0), 0);
+    const totalPendente   = mensAbertas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
+    const totalVencido    = vencidas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
+    const ticketMedio     = recebidas.length > 0 ? totalRecebido / recebidas.length : 0;
+
+    /* Linhas — recebidas no período */
+    const linhasRecebidas = recebidas
+      .sort((a, b) => (parseDate(b.data) || 0) - (parseDate(a.data) || 0))
+      .map(v => ({
+        data:     v.data,
+        aluno:    v.clienteNome || v.cliente || "—",
+        mes:      v.mesReferencia || "—",
+        valor:    Number(v.total || 0),
+        forma:    v.formaPagamento || "—",
+      }));
+
+    /* Linhas — pendentes (ordenadas por vencimento) */
+    const linhasPendentes = mensAbertas
+      .sort((a, b) => (a.dataVencimento || "").localeCompare(b.dataVencimento || ""))
+      .map(m => ({
+        aluno:         m.clienteNome || m.alunoNome || "—",
+        mes:           m.mesReferencia || "—",
+        vencimento:    m.dataVencimento || "",
+        valor:         Number(m.valorRestante || 0),
+        status:        (m.dataVencimento || "") < hoje ? "Vencida" : "Pendente",
+      }));
+
+    /* Inadimplência por aluno */
+    const porAluno = {};
+    mensAbertas.forEach(m => {
+      const id = m.alunoId || m.clienteNome;
+      if (!porAluno[id]) porAluno[id] = { aluno: m.clienteNome || m.alunoNome || "—", qtd: 0, total: 0 };
+      porAluno[id].qtd   += 1;
+      porAluno[id].total += Number(m.valorRestante || 0);
+    });
+    const rankingInadimplencia = Object.values(porAluno)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+
+    return {
+      linhasRecebidas, linhasPendentes, rankingInadimplencia,
+      totalRecebido, totalPendente, totalVencido, ticketMedio,
+      qtdRecebidas: recebidas.length,
+      qtdPendentes: mensAbertas.length,
+      qtdVencidas:  vencidas.length,
+      taxaInadimplencia: (totalRecebido + totalVencido) > 0
+        ? (totalVencido / (totalRecebido + totalVencido)) * 100
+        : 0,
+    };
+  }, [alunos, aReceber, vendas, caixa, intervalo]);
+
+  const handleExport = () => {
+    exportarExcel("mensalidades", [
+      {
+        nome: "Recebidas no período",
+        colunas: ["Data", "Aluno", "Mês Ref.", "Forma Pag.", "Valor (R$)"],
+        dados: dados.linhasRecebidas.map(l => [
+          fmtData(l.data), l.aluno, l.mes, l.forma, l.valor.toFixed(2),
+        ]),
+      },
+      {
+        nome: "Pendentes (snapshot atual)",
+        colunas: ["Aluno", "Mês Ref.", "Vencimento", "Status", "Valor (R$)"],
+        dados: dados.linhasPendentes.map(l => [
+          l.aluno, l.mes, fmtData(l.vencimento), l.status, l.valor.toFixed(2),
+        ]),
+      },
+      {
+        nome: "Ranking Inadimplência",
+        colunas: ["Aluno", "Qtd Mens. Abertas", "Total Devido (R$)"],
+        dados: dados.rankingInadimplencia.map(l => [l.aluno, l.qtd, l.total.toFixed(2)]),
+      },
+    ]);
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="btn-secondary" onClick={handleExport} data-print-hide
+          style={{ fontSize: 12, padding: "6px 14px" }}>
+          <Download size={13} /> Exportar Excel
+        </button>
+      </div>
+
+      <div className="cr-grid">
+        <CardResumo icon={<CreditCard size={18} />} label="Recebido no Período"
+          value={fmtR$(dados.totalRecebido)}
+          sub={`${dados.qtdRecebidas} mensalidade(s)`}
+          trend="up" colorVar="var(--green)" />
+        <CardResumo icon={<DollarSign size={18} />} label="Ticket Médio"
+          value={fmtR$(dados.ticketMedio)} sub="por mensalidade"
+          trend="neutral" colorVar="var(--blue)" />
+        <CardResumo icon={<Clock size={18} />} label="Pendente Total"
+          value={fmtR$(dados.totalPendente)}
+          sub={`${dados.qtdPendentes} aberta(s)`}
+          trend="neutral" colorVar="var(--gold)" />
+        <CardResumo icon={<AlertCircle size={18} />} label="Inadimplência"
+          value={fmtR$(dados.totalVencido)}
+          sub={`${dados.qtdVencidas} vencida(s) · ${dados.taxaInadimplencia.toFixed(1)}%`}
+          trend="down" colorVar="var(--red)" />
+      </div>
+
+      {dados.linhasRecebidas.length > 0 && (
+        <TabelaRelatorio
+          titulo="Mensalidades Recebidas no Período"
+          colunas={[
+            { key: "data",  label: "Data", format: (v) => fmtData(v) },
+            { key: "aluno", label: "Aluno" },
+            { key: "mes",   label: "Mês Ref." },
+            { key: "forma", label: "Pagamento" },
+            { key: "valor", label: "Valor", format: (v) => fmtR$(v) },
+          ]}
+          dados={dados.linhasRecebidas}
+        />
+      )}
+
+      {dados.linhasPendentes.length > 0 && (
+        <TabelaRelatorio
+          titulo="Mensalidades Pendentes (atual)"
+          colunas={[
+            { key: "aluno",      label: "Aluno" },
+            { key: "mes",        label: "Mês Ref." },
+            { key: "vencimento", label: "Vencimento", format: (v) => fmtData(v) },
+            { key: "status",     label: "Status" },
+            { key: "valor",      label: "Valor", format: (v) => fmtR$(v) },
+          ]}
+          dados={dados.linhasPendentes}
+        />
+      )}
+
+      {dados.rankingInadimplencia.length > 0 && (
+        <div className="tr-wrap">
+          <div className="tr-header">
+            <span className="tr-title">Top 10 — Inadimplência por Aluno</span>
+          </div>
+          {dados.rankingInadimplencia.map((l, i) => (
+            <div key={l.aluno + i} className="rank-item">
+              <span className="rank-num">#{i + 1}</span>
+              <span className="rank-label">{l.aluno}</span>
+              <span style={{ fontSize: 11, color: "var(--text-3)", marginLeft: "auto" }}>
+                {l.qtd} mens.
+              </span>
+              <span className="rank-val" style={{ color: "var(--red)" }}>{fmtR$(l.total)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+
+
+/* ══════════════════════════════════════════════════════
+   HELPERS LOCAIS — Compras & A Receber
+   ══════════════════════════════════════════════════════ */
+const parseDateISO = (d) => {
+  if (!d) return null;
+  if (typeof d === "string") return d.slice(0, 10);
+  if (d?.toDate) return d.toDate().toISOString().slice(0, 10);
+  return null;
+};
+
+const hojeISO_rcr = () => {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+};
+
+const dentroIntervalo_rcr = (dateISO, intervalo) => {
+  if (!intervalo || !dateISO) return true;
+  const { inicio, fim } = intervalo;
+  if (inicio && dateISO < inicio) return false;
+  if (fim   && dateISO > fim)    return false;
+  return true;
+};
+
+const getMesLabel_rcr = (dateISO) => {
+  if (!dateISO) return "—";
+  const [ano, mes] = dateISO.split("-");
+  const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+  return `${meses[parseInt(mes) - 1]}/${ano.slice(2)}`;
+};
+
+const agruparPorMes_rcr = (items, campoData, campoValor) => {
+  const mapa = {};
+  items.forEach((item) => {
+    const d = parseDateISO(item[campoData]);
+    if (!d) return;
+    const k = d.slice(0, 7);
+    if (!mapa[k]) mapa[k] = { mes: k, label: getMesLabel_rcr(d), total: 0, count: 0 };
+    mapa[k].total += Number(item[campoValor] || 0);
+    mapa[k].count++;
+  });
+  return Object.values(mapa).sort((a, b) => a.mes.localeCompare(b.mes)).slice(-12);
+};
+
+const calcTendencia_rcr = (atual, anterior) => {
+  if (!anterior || anterior === 0) return null;
+  return ((atual - anterior) / anterior) * 100;
+};
+
+/* ── Gráfico de barras verticais ── */
+function RcrBarChart({ dados, colorFn, height = 140 }) {
+  const [hover, setHover] = useState(null);
+  const max = Math.max(...dados.map((d) => d.total), 1);
+  return (
+    <div style={{ position: "relative" }}>
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height, pointerEvents: "none" }}>
+        {[75, 50, 25].map((p) => (
+          <div key={p} style={{ position: "absolute", top: `${100 - p}%`, left: 0, right: 0, borderTop: "1px dashed rgba(255,255,255,0.05)" }} />
+        ))}
+      </div>
+      <div className="rcr-bar-chart" style={{ height: height + 28 }}>
+        {dados.map((d, i) => {
+          const pct = max > 0 ? (d.total / max) * 100 : 0;
+          const cor = colorFn ? colorFn(d, i) : "var(--gold)";
+          return (
+            <div key={d.mes || i} className="rcr-bar-col">
+              <div
+                className="rcr-bar"
+                style={{ height: `${Math.max(pct, 2)}%`, background: cor, opacity: hover !== null && hover !== i ? 0.4 : 1 }}
+                onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}
+              >
+                <div className="rcr-bar-tooltip">{fmtR$(d.total)}</div>
+              </div>
+              <span className="rcr-bar-label">{d.label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── Donut SVG ── */
+function RcrDonut({ dados, size = 110 }) {
+  const PALETA = ["#C8A55E","#5b8ef0","#48c78e","#e05252","#9b59b6","#e67e22","#1abc9c","#e74c3c"];
+  const total = dados.reduce((s, d) => s + d.valor, 0);
+  if (!total) return <div className="rcr-empty" style={{ padding: 20, fontSize: 12 }}>Sem dados</div>;
+  const cx = size / 2, cy = size / 2, r = size * 0.36, R = size * 0.48;
+  let angulo = -Math.PI / 2;
+  const setores = dados.slice(0, 8).map((d, i) => {
+    const frac = d.valor / total;
+    const ang  = frac * 2 * Math.PI;
+    const x1 = cx + R * Math.cos(angulo), y1 = cy + R * Math.sin(angulo);
+    angulo += ang;
+    const x2 = cx + R * Math.cos(angulo), y2 = cy + R * Math.sin(angulo);
+    const x3 = cx + r * Math.cos(angulo), y3 = cy + r * Math.sin(angulo);
+    const x4 = cx + r * Math.cos(angulo - ang), y4 = cy + r * Math.sin(angulo - ang);
+    const lA = ang > Math.PI ? 1 : 0;
+    return { path: `M${x1},${y1} A${R},${R} 0 ${lA},1 ${x2},${y2} L${x3},${y3} A${r},${r} 0 ${lA},0 ${x4},${y4} Z`, cor: PALETA[i % PALETA.length], ...d, pct: frac * 100 };
+  });
+  return (
+    <div className="rcr-donut-wrap">
+      <svg width={size} height={size}>
+        {setores.map((s, i) => (
+          <path key={i} d={s.path} fill={s.cor}
+            onMouseEnter={(e) => e.target.style.opacity = ".7"}
+            onMouseLeave={(e) => e.target.style.opacity = "1"} />
+        ))}
+        <circle cx={cx} cy={cy} r={r - 2} fill="var(--s1)" />
+        <text x={cx} y={cy - 5} textAnchor="middle" style={{ fill: "var(--text-3)", fontSize: 8, fontFamily: "DM Sans,sans-serif", fontWeight: 600, letterSpacing: ".05em" }}>TOTAL</text>
+        <text x={cx} y={cy + 8} textAnchor="middle" style={{ fill: "var(--gold)", fontSize: 9, fontFamily: "Sora,sans-serif", fontWeight: 700 }}>100%</text>
+      </svg>
+      <div className="rcr-donut-legend">
+        {setores.map((s, i) => (
+          <div key={i} className="rcr-donut-leg-item">
+            <div className="rcr-donut-leg-dot" style={{ background: s.cor }} />
+            <span className="rcr-donut-leg-name">{s.nome}</span>
+            <span className="rcr-donut-leg-pct">{Number(s.pct).toFixed(1)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── KPI Card ── */
+function RcrKpi({ icon: Icon, label, value, sub, cor = "gold", trend }) {
+  const trendCls = trend === null || trend === undefined ? "" : trend > 0 ? "up" : trend < 0 ? "down" : "neu";
+  const TrendIcon = !trend ? Minus : trend > 0 ? ArrowUpRight : ArrowDownRight;
+  return (
+    <div className={`rcr-kpi ${cor}`}>
+      <div className={`rcr-kpi-icon ${cor}`}><Icon size={16} /></div>
+      <div className="rcr-kpi-label">{label}</div>
+      <div className={`rcr-kpi-val ${cor}`}>{value}</div>
+      {trend !== undefined && trend !== null
+        ? <div className={`rcr-kpi-trend ${trendCls}`}><TrendIcon size={12} />{Math.abs(trend).toFixed(1)}% vs mês anterior</div>
+        : <div className="rcr-kpi-sub">{sub}</div>
+      }
+    </div>
+  );
+}
+
+/* ── Insight card ── */
+function RcrInsight({ tipo, texto }) {
+  const cfg = {
+    warn:   { icon: <AlertCircle   size={15} color="var(--gold)"  />, cls: "warn"   },
+    danger: { icon: <AlertTriangle size={15} color="var(--red)"   />, cls: "danger" },
+    good:   { icon: <CheckCircle   size={15} color="var(--green)" />, cls: "good"   },
+    info:   { icon: <Activity      size={15} color="var(--blue, #5b8ef0)" />, cls: "info" },
+  }[tipo] || { icon: <Zap size={15} />, cls: "info" };
+  return (
+    <div className={`rcr-insight ${cfg.cls}`}>
+      <span className="rcr-insight-icon">{cfg.icon}</span>
+      <span className="rcr-insight-text" dangerouslySetInnerHTML={{ __html: texto }} />
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   RELATÓRIO: COMPRAS
+   ══════════════════════════════════════════════════════ */
+function RelatorioCompras({ compras = [], intervalo }) {
+  const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [filtroPag,    setFiltroPag]    = useState("todos");
+  const hoje = hojeISO_rcr();
+
+  const filtrados = useMemo(() => compras.filter((c) => {
+    const d = parseDateISO(c.data || c.dataCompra || c.dataCriacao);
+    if (!dentroIntervalo_rcr(d, intervalo)) return false;
+    if (filtroStatus !== "todos" && c.status !== filtroStatus) return false;
+    if (filtroPag    !== "todos" && c.metodoPagamento !== filtroPag) return false;
+    return true;
+  }), [compras, intervalo, filtroStatus, filtroPag]);
+
+  const pagas      = useMemo(() => filtrados.filter((c) => c.status === "pago"),      [filtrados]);
+  const pendentes  = useMemo(() => filtrados.filter((c) => c.status === "pendente"),  [filtrados]);
+  const canceladas = useMemo(() => filtrados.filter((c) => c.status === "cancelado"), [filtrados]);
+
+  const totalGasto     = useMemo(() => pagas.reduce((s, c) => s + Number(c.valor || c.total || 0), 0), [pagas]);
+  const totalPendente  = useMemo(() => pendentes.reduce((s, c) => s + Number(c.valor || c.total || 0), 0), [pendentes]);
+  const totalCancelado = useMemo(() => canceladas.reduce((s, c) => s + Number(c.valor || c.total || 0), 0), [canceladas]);
+  const ticketMedio    = useMemo(() => pagas.length ? totalGasto / pagas.length : 0, [totalGasto, pagas]);
+
+  const evolucaoMensal = useMemo(() => agruparPorMes_rcr(pagas, "data", "valor"), [pagas]);
+
+  const tendencia = useMemo(() => {
+    if (evolucaoMensal.length < 2) return null;
+    return calcTendencia_rcr(
+      evolucaoMensal[evolucaoMensal.length - 1].total,
+      evolucaoMensal[evolucaoMensal.length - 2].total
+    );
+  }, [evolucaoMensal]);
+
+  const rankFornecedores = useMemo(() => {
+    const mapa = {};
+    pagas.forEach((c) => {
+      const nome = c.fornecedor || c.nomeFornecedor || "Sem fornecedor";
+      if (!mapa[nome]) mapa[nome] = { nome, total: 0, qtd: 0 };
+      mapa[nome].total += Number(c.valor || c.total || 0);
+      mapa[nome].qtd++;
+    });
+    return Object.values(mapa).sort((a, b) => b.total - a.total).slice(0, 8);
+  }, [pagas]);
+
+  const distPagamento = useMemo(() => {
+    const mapa = {};
+    const labels = { dinheiro: "Dinheiro", pix: "PIX", transferencia: "Transferência", boleto: "Boleto", cartao_credito: "Cartão Crédito" };
+    pagas.forEach((c) => {
+      const nome = labels[c.metodoPagamento] || c.metodoPagamento || "Outro";
+      if (!mapa[nome]) mapa[nome] = { nome, valor: 0 };
+      mapa[nome].valor += Number(c.valor || c.total || 0);
+    });
+    return Object.values(mapa).sort((a, b) => b.valor - a.valor);
+  }, [pagas]);
+
+  const metodosPag = useMemo(() => [...new Set(compras.map((c) => c.metodoPagamento).filter(Boolean))], [compras]);
+
+  const insights = useMemo(() => {
+    const lista = [];
+    if (tendencia !== null) {
+      if (tendencia > 20) lista.push({ tipo: "danger", texto: `<strong>⚠ Gastos em alta:</strong> suas compras aumentaram <strong>${Math.abs(tendencia).toFixed(1)}%</strong> vs mês anterior.` });
+      else if (tendencia < -10) lista.push({ tipo: "good", texto: `<strong>✓ Economia detectada:</strong> gastos reduziram <strong>${Math.abs(tendencia).toFixed(1)}%</strong> vs mês anterior.` });
+    }
+    if (rankFornecedores.length > 0 && totalGasto > 0) {
+      const top = rankFornecedores[0];
+      const pct = (top.total / totalGasto) * 100;
+      if (pct > 50) lista.push({ tipo: "warn", texto: `<strong>Concentração de fornecedor:</strong> ${pct.toFixed(0)}% dos gastos estão com <strong>${top.nome}</strong>. Avalie diversificação.` });
+    }
+    if (totalPendente > 0) lista.push({ tipo: "info", texto: `<strong>Pagamentos pendentes:</strong> <strong>${fmtR$(totalPendente)}</strong> em compras aguardando pagamento.` });
+    if (lista.length === 0 && filtrados.length > 0) lista.push({ tipo: "good", texto: `<strong>Situação estável:</strong> nenhum alerta detectado no período.` });
+    return lista;
+  }, [tendencia, rankFornecedores, totalGasto, totalPendente, filtrados]);
+
+  const tabelaItens = useMemo(() =>
+    [...filtrados].sort((a, b) => (parseDateISO(b.data || b.dataCompra) || "").localeCompare(parseDateISO(a.data || a.dataCompra) || "")).slice(0, 50),
+    [filtrados]
+  );
+
+  const handleExport = useCallback(() => {
+    exportarExcel("compras", [{
+      nome: "Compras",
+      colunas: ["Data", "ID", "Fornecedor", "Descrição", "Valor (R$)", "Método", "Status"],
+      dados: tabelaItens.map((c) => [
+        parseDateISO(c.data || c.dataCompra) || "",
+        c.idShow || c.id || "",
+        c.fornecedor || c.nomeFornecedor || "",
+        c.descricao || c.insumo || "",
+        Number(c.valor || c.total || 0),
+        c.metodoPagamento || "",
+        c.status || "",
+      ]),
+    }]);
+  }, [tabelaItens]);
+
+  if (!compras.length) return <div className="rcr-empty"><ShoppingCart size={32} opacity={0.3} /><p>Nenhuma compra registrada.</p></div>;
+
+  const PAG_LABELS = { dinheiro: "Dinheiro", pix: "PIX", transferencia: "Transf.", boleto: "Boleto", cartao_credito: "Cartão" };
+  const CORES = ["#C8A55E","#5b8ef0","#48c78e","#e05252","#9b59b6","#e67e22","#1abc9c","#e74c3c"];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+
+      {/* ── Filtros ── */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span className="rcr-filter-label">Status</span>
+          <div className="rcr-filters">
+            {["todos","pago","pendente","cancelado"].map((s) => (
+              <button key={s} className={`rcr-filter-btn ${filtroStatus === s ? "active" : ""}`} onClick={() => setFiltroStatus(s)}>
+                {s === "todos" ? "Todos" : s[0].toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+        {metodosPag.length > 1 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span className="rcr-filter-label">Pagamento</span>
+            <div className="rcr-filters">
+              <button className={`rcr-filter-btn ${filtroPag === "todos" ? "active" : ""}`} onClick={() => setFiltroPag("todos")}>Todos</button>
+              {metodosPag.map((m) => (
+                <button key={m} className={`rcr-filter-btn ${filtroPag === m ? "active" : ""}`} onClick={() => setFiltroPag(m)}>
+                  {PAG_LABELS[m] || m}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── KPIs ── */}
+      <div className="rcr-kpi-grid">
+        <RcrKpi icon={DollarSign}   label="Total Gasto (pago)"  value={fmtR$(totalGasto)}    cor="gold"  trend={tendencia} />
+        <RcrKpi icon={Clock}        label="A Pagar (pendente)"  value={fmtR$(totalPendente)}  cor="blue"  sub={`${pendentes.length} compra${pendentes.length !== 1 ? "s" : ""}`} />
+        <RcrKpi icon={ShoppingCart} label="Ticket Médio"        value={fmtR$(ticketMedio)}    cor="green" sub={`${pagas.length} compras pagas`} />
+        <RcrKpi icon={Target}       label="Cancelado"           value={fmtR$(totalCancelado)} cor="red"   sub={`${canceladas.length} compra${canceladas.length !== 1 ? "s" : ""}`} />
+      </div>
+
+      {/* ── Métricas rápidas ── */}
+      {filtrados.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <div className="rcr-highlight-row">
+            <span>Taxa de cancelamento</span>
+            <span className="val">{fmtPct((canceladas.length / filtrados.length) * 100)}</span>
+          </div>
+          <div className="rcr-highlight-row">
+            <span>Total de transações no período</span>
+            <span className="val">{filtrados.length}</span>
+          </div>
+          {pagas.length > 0 && (
+            <div className="rcr-highlight-row">
+              <span>Maior compra registrada</span>
+              <span className="val">{fmtR$(Math.max(...pagas.map((c) => Number(c.valor || c.total || 0))))}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Insights ── */}
+      {insights.length > 0 && (
+        <>
+          <div className="rcr-section-title"><Zap size={15} />Insights Automáticos</div>
+          <div className="rcr-insights">{insights.map((ins, i) => <RcrInsight key={i} tipo={ins.tipo} texto={ins.texto} />)}</div>
+        </>
+      )}
+
+      {/* ── Gráficos ── */}
+      {evolucaoMensal.length > 1 && (
+        <>
+          <div className="rcr-section-title"><BarChart2 size={15} />Análise Visual</div>
+          <div className="rcr-charts-grid trio">
+            <div className="rcr-chart-card">
+              <div className="rcr-chart-header">
+                <div className="rcr-chart-title">
+                  <div className="rcr-chart-title-dot" style={{ color: "var(--gold)", background: "var(--gold)" }} />
+                  Evolução Mensal de Despesas
+                </div>
+                <span className="rcr-chart-badge">Barras</span>
+              </div>
+              <div className="rcr-chart-body">
+                <RcrBarChart dados={evolucaoMensal} colorFn={(d, i) => `rgba(200,165,94,${0.4 + (i / Math.max(evolucaoMensal.length - 1, 1)) * 0.6})`} />
+              </div>
+            </div>
+            {distPagamento.length > 0 && (
+              <div className="rcr-chart-card">
+                <div className="rcr-chart-header">
+                  <div className="rcr-chart-title">
+                    <div className="rcr-chart-title-dot" style={{ color: "var(--blue, #5b8ef0)", background: "var(--blue, #5b8ef0)" }} />
+                    Por Método de Pagamento
+                  </div>
+                </div>
+                <div className="rcr-chart-body"><RcrDonut dados={distPagamento} size={120} /></div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ── Pagas vs Canceladas + Ticket médio mensal ── */}
+      {(pagas.length > 0 || canceladas.length > 0) && (
+        <div className="rcr-charts-grid">
+          <div className="rcr-chart-card">
+            <div className="rcr-chart-header">
+              <div className="rcr-chart-title"><div className="rcr-chart-title-dot" style={{ color: "var(--green)", background: "var(--green)" }} />Pagas vs Canceladas</div>
+            </div>
+            <div className="rcr-chart-body">
+              <RcrDonut dados={[{ nome: "Pagas", valor: totalGasto }, { nome: "Pendentes", valor: totalPendente }, { nome: "Canceladas", valor: totalCancelado }].filter((d) => d.valor > 0)} size={110} />
+            </div>
+          </div>
+          {evolucaoMensal.length > 1 && (
+            <div className="rcr-chart-card">
+              <div className="rcr-chart-header">
+                <div className="rcr-chart-title"><div className="rcr-chart-title-dot" style={{ color: "var(--green)", background: "var(--green)" }} />Ticket Médio Mensal</div>
+              </div>
+              <div className="rcr-chart-body">
+                <RcrBarChart dados={evolucaoMensal.map((m) => ({ ...m, total: m.count > 0 ? m.total / m.count : 0 }))} colorFn={() => "rgba(72,199,142,0.7)"} height={120} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Ranking de fornecedores ── */}
+      {rankFornecedores.length > 0 && (
+        <>
+          <div className="rcr-section-title"><Users size={15} />Ranking de Fornecedores</div>
+          <div className="rcr-chart-card">
+            <div className="rcr-chart-header">
+              <div className="rcr-chart-title"><div className="rcr-chart-title-dot" style={{ color: "var(--gold)", background: "var(--gold)" }} />Top Fornecedores por Gasto</div>
+              <span className="rcr-chart-badge">{rankFornecedores.length} fornecedores</span>
+            </div>
+            <div className="rcr-chart-body">
+              <div className="rcr-rank-list">
+                {rankFornecedores.map((f, i) => {
+                  const pct = totalGasto > 0 ? (f.total / totalGasto) * 100 : 0;
+                  return (
+                    <div key={f.nome} className="rcr-rank-item">
+                      <span className="rcr-rank-pos">#{i + 1}</span>
+                      <div className="rcr-rank-info">
+                        <div className="rcr-rank-name">{f.nome}</div>
+                        <div className="rcr-rank-sub">{f.qtd} compra{f.qtd !== 1 ? "s" : ""} · {fmtPct(pct)} do total</div>
+                      </div>
+                      <div className="rcr-rank-bar-wrap">
+                        <div className="rcr-rank-bar-bg"><div className="rcr-rank-bar-fill" style={{ width: `${pct}%`, background: CORES[i % CORES.length] }} /></div>
+                      </div>
+                      <span className="rcr-rank-val">{fmtR$(f.total)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Tabela detalhada ── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="rcr-section-title"><Package size={15} />Detalhamento</div>
+        <button className="btn-secondary" style={{ fontSize: 12, padding: "6px 14px" }} onClick={handleExport}><Download size={13} />Exportar Excel</button>
+      </div>
+      <div className="rcr-table-wrap">
+        <div className="rcr-table-header"><span className="rcr-table-title">Registro de Compras</span><span className="rcr-table-badge">{tabelaItens.length} registros</span></div>
+        <div className="rcr-row rcr-row-head" style={{ gridTemplateColumns: "90px 1fr 1fr 120px 110px 100px" }}>
+          <span>Data</span><span>Fornecedor</span><span>Descrição</span><span style={{ textAlign: "right" }}>Valor</span><span>Pagamento</span><span>Status</span>
+        </div>
+        {tabelaItens.length === 0
+          ? <div className="rcr-empty" style={{ padding: 40 }}><ShoppingCart size={24} opacity={0.3} /><p>Nenhuma compra com os filtros selecionados.</p></div>
+          : tabelaItens.map((c) => {
+              const d = parseDateISO(c.data || c.dataCompra);
+              return (
+                <div key={c.id} className="rcr-row" style={{ gridTemplateColumns: "90px 1fr 1fr 120px 110px 100px" }}>
+                  <span>{d ? d.split("-").reverse().join("/") : "—"}</span>
+                  <span style={{ color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.fornecedor || c.nomeFornecedor || "—"}</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.descricao || c.insumo || "—"}</span>
+                  <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: c.status === "cancelado" ? "var(--text-3)" : "var(--text)" }}>{fmtR$(Number(c.valor || c.total || 0))}</span>
+                  <span>{PAG_LABELS[c.metodoPagamento] || c.metodoPagamento || "—"}</span>
+                  <span><span className={`rcr-badge ${c.status || "pendente"}`}>{c.status || "pendente"}</span></span>
+                </div>
+              );
+            })
+        }
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   RELATÓRIO: CONTAS A RECEBER
+   ══════════════════════════════════════════════════════ */
+function RelatorioContasReceber({ aReceber = [], intervalo }) {
+  const [filtroStatus, setFiltroStatus] = useState("todos");
+  const hoje = hojeISO_rcr();
+
+  const calcStatusRcr = useCallback((item) => {
+    const restante = Number(item.valorRestante ?? item.valor ?? 0);
+    if (restante <= 0) return "pago";
+    const venc = parseDateISO(item.dataVencimento);
+    if (venc && venc < hoje) return "vencido";
+    return "pendente";
+  }, [hoje]);
+
+  const comStatus = useMemo(() => aReceber.map((i) => ({ ...i, _status: calcStatusRcr(i) })), [aReceber, calcStatusRcr]);
+
+  const filtrados = useMemo(() => comStatus.filter((item) => {
+    const d = parseDateISO(item.dataVencimento) || parseDateISO(item.dataCriacao);
+    if (!dentroIntervalo_rcr(d, intervalo)) return false;
+    if (filtroStatus !== "todos" && item._status !== filtroStatus) return false;
+    return true;
+  }), [comStatus, intervalo, filtroStatus]);
+
+  const pagos    = useMemo(() => filtrados.filter((i) => i._status === "pago"),    [filtrados]);
+  const pendentes= useMemo(() => filtrados.filter((i) => i._status === "pendente"),[filtrados]);
+  const vencidos = useMemo(() => filtrados.filter((i) => i._status === "vencido"), [filtrados]);
+
+  const totalRecebido = useMemo(() => pagos.reduce((s, i) => s + Number(i.valorTotal || i.valor || 0), 0), [pagos]);
+  const totalPendente = useMemo(() => pendentes.reduce((s, i) => s + Number(i.valorRestante ?? i.valor ?? 0), 0), [pendentes]);
+  const totalVencido  = useMemo(() => vencidos.reduce((s, i) => s + Number(i.valorRestante ?? i.valor ?? 0), 0), [vencidos]);
+  const totalGeral    = useMemo(() => filtrados.reduce((s, i) => s + Number(i.valorTotal || i.valor || 0), 0), [filtrados]);
+
+  const txInadimplencia = useMemo(() => {
+    const base = totalPendente + totalVencido + totalRecebido;
+    return base > 0 ? (totalVencido / base) * 100 : 0;
+  }, [totalVencido, totalPendente, totalRecebido]);
+
+  const tempoMedioPag = useMemo(() => {
+    const c = pagos.filter((i) => i.dataPagamento && (i.dataEmissao || i.dataCriacao));
+    if (!c.length) return null;
+    const diffs = c.map((i) => {
+      const e = new Date(parseDateISO(i.dataEmissao || i.dataCriacao));
+      const p = new Date(parseDateISO(i.dataPagamento));
+      return Math.max(0, (p - e) / 86400000);
+    });
+    return diffs.reduce((s, d) => s + d, 0) / diffs.length;
+  }, [pagos]);
+
+  const evolucaoRecebido = useMemo(() => agruparPorMes_rcr(pagos, "dataPagamento", "valorTotal"), [pagos]);
+
+  const tendencia = useMemo(() => {
+    if (evolucaoRecebido.length < 2) return null;
+    return calcTendencia_rcr(evolucaoRecebido[evolucaoRecebido.length - 1].total, evolucaoRecebido[evolucaoRecebido.length - 2].total);
+  }, [evolucaoRecebido]);
+
+  const rankClientes = useMemo(() => {
+    const mapa = {};
+    filtrados.forEach((item) => {
+      const nome = item.cliente || item.nomeCliente || "Sem cliente";
+      if (!mapa[nome]) mapa[nome] = { nome, totalPago: 0, totalPendente: 0, qtd: 0 };
+      mapa[nome].totalPago     += item._status === "pago"  ? Number(item.valorTotal || item.valor || 0) : 0;
+      mapa[nome].totalPendente += item._status !== "pago"  ? Number(item.valorRestante ?? item.valor ?? 0) : 0;
+      mapa[nome].qtd++;
+    });
+    return Object.values(mapa).sort((a, b) => (b.totalPago + b.totalPendente) - (a.totalPago + a.totalPendente)).slice(0, 8);
+  }, [filtrados]);
+
+  const fluxoFuturo = useMemo(() => {
+    const limite = new Date();
+    limite.setDate(limite.getDate() + 30);
+    const limiISO = `${limite.getFullYear()}-${String(limite.getMonth()+1).padStart(2,"0")}-${String(limite.getDate()).padStart(2,"0")}`;
+    return comStatus
+      .filter((i) => i._status !== "pago")
+      .map((i) => ({ ...i, _venc: parseDateISO(i.dataVencimento) }))
+      .filter((i) => i._venc && i._venc >= hoje && i._venc <= limiISO)
+      .sort((a, b) => a._venc.localeCompare(b._venc))
+      .slice(0, 15);
+  }, [comStatus, hoje]);
+
+  const totalFluxo30 = useMemo(() => fluxoFuturo.reduce((s, i) => s + Number(i.valorRestante ?? i.valor ?? 0), 0), [fluxoFuturo]);
+
+  const insights = useMemo(() => {
+    const lista = [];
+    if (txInadimplencia > 15)      lista.push({ tipo: "danger", texto: `<strong>⚠ Inadimplência alta:</strong> ${fmtPct(txInadimplencia)} do valor a receber está vencido. Acione os clientes em atraso.` });
+    else if (txInadimplencia > 5)  lista.push({ tipo: "warn",   texto: `<strong>Atenção:</strong> inadimplência em <strong>${fmtPct(txInadimplencia)}</strong>. Fique de olho nos vencimentos.` });
+    else if (filtrados.length > 0) lista.push({ tipo: "good",   texto: `<strong>Inadimplência sob controle:</strong> apenas <strong>${fmtPct(txInadimplencia)}</strong> do valor está vencido.` });
+    if (totalFluxo30 > 0)          lista.push({ tipo: "info",   texto: `<strong>Previsão 30 dias:</strong> você deve receber <strong>${fmtR$(totalFluxo30)}</strong> em ${fluxoFuturo.length} cobranças pendentes.` });
+    if (tendencia !== null) {
+      if (tendencia > 15)          lista.push({ tipo: "good",   texto: `<strong>Receita em crescimento:</strong> alta de <strong>${tendencia.toFixed(1)}%</strong> vs mês anterior.` });
+      else if (tendencia < -15)    lista.push({ tipo: "warn",   texto: `<strong>Receita em queda:</strong> redução de <strong>${Math.abs(tendencia).toFixed(1)}%</strong> vs mês anterior.` });
+    }
+    if (tempoMedioPag !== null && tempoMedioPag > 15) lista.push({ tipo: "warn", texto: `<strong>Prazo longo:</strong> clientes levam em média <strong>${tempoMedioPag.toFixed(0)} dias</strong> para pagar.` });
+    if (rankClientes.length > 0 && totalGeral > 0) {
+      const top = rankClientes[0];
+      const pct = ((top.totalPago + top.totalPendente) / totalGeral) * 100;
+      if (pct > 50) lista.push({ tipo: "warn", texto: `<strong>Concentração de receita:</strong> <strong>${top.nome}</strong> representa ${pct.toFixed(0)}% da receita total.` });
+    }
+    return lista;
+  }, [txInadimplencia, totalFluxo30, fluxoFuturo, tendencia, tempoMedioPag, rankClientes, totalGeral, filtrados]);
+
+  const tabelaItens = useMemo(() =>
+    [...filtrados].sort((a, b) => (parseDateISO(a.dataVencimento) || "").localeCompare(parseDateISO(b.dataVencimento) || "")).slice(0, 50),
+    [filtrados]
+  );
+
+  const handleExport = useCallback(() => {
+    exportarExcel("a-receber", [{
+      nome: "A Receber",
+      colunas: ["Vencimento", "Cliente", "Descrição", "Valor Total (R$)", "Valor Restante (R$)", "Status"],
+      dados: tabelaItens.map((i) => [
+        parseDateISO(i.dataVencimento) || "",
+        i.cliente || i.nomeCliente || "",
+        i.descricao || "",
+        Number(i.valorTotal || i.valor || 0),
+        Number(i.valorRestante ?? i.valor ?? 0),
+        i._status,
+      ]),
+    }]);
+  }, [tabelaItens]);
+
+  if (!aReceber.length) return <div className="rcr-empty"><Receipt size={32} opacity={0.3} /><p>Nenhuma conta a receber registrada.</p></div>;
+
+  const CORES = ["#48c78e","#C8A55E","#5b8ef0","#e05252","#9b59b6","#e67e22","#1abc9c","#e74c3c"];
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+
+      {/* ── Filtros ── */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <span className="rcr-filter-label">Status</span>
+        <div className="rcr-filters">
+          {["todos","pendente","vencido","pago"].map((s) => (
+            <button key={s} className={`rcr-filter-btn ${filtroStatus === s ? "active" : ""}`} onClick={() => setFiltroStatus(s)}>
+              {s === "todos" ? "Todos" : s[0].toUpperCase() + s.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── KPIs ── */}
+      <div className="rcr-kpi-grid">
+        <RcrKpi icon={CheckCircle} label="Receita Recebida"       value={fmtR$(totalRecebido)}  cor="green" trend={tendencia} />
+        <RcrKpi icon={Clock}       label="Pendente a Receber"     value={fmtR$(totalPendente)}  cor="gold"  sub={`${pendentes.length} cobranças`} />
+        <RcrKpi icon={AlertCircle} label="Vencido / Inadimplente" value={fmtR$(totalVencido)}   cor="red"   sub={fmtPct(txInadimplencia) + " inadimplência"} />
+        <RcrKpi icon={Calendar}    label="Previsão 30 dias"       value={fmtR$(totalFluxo30)}   cor="blue"  sub={`${fluxoFuturo.length} cobranças futuras`} />
+      </div>
+
+      {/* ── Métricas rápidas ── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="rcr-highlight-row">
+          <span>Taxa de inadimplência</span>
+          <span className="val" style={{ color: txInadimplencia > 10 ? "var(--red)" : txInadimplencia > 5 ? "var(--gold)" : "var(--green)" }}>{fmtPct(txInadimplencia)}</span>
+        </div>
+        {tempoMedioPag !== null && (
+          <div className="rcr-highlight-row"><span>Tempo médio de pagamento</span><span className="val">{tempoMedioPag.toFixed(0)} dias</span></div>
+        )}
+        <div className="rcr-highlight-row"><span>Total registrado no período</span><span className="val">{fmtR$(totalGeral)}</span></div>
+      </div>
+
+      {/* ── Insights ── */}
+      {insights.length > 0 && (
+        <>
+          <div className="rcr-section-title"><Zap size={15} />Insights Automáticos</div>
+          <div className="rcr-insights">{insights.map((ins, i) => <RcrInsight key={i} tipo={ins.tipo} texto={ins.texto} />)}</div>
+        </>
+      )}
+
+      {/* ── Gráficos ── */}
+      {evolucaoRecebido.length > 1 && (
+        <>
+          <div className="rcr-section-title"><BarChart2 size={15} />Análise Visual</div>
+          <div className="rcr-charts-grid trio">
+            <div className="rcr-chart-card">
+              <div className="rcr-chart-header">
+                <div className="rcr-chart-title"><div className="rcr-chart-title-dot" style={{ color: "var(--green)", background: "var(--green)" }} />Receita Recebida por Mês</div>
+                <span className="rcr-chart-badge">Barras</span>
+              </div>
+              <div className="rcr-chart-body">
+                <RcrBarChart dados={evolucaoRecebido} colorFn={(d, i) => `rgba(72,199,142,${0.4 + (i / Math.max(evolucaoRecebido.length - 1, 1)) * 0.6})`} />
+              </div>
+            </div>
+            <div className="rcr-chart-card">
+              <div className="rcr-chart-header">
+                <div className="rcr-chart-title"><div className="rcr-chart-title-dot" style={{ color: "var(--red)", background: "var(--red)" }} />Distribuição por Status</div>
+              </div>
+              <div className="rcr-chart-body">
+                <RcrDonut dados={[{ nome: "Recebido", valor: totalRecebido }, { nome: "Pendente", valor: totalPendente }, { nome: "Vencido", valor: totalVencido }].filter((d) => d.valor > 0)} size={110} />
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Ranking de clientes ── */}
+      {rankClientes.length > 0 && (
+        <>
+          <div className="rcr-section-title"><Users size={15} />Ranking de Clientes</div>
+          <div className="rcr-chart-card">
+            <div className="rcr-chart-header">
+              <div className="rcr-chart-title"><div className="rcr-chart-title-dot" style={{ color: "var(--green)", background: "var(--green)" }} />Clientes que Mais Geram Receita</div>
+              <span className="rcr-chart-badge">{rankClientes.length} clientes</span>
+            </div>
+            <div className="rcr-chart-body">
+              <div className="rcr-rank-list">
+                {rankClientes.map((cl, i) => {
+                  const tot = cl.totalPago + cl.totalPendente;
+                  const pct = totalGeral > 0 ? (tot / totalGeral) * 100 : 0;
+                  return (
+                    <div key={cl.nome} className="rcr-rank-item">
+                      <span className="rcr-rank-pos">#{i + 1}</span>
+                      <div className="rcr-rank-info">
+                        <div className="rcr-rank-name">{cl.nome}</div>
+                        <div className="rcr-rank-sub">{cl.qtd} cobranças · pago: {fmtR$(cl.totalPago)}{cl.totalPendente > 0 ? ` · pendente: ${fmtR$(cl.totalPendente)}` : ""}</div>
+                      </div>
+                      <div className="rcr-rank-bar-wrap">
+                        <div className="rcr-rank-bar-bg"><div className="rcr-rank-bar-fill" style={{ width: `${pct}%`, background: CORES[i % CORES.length] }} /></div>
+                      </div>
+                      <span className="rcr-rank-val">{fmtR$(tot)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Fluxo de caixa futuro ── */}
+      {fluxoFuturo.length > 0 && (
+        <>
+          <div className="rcr-section-title" style={{ justifyContent: "space-between" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}><Calendar size={15} style={{ color: "var(--gold)" }} />Fluxo de Caixa — Próximos 30 dias</span>
+            <span style={{ fontSize: 12, color: "var(--text-3)" }}>Previsão: <strong style={{ color: "var(--green)" }}>{fmtR$(totalFluxo30)}</strong></span>
+          </div>
+          <div className="rcr-chart-card">
+            <div className="rcr-chart-header">
+              <div className="rcr-chart-title"><div className="rcr-chart-title-dot" style={{ color: "var(--blue, #5b8ef0)", background: "var(--blue, #5b8ef0)" }} />Cobranças com Vencimento Futuro</div>
+              <span className="rcr-chart-badge">{fluxoFuturo.length} cobranças</span>
+            </div>
+            <div className="rcr-chart-body">
+              <div className="rcr-cashflow">
+                {fluxoFuturo.map((item, i) => {
+                  const d = item._venc ? item._venc.split("-").reverse().join("/") : "—";
+                  const val = Number(item.valorRestante ?? item.valor ?? 0);
+                  const dias = item._venc ? Math.ceil((new Date(item._venc) - new Date(hoje)) / 86400000) : null;
+                  return (
+                    <div key={item.id || i} className="rcr-cf-row">
+                      <span className="rcr-cf-date">{d}</span>
+                      <span className="rcr-cf-desc">{item.cliente || item.nomeCliente || "—"} — {item.descricao || "Cobrança"}</span>
+                      {dias !== null && <span style={{ fontSize: 10, color: dias <= 3 ? "var(--red)" : "var(--text-3)", marginRight: 8 }}>{dias === 0 ? "Hoje" : dias === 1 ? "Amanhã" : `em ${dias}d`}</span>}
+                      <span className={`rcr-cf-val ${item._status}`}>{fmtR$(val)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Tabela detalhada ── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="rcr-section-title"><Receipt size={15} />Detalhamento</div>
+        <button className="btn-secondary" style={{ fontSize: 12, padding: "6px 14px" }} onClick={handleExport}><Download size={13} />Exportar Excel</button>
+      </div>
+      <div className="rcr-table-wrap">
+        <div className="rcr-table-header"><span className="rcr-table-title">Contas a Receber</span><span className="rcr-table-badge">{tabelaItens.length} registros</span></div>
+        <div className="rcr-row rcr-row-head" style={{ gridTemplateColumns: "95px 1fr 1fr 120px 120px 100px" }}>
+          <span>Vencimento</span><span>Cliente</span><span>Descrição</span><span style={{ textAlign: "right" }}>Valor Total</span><span style={{ textAlign: "right" }}>Restante</span><span>Status</span>
+        </div>
+        {tabelaItens.length === 0
+          ? <div className="rcr-empty" style={{ padding: 40 }}><Receipt size={24} opacity={0.3} /><p>Nenhuma conta com os filtros selecionados.</p></div>
+          : tabelaItens.map((item, i) => {
+              const d = parseDateISO(item.dataVencimento);
+              const dFmt = d ? d.split("-").reverse().join("/") : "—";
+              const vTotal   = Number(item.valorTotal || item.valor || 0);
+              const vRestante= Number(item.valorRestante ?? vTotal);
+              return (
+                <div key={item.id || i} className="rcr-row" style={{ gridTemplateColumns: "95px 1fr 1fr 120px 120px 100px", background: d === hoje ? "rgba(200,165,94,0.04)" : undefined }}>
+                  <span style={{ color: item._status === "vencido" ? "var(--red)" : "var(--text-2)" }}>{dFmt}</span>
+                  <span style={{ color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.cliente || item.nomeCliente || "—"}</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.descricao || "—"}</span>
+                  <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: "var(--text)" }}>{fmtR$(vTotal)}</span>
+                  <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: item._status === "pago" ? "var(--green)" : item._status === "vencido" ? "var(--red)" : "var(--gold)" }}>{fmtR$(vRestante)}</span>
+                  <span><span className={`rcr-badge ${item._status}`}>{item._status}</span></span>
+                </div>
+              );
+            })
+        }
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
    MENU DE NAVEGAÇÃO — configuração
    ══════════════════════════════════════════════════════ */
 const PERMISSOES_RELATORIO = {
@@ -3010,9 +4177,13 @@ const PERMISSOES_RELATORIO = {
   estoque:    ["financeiro", "comercial", "compras", "operacional", "vendedor"],
   vendas:     ["financeiro", "comercial", "vendedor", "suporte"],
   clientes:   ["comercial", "vendedor", "suporte"],
+  alunos:        ["financeiro", "comercial", "vendedor", "suporte"],  // ← NOVO
+  mensalidades:  ["financeiro", "comercial"],       
   agenda:     ["comercial", "vendedor", "suporte"],
-  lucro_ps:   ["financeiro", "comercial"],
-  vendedores: ["financeiro", "comercial"],
+  lucro_ps:            ["financeiro", "comercial"],
+  vendedores:          ["financeiro", "comercial"],
+  rel_compras:         ["financeiro", "compras"],
+  rel_contas_receber:  ["financeiro", "comercial"],
 };
 
 const MENU = [
@@ -3022,10 +4193,13 @@ const MENU = [
   { key: "vendas",     label: "Vendas",       icon: <ShoppingCart size={15} />   },
   { key: "vendedores", label: "Vendedores",   icon: <Users size={15} />          },
   { key: "clientes",   label: "Clientes",     icon: <Users size={15} />          },
+   { key: "alunos",       label: "Alunos",         icon: <Users size={15} />        },  // ← NOVO
+  { key: "mensalidades", label: "Mensalidades",   icon: <CreditCard size={15} />   },  // ← NOVO
   { key: "despesas",   label: "Despesas",     icon: <Receipt size={15} />        },
-  { key: "estoque",    label: "Estoque",      icon: <Package size={15} />        },
-  { key: "agenda",     label: "Agenda",       icon: <Calendar size={15} />       },
- 
+  { key: "estoque",           label: "Estoque",           icon: <Package size={15} />     },
+  { key: "agenda",            label: "Agenda",            icon: <Calendar size={15} />    },
+  { key: "rel_compras",       label: "Rel. Compras",      icon: <ShoppingCart size={15} /> },
+  { key: "rel_contas_receber",label: "Rel. A. Receber",   icon: <Receipt size={15} />     },
 ];
 
 const TITULO_RELATORIO = {
@@ -3035,9 +4209,13 @@ const TITULO_RELATORIO = {
   despesas:   "Relatório de Despesas",
   estoque:    "Relatório de Estoque",
   clientes:   "Relatório de Clientes",
+   alunos:       "Relatório de Alunos",              // ← NOVO
+  mensalidades: "Relatório de Mensalidades", 
   agenda:     "Relatório de Agenda",
-  lucro_ps:   "Produtos & Serviços",
-  vendedores: "Relatório de Vendedores",
+  lucro_ps:            "Produtos & Serviços",
+  vendedores:          "Relatório de Vendedores",
+  rel_compras:         "Relatório de Compras",
+  rel_contas_receber:  "Relatório de Contas a Receber",
 };
 
 
@@ -3589,6 +4767,8 @@ export default function Relatorios() {
   const [caixa,      setCaixa]      = useState([]);
   const [aReceber,   setAReceber]   = useState([]);
   const [vendedores, setVendedores] = useState([]);
+  const [alunos,     setAlunos]     = useState([]);
+  const [compras,    setCompras]    = useState([]);
 
   // Permissão por sub-relatório
   const temAcesso = (id) => {
@@ -3611,6 +4791,8 @@ export default function Relatorios() {
         /* Ignorar erro se collection não existir */ () => {}),
       onSnapshot(col("servicos"), (s) => setServicos(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => {}),
+       onSnapshot(col("alunos"),     (s) => setAlunos(s.docs.map((d) => ({ docId: d.id, ...d.data() }))),
+        () => {}),  // ← NOVO
       onSnapshot(col("eventos"),   (s) => setAgenda(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => {}),
       onSnapshot(col("caixa"),    (s) => setCaixa(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
@@ -3618,6 +4800,8 @@ export default function Relatorios() {
       onSnapshot(col("a_receber"), (s) => setAReceber(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => {}),
       onSnapshot(col("vendedores"), (s) => setVendedores(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        () => {}),
+      onSnapshot(col("compras"),    (s) => setCompras(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => {}),
     ];
 
@@ -3668,6 +4852,10 @@ export default function Relatorios() {
       case "agenda":     return <RelatorioAgenda agenda={agenda} intervalo={intervalo} />;
       case "lucro_ps":   return <RelatorioLucroPorPS vendas={vendas} produtos={produtos} servicos={servicos} vendedores={vendedores} intervalo={intervalo} />;
       case "vendedores": return <RelatorioVendedores vendas={vendas} vendedores={vendedores} intervalo={intervalo} />;
+      case "alunos":       return <RelatorioAlunos alunos={alunos} aReceber={aReceber} vendas={vendas} intervalo={intervalo} />;           // ← NOVO
+      case "mensalidades": return <RelatorioMensalidades alunos={alunos} aReceber={aReceber} vendas={vendas} caixa={caixa} intervalo={intervalo} />;
+      case "rel_compras":        return <RelatorioCompras compras={compras} intervalo={intervalo} />;
+      case "rel_contas_receber": return <RelatorioContasReceber aReceber={aReceber} intervalo={intervalo} />;
       default:           return null;
     }
   };
