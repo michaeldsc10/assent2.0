@@ -515,7 +515,7 @@ function Toggle({ checked, onChange }) {
 /* ═══════════════════════════════════════════════════
    MODAL: Nova / Editar Compra
    ═══════════════════════════════════════════════════ */
-function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved }) {
+function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved, nomeUsuario, cargo }) {
   const isEdit = !!compra;
 
   const [form, setForm] = useState({
@@ -1511,7 +1511,6 @@ function ModalMovimentacao({ insumos, uid, onClose, onSaved }) {
             <select className="form-input" value={form.motivo}
               onChange={e => set("motivo", e.target.value)}>
               {MOTIVOS_SAIDA.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-              <option value="ajuste">Ajuste de Inventário</option>
             </select>
           </div>
 
@@ -1591,9 +1590,14 @@ function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEdita
 
   const handleDeletar = async () => {
     if (!deletando) return;
-    await deleteDoc(doc(collection(db, "users", uid, "compras"), deletando.id));
-    await logAction({ tenantUid: uid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.COMPRAS, descricao: `Excluiu Compra de ${deletando.fornecedorNome || "Fornecedor"}` });
-    setDeletando(null);
+    try {
+      await deleteDoc(doc(collection(db, "users", uid, "compras"), deletando.id));
+      await logAction({ tenantUid: uid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.COMPRAS, descricao: `Excluiu Compra de ${deletando.fornecedorNome || "Fornecedor"}` });
+      setDeletando(null);
+    } catch (err) {
+      console.error("[Compras] Erro ao excluir compra:", err);
+      alert("Erro ao excluir compra. Tente novamente.");
+    }
   };
 
   return (
@@ -1678,10 +1682,12 @@ function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEdita
       {/* Modais */}
       {modalNova && (
         <ModalNovaCompra uid={uid} fornecedores={fornecedores} insumos={insumos}
+          nomeUsuario={nomeUsuario} cargo={cargo}
           onClose={() => setModalNova(false)} onSaved={() => {}} />
       )}
       {editando && podeEditarV && (
         <ModalNovaCompra uid={uid} compra={editando} fornecedores={fornecedores} insumos={insumos}
+          nomeUsuario={nomeUsuario} cargo={cargo}
           onClose={() => setEditando(null)} onSaved={() => {}} />
       )}
       {detalhes && (
@@ -1720,15 +1726,25 @@ function TabInsumos({ uid, insumos, isPro, podeCriarV, podeEditarV, podeExcluirV
 
   const handleDeletar = async () => {
     if (!deletando) return;
-    await deleteDoc(doc(collection(db, "users", uid, "insumos"), deletando.id));
-    setDeletando(null);
+    try {
+      await deleteDoc(doc(collection(db, "users", uid, "insumos"), deletando.id));
+      setDeletando(null);
+    } catch (err) {
+      console.error("[Compras] Erro ao excluir insumo:", err);
+      alert("Erro ao excluir insumo. Tente novamente.");
+    }
   };
 
   const handleToggleAtivo = async (insumo) => {
-    await updateDoc(doc(collection(db, "users", uid, "insumos"), insumo.id), {
-      ativo:        !insumo.ativo,
-      atualizadoEm: new Date().toISOString(),
-    });
+    try {
+      await updateDoc(doc(collection(db, "users", uid, "insumos"), insumo.id), {
+        ativo:        !insumo.ativo,
+        atualizadoEm: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error("[Compras] Erro ao atualizar status do insumo:", err);
+      alert("Erro ao atualizar status. Tente novamente.");
+    }
   };
 
   return (
@@ -1936,7 +1952,7 @@ export default function Compras() {
       err  => console.error("[Compras] fornecedores:", err)
     );
     return unsub;
-  }, [tenantUid]);
+  }, [uid]);
 
   if (!uid || loadingLicenca) return <div className="cp-loading">Carregando...</div>;
   if (loading)                return <div className="cp-loading">Carregando módulo de compras...</div>;
