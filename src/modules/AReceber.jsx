@@ -855,17 +855,17 @@ export default function AReceber() {
              /vendas (Relatório de Vendas) e seja reconhecida pelo DRE via
              caixa origem="venda" + referenciaId existente. */
           const vendaMensalidade = {
-            tipoVenda:     "mensalidade",
-            categoria:     "Mensalidade",
-            cliente:       conta.clienteNome || conta.alunoNome || "—",
-            clienteNome:   conta.clienteNome || conta.alunoNome || "—",
-            alunoId:       conta.alunoId || null,
-            alunoIdSeq:    conta.alunoIdSeq ?? null,
-            mesReferencia: conta.mesReferencia || null,
-            total:         valorRecebido,
+            tipoVenda:       "mensalidade",
+            categoria:       "Mensalidade",
+            cliente:         conta.clienteNome || "—",
+            clienteNome:     conta.clienteNome || "—",
+            clienteId:       conta.clienteId   || null,
+            clienteIdSeq:    conta.clienteIdSeq ?? null,
+            mesReferencia:   conta.mesReferencia || null,
+            total:           valorRecebido,
             valorRecebido,
             itens: [{
-              nome:          `Mensalidade ${conta.mesReferencia || ""} — ${conta.clienteNome || conta.alunoNome || ""}`.trim(),
+              nome:          `Mensalidade ${conta.mesReferencia || ""} — ${conta.clienteNome || ""}`.trim(),
               produto:       "Mensalidade",
               qtd:           1,
               quantidade:    1,
@@ -876,13 +876,13 @@ export default function AReceber() {
               tipo:          "mensalidade",
               custo:         0,
             }],
-            formaPagamento: "Mensalidade",
-            data:           agora,
-            criadoEm:       agora,
-            origem:         "mensalidade",
-            referenciaAluno: conta.alunoId || null,
-            descontos:      0,
-            valorTaxa:      0,
+            formaPagamento:   "Mensalidade",
+            data:             agora,
+            criadoEm:         agora,
+            origem:           "mensalidade",
+            referenciaCliente: conta.clienteId || null,
+            descontos:        0,
+            valorTaxa:        0,
           };
           const vendaRef = await addDoc(
             collection(db, "users", tenantUid, "vendas"),
@@ -901,7 +901,7 @@ export default function AReceber() {
           referenciaId: referenciaCaixa,
           valor:        valorRecebido,
           descricao:    ehMensalidade
-            ? `Mensalidade recebida — ${conta.clienteNome || conta.alunoNome || ""}${conta.mesReferencia ? ` · ${conta.mesReferencia}` : ""}`
+            ? `Mensalidade recebida — ${conta.clienteNome || ""}${conta.mesReferencia ? ` · ${conta.mesReferencia}` : ""}`
             : `Recebimento — ${conta.clienteNome || ""}${conta.descricao ? ` · ${conta.descricao}` : ""}`,
           categoria:    ehMensalidade ? "Mensalidade" : (ehVenda ? "Venda" : "A Receber"),
           data:         agora,
