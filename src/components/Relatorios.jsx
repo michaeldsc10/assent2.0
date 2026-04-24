@@ -3399,8 +3399,11 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
    dos mesmos lançamentos que alimentam o DRE e Vendas
    ══════════════════════════════════════════════════════ */
 function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
+  /* Filtro de view — null = tudo visível */
+  const [filtroView, setFiltroView] = useState(null); // null | "recebidas" | "pendentes"
+
   const dados = useMemo(() => {
-    /* Mensalidades recebidas no período — origem real = vendas sintéticas */
+    /* Mensalidades recebidas no período — vendas sintéticas com tipoVenda="mensalidade" */
     const recebidas = vendas.filter(v =>
       v.tipoVenda === "mensalidade" &&
       v.status !== "cancelada" &&
@@ -3415,31 +3418,31 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
     const hoje = new Date().toISOString().slice(0, 10);
     const vencidas = mensAbertas.filter(m => (m.dataVencimento || "") < hoje);
 
-    const totalRecebido   = recebidas.reduce((s, v) => s + Number(v.total || 0), 0);
-    const totalPendente   = mensAbertas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
-    const totalVencido    = vencidas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
-    const ticketMedio     = recebidas.length > 0 ? totalRecebido / recebidas.length : 0;
+    const totalRecebido = recebidas.reduce((s, v) => s + Number(v.total || 0), 0);
+    const totalPendente = mensAbertas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
+    const totalVencido  = vencidas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
+    const ticketMedio   = recebidas.length > 0 ? totalRecebido / recebidas.length : 0;
 
     /* Linhas — recebidas no período */
     const linhasRecebidas = recebidas
       .sort((a, b) => (parseDate(b.data) || 0) - (parseDate(a.data) || 0))
       .map(v => ({
-        data:     v.data,
-        aluno:    v.clienteNome || v.cliente || "—",
-        mes:      v.mesReferencia || "—",
-        valor:    Number(v.total || 0),
-        forma:    v.formaPagamento || "—",
+        data:  v.data,
+        aluno: v.clienteNome || v.cliente || "—",
+        mes:   v.mesReferencia || "—",
+        valor: Number(v.total || 0),
+        forma: v.formaPagamento || "—",
       }));
 
     /* Linhas — pendentes (ordenadas por vencimento) */
     const linhasPendentes = mensAbertas
       .sort((a, b) => (a.dataVencimento || "").localeCompare(b.dataVencimento || ""))
       .map(m => ({
-        aluno:         m.clienteNome || "—",
-        mes:           m.mesReferencia || "—",
-        vencimento:    m.dataVencimento || "",
-        valor:         Number(m.valorRestante || 0),
-        status:        (m.dataVencimento || "") < hoje ? "Vencida" : "Pendente",
+        aluno:      m.clienteNome || "—",
+        mes:        m.mesReferencia || "—",
+        vencimento: m.dataVencimento || "",
+        valor:      Number(m.valorRestante || 0),
+        status:     (m.dataVencimento || "") < hoje ? "Vencida" : "Pendente",
       }));
 
     /* Inadimplência por aluno */
@@ -3457,9 +3460,9 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
     return {
       linhasRecebidas, linhasPendentes, rankingInadimplencia,
       totalRecebido, totalPendente, totalVencido, ticketMedio,
-      qtdRecebidas: recebidas.length,
-      qtdPendentes: mensAbertas.length,
-      qtdVencidas:  vencidas.length,
+      qtdRecebidas:  recebidas.length,
+      qtdPendentes:  mensAbertas.length,
+      qtdVencidas:   vencidas.length,
       taxaInadimplencia: (totalRecebido + totalVencido) > 0
         ? (totalVencido / (totalRecebido + totalVencido)) * 100
         : 0,
@@ -3490,6 +3493,81 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
     ]);
   };
 
+  /* ── Helpers visuais ── */
+  const fmtDataLocal = (iso) => {
+    if (!iso) return "—";
+    try { const [a,m,d] = iso.split("-"); return `${d}/${m}/${a}`; } catch { return "—"; }
+  };
+
+  const StatusPill = ({ status }) => {
+    const isVenc = status === "Vencida";
+    return (
+      <span style={{
+        display: "inline-flex", alignItems: "center", padding: "3px 9px",
+        borderRadius: 20, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
+        background: isVenc ? "rgba(224,82,82,.12)"  : "rgba(200,165,94,.12)",
+        color:      isVenc ? "var(--red)"            : "#F5A623",
+        border:     isVenc ? "1px solid rgba(224,82,82,.25)" : "1px solid rgba(245,166,35,.25)",
+      }}>{status}</span>
+    );
+  };
+
+  /* Tabela inline genérica — evita TabelaRelatorio que filtra por data */
+  const InlineTable = ({ titulo, colunas, linhas, emptyMsg }) => (
+    <div style={{
+      background: "var(--s1)", border: "1px solid var(--border)",
+      borderRadius: 12, overflow: "hidden",
+    }}>
+      <div style={{
+        padding: "13px 18px", borderBottom: "1px solid var(--border)",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <span style={{ fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600, color: "var(--text)", display: "flex", alignItems: "center", gap: 8 }}>
+          {titulo}
+          <span style={{ fontSize: 10, background: "var(--s3)", color: "var(--text-3)", padding: "2px 8px", borderRadius: 20, fontWeight: 600 }}>
+            {linhas.length}
+          </span>
+        </span>
+      </div>
+      {/* Cabeçalho */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: colunas.map(() => "1fr").join(" "),
+        padding: "9px 18px", gap: 8,
+        background: "var(--s2)", borderBottom: "1px solid var(--border)",
+        fontSize: 10, fontWeight: 600, letterSpacing: ".07em",
+        textTransform: "uppercase", color: "var(--text-3)",
+      }}>
+        {colunas.map(c => <span key={c.key}>{c.label}</span>)}
+      </div>
+      {/* Linhas */}
+      {linhas.length === 0 ? (
+        <div style={{ padding: "32px", textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>
+          {emptyMsg || "Nenhum registro encontrado."}
+        </div>
+      ) : linhas.map((row, i) => (
+        <div key={i} style={{
+          display: "grid",
+          gridTemplateColumns: colunas.map(() => "1fr").join(" "),
+          padding: "10px 18px", gap: 8,
+          borderBottom: i < linhas.length - 1 ? "1px solid var(--border)" : "none",
+          alignItems: "center", fontSize: 12, color: "var(--text-2)",
+          transition: "background .13s",
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}
+        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+          {colunas.map(c => (
+            <span key={c.key}>{c.render ? c.render(row[c.key], row) : (row[c.key] ?? "—")}</span>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+
+  /* Determina quais seções mostrar com base no filtro */
+  const mostrarRecebidas = filtroView === null || filtroView === "recebidas";
+  const mostrarPendentes = filtroView === null || filtroView === "pendentes";
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
@@ -3499,52 +3577,96 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
         </button>
       </div>
 
+      {/* ── KPI cards — "Recebido" e "Pendente" são clicáveis como filtros ── */}
       <div className="cr-grid">
-        <CardResumo icon={<CreditCard size={18} />} label="Recebido no Período"
-          value={fmtR$(dados.totalRecebido)}
-          sub={`${dados.qtdRecebidas} mensalidade(s)`}
-          trend="up" colorVar="var(--green)" />
+        <div
+          onClick={() => setFiltroView(v => v === "recebidas" ? null : "recebidas")}
+          style={{
+            cursor: "pointer", borderRadius: 12,
+            border: `2px solid ${filtroView === "recebidas" ? "var(--green)" : "var(--border)"}`,
+            transition: "border-color .15s",
+          }}
+        >
+          <CardResumo icon={<CreditCard size={18} />} label="Recebido no Período"
+            value={fmtR$(dados.totalRecebido)}
+            sub={`${dados.qtdRecebidas} mensalidade(s) · clique para filtrar`}
+            trend="up" colorVar="var(--green)" />
+        </div>
+
+        {/* Ticket médio — apenas informativo */}
         <CardResumo icon={<DollarSign size={18} />} label="Ticket Médio"
           value={fmtR$(dados.ticketMedio)} sub="por mensalidade"
           trend="neutral" colorVar="var(--blue)" />
-        <CardResumo icon={<Clock size={18} />} label="Pendente Total"
-          value={fmtR$(dados.totalPendente)}
-          sub={`${dados.qtdPendentes} aberta(s)`}
-          trend="neutral" colorVar="var(--gold)" />
+
+        <div
+          onClick={() => setFiltroView(v => v === "pendentes" ? null : "pendentes")}
+          style={{
+            cursor: "pointer", borderRadius: 12,
+            border: `2px solid ${filtroView === "pendentes" ? "#F5A623" : "var(--border)"}`,
+            transition: "border-color .15s",
+          }}
+        >
+          <CardResumo icon={<Clock size={18} />} label="Pendente Total"
+            value={fmtR$(dados.totalPendente)}
+            sub={`${dados.qtdPendentes} aberta(s) · clique para filtrar`}
+            trend="neutral" colorVar="#F5A623" />
+        </div>
+
+        {/* Inadimplência — apenas informativo */}
         <CardResumo icon={<AlertCircle size={18} />} label="Inadimplência"
           value={fmtR$(dados.totalVencido)}
           sub={`${dados.qtdVencidas} vencida(s) · ${dados.taxaInadimplencia.toFixed(1)}%`}
           trend="down" colorVar="var(--red)" />
       </div>
 
-      {dados.linhasRecebidas.length > 0 && (
-        <TabelaRelatorio
+      {/* Label de filtro ativo */}
+      {filtroView && (
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 8,
+          fontSize: 11, color: "var(--gold)",
+          background: "rgba(200,165,94,.08)", border: "1px solid rgba(200,165,94,.2)",
+          borderRadius: 8, padding: "6px 12px", alignSelf: "flex-start",
+        }}>
+          Filtrando: {filtroView === "recebidas" ? "Mensalidades Recebidas" : "Mensalidades Pendentes"}
+          <span onClick={() => setFiltroView(null)}
+            style={{ cursor: "pointer", textDecoration: "underline", marginLeft: 4 }}>
+            Mostrar todas
+          </span>
+        </div>
+      )}
+
+      {/* ── Tabela 1: Recebidas no período ── */}
+      {mostrarRecebidas && (
+        <InlineTable
           titulo="Mensalidades Recebidas no Período"
           colunas={[
-            { key: "data",  label: "Data", format: (v) => fmtData(v) },
+            { key: "data",  label: "Data",      render: (v) => fmtDataLocal(typeof v === "string" ? v.slice(0,10) : v) },
             { key: "aluno", label: "Aluno" },
             { key: "mes",   label: "Mês Ref." },
             { key: "forma", label: "Pagamento" },
-            { key: "valor", label: "Valor", format: (v) => fmtR$(v) },
+            { key: "valor", label: "Valor",     render: (v) => <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: "var(--green)" }}>{fmtR$(v)}</span> },
           ]}
-          dados={dados.linhasRecebidas}
+          linhas={dados.linhasRecebidas}
+          emptyMsg="Nenhuma mensalidade recebida neste período."
         />
       )}
 
-      {dados.linhasPendentes.length > 0 && (
-        <TabelaRelatorio
+      {/* ── Tabela 2: Pendentes (snapshot atual) ── */}
+      {mostrarPendentes && dados.linhasPendentes.length > 0 && (
+        <InlineTable
           titulo="Mensalidades Pendentes (atual)"
           colunas={[
             { key: "aluno",      label: "Aluno" },
             { key: "mes",        label: "Mês Ref." },
-            { key: "vencimento", label: "Vencimento", format: (v) => fmtData(v) },
-            { key: "status",     label: "Status" },
-            { key: "valor",      label: "Valor", format: (v) => fmtR$(v) },
+            { key: "vencimento", label: "Vencimento", render: (v) => fmtDataLocal(v) },
+            { key: "status",     label: "Status",     render: (v) => <StatusPill status={v} /> },
+            { key: "valor",      label: "Valor",      render: (v) => <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: "var(--red)" }}>{fmtR$(v)}</span> },
           ]}
-          dados={dados.linhasPendentes}
+          linhas={dados.linhasPendentes}
         />
       )}
 
+      {/* ── Ranking inadimplência ── */}
       {dados.rankingInadimplencia.length > 0 && (
         <div className="tr-wrap">
           <div className="tr-header">
@@ -4364,8 +4486,6 @@ const MENU = [
   { key: "financeiro", label: "Financeiro",   icon: <Wallet size={15} />         },
   { key: "lucro_ps",   label: "Produtos & Serviços", icon: <DollarSign size={15} />     },
   { key: "vendas",     label: "Vendas",       icon: <ShoppingCart size={15} />   },
-   { key: "rel_compras",       label: "Rel. Compras",      icon: <ShoppingCart size={15} /> },
-  { key: "rel_contas_receber",label: "Rel. A. Receber",   icon: <Receipt size={15} />     },
   { key: "vendedores", label: "Vendedores",   icon: <Users size={15} />          },
   { key: "clientes",   label: "Clientes",     icon: <Users size={15} />          },
    { key: "alunos",       label: "Alunos",         icon: <Users size={15} />        },  // ← NOVO
@@ -4373,7 +4493,8 @@ const MENU = [
   { key: "despesas",   label: "Despesas",     icon: <Receipt size={15} />        },
   { key: "estoque",           label: "Estoque",           icon: <Package size={15} />     },
   { key: "agenda",            label: "Agenda",            icon: <Calendar size={15} />    },
-  
+  { key: "rel_compras",       label: "Rel. Compras",      icon: <ShoppingCart size={15} /> },
+  { key: "rel_contas_receber",label: "Rel. A. Receber",   icon: <Receipt size={15} />     },
 ];
 
 const TITULO_RELATORIO = {
