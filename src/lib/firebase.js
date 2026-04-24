@@ -19,6 +19,8 @@ import {
   setDoc,
 } from "firebase/firestore";
 
+import { getStorage } from "firebase/storage";
+
 // ⚠️ Todas as chaves são lidas de variáveis de ambiente (.env)
 // Nunca commite valores reais neste arquivo.
 // Copie .env.example para .env e preencha com suas credenciais.
@@ -35,8 +37,9 @@ export const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const auth = getAuth(app);
-export const db   = getFirestore(app);
+export const auth    = getAuth(app);
+export const db      = getFirestore(app);
+export const storage = getStorage(app);
 
 
 /* ── Funções de Autenticação ── */
