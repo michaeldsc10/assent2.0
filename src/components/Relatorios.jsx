@@ -4364,6 +4364,8 @@ const MENU = [
   { key: "financeiro", label: "Financeiro",   icon: <Wallet size={15} />         },
   { key: "lucro_ps",   label: "Produtos & Serviços", icon: <DollarSign size={15} />     },
   { key: "vendas",     label: "Vendas",       icon: <ShoppingCart size={15} />   },
+   { key: "rel_compras",       label: "Rel. Compras",      icon: <ShoppingCart size={15} /> },
+  { key: "rel_contas_receber",label: "Rel. A. Receber",   icon: <Receipt size={15} />     },
   { key: "vendedores", label: "Vendedores",   icon: <Users size={15} />          },
   { key: "clientes",   label: "Clientes",     icon: <Users size={15} />          },
    { key: "alunos",       label: "Alunos",         icon: <Users size={15} />        },  // ← NOVO
@@ -4371,8 +4373,7 @@ const MENU = [
   { key: "despesas",   label: "Despesas",     icon: <Receipt size={15} />        },
   { key: "estoque",           label: "Estoque",           icon: <Package size={15} />     },
   { key: "agenda",            label: "Agenda",            icon: <Calendar size={15} />    },
-  { key: "rel_compras",       label: "Rel. Compras",      icon: <ShoppingCart size={15} /> },
-  { key: "rel_contas_receber",label: "Rel. A. Receber",   icon: <Receipt size={15} />     },
+  
 ];
 
 const TITULO_RELATORIO = {
