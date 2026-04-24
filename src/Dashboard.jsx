@@ -42,7 +42,7 @@ import Orcamentos    from "./modules/Orcamentos.jsx";
 import Usuarios      from "./modules/Usuarios.jsx";
 import Compras       from "./modules/Compras.jsx";
 import Mesas         from "./modules/Mesas.jsx";
-import Alunos        from "./modules/Alunos";
+import Alunos        from "./modules/Alunos.jsx";
 
 import RotaProtegida from "./contexts/RotaProtegida";
 import { usePermissao } from "./hooks/usePermissao";
