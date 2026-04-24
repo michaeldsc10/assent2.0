@@ -728,7 +728,7 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
 function ModalDetalheAluno({
   aluno, mensalidades, config,
   onClose, onEditar, onExcluir, onGerarMensalidade,
-  podeEditar, podeExcluir,
+  podeEditar, podeExcluir, onVerFoto,
 }) {
   /* Monta link de WhatsApp com template da config */
   const cobrarWhatsApp = (mensAlvo) => {
@@ -781,7 +781,11 @@ function ModalDetalheAluno({
         <div className="modal-header">
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
 {aluno.foto
-              ? <img src={aluno.foto} alt={aluno.nome} style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--border-h)", flexShrink: 0 }} />
+              ? <img src={aluno.foto} alt={aluno.nome}
+                  style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--border-h)", flexShrink: 0, cursor: onVerFoto ? "zoom-in" : "default" }}
+                  onClick={() => onVerFoto?.(aluno.foto)}
+                  title="Ver foto"
+                />
               : <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--s3)", border: "2px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Sora',sans-serif", fontSize: 18, fontWeight: 600, color: "var(--text-2)", flexShrink: 0 }}>{(aluno.nome || "?")[0].toUpperCase()}</div>}
             <div>
               <div className="modal-title">{aluno.nome}</div>
@@ -1059,6 +1063,7 @@ export default function Alunos() {
   const [search, setSearch]   = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
   const [sortDir, setSortDir] = useState("asc"); // "asc" | "desc"
+  const [fotoVisualizando, setFotoVisualizando] = useState(null); // lightbox read-only
 
   const toggleSort = () => setSortDir(d => d === "asc" ? "desc" : "asc");
 
@@ -1451,7 +1456,12 @@ export default function Alunos() {
                 <span className="mat-id">{fmtIdSeq(a.idSeq)}</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   {a.foto
-                    ? <img src={a.foto} alt={a.nome} className="aluno-avatar" />
+                    ? <img
+                        src={a.foto} alt={a.nome} className="aluno-avatar"
+                        style={{ cursor: "zoom-in" }}
+                        onClick={(e) => { e.stopPropagation(); setFotoVisualizando(a.foto); }}
+                        title="Ver foto"
+                      />
                     : <div className="aluno-avatar-placeholder">{(a.nome || "?")[0].toUpperCase()}</div>}
                   <span>
                     <div className="mat-aluno-nome">{a.nome}</div>
@@ -1518,6 +1528,7 @@ export default function Alunos() {
           onGerarMensalidade={handleGerarMensalidade}
           podeEditar={podeEditar}
           podeExcluir={podeExcluir}
+          onVerFoto={(foto) => setFotoVisualizando(foto)}
         />
       )}
       {excluindo && (
@@ -1535,6 +1546,15 @@ export default function Alunos() {
           onClose={() => setModalConfig(false)}
         />
       )}
+
+      {/* Lightbox read-only (tabela + modal detalhe) */}
+      {fotoVisualizando && (
+        <FotoLightbox
+          src={fotoVisualizando}
+          readOnly
+          onClose={() => setFotoVisualizando(null)}
+        />
+      )}
     </>
   );
 }
@@ -1543,8 +1563,7 @@ export default function Alunos() {
 /* ══════════════════════════════════════════════════════════════════════
    LIGHTBOX: Visualizador de foto do aluno
    ══════════════════════════════════════════════════════════════════════ */
-function FotoLightbox({ src, onAlterar, onRemover, onClose }) {
-  /* Fecha ao pressionar Esc */
+function FotoLightbox({ src, onAlterar, onRemover, onClose, readOnly = false }) {
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -1558,12 +1577,16 @@ function FotoLightbox({ src, onAlterar, onRemover, onClose }) {
         <button className="btn-secondary" onClick={onClose}>
           <X size={14} /> Fechar
         </button>
-        <button className="btn-secondary" onClick={onAlterar}>
-          <Camera size={14} /> Alterar foto
-        </button>
-        <button className="btn-danger" onClick={onRemover}>
-          <Trash2 size={14} /> Remover
-        </button>
+        {!readOnly && (
+          <>
+            <button className="btn-secondary" onClick={onAlterar}>
+              <Camera size={14} /> Alterar foto
+            </button>
+            <button className="btn-danger" onClick={onRemover}>
+              <Trash2 size={14} /> Remover
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
