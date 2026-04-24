@@ -344,6 +344,16 @@ const CSS = `
 .foto-picker-circle:hover .foto-picker-overlay { opacity:1; }
 .foto-picker-info { font-size:12px; color:var(--text-2); line-height:1.6; }
 .foto-picker-info strong { color:var(--text); display:block; margin-bottom:2px; }
+
+/* ── lightbox foto ── */
+.foto-lightbox { position:fixed; inset:0; z-index:1300; background:rgba(0,0,0,.92);
+  backdrop-filter:blur(8px); display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:20px; animation:fadeIn .15s ease; }
+.foto-lightbox-img { max-width:min(480px,90vw); max-height:60vh; border-radius:50%;
+  object-fit:cover; border:3px solid var(--gold);
+  box-shadow:0 0 80px rgba(212,175,55,.25); }
+.foto-lightbox-actions { display:flex; gap:10px; }
+
 /* ── crop modal ── */
 .crop-overlay { position:fixed; inset:0; z-index:1200; background:rgba(0,0,0,.88);
   backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; }
@@ -446,6 +456,7 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
   /* ── Foto (base64, igual a Produtos) ── */
   const [fotoBase64, setFotoBase64]   = useState(aluno?.foto || null);
   const [cropSrc, setCropSrc]         = useState(null); // blob URL para o crop modal
+  const [viewerOpen, setViewerOpen]   = useState(false);  // lightbox
   const fileInputRef = useRef(null);
 
   const handleFotoChange = (e) => {
@@ -533,26 +544,39 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
         <div className="modal-body">
           {/* — Foto — */}
           <div className="foto-picker-wrap">
-            <div className="foto-picker-circle" onClick={() => fileInputRef.current?.click()}>
+            <div
+              className="foto-picker-circle"
+              onClick={() => fotoBase64 ? setViewerOpen(true) : fileInputRef.current?.click()}
+              title={fotoBase64 ? "Ver foto" : "Adicionar foto"}
+            >
               {fotoBase64
                 ? <img src={fotoBase64} alt="Foto do aluno" />
                 : <Camera size={24} color="var(--text-3)" />}
-              <div className="foto-picker-overlay"><Camera size={18} color="#fff" /></div>
+              <div className="foto-picker-overlay">
+                {fotoBase64
+                  ? <Search size={16} color="#fff" />
+                  : <Camera size={18} color="#fff" />}
+              </div>
             </div>
             <div className="foto-picker-info">
               <strong>Foto do aluno</strong>
-              Clique para selecionar uma imagem.<br />
-              Arraste para posicionar · máx. 10 MB
-              {fotoBase64 && (
-                <button className="btn-secondary" style={{ marginTop: 8, padding: "4px 10px", fontSize: 11 }}
-                  onClick={(e) => { e.stopPropagation(); setFotoBase64(null); }}>
-                  Remover foto
-                </button>
-              )}
+              {fotoBase64
+                ? <>Clique na foto para visualizar.<br />Altere ou remova pelo visualizador.</>
+                : <>Clique para selecionar uma imagem.<br />Arraste para posicionar · máx. 10 MB</>}
             </div>
             <input ref={fileInputRef} type="file" accept="image/*"
               style={{ display: "none" }} onChange={handleFotoChange} />
           </div>
+
+          {/* — Lightbox visualizador — */}
+          {viewerOpen && fotoBase64 && (
+            <FotoLightbox
+              src={fotoBase64}
+              onAlterar={() => { setViewerOpen(false); fileInputRef.current?.click(); }}
+              onRemover={() => { setFotoBase64(null); setViewerOpen(false); }}
+              onClose={() => setViewerOpen(false)}
+            />
+          )}
 
           {/* — Crop modal — */}
           {cropSrc && (
@@ -1515,6 +1539,35 @@ export default function Alunos() {
   );
 }
 
+
+/* ══════════════════════════════════════════════════════════════════════
+   LIGHTBOX: Visualizador de foto do aluno
+   ══════════════════════════════════════════════════════════════════════ */
+function FotoLightbox({ src, onAlterar, onRemover, onClose }) {
+  /* Fecha ao pressionar Esc */
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="foto-lightbox" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <img src={src} alt="Foto do aluno" className="foto-lightbox-img" />
+      <div className="foto-lightbox-actions">
+        <button className="btn-secondary" onClick={onClose}>
+          <X size={14} /> Fechar
+        </button>
+        <button className="btn-secondary" onClick={onAlterar}>
+          <Camera size={14} /> Alterar foto
+        </button>
+        <button className="btn-danger" onClick={onRemover}>
+          <Trash2 size={14} /> Remover
+        </button>
+      </div>
+    </div>
+  );
+}
 
 /* ══════════════════════════════════════════════════════════════════════
    MODAL: Posicionar / cortar foto (drag + zoom → canvas → base64)
