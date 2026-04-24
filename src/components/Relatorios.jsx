@@ -1653,25 +1653,69 @@ function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], in
 /* ══════════════════════════════════════════════════════
    RELATÓRIO: DESPESAS
    ══════════════════════════════════════════════════════ */
+/* ── Badge visual de status para uso no relatório de despesas ── */
+function StatusBadgeRel({ status }) {
+  const cfg = {
+    pago:     { label: "Pago",     bg: "rgba(74,186,130,.13)",  color: "var(--green)", icon: "✓" },
+    pendente: { label: "Pendente", bg: "rgba(200,165,94,.12)",  color: "var(--gold)",  icon: "○" },
+    vencido:  { label: "Vencido",  bg: "rgba(224,82,82,.12)",   color: "var(--red)",   icon: "!" },
+    cancelado:{ label: "Cancelado",bg: "rgba(120,120,120,.12)", color: "var(--text-3)",icon: "–" },
+  }[status] || { label: status || "—", bg: "var(--s3)", color: "var(--text-3)", icon: "·" };
+
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: 4,
+      padding: "2px 8px", borderRadius: 5,
+      background: cfg.bg, color: cfg.color,
+      fontSize: 10, fontWeight: 700, letterSpacing: ".05em",
+      textTransform: "uppercase", whiteSpace: "nowrap",
+    }}>
+      <span style={{ fontSize: 11, lineHeight: 1 }}>{cfg.icon}</span>
+      {cfg.label}
+    </span>
+  );
+}
+
 function RelatorioDespesas({ despesas, intervalo }) {
+  const [filtroStatus, setFiltroStatus] = useState("todas");
+
   const dados = useMemo(() => {
-    // Para despesas pagas: priorizar dataPagamentoTs (Timestamp, sem bug de timezone),
-    // depois dataPagamento (string legada), depois vencimento.
-    // Para pendentes/vencidas: usar vencimento.
     const dataRefDespesa = (d) =>
       d.status === "pago"
         ? (d.dataPagamentoTs || d.dataPagamento || d.vencimento)
         : d.vencimento;
 
-    const filtradas = despesas
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+
+    // Todas dentro do período — enriquece status vencido
+    const noPeriodo = despesas
       .filter((d) => dentroDoIntervalo(dataRefDespesa(d), intervalo))
+      .map((d) => {
+        const statusEfetivo =
+          d.status === "pago" ? "pago" :
+          d.status === "cancelado" ? "cancelado" :
+          d.vencimento && parseDate(d.vencimento) < hoje ? "vencido" :
+          "pendente";
+        return { ...d, statusEfetivo };
+      })
       .sort((a, b) => {
         const da  = parseDate(dataRefDespesa(a));
         const db2 = parseDate(dataRefDespesa(b));
         return (db2 || 0) - (da || 0);
       });
 
-    const total = filtradas.reduce((s, d) => s + Number(d.valor || 0), 0);
+    const totalGeral   = noPeriodo.reduce((s, d) => s + Number(d.valor || 0), 0);
+    const totalPago    = noPeriodo.filter(d => d.statusEfetivo === "pago")    .reduce((s, d) => s + Number(d.valor || 0), 0);
+    const totalPendente= noPeriodo.filter(d => d.statusEfetivo === "pendente").reduce((s, d) => s + Number(d.valor || 0), 0);
+    const totalVencido = noPeriodo.filter(d => d.statusEfetivo === "vencido") .reduce((s, d) => s + Number(d.valor || 0), 0);
+    const qtdPago      = noPeriodo.filter(d => d.statusEfetivo === "pago").length;
+    const qtdPendente  = noPeriodo.filter(d => d.statusEfetivo === "pendente").length;
+    const qtdVencido   = noPeriodo.filter(d => d.statusEfetivo === "vencido").length;
+
+    // Aplica filtro de status
+    const filtradas = filtroStatus === "todas"
+      ? noPeriodo
+      : noPeriodo.filter(d => d.statusEfetivo === filtroStatus);
 
     const porCategoria = {};
     filtradas.forEach((d) => {
@@ -1685,8 +1729,13 @@ function RelatorioDespesas({ despesas, intervalo }) {
 
     const maxVal = ranking[0]?.val || 1;
 
-    return { filtradas, total, ranking, maxVal };
-  }, [despesas, intervalo]);
+    return {
+      filtradas, noPeriodo,
+      totalGeral, totalPago, totalPendente, totalVencido,
+      qtdPago, qtdPendente, qtdVencido,
+      ranking, maxVal,
+    };
+  }, [despesas, intervalo, filtroStatus]);
 
   const handleExport = () => {
     exportarExcel("despesas", [{
@@ -1697,37 +1746,99 @@ function RelatorioDespesas({ despesas, intervalo }) {
         fmtData(d.vencimento),
         d.descricao || "—",
         d.categoria || "—",
-        d.status || "—",
+        d.statusEfetivo || d.status || "—",
         Number(d.valor || 0).toFixed(2),
       ]),
     }]);
   };
 
+  const FILTROS_STATUS = [
+    { value: "todas",    label: "Todas",    cor: "var(--text-2)" },
+    { value: "pago",     label: "Pagas",    cor: "var(--green)"  },
+    { value: "pendente", label: "Pendentes",cor: "var(--gold)"   },
+    { value: "vencido",  label: "Vencidas", cor: "var(--red)"    },
+  ];
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* ── KPIs ── */}
       <div className="cr-grid">
         <CardResumo
           icon={<Receipt size={18} />}
-          label="Total de Despesas"
-          value={fmtR$(dados.total)}
-          sub={`${dados.filtradas.length} registros`}
+          label="Total no Período"
+          value={fmtR$(dados.totalGeral)}
+          sub={`${dados.noPeriodo.length} registros`}
           trend="down" colorVar="var(--red)"
         />
         <CardResumo
-          icon={<BarChart2 size={18} />}
-          label="Categorias"
-          value={String(dados.ranking.length)}
-          sub="categorias distintas" trend="neutral" colorVar="var(--blue)"
+          icon={<CheckCircle size={18} />}
+          label="Total Pago"
+          value={fmtR$(dados.totalPago)}
+          sub={`${dados.qtdPago} despesa${dados.qtdPago !== 1 ? "s" : ""} quitada${dados.qtdPago !== 1 ? "s" : ""}`}
+          trend="neutral" colorVar="var(--green)"
         />
         <CardResumo
-          icon={<DollarSign size={18} />}
-          label="Média por Despesa"
-          value={dados.filtradas.length > 0 ? fmtR$(dados.total / dados.filtradas.length) : "R$ 0,00"}
-          sub="ticket médio" trend="neutral" colorVar="var(--gold)"
+          icon={<Clock size={18} />}
+          label="A Pagar"
+          value={fmtR$(dados.totalPendente)}
+          sub={`${dados.qtdPendente} pendente${dados.qtdPendente !== 1 ? "s" : ""}`}
+          trend="neutral" colorVar="var(--gold)"
+        />
+        <CardResumo
+          icon={<AlertCircle size={18} />}
+          label="Vencidas"
+          value={fmtR$(dados.totalVencido)}
+          sub={`${dados.qtdVencido} em atraso`}
+          trend={dados.qtdVencido > 0 ? "down" : "neutral"} colorVar="var(--red)"
         />
       </div>
 
-      {/* Ranking por categoria */}
+      {/* ── Filtro de status ── */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+        padding: "10px 14px",
+        background: "var(--s1)", border: "1px solid var(--border)",
+        borderRadius: 10,
+      }}>
+        <span style={{ fontSize: 10, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".07em", color: "var(--text-3)", marginRight: 4 }}>
+          <Filter size={11} style={{ verticalAlign: "middle", marginRight: 4 }} />
+          Filtrar:
+        </span>
+        {FILTROS_STATUS.map(f => {
+          const ativo = filtroStatus === f.value;
+          return (
+            <button
+              key={f.value}
+              onClick={() => setFiltroStatus(f.value)}
+              style={{
+                padding: "4px 13px", borderRadius: 6, fontSize: 11, fontWeight: 600,
+                fontFamily: "'DM Sans', sans-serif", cursor: "pointer",
+                transition: "all .13s",
+                background: ativo ? (f.value === "todas" ? "rgba(200,165,94,.15)" : `${f.cor}18`) : "var(--s3)",
+                border: `1px solid ${ativo ? f.cor : "var(--border)"}`,
+                color: ativo ? f.cor : "var(--text-2)",
+              }}
+            >
+              {f.label}
+              {f.value !== "todas" && (
+                <span style={{
+                  marginLeft: 5, fontSize: 9, fontWeight: 700,
+                  background: ativo ? f.cor : "var(--s2)",
+                  color: ativo ? "#0a0808" : "var(--text-3)",
+                  padding: "1px 5px", borderRadius: 20,
+                }}>
+                  {f.value === "pago" ? dados.qtdPago :
+                   f.value === "pendente" ? dados.qtdPendente :
+                   dados.qtdVencido}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Ranking por categoria (baseado nas filtradas) ── */}
       {dados.ranking.length > 0 && (
         <div className="tr-wrap">
           <div className="tr-header">
@@ -1749,20 +1860,27 @@ function RelatorioDespesas({ despesas, intervalo }) {
         </div>
       )}
 
+      {/* ── Tabela de lançamentos ── */}
       <TabelaRelatorio
         title="Lançamentos de Despesas"
         count={dados.filtradas.length}
-        empty="Nenhuma despesa no período."
+        empty="Nenhuma despesa encontrada para o filtro selecionado."
         data={dados.filtradas}
         columns={[
           {
+            key: "statusEfetivo",
+            label: "Status",
+            render: (v) => <StatusBadgeRel status={v} />,
+          },
+          {
             key: "dataPagamento",
-            label: "Data Referência",
+            label: "Data Ref.",
             render: (v, row) => {
-              const dataRef = row.status === "pago" && v ? v : row.vencimento;
-              const label   = row.status === "pago" ? "Pago em" : "Vence em";
+              const isPago  = row.statusEfetivo === "pago";
+              const dataRef = isPago && v ? v : row.vencimento;
               return (
-                <span title={label} style={{ color: row.status === "pago" ? "var(--green)" : "var(--text-2)" }}>
+                <span title={isPago ? "Pago em" : "Vence em"}
+                  style={{ color: isPago ? "var(--green)" : "var(--text-2)", fontSize: 12 }}>
                   {fmtData(dataRef)}
                 </span>
               );
@@ -1773,8 +1891,10 @@ function RelatorioDespesas({ despesas, intervalo }) {
             label: "Vencimento",
             render: (v, row) => {
               if (!v) return <span style={{ color: "var(--text-3)" }}>—</span>;
-              const dias = getDiasRestantes(v);
-              const color = dias !== null && dias < 0
+              const dias  = getDiasRestantes(v);
+              const color = row.statusEfetivo === "pago"
+                ? "var(--text-3)"
+                : dias !== null && dias < 0
                 ? "var(--red)"
                 : dias !== null && dias <= 3
                 ? "var(--gold)"
@@ -1782,11 +1902,34 @@ function RelatorioDespesas({ despesas, intervalo }) {
               return <span style={{ color }}>{fmtData(v)}</span>;
             },
           },
-          { key: "descricao", label: "Descrição" },
+          {
+            key: "descricao",
+            label: "Descrição",
+            render: (v, row) => (
+              <span style={{
+                display: "flex", alignItems: "center", gap: 6,
+                fontWeight: row.statusEfetivo === "pago" ? 400 : 500,
+                color: row.statusEfetivo === "pago" ? "var(--text-3)" : "var(--text)",
+                textDecoration: row.statusEfetivo === "cancelado" ? "line-through" : "none",
+              }}>
+                {row.statusEfetivo === "pago" && (
+                  <CheckCircle size={12} style={{ color: "var(--green)", flexShrink: 0 }} />
+                )}
+                {v || "—"}
+              </span>
+            ),
+          },
           { key: "categoria", label: "Categoria" },
           {
             key: "valor", label: "Valor", align: "right",
-            render: (v) => <span className="val-neg">{fmtR$(v)}</span>,
+            render: (v, row) => (
+              <span style={{
+                fontFamily: "'Sora', sans-serif", fontWeight: 600, fontSize: 12,
+                color: row.statusEfetivo === "pago" ? "var(--green)" : "var(--red)",
+              }}>
+                {fmtR$(v)}
+              </span>
+            ),
           },
         ]}
       />
