@@ -30,6 +30,8 @@ import {
   deleteDoc,
   onSnapshot,
   serverTimestamp,
+  runTransaction,
+  getDoc,
 } from "firebase/firestore";
 
 /* ══════════════════════════════════════════════════
@@ -386,6 +388,9 @@ const normalizarConta = (conta) => {
   const status = calcStatus(valorRestante, conta.dataVencimento);
   return { ...conta, valorTotal, valorPago, valorRestante, status };
 };
+
+/* Gera ID sequencial de venda — espelha o padrão de Vendas.jsx */
+const gerarIdVenda = (cnt) => `V${String(cnt + 1).padStart(4, "0")}`;
 
 const FILTROS_STATUS = ["Todos", "pendente", "vencido", "pago"];
 
@@ -884,12 +889,22 @@ export default function AReceber() {
             descontos:        0,
             valorTaxa:        0,
           };
-          const vendaRef = await addDoc(
-            collection(db, "users", tenantUid, "vendas"),
-            vendaMensalidade
-          );
+          /* Gera ID sequencial (V0001…) atômico via transaction —
+             mesmo padrão de Vendas.jsx para manter consistência visual */
+          const novoIdVenda = await runTransaction(db, async (tx) => {
+            const userRef  = doc(db, "users", tenantUid);
+            const userSnap = await tx.get(userRef);
+            const currentCnt = userSnap.data()?.vendaIdCnt || 0;
+            const vendaId    = gerarIdVenda(currentCnt);
+            tx.set(doc(db, "users", tenantUid, "vendas", vendaId), {
+              ...vendaMensalidade,
+              id: vendaId,
+            });
+            tx.set(userRef, { vendaIdCnt: currentCnt + 1 }, { merge: true });
+            return vendaId;
+          });
           origemCaixa     = "venda";
-          referenciaCaixa = vendaRef.id;
+          referenciaCaixa = novoIdVenda;
         } else {
           origemCaixa     = "a_receber";
           referenciaCaixa = conta.id;
