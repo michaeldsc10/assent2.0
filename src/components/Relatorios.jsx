@@ -3140,19 +3140,214 @@ function RelatorioLucroPorPS({ vendas, produtos, servicos, vendedores, intervalo
    RELATÓRIO: ALUNOS
    Lista com situação de pagamento, totais e ticket médio
    ══════════════════════════════════════════════════════ */
+function AlunosGraficos({ alunos, vendas, dados }) {
+  /* ── Matrículas por mês — baseado em criadoEm de cada aluno ── */
+  const matriculasPorMes = useMemo(() => {
+    const map = {};
+    alunos.forEach((a) => {
+      if (!a.criadoEm) return;
+      const key = String(a.criadoEm).slice(0, 7); // "YYYY-MM"
+      if (!map[key]) map[key] = 0;
+      map[key]++;
+    });
+    return Object.entries(map)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, val]) => {
+        const [ano, mes] = key.split("-");
+        return { label: MESES_CURTOS[Number(mes) - 1] + "/" + ano.slice(2), val, qtd: val };
+      });
+  }, [alunos]);
+
+  /* ── Receita de mensalidades por mês — vendas sintéticas ── */
+  const receitaPorMes = useMemo(() => {
+    const map = {};
+    vendas
+      .filter((v) => v.tipoVenda === "mensalidade" && v.status !== "cancelada")
+      .forEach((v) => {
+        const dt = parseDate(v.data);
+        if (!dt) return;
+        const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
+        if (!map[key]) map[key] = { val: 0, qtd: 0 };
+        map[key].val += Number(v.total || 0);
+        map[key].qtd++;
+      });
+    return Object.entries(map)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, v]) => {
+        const [ano, mes] = key.split("-");
+        return { label: MESES_CURTOS[Number(mes) - 1] + "/" + ano.slice(2), ...v };
+      });
+  }, [vendas]);
+
+  /* ── Ticket médio por mês ── */
+  const ticketPorMes = useMemo(() =>
+    receitaPorMes.map((m) => ({ label: m.label, val: m.qtd > 0 ? m.val / m.qtd : 0 })),
+  [receitaPorMes]);
+
+  /* ── Distribuição por situação (para barra) ── */
+  const distribuicao = useMemo(() => {
+    const map = {};
+    dados.linhas.forEach((l) => { map[l.situacao] = (map[l.situacao] || 0) + 1; });
+    return Object.entries(map)
+      .sort((a, b) => b[1] - a[1])
+      .map(([sit, val]) => ({ label: sit, val }));
+  }, [dados.linhas]);
+
+  const totalReceita = receitaPorMes.reduce((s, m) => s + m.val, 0);
+  const totalMeses   = receitaPorMes.length;
+
+  if (alunos.length === 0) {
+    return (
+      <div className="rel-empty">
+        <BarChart2 size={32} />
+        <p>Nenhum aluno matriculado para exibir gráficos.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+
+      {/* KPIs rápidos */}
+      <div className="rv-kpi-row">
+        <div className="rv-kpi-mini">
+          <div className="rv-kpi-mini-accent" style={{ background: "linear-gradient(90deg, var(--gold), transparent)" }} />
+          <div className="rv-kpi-mini-label">Total de Alunos</div>
+          <div className="rv-kpi-mini-val" style={{ color: "var(--gold)" }}>{alunos.length}</div>
+          <div className="rv-kpi-mini-sub">{dados.totalAtivos} ativos</div>
+        </div>
+        <div className="rv-kpi-mini">
+          <div className="rv-kpi-mini-accent" style={{ background: "linear-gradient(90deg, var(--green), transparent)" }} />
+          <div className="rv-kpi-mini-label">Receita Total (histórico)</div>
+          <div className="rv-kpi-mini-val" style={{ color: "var(--green)" }}>{fmtR$(totalReceita)}</div>
+          <div className="rv-kpi-mini-sub">{totalMeses} {totalMeses === 1 ? "mês ativo" : "meses ativos"}</div>
+        </div>
+        <div className="rv-kpi-mini">
+          <div className="rv-kpi-mini-accent" style={{ background: "linear-gradient(90deg, var(--blue), transparent)" }} />
+          <div className="rv-kpi-mini-label">Ticket Médio Mensal</div>
+          <div className="rv-kpi-mini-val" style={{ color: "var(--blue)" }}>
+            {fmtR$(dados.ticketMedio)}
+          </div>
+          <div className="rv-kpi-mini-sub">por aluno ativo</div>
+        </div>
+      </div>
+
+      <div className="rv-charts-grid">
+
+        {/* ── Matrículas por Mês — crescimento ── */}
+        {matriculasPorMes.length > 0 && (
+          <div className="rv-chart-card full">
+            <div className="rv-chart-header">
+              <span className="rv-chart-title">
+                <span className="rv-chart-title-dot" />
+                Novas Matrículas por Mês
+              </span>
+              <span style={{ fontSize: 11, color: "var(--text-3)" }}>
+                {matriculasPorMes.length} {matriculasPorMes.length === 1 ? "mês" : "meses"} · hover para detalhes
+              </span>
+            </div>
+            <div className="rv-chart-body" style={{ paddingTop: 44 }}>
+              <BarChartCSS
+                dados={matriculasPorMes}
+                altura={170}
+                cor="#C8A55E"
+                fmtVal={(v) => `${v} aluno${v !== 1 ? "s" : ""}`}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ── Receita de Mensalidades por Mês ── */}
+        {receitaPorMes.length > 0 && (
+          <div className="rv-chart-card full">
+            <div className="rv-chart-header">
+              <span className="rv-chart-title">
+                <span className="rv-chart-title-dot" style={{ background: "var(--green)" }} />
+                Receita de Mensalidades por Mês
+              </span>
+              <span style={{ fontSize: 11, color: "var(--text-3)" }}>
+                {receitaPorMes.length} {receitaPorMes.length === 1 ? "mês" : "meses"} · hover para detalhes
+              </span>
+            </div>
+            <div className="rv-chart-body" style={{ paddingTop: 44 }}>
+              <BarChartCSS dados={receitaPorMes} altura={170} cor="var(--green)" />
+            </div>
+          </div>
+        )}
+
+        {/* ── Ticket Médio por Mês ── */}
+        {ticketPorMes.length > 0 && (
+          <div className="rv-chart-card">
+            <div className="rv-chart-header">
+              <span className="rv-chart-title">
+                <span className="rv-chart-title-dot" style={{ background: "var(--blue)" }} />
+                Ticket Médio por Mês
+              </span>
+            </div>
+            <div className="rv-chart-body" style={{ paddingTop: 44 }}>
+              <BarChartCSS dados={ticketPorMes} altura={140} cor="var(--blue)" />
+            </div>
+          </div>
+        )}
+
+        {/* ── Distribuição por situação ── */}
+        {distribuicao.length > 0 && (
+          <div className="rv-chart-card">
+            <div className="rv-chart-header">
+              <span className="rv-chart-title">
+                <span className="rv-chart-title-dot" style={{ background: "#9B8AFA" }} />
+                Distribuição por Situação
+              </span>
+            </div>
+            <div className="rv-chart-body">
+              <div className="rv-fp-list">
+                {distribuicao.map((d) => {
+                  const total = dados.linhas.length || 1;
+                  const pct   = (d.val / total) * 100;
+                  const cor   = d.label === "Em dia"   ? "var(--green)"
+                              : d.label === "Vencido"  ? "var(--red)"
+                              : d.label === "Pendente" ? "#F5A623"
+                              : "var(--text-3)";
+                  return (
+                    <div key={d.label} className="rv-fp-item">
+                      <span className="rv-fp-color" style={{ background: cor }} />
+                      <span className="rv-fp-name">{d.label}</span>
+                      <div className="rv-fp-bar-bg" style={{ flex: 1, maxWidth: 180 }}>
+                        <div className="rv-fp-bar-fill"
+                          style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${cor}, ${cor}55)` }} />
+                      </div>
+                      <span className="rv-fp-pct">{pct.toFixed(1)}%</span>
+                      <span style={{ fontSize: 11, color: "var(--text-3)", minWidth: 46, textAlign: "right" }}>
+                        {d.val} aluno{d.val !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   RELATÓRIO: ALUNOS
+   Lista com situação de pagamento, totais e ticket médio
+   ══════════════════════════════════════════════════════ */
 function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
-  /* Filtro de situação ativo — "todos" | "Em dia" | "Vencido" | "Pendente" */
+  const [view, setView]       = useState("lista"); // "lista" | "graficos"
   const [filtroSit, setFiltroSit] = useState("todos");
 
   const dados = useMemo(() => {
-    /* Mensalidades em aberto (a_receber origem=mensalidade) */
     const mensAbertas = aReceber.filter(ar => ar.origem === "mensalidade");
     const mensPorAluno = mensAbertas.reduce((acc, m) => {
       (acc[m.clienteId] = acc[m.clienteId] || []).push(m);
       return acc;
     }, {});
 
-    /* Vendas de mensalidade pagas no período */
     const vendasMens = vendas.filter(v =>
       v.tipoVenda === "mensalidade" &&
       v.status !== "cancelada" &&
@@ -3162,15 +3357,12 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
     const hoje = new Date().toISOString().slice(0, 10);
 
     const linhas = alunos.map(a => {
-      const abertas = mensPorAluno[a.docId] || [];
-      const totalAberto = abertas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
-      const vencidas = abertas.filter(m => (m.dataVencimento || "") < hoje).length;
-      const pagasPeriodo = vendasMens.filter(v => v.clienteId === a.docId);
+      const abertas       = mensPorAluno[a.docId] || [];
+      const totalAberto   = abertas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
+      const vencidas      = abertas.filter(m => (m.dataVencimento || "") < hoje).length;
+      const pagasPeriodo  = vendasMens.filter(v => v.clienteId === a.docId);
       const recebidoPeriodo = pagasPeriodo.reduce((s, v) => s + Number(v.total || 0), 0);
-
-      /* Próximo vencimento em aberto */
-      const proxVenc = abertas
-        .map(m => m.dataVencimento).filter(Boolean).sort()[0] || null;
+      const proxVenc      = abertas.map(m => m.dataVencimento).filter(Boolean).sort()[0] || null;
 
       let situacao = "Em dia";
       if (a.status !== "ativo") situacao = a.status === "trancado" ? "Trancado" : "Inativo";
@@ -3178,9 +3370,9 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
       else if (abertas.length)  situacao = "Pendente";
 
       return {
-        docId:       a.docId,
-        id:          a.idSeq ? `A${String(a.idSeq).padStart(4, "0")}` : "—",
-        nome:        a.nome || "—",
+        docId: a.docId,
+        id:    a.idSeq ? `A${String(a.idSeq).padStart(4, "0")}` : "—",
+        nome:  a.nome || "—",
         documento:   a.documento || "—",
         telefone:    a.telefone  || "—",
         mensalidade: Number(a.valorMensalidade || 0),
@@ -3196,8 +3388,9 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
 
     const totalAtivos   = alunos.filter(a => a.status === "ativo").length;
     const totalInativos = alunos.filter(a => a.status !== "ativo").length;
-    const ticketMedio = totalAtivos > 0
-      ? alunos.filter(a => a.status === "ativo").reduce((s, a) => s + Number(a.valorMensalidade || 0), 0) / totalAtivos
+    const ticketMedio   = totalAtivos > 0
+      ? alunos.filter(a => a.status === "ativo")
+              .reduce((s, a) => s + Number(a.valorMensalidade || 0), 0) / totalAtivos
       : 0;
     const emDia    = linhas.filter(l => l.situacao === "Em dia").length;
     const vencidos = linhas.filter(l => l.situacao === "Vencido").length;
@@ -3206,54 +3399,6 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
     return { linhas, totalAtivos, totalInativos, ticketMedio, emDia, vencidos, pendentes };
   }, [alunos, aReceber, vendas, intervalo]);
 
-  /* ── Dados para gráficos — últimos 12 meses ── */
-  const { chartMatriculas, chartReceita } = useMemo(() => {
-    const hoje = new Date();
-
-    /* Gera array dos últimos 12 meses { key: "YYYY-MM", label: "jan/25" } */
-    const meses = Array.from({ length: 12 }, (_, i) => {
-      const d = new Date(hoje.getFullYear(), hoje.getMonth() - (11 - i), 1);
-      return {
-        key:   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-        label: d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
-      };
-    });
-
-    /* Matrículas: conta alunos criados em cada mês */
-    const contagemAlunos = {};
-    alunos.forEach(a => {
-      if (!a.criadoEm) return;
-      const mesKey = String(a.criadoEm).slice(0, 7);
-      contagemAlunos[mesKey] = (contagemAlunos[mesKey] || 0) + 1;
-    });
-
-    /* Receita: soma vendas sintéticas de mensalidade por mês */
-    const receitaMes = {};
-    vendas
-      .filter(v => v.tipoVenda === "mensalidade" && v.status !== "cancelada")
-      .forEach(v => {
-        const dateStr = typeof v.data === "string"
-          ? v.data
-          : (v.data?.toDate?.()?.toISOString() || "");
-        if (!dateStr) return;
-        const mesKey = dateStr.slice(0, 7);
-        receitaMes[mesKey] = (receitaMes[mesKey] || 0) + Number(v.total || 0);
-      });
-
-    return {
-      chartMatriculas: meses.map(m => ({
-        label: m.label,
-        val:   contagemAlunos[m.key] || 0,
-        qtd:   contagemAlunos[m.key] || 0,
-      })),
-      chartReceita: meses.map(m => ({
-        label: m.label,
-        val:   receitaMes[m.key] || 0,
-      })),
-    };
-  }, [alunos, vendas]);
-
-  /* Aplica filtro de situação */
   const linhasFiltradas = useMemo(() =>
     filtroSit === "todos"
       ? dados.linhas
@@ -3264,7 +3409,7 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
   const handleExport = () => {
     exportarExcel("alunos", [{
       nome: "Alunos",
-      colunas: ["ID", "Nome", "Documento", "Telefone", "Mensalidade", "Situação", "Mens. Abertas", "Vencidas", "Total em Aberto", "Recebido no Período"],
+      colunas: ["ID","Nome","Documento","Telefone","Mensalidade","Situação","Mens. Abertas","Vencidas","Total em Aberto","Recebido no Período"],
       dados: linhasFiltradas.map(l => [
         l.id, l.nome, l.documento, l.telefone,
         l.mensalidade.toFixed(2), l.situacao,
@@ -3274,14 +3419,14 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
     }]);
   };
 
-  /* Helper: pill de situação */
+  /* Pill de situação */
   const SituacaoPill = ({ sit }) => {
     const map = {
-      "Em dia":   { bg: "rgba(74,222,128,.12)",  color: "var(--green)", border: "rgba(74,222,128,.2)"  },
-      "Vencido":  { bg: "rgba(224,82,82,.12)",   color: "var(--red)",   border: "rgba(224,82,82,.25)" },
-      "Pendente": { bg: "rgba(245,166,35,.12)",  color: "#F5A623",      border: "rgba(245,166,35,.25)" },
-      "Trancado": { bg: "var(--s3)",             color: "var(--text-3)",border: "var(--border)"        },
-      "Inativo":  { bg: "var(--s3)",             color: "var(--text-3)",border: "var(--border)"        },
+      "Em dia":   { bg: "rgba(74,222,128,.12)",  color: "var(--green)", border: "rgba(74,222,128,.2)"   },
+      "Vencido":  { bg: "rgba(224,82,82,.12)",   color: "var(--red)",   border: "rgba(224,82,82,.25)"  },
+      "Pendente": { bg: "rgba(245,166,35,.12)",  color: "#F5A623",      border: "rgba(245,166,35,.25)"  },
+      "Trancado": { bg: "var(--s3)",             color: "var(--text-3)",border: "var(--border)"         },
+      "Inativo":  { bg: "var(--s3)",             color: "var(--text-3)",border: "var(--border)"         },
     };
     const s = map[sit] || map["Inativo"];
     return (
@@ -3300,204 +3445,115 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button className="btn-secondary" onClick={handleExport} data-print-hide
-          style={{ fontSize: 12, padding: "6px 14px" }}>
-          <Download size={13} /> Exportar Excel
-        </button>
+
+      {/* ── Toggle Lista / Gráficos (igual ao padrão de Vendas) ── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+        <div className="rv-view-toggle" data-print-hide>
+          <button
+            className={`rv-view-btn ${view === "lista" ? "active" : ""}`}
+            onClick={() => setView("lista")}
+          >
+            <FileText size={14} /> Lista
+          </button>
+          <button
+            className={`rv-view-btn ${view === "graficos" ? "active" : ""}`}
+            onClick={() => setView("graficos")}
+          >
+            <BarChart2 size={14} /> Gráficos
+          </button>
+        </div>
+        {view === "lista" && (
+          <button className="btn-secondary" onClick={handleExport} data-print-hide
+            style={{ fontSize: 12, padding: "6px 14px" }}>
+            <Download size={13} /> Exportar Excel
+          </button>
+        )}
       </div>
 
-      {/* ── KPI cards — clicáveis como filtros ── */}
-      <div className="cr-grid">
-        {/* Total ativos — clique limpa o filtro */}
-        <div
-          onClick={() => setFiltroSit("todos")}
-          style={{
-            cursor: "pointer", borderRadius: 12,
-            border: `2px solid ${filtroSit === "todos" ? "var(--gold)" : "var(--border)"}`,
-            transition: "border-color .15s",
-          }}
-        >
-          <CardResumo icon={<Users size={18} />} label="Alunos Ativos"
-            value={String(dados.totalAtivos)}
-            sub={`${dados.totalInativos} inativos/trancados`}
-            trend="neutral" colorVar="var(--gold)" />
-        </div>
+      {/* ── VISTA: GRÁFICOS ── */}
+      {view === "graficos" && <AlunosGraficos alunos={alunos} vendas={vendas} dados={dados} />}
 
-        <div
-          onClick={() => setFiltroSit(f => f === "Em dia" ? "todos" : "Em dia")}
-          style={{
-            cursor: "pointer", borderRadius: 12,
-            border: `2px solid ${filtroSit === "Em dia" ? "var(--green)" : "var(--border)"}`,
-            transition: "border-color .15s",
-          }}
-        >
-          <CardResumo icon={<TrendingUp size={18} />} label="Em Dia"
-            value={String(dados.emDia)} sub="clique para filtrar"
-            trend="up" colorVar="var(--green)" />
-        </div>
+      {/* ── VISTA: LISTA ── */}
+      {view === "lista" && (
+        <>
+          {/* KPI cards clicáveis */}
+          <div className="cr-grid">
+            <div onClick={() => setFiltroSit("todos")} style={{ cursor: "pointer", borderRadius: 12, border: `2px solid ${filtroSit === "todos" ? "var(--gold)" : "var(--border)"}`, transition: "border-color .15s" }}>
+              <CardResumo icon={<Users size={18} />} label="Alunos Ativos"
+                value={String(dados.totalAtivos)}
+                sub={`${dados.totalInativos} inativos/trancados`}
+                trend="neutral" colorVar="var(--gold)" />
+            </div>
+            <div onClick={() => setFiltroSit(f => f === "Em dia" ? "todos" : "Em dia")} style={{ cursor: "pointer", borderRadius: 12, border: `2px solid ${filtroSit === "Em dia" ? "var(--green)" : "var(--border)"}`, transition: "border-color .15s" }}>
+              <CardResumo icon={<TrendingUp size={18} />} label="Em Dia"
+                value={String(dados.emDia)} sub="clique para filtrar"
+                trend="up" colorVar="var(--green)" />
+            </div>
+            <div onClick={() => setFiltroSit(f => f === "Pendente" ? "todos" : "Pendente")} style={{ cursor: "pointer", borderRadius: 12, border: `2px solid ${filtroSit === "Pendente" ? "#F5A623" : "var(--border)"}`, transition: "border-color .15s" }}>
+              <CardResumo icon={<DollarSign size={18} />} label="Pendentes"
+                value={String(dados.pendentes)} sub="clique para filtrar"
+                trend="neutral" colorVar="#F5A623" />
+            </div>
+            <div onClick={() => setFiltroSit(f => f === "Vencido" ? "todos" : "Vencido")} style={{ cursor: "pointer", borderRadius: 12, border: `2px solid ${filtroSit === "Vencido" ? "var(--red)" : "var(--border)"}`, transition: "border-color .15s" }}>
+              <CardResumo icon={<AlertCircle size={18} />} label="Vencidos"
+                value={String(dados.vencidos)} sub="clique para filtrar"
+                trend="down" colorVar="var(--red)" />
+            </div>
+          </div>
 
-        <div
-          onClick={() => setFiltroSit(f => f === "Pendente" ? "todos" : "Pendente")}
-          style={{
-            cursor: "pointer", borderRadius: 12,
-            border: `2px solid ${filtroSit === "Pendente" ? "#F5A623" : "var(--border)"}`,
-            transition: "border-color .15s",
-          }}
-        >
-          <CardResumo icon={<DollarSign size={18} />} label="Pendentes"
-            value={String(dados.pendentes)} sub="clique para filtrar"
-            trend="neutral" colorVar="#F5A623" />
-        </div>
-
-        <div
-          onClick={() => setFiltroSit(f => f === "Vencido" ? "todos" : "Vencido")}
-          style={{
-            cursor: "pointer", borderRadius: 12,
-            border: `2px solid ${filtroSit === "Vencido" ? "var(--red)" : "var(--border)"}`,
-            transition: "border-color .15s",
-          }}
-        >
-          <CardResumo icon={<AlertCircle size={18} />} label="Vencidos"
-            value={String(dados.vencidos)} sub="clique para filtrar"
-            trend="down" colorVar="var(--red)" />
-        </div>
-      </div>
-
-      {/* ══ Gráficos de Crescimento ══════════════════════════════════════════════════ */}
-      {(chartMatriculas.some(m => m.val > 0) || chartReceita.some(m => m.val > 0)) && (
-        <div className="rv-charts-grid">
-
-          {/* Novas Matrículas por Mês */}
-          {chartMatriculas.some(m => m.val > 0) && (
-            <div className="rv-chart-card">
-              <div className="rv-chart-header">
-                <span className="rv-chart-title">
-                  <span className="rv-chart-title-dot" style={{ background: "var(--gold)" }} />
-                  Novas Matrículas por Mês
-                </span>
-                <span style={{ fontSize: 11, color: "var(--text-3)" }}>
-                  últimos 12 meses
-                </span>
-              </div>
-              <div className="rv-chart-body" style={{ paddingTop: 44 }}>
-                <BarChartCSS
-                  dados={chartMatriculas}
-                  altura={150}
-                  cor="#C8A55E"
-                  fmtVal={(v) => `${v} aluno${v !== 1 ? "s" : ""}`}
-                />
-              </div>
+          {/* Chip de filtro ativo */}
+          {filtroSit !== "todos" && (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--gold)", background: "rgba(200,165,94,.08)", border: "1px solid rgba(200,165,94,.2)", borderRadius: 8, padding: "6px 12px", alignSelf: "flex-start" }}>
+              Filtrando: {filtroSit}
+              <span onClick={() => setFiltroSit("todos")} style={{ cursor: "pointer", textDecoration: "underline", marginLeft: 4 }}>Limpar</span>
             </div>
           )}
 
-          {/* Receita de Mensalidades por Mês */}
-          {chartReceita.some(m => m.val > 0) && (
-            <div className="rv-chart-card">
-              <div className="rv-chart-header">
-                <span className="rv-chart-title">
-                  <span className="rv-chart-title-dot" style={{ background: "var(--green)" }} />
-                  Receita de Mensalidades por Mês
-                </span>
-                <span style={{ fontSize: 11, color: "var(--text-3)" }}>
-                  últimos 12 meses
-                </span>
-              </div>
-              <div className="rv-chart-body" style={{ paddingTop: 44 }}>
-                <BarChartCSS
-                  dados={chartReceita}
-                  altura={150}
-                  cor="var(--green)"
-                />
-              </div>
-            </div>
-          )}
-
-        </div>
-      )}
-
-      {/* ── Tabela inline de alunos — sem TabelaRelatorio para evitar filtro por período ── */}
-      <div style={{
-        background: "var(--s1)", border: "1px solid var(--border)",
-        borderRadius: 12, overflow: "hidden",
-      }}>
-        {/* Header */}
-        <div style={{
-          padding: "13px 18px", borderBottom: "1px solid var(--border)",
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-        }}>
-          <span style={{ fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600, color: "var(--text)", display: "flex", alignItems: "center", gap: 8 }}>
-            <Users size={14} />
-            Alunos matriculados
-            <span style={{ fontSize: 10, background: "var(--s3)", color: "var(--text-3)", padding: "2px 8px", borderRadius: 20, fontWeight: 600 }}>
-              {linhasFiltradas.length}
-            </span>
-            {filtroSit !== "todos" && (
-              <span style={{ fontSize: 10, padding: "2px 10px", borderRadius: 20, background: "rgba(200,165,94,.12)", border: "1px solid rgba(200,165,94,.25)", color: "var(--gold)" }}>
-                Filtro: {filtroSit} · <span onClick={() => setFiltroSit("todos")} style={{ cursor: "pointer", textDecoration: "underline" }}>Limpar</span>
+          {/* Tabela inline */}
+          <div style={{ background: "var(--s1)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ padding: "13px 18px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600, color: "var(--text)", display: "flex", alignItems: "center", gap: 8 }}>
+                <Users size={14} /> Alunos matriculados
+                <span style={{ fontSize: 10, background: "var(--s3)", color: "var(--text-3)", padding: "2px 8px", borderRadius: 20, fontWeight: 600 }}>{linhasFiltradas.length}</span>
               </span>
-            )}
-          </span>
-        </div>
-
-        {/* Cabeçalho das colunas */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "72px 1.4fr 120px 120px 110px 110px 110px",
-          padding: "10px 18px", gap: 8,
-          background: "var(--s2)", borderBottom: "1px solid var(--border)",
-          fontSize: 10, fontWeight: 600, letterSpacing: ".07em",
-          textTransform: "uppercase", color: "var(--text-3)",
-        }}>
-          <span>ID</span>
-          <span>Nome</span>
-          <span>Documento</span>
-          <span>Mensalidade</span>
-          <span>Prox. Venc.</span>
-          <span>Aberto</span>
-          <span>Situação</span>
-        </div>
-
-        {/* Linhas */}
-        {linhasFiltradas.length === 0 ? (
-          <div style={{ padding: "42px 18px", textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>
-            {dados.linhas.length === 0
-              ? "Nenhum aluno matriculado."
-              : `Nenhum aluno com situação "${filtroSit}".`}
+            </div>
+            {/* Cabeçalho */}
+            <div style={{ display: "grid", gridTemplateColumns: "72px 1.4fr 120px 120px 110px 110px 110px", padding: "10px 18px", gap: 8, background: "var(--s2)", borderBottom: "1px solid var(--border)", fontSize: 10, fontWeight: 600, letterSpacing: ".07em", textTransform: "uppercase", color: "var(--text-3)" }}>
+              <span>ID</span><span>Nome</span><span>Documento</span>
+              <span>Mensalidade</span><span>Prox. Venc.</span>
+              <span>Aberto</span><span>Situação</span>
+            </div>
+            {/* Linhas */}
+            {linhasFiltradas.length === 0 ? (
+              <div style={{ padding: "42px 18px", textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>
+                {dados.linhas.length === 0
+                  ? "Nenhum aluno matriculado."
+                  : `Nenhum aluno com situação "${filtroSit}".`}
+              </div>
+            ) : linhasFiltradas.map((l, i) => (
+              <div key={l.docId || i} style={{ display: "grid", gridTemplateColumns: "72px 1.4fr 120px 120px 110px 110px 110px", padding: "11px 18px", gap: 8, borderBottom: i < linhasFiltradas.length - 1 ? "1px solid var(--border)" : "none", alignItems: "center", fontSize: 12, color: "var(--text-2)", transition: "background .13s" }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                <span style={{ fontFamily: "'JetBrains Mono','Courier New',monospace", color: "var(--text-3)", fontSize: 11 }}>{l.id}</span>
+                <span>
+                  <div style={{ color: "var(--text)", fontWeight: 500, fontSize: 13 }}>{l.nome}</div>
+                  {l.telefone !== "—" && <div style={{ color: "var(--text-3)", fontSize: 11 }}>{l.telefone}</div>}
+                </span>
+                <span>{l.documento}</span>
+                <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: "var(--text)" }}>{fmtR$(l.mensalidade)}</span>
+                <span style={{ color: l.situacao === "Vencido" ? "var(--red)" : "var(--text-2)" }}>{fmtDataLocal(l.proxVenc) || (l.abertas === 0 ? "—" : "Pendente")}</span>
+                <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: l.totalAberto > 0 ? "var(--red)" : "var(--text-3)" }}>{fmtR$(l.totalAberto)}</span>
+                <span><SituacaoPill sit={l.situacao} /></span>
+              </div>
+            ))}
           </div>
-        ) : linhasFiltradas.map((l, i) => (
-          <div key={l.docId || i} style={{
-            display: "grid",
-            gridTemplateColumns: "72px 1.4fr 120px 120px 110px 110px 110px",
-            padding: "11px 18px", gap: 8,
-            borderBottom: i < linhasFiltradas.length - 1 ? "1px solid var(--border)" : "none",
-            alignItems: "center", fontSize: 12, color: "var(--text-2)",
-            transition: "background .13s",
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}
-          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-            <span style={{ fontFamily: "'JetBrains Mono','Courier New',monospace", color: "var(--text-3)", fontSize: 11 }}>{l.id}</span>
-            <span>
-              <div style={{ color: "var(--text)", fontWeight: 500, fontSize: 13 }}>{l.nome}</div>
-              {l.telefone !== "—" && <div style={{ color: "var(--text-3)", fontSize: 11 }}>{l.telefone}</div>}
-            </span>
-            <span>{l.documento}</span>
-            <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: "var(--text)" }}>{fmtR$(l.mensalidade)}</span>
-            <span style={{ color: l.situacao === "Vencido" ? "var(--red)" : "var(--text-2)" }}>{fmtDataLocal(l.proxVenc) || (l.abertas === 0 ? "—" : "Pendente")}</span>
-            <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: l.totalAberto > 0 ? "var(--red)" : "var(--text-3)" }}>{fmtR$(l.totalAberto)}</span>
-            <span><SituacaoPill sit={l.situacao} /></span>
-          </div>
-        ))}
-      </div>
+        </>
+      )}
     </div>
   );
 }
 
-/* ══════════════════════════════════════════════════════
-   RELATÓRIO: MENSALIDADES
-   Recebidas, pendentes e inadimplência — todas derivadas
-   dos mesmos lançamentos que alimentam o DRE e Vendas
-   ══════════════════════════════════════════════════════ */
+
 function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
   /* Filtro de view — null = tudo visível */
   const [filtroView, setFiltroView] = useState(null); // null | "recebidas" | "pendentes"
@@ -5272,16 +5328,19 @@ export default function Relatorios() {
       case "dre":        return <RelatorioDRE vendas={vendas} despesas={despesas} caixa={caixa} vendedores={vendedores} intervalo={intervalo} uid={tenantUid} />;
       case "financeiro": return <RelatorioFinanceiro caixa={caixa} despesas={despesas} vendas={vendas} vendedores={vendedores} intervalo={intervalo} />;
       case "vendas":     return <RelatorioVendas vendas={vendas} intervalo={intervalo} />;
-      case "despesas":   return <RelatorioDespesas despesas={despesas} intervalo={intervalo} />;
-      case "estoque":    return <RelatorioEstoque produtos={produtos} />;
       case "clientes":   return <RelatorioClientes clientes={clientes} vendas={vendas} intervalo={intervalo} aReceber={aReceber} />;
-      case "agenda":     return <RelatorioAgenda agenda={agenda} intervalo={intervalo} />;
-      case "lucro_ps":   return <RelatorioLucroPorPS vendas={vendas} produtos={produtos} servicos={servicos} vendedores={vendedores} intervalo={intervalo} />;
-      case "vendedores": return <RelatorioVendedores vendas={vendas} vendedores={vendedores} intervalo={intervalo} />;
-      case "alunos":       return <RelatorioAlunos alunos={alunos} aReceber={aReceber} vendas={vendas} intervalo={intervalo} />;           // ← NOVO
+      case "alunos":       return <RelatorioAlunos alunos={alunos} aReceber={aReceber} vendas={vendas} intervalo={intervalo} />;  
       case "mensalidades": return <RelatorioMensalidades alunos={alunos} aReceber={aReceber} vendas={vendas} caixa={caixa} intervalo={intervalo} />;
       case "rel_compras":        return <RelatorioCompras compras={compras} fornecedores={fornecedores} intervalo={intervalo} />;
       case "rel_contas_receber": return <RelatorioContasReceber aReceber={aReceber} intervalo={intervalo} />;
+      case "despesas":   return <RelatorioDespesas despesas={despesas} intervalo={intervalo} />;
+      case "lucro_ps":   return <RelatorioLucroPorPS vendas={vendas} produtos={produtos} servicos={servicos} vendedores={vendedores} intervalo={intervalo} />;
+      case "estoque":    return <RelatorioEstoque produtos={produtos} />;
+      case "vendedores": return <RelatorioVendedores vendas={vendas} vendedores={vendedores} intervalo={intervalo} />;
+      case "agenda":     return <RelatorioAgenda agenda={agenda} intervalo={intervalo} />;
+     
+      
+     
       default:           return null;
     }
   };
