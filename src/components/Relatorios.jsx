@@ -21,7 +21,7 @@ import {
 import { db } from "../lib/firebase";
 import AuthContext from "../contexts/AuthContext";
 import { Lock } from "lucide-react";
-import { collection, onSnapshot, doc, getDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, getDoc, query, where } from "firebase/firestore";
 
 import FiltroPeriodo, { getIntervalo, dentroDoIntervalo } from "./FiltroPeriodo";
 import CardResumo from "./CardResumo";
@@ -3144,7 +3144,7 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
     /* Mensalidades em aberto (a_receber origem=mensalidade) */
     const mensAbertas = aReceber.filter(ar => ar.origem === "mensalidade");
     const mensPorAluno = mensAbertas.reduce((acc, m) => {
-      (acc[m.alunoId] = acc[m.alunoId] || []).push(m);
+      (acc[m.clienteId] = acc[m.clienteId] || []).push(m);
       return acc;
     }, {});
 
@@ -3161,7 +3161,7 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
       const abertas = mensPorAluno[a.docId] || [];
       const totalAberto = abertas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
       const vencidas = abertas.filter(m => (m.dataVencimento || "") < hoje).length;
-      const pagasPeriodo = vendasMens.filter(v => v.alunoId === a.docId);
+      const pagasPeriodo = vendasMens.filter(v => v.clienteId === a.docId);
       const recebidoPeriodo = pagasPeriodo.reduce((s, v) => s + Number(v.total || 0), 0);
 
       let situacao = "Em dia";
@@ -3293,7 +3293,7 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
     const linhasPendentes = mensAbertas
       .sort((a, b) => (a.dataVencimento || "").localeCompare(b.dataVencimento || ""))
       .map(m => ({
-        aluno:         m.clienteNome || m.alunoNome || "—",
+        aluno:         m.clienteNome || "—",
         mes:           m.mesReferencia || "—",
         vencimento:    m.dataVencimento || "",
         valor:         Number(m.valorRestante || 0),
@@ -3303,7 +3303,7 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
     /* Inadimplência por aluno */
     const porAluno = {};
     mensAbertas.forEach(m => {
-      const id = m.alunoId || m.clienteNome;
+      const id = m.clienteId || m.clienteNome;
       if (!porAluno[id]) porAluno[id] = { aluno: m.clienteNome || m.alunoNome || "—", qtd: 0, total: 0 };
       porAluno[id].qtd   += 1;
       porAluno[id].total += Number(m.valorRestante || 0);
@@ -4823,8 +4823,8 @@ export default function Relatorios() {
         /* Ignorar erro se collection não existir */ () => {}),
       onSnapshot(col("servicos"), (s) => setServicos(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => {}),
-       onSnapshot(col("alunos"),     (s) => setAlunos(s.docs.map((d) => ({ docId: d.id, ...d.data() }))),
-        () => {}),  // ← NOVO
+       onSnapshot(query(col("clientes"), where("perfis", "array-contains", "aluno")), (s) => setAlunos(s.docs.map((d) => ({ docId: d.id, ...d.data() }))),
+        () => {}),  // filtra apenas alunos na coleção unificada /clientes
       onSnapshot(col("eventos"),   (s) => setAgenda(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => {}),
       onSnapshot(col("caixa"),    (s) => setCaixa(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
