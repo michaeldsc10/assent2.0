@@ -183,8 +183,12 @@ const CSS = `
     flex: 1 1 0;
     min-height: 0;
     overflow-y: auto;
+    overflow-x: hidden;
     display: flex;
     flex-direction: column;
+    /* Garante scroll em contextos onde o pai não define altura */
+    max-height: 100dvh;
+    -webkit-overflow-scrolling: touch;
   }
   .desp-container::-webkit-scrollbar { width: 4px; }
   .desp-container::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
@@ -223,6 +227,18 @@ const CSS = `
   .metric-card-amber  { background: rgba(200,165,94,.08);   border-color: rgba(200,165,94,.18); }
   .metric-card-purple { background: rgba(139,92,246,.08);   border-color: rgba(139,92,246,.18); }
   .metric-card-green  { background: rgba(74,186,130,.08);   border-color: rgba(74,186,130,.18); }
+
+  .metric-card.clickable {
+    cursor: pointer;
+    transition: all .15s;
+    user-select: none;
+  }
+  .metric-card.clickable:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  .metric-card.clickable:active { transform: scale(.97); }
+  .metric-card-red.active    { background: rgba(224,82,82,.18);    border-color: rgba(224,82,82,.5); box-shadow: 0 0 0 2px rgba(224,82,82,.15); }
+  .metric-card-amber.active  { background: rgba(200,165,94,.18);   border-color: rgba(200,165,94,.5); box-shadow: 0 0 0 2px rgba(200,165,94,.15); }
+  .metric-card-purple.active { background: rgba(139,92,246,.18);   border-color: rgba(139,92,246,.5); box-shadow: 0 0 0 2px rgba(139,92,246,.15); }
+  .metric-card-green.active  { background: rgba(74,186,130,.18);   border-color: rgba(74,186,130,.5); box-shadow: 0 0 0 2px rgba(74,186,130,.15); }
 
   .metric-icon {
     width: 28px; height: 28px; border-radius: 7px;
@@ -454,7 +470,42 @@ const CSS = `
   .pay-info-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-2); margin-bottom: 6px; }
   .pay-info-row:last-child { margin-bottom: 0; }
   .pay-info-val { font-weight: 600; color: var(--text); }
+
+  /* ── Mobile responsive ── */
+  @media (max-width: 640px) {
+    .desp-container { padding-bottom: 72px; }
+
+    /* Topbar */
+    .desp-topbar { padding: 12px 14px; gap: 10px; }
+    .desp-topbar-title h1 { font-size: 15px; }
+    .desp-topbar-title p  { font-size: 10px; }
+    .desp-search { width: 100%; flex: 1; min-width: 0; }
+    .btn-nova-desp { padding: 7px 12px; font-size: 12px; }
+
+    /* Cards 2×2 */
+    .desp-metrics {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+      padding: 12px 14px;
+    }
+    .metric-card { padding: 10px 12px; }
+    .metric-icon { width: 24px; height: 24px; margin-bottom: 8px; }
+    .metric-label { font-size: 9px; margin-bottom: 3px; }
+    .metric-val   { font-size: 18px; }
+    .metric-sub   { font-size: 10px; }
+
+    /* Filtros */
+    .desp-filters { padding: 0 14px 12px; gap: 6px; }
+    .filter-select { font-size: 11px; padding: 4px 8px; max-width: 130px; }
+    .periodo-custom { flex-wrap: wrap; }
+    .periodo-custom input[type="date"] { font-size: 11px; }
+
+    /* Tabela */
+    .desp-table-wrap { margin: 0 14px 14px; }
+    .desp-table-header { padding: 11px 14px; }
+  }
 `;
+
 
 /* ── Helpers ── */
 const fmtR$ = (v) =>
@@ -1558,7 +1609,17 @@ export default function Despesas({ isPro = false }) {
     }
 
     // Status
-    if (filtroStatus !== "todas") lista = lista.filter(d => d.status === filtroStatus);
+    if (filtroStatus === "em3dias") {
+      lista = lista.filter(d => {
+        if (d.status !== "pendente") return false;
+        const dt = parseDate(d.vencimento);
+        if (!dt) return false;
+        const diff = (dt - hoje()) / (1000 * 60 * 60 * 24);
+        return diff >= 0 && diff <= 3;
+      });
+    } else if (filtroStatus !== "todas") {
+      lista = lista.filter(d => d.status === filtroStatus);
+    }
 
     // Categoria
     if (filtroCategoria !== "todas") lista = lista.filter(d => d.categoria === filtroCategoria);
@@ -1638,7 +1699,11 @@ export default function Despesas({ isPro = false }) {
       {/* Cards de métricas */}
       <BannerLimite total={despesas.length} limite={LIMITES_FREE.despesas} tipo="despesas" isPro={isPro} />
       <div className="desp-metrics">
-        <div className="metric-card metric-card-red">
+        <div
+          className={`metric-card metric-card-red clickable ${filtroStatus === "vencido" ? "active" : ""}`}
+          onClick={() => setFiltroStatus(filtroStatus === "vencido" ? "todas" : "vencido")}
+          title="Filtrar por despesas vencidas"
+        >
           <div className="metric-icon metric-icon-red">
             <AlertCircle size={15} color="var(--red)" />
           </div>
@@ -1647,7 +1712,17 @@ export default function Despesas({ isPro = false }) {
           <div className="metric-sub">despesas em atraso</div>
         </div>
 
-        <div className="metric-card metric-card-amber">
+        <div
+          className={`metric-card metric-card-amber clickable ${filtroStatus === "em3dias" ? "active" : ""}`}
+          onClick={() => {
+            if (filtroStatus === "em3dias") {
+              setFiltroStatus("todas");
+            } else {
+              setFiltroStatus("em3dias");
+            }
+          }}
+          title="Filtrar por despesas vencendo em 3 dias"
+        >
           <div className="metric-icon metric-icon-amber">
             <AlertTriangle size={15} color="var(--gold)" />
           </div>
@@ -1656,7 +1731,11 @@ export default function Despesas({ isPro = false }) {
           <div className="metric-sub">requerem atenção</div>
         </div>
 
-        <div className="metric-card metric-card-purple">
+        <div
+          className={`metric-card metric-card-purple clickable ${filtroStatus === "pendente" ? "active" : ""}`}
+          onClick={() => setFiltroStatus(filtroStatus === "pendente" ? "todas" : "pendente")}
+          title="Filtrar por despesas pendentes"
+        >
           <div className="metric-icon metric-icon-purple">
             <Clock size={15} color="#8b5cf6" />
           </div>
@@ -1665,7 +1744,11 @@ export default function Despesas({ isPro = false }) {
           <div className="metric-sub">a pagar</div>
         </div>
 
-        <div className="metric-card metric-card-green">
+        <div
+          className={`metric-card metric-card-green clickable ${filtroStatus === "pago" ? "active" : ""}`}
+          onClick={() => setFiltroStatus(filtroStatus === "pago" ? "todas" : "pago")}
+          title="Filtrar por despesas pagas"
+        >
           <div className="metric-icon metric-icon-green">
             <TrendingUp size={15} color="var(--green)" />
           </div>
@@ -1681,6 +1764,7 @@ export default function Despesas({ isPro = false }) {
         {[
           { value: "todas",    label: "Todas" },
           { value: "pendente", label: "Pendentes" },
+          { value: "em3dias",  label: "Em 3 dias" },
           { value: "vencido",  label: "Vencidas" },
           { value: "pago",     label: "Pagas" },
         ].map(f => (
