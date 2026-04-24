@@ -24,8 +24,7 @@ import {
   Search, Plus, Edit2, Trash2, X, Users,
   MessageCircle, Calendar, CreditCard, Settings,
   ChevronLeft, CheckCircle, AlertCircle, Clock,
-  Phone, Mail, MapPin, User, FileText, DollarSign, Camera,
-  Instagram,
+  Phone, Mail, MapPin, User, FileText, DollarSign, Camera, AtSign,
 } from "lucide-react";
 
 import AuthContext from "../contexts/AuthContext";
@@ -613,7 +612,7 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
           {/* Instagram — campo opcional */}
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label"><Instagram size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />Instagram</label>
+              <label className="form-label"><AtSign size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />Instagram</label>
               <input type="text" className="form-input"
                 value={form.instagram}
                 onChange={(e) => set("instagram", e.target.value)}
@@ -797,7 +796,7 @@ function ModalDetalheAluno({
             </div>
             {aluno.instagram && (
               <div className="mat-detail-item">
-                <div className="mat-detail-label"><Instagram size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />Instagram</div>
+                <div className="mat-detail-label"><AtSign size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />Instagram</div>
                 <div className="mat-detail-value" style={{ color: "var(--blue)" }}>@{aluno.instagram}</div>
               </div>
             )}
