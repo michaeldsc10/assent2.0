@@ -886,6 +886,9 @@ export default function AReceber() {
             criadoEm:         agora,
             origem:           "mensalidade",
             referenciaCliente: conta.clienteId || null,
+            /* ── Link de volta ao a_receber que originou esta venda sintética.
+               Usado por Vendas.jsx para reverter o pagamento ao cancelar/excluir. ── */
+            aReceberDocId:    conta.id,
             descontos:        0,
             valorTaxa:        0,
           };
