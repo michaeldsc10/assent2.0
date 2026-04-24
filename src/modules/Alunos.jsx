@@ -1,19 +1,20 @@
 /* ═══════════════════════════════════════════════════
    ASSENT v2.0 — Alunos.jsx (Módulo de Matrículas)
    ─────────────────────────────────────────────────
-   Estrutura Firestore:
-     users/{uid}/alunos/{docId}           → cada aluno
-                                            docId = aluno_{ts}_{rand}
-                                            idSeq = sequencial visual A0001…
-                                            fotoUrl = Firebase Storage URL (opcional)
+   Estrutura Firestore (pós-unificação):
+     users/{uid}/clientes/{docId}          → cada aluno (perfis: ["aluno"])
+                                             docId = aluno_{ts}_{rand}
+                                             idSeq = sequencial visual A0001…
+                                             foto  = base64 direto no documento
 
      users/{uid}/a_receber/{autoId}        → mensalidades em aberto
-                                            origem: "mensalidade"
-                                            idSeqMens = M0001…, alunoId, mesReferencia
+                                             origem: "mensalidade"
+                                             idSeqMens = M0001…
+                                             clienteId, mesReferencia
 
-     users/{uid}/vendas/{autoId}           → mensalidades pagas
-                                            categoria: "Mensalidade"
-                                            tipoVenda: "mensalidade"
+     users/{uid}/vendas/{autoId}           → mensalidades pagas (venda sintética)
+                                             categoria: "Mensalidade"
+                                             tipoVenda: "mensalidade"
 
      users/{uid}/config/matriculas         → template mensagem WhatsApp
    ═══════════════════════════════════════════════════ */
@@ -24,6 +25,7 @@ import {
   MessageCircle, Calendar, CreditCard, Settings,
   ChevronLeft, CheckCircle, AlertCircle, Clock,
   Phone, Mail, MapPin, User, FileText, DollarSign, Camera,
+  Instagram,
 } from "lucide-react";
 
 import AuthContext from "../contexts/AuthContext";
@@ -43,10 +45,10 @@ const PERMISSOES_MATRICULAS = {
   admin:       { ver: true,  criar: true,  editar: true,  excluir: true  },
   financeiro:  { ver: true,  criar: false, editar: false, excluir: false },
   comercial:   { ver: true,  criar: true,  editar: true,  excluir: false },
-  operacional: { ver: false,  criar: false,  editar: false,  excluir: false },
+  operacional: { ver: false, criar: false, editar: false, excluir: false },
   vendedor:    { ver: true,  criar: true,  editar: true,  excluir: false },
   compras:     { ver: false, criar: false, editar: false, excluir: false },
-  suporte:     { ver: true,  criar: false, editar: true, excluir: false },
+  suporte:     { ver: true,  criar: false, editar: true,  excluir: false },
 };
 const permMat = (cargo, acao) => PERMISSOES_MATRICULAS[cargo]?.[acao] ?? false;
 
@@ -102,29 +104,26 @@ const parseValorInput = (v) => {
   return d ? Number(d) / 100 : 0;
 };
 
-/* Gerador de docId único — aluno_{timestamp}_{rand5}
-   Zero colisão: vive em subcoleção /alunos, isolada de clientes/produtos/vendas */
+/* Gerador de docId único para alunos na coleção /clientes */
 const gerarDocIdAluno = () =>
   `aluno_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-/* Próximo idSeq visual — puramente display, dentro da subcoleção alunos */
+/* Próximo idSeq visual — puramente display */
 const proximoIdSeq = (alunos) => {
   const max = alunos.reduce((m, a) => Math.max(m, Number(a.idSeq || 0)), 0);
   return max + 1;
 };
-const fmtIdSeq    = (n) => `A${String(n).padStart(4, "0")}`;
+const fmtIdSeq     = (n) => `A${String(n).padStart(4, "0")}`;
 const fmtIdSeqMens = (n) => `M${String(n).padStart(4, "0")}`;
 
 /* YYYY-MM do mês/ano */
 const toMesRef = (ano, mes) => `${ano}-${String(mes).padStart(2, "0")}`;
 
-/* Calcula data de vencimento (YYYY-MM-DD) para um dia X, ano e mês dados.
-   Dia sempre 1–28 (validação de entrada), não precisa de clamp. */
+/* Calcula data de vencimento (YYYY-MM-DD) para um dia X, ano e mês dados. */
 const calcVencimento = (ano, mes /*1-12*/, dia) =>
   `${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
 
-/* Dado um aluno e a data atual, retorna próximo mês (ano, mes) ainda não gerado.
-   Se não há mensalidades, inicia no mês da dataInicio. */
+/* Dado um aluno e a data atual, retorna próximo mês (ano, mes) ainda não gerado. */
 const proximoMesParaGerar = (aluno, mensalidadesDoAluno) => {
   if (!mensalidadesDoAluno.length) {
     const base = aluno.dataInicio
@@ -132,7 +131,6 @@ const proximoMesParaGerar = (aluno, mensalidadesDoAluno) => {
       : new Date();
     return { ano: base.getFullYear(), mes: base.getMonth() + 1 };
   }
-  /* pega o maior mesReferencia e avança 1 mês */
   const ordenadas = [...mensalidadesDoAluno].sort((a, b) =>
     (a.mesReferencia || "").localeCompare(b.mesReferencia || "")
   );
@@ -145,14 +143,13 @@ const proximoMesParaGerar = (aluno, mensalidadesDoAluno) => {
   return { ano, mes };
 };
 
-/* Status visual da mensalidade (pendente/vencendo/vencido) */
+/* Status visual da mensalidade */
 const statusMensalidade = (mens) => {
   const restante = Number(mens.valorRestante ?? 0);
   if (restante <= 0) return "paga";
   const hoje = new Date().toISOString().slice(0, 10);
   const venc = mens.dataVencimento || "";
   if (venc && venc < hoje) return "vencida";
-  /* Vence em até 3 dias = "vencendo" */
   try {
     const dVenc = new Date(venc + "T12:00:00");
     const dHoje = new Date(hoje + "T12:00:00");
@@ -162,14 +159,12 @@ const statusMensalidade = (mens) => {
   return "pendente";
 };
 
-/* Primeiro nome */
 const primeiroNome = (s) => String(s || "").trim().split(/\s+/)[0] || "";
 
 /* ══════════════════════════════════════════════════
    CSS
    ══════════════════════════════════════════════════ */
 const CSS = `
-/* reaproveita padrão Vendas/AReceber */
 .modal-overlay { position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,.78);
   backdrop-filter:blur(5px); display:flex; align-items:center; justify-content:center;
   padding:20px; animation:fadeIn .15s ease; }
@@ -199,7 +194,6 @@ const CSS = `
   display:flex; justify-content:flex-end; gap:10px;
   position:sticky; bottom:0; background:var(--s1); z-index:2; }
 
-/* botões — espelham Vendas */
 .btn-primary { padding:9px 20px; border-radius:9px; background:var(--gold); color:#0a0808;
   border:none; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600;
   transition:opacity .13s, transform .1s; display:flex; align-items:center; gap:6px; }
@@ -234,7 +228,6 @@ const CSS = `
 .btn-icon-view { color:var(--text-2); }
 .btn-icon-view:hover { background:var(--s3); border-color:var(--border-h); }
 
-/* forms — Vendas */
 .form-group { margin-bottom:16px; }
 .form-label { display:block; font-size:10px; font-weight:600;
   letter-spacing:.07em; text-transform:uppercase;
@@ -252,7 +245,6 @@ const CSS = `
 .form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 .form-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
 
-/* ── Módulo Matrículas ── */
 .mat-root { display:flex; flex-direction:column; height:100%; min-height:0; overflow:hidden; }
 .mat-topbar { padding:14px 22px; background:var(--s1); border-bottom:1px solid var(--border);
   display:flex; align-items:center; justify-content:space-between; gap:14px; flex-shrink:0; }
@@ -265,7 +257,6 @@ const CSS = `
 .mat-content::-webkit-scrollbar { width:3px; }
 .mat-content::-webkit-scrollbar-thumb { background:var(--text-3); border-radius:2px; }
 
-/* cards */
 .mat-cards { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; }
 .mat-card { background:var(--s1); border:1px solid var(--border); border-radius:12px;
   padding:16px 18px; display:flex; flex-direction:column; gap:6px; }
@@ -277,7 +268,6 @@ const CSS = `
 .mat-card-value .ok { color:var(--green); }
 .mat-card-value .sep { color:var(--text-3); font-size:16px; font-weight:400; }
 
-/* busca + filtro */
 .mat-filters { display:flex; gap:10px; align-items:center; }
 .mat-search { flex:1; position:relative; }
 .mat-search svg { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-3); }
@@ -291,7 +281,6 @@ const CSS = `
   color:var(--text); font-size:13px; font-family:'DM Sans',sans-serif; outline:none;
   min-width:170px; cursor:pointer; }
 
-/* tabela */
 .mat-table-wrap { background:var(--s1); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
 .mat-table-header { padding:14px 18px; border-bottom:1px solid var(--border);
   display:flex; align-items:center; justify-content:space-between; gap:12px; }
@@ -313,7 +302,6 @@ const CSS = `
 .mat-valor { font-family:'JetBrains Mono','Courier New',monospace; color:var(--text); }
 .mat-actions-cell { display:flex; justify-content:flex-end; gap:4px; }
 
-/* status pill */
 .mat-pill { display:inline-flex; align-items:center; gap:5px;
   padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; }
 .mat-pill.ok { background:rgba(74,222,128,.12); color:var(--green); border:1px solid rgba(74,222,128,.2); }
@@ -321,8 +309,6 @@ const CSS = `
 .mat-pill.danger { background:rgba(224,82,82,.12); color:var(--red); border:1px solid rgba(224,82,82,.25); }
 .mat-pill.neutral { background:var(--s3); color:var(--text-3); border:1px solid var(--border); }
 
-
-/* ── foto do aluno ── */
 .aluno-avatar { width:36px; height:36px; border-radius:50%; object-fit:cover;
   border:1.5px solid var(--border-h); flex-shrink:0; }
 .aluno-avatar-placeholder { width:36px; height:36px; border-radius:50%;
@@ -345,7 +331,6 @@ const CSS = `
 .foto-picker-info { font-size:12px; color:var(--text-2); line-height:1.6; }
 .foto-picker-info strong { color:var(--text); display:block; margin-bottom:2px; }
 
-/* ── lightbox foto ── */
 .foto-lightbox { position:fixed; inset:0; z-index:1300; background:rgba(0,0,0,.92);
   backdrop-filter:blur(8px); display:flex; flex-direction:column;
   align-items:center; justify-content:center; gap:20px; animation:fadeIn .15s ease; }
@@ -354,7 +339,6 @@ const CSS = `
   box-shadow:0 0 80px rgba(212,175,55,.25); }
 .foto-lightbox-actions { display:flex; gap:10px; }
 
-/* ── crop modal ── */
 .crop-overlay { position:fixed; inset:0; z-index:1200; background:rgba(0,0,0,.88);
   backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; }
 .crop-box { background:var(--s1); border:1px solid var(--border-h); border-radius:18px;
@@ -365,8 +349,7 @@ const CSS = `
   position:relative; cursor:grab; border:3px solid var(--gold);
   background:#111; user-select:none; }
 .crop-stage:active { cursor:grabbing; }
-.crop-stage img { position:absolute; transform-origin:center center;
-  pointer-events:none; }
+.crop-stage img { position:absolute; transform-origin:center center; pointer-events:none; }
 .crop-hint { font-size:11px; color:var(--text-3); text-align:center; line-height:1.6; }
 .crop-zoom { display:flex; align-items:center; gap:10px; width:100%; }
 .crop-zoom input[type=range] { flex:1; accent-color:var(--gold); }
@@ -375,11 +358,9 @@ const CSS = `
 .crop-footer .btn-primary { flex:1; justify-content:center; }
 .crop-footer .btn-secondary { justify-content:center; }
 
-
 .mat-empty { padding:42px 18px; text-align:center; color:var(--text-3); font-size:13px; }
 .mat-empty svg { margin-bottom:8px; }
 
-/* filtros rapidos cobranca */
 .mat-quick-filters { display:flex; gap:7px; flex-wrap:wrap; margin-top:10px; }
 .mat-qbtn { display:inline-flex; align-items:center; gap:5px; padding:5px 13px;
   border-radius:20px; font-size:12px; font-weight:600; cursor:pointer;
@@ -390,12 +371,10 @@ const CSS = `
 .mat-qbtn.active-danger { background:rgba(224,82,82,.13); color:var(--red); border-color:rgba(224,82,82,.35); }
 .mat-qbtn.active-neutral { background:var(--s2); color:var(--text); border-color:var(--border-h); }
 
-/* header clicavel de ordenacao */
 .mat-col-sort { cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:4px; }
 .mat-col-sort:hover { color:var(--text-2); }
 .mat-sort-icon { font-size:10px; color:var(--gold); }
 
-/* detalhe do aluno */
 .mat-detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px; }
 .mat-detail-item { background:var(--s2); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
 .mat-detail-label { font-size:10px; font-weight:600; letter-spacing:.07em;
@@ -404,7 +383,6 @@ const CSS = `
 .mat-section-title { font-family:'Sora',sans-serif; font-size:13px; font-weight:600;
   color:var(--text); margin:4px 0 12px; display:flex; align-items:center; gap:7px; }
 
-/* lista mensalidades dentro do modal */
 .mat-mens-list { display:flex; flex-direction:column; border:1px solid var(--border);
   border-radius:10px; overflow:hidden; }
 .mat-mens-row { display:grid; grid-template-columns: 1fr 110px 110px 100px 60px;
@@ -435,12 +413,13 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
   const isEdit = !!aluno;
 
   const [form, setForm] = useState({
-    nome:           aluno?.nome           || "",
-    documento:      aluno?.documento      || "",
-    telefone:       aluno?.telefone       || "",
-    email:          aluno?.email          || "",
-    dataNascimento: aluno?.dataNascimento || "",
-    endereco:       aluno?.endereco       || "",
+    nome:                aluno?.nome                || "",
+    documento:           aluno?.documento           || "",
+    telefone:            aluno?.telefone            || "",
+    email:               aluno?.email               || "",
+    instagram:           aluno?.instagram           || "",
+    dataNascimento:      aluno?.dataNascimento      || "",
+    endereco:            aluno?.endereco            || "",
     responsavel:         aluno?.responsavel         || "",
     telefoneResponsavel: aluno?.telefoneResponsavel || "",
     valorMensalidade: aluno
@@ -453,10 +432,10 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
   });
   const [erros, setErros] = useState({});
 
-  /* ── Foto (base64, igual a Produtos) ── */
-  const [fotoBase64, setFotoBase64]   = useState(aluno?.foto || null);
-  const [cropSrc, setCropSrc]         = useState(null); // blob URL para o crop modal
-  const [viewerOpen, setViewerOpen]   = useState(false);  // lightbox
+  /* ── Foto (base64) ── */
+  const [fotoBase64, setFotoBase64] = useState(aluno?.foto || null);
+  const [cropSrc, setCropSrc]       = useState(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
   const fileInputRef = useRef(null);
 
   const handleFotoChange = (e) => {
@@ -497,7 +476,7 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
     if (!form.dataInicio)
       e.dataInicio = "Data de início é obrigatória.";
 
-    /* documento duplicado (exceto o próprio aluno em edição) */
+    /* Documento duplicado (exceto o próprio aluno em edição) */
     const duplicado = alunosExistentes.find(a =>
       a.docId !== aluno?.docId &&
       onlyDigits(a.documento) === docDigits
@@ -515,6 +494,7 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
       documento:           form.documento.trim(),
       telefone:            form.telefone.trim(),
       email:               form.email.trim(),
+      instagram:           form.instagram.trim().replace(/^@/, ""),
       dataNascimento:      form.dataNascimento,
       endereco:            form.endereco.trim(),
       responsavel:         form.responsavel.trim(),
@@ -524,7 +504,7 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
       dataInicio:          form.dataInicio,
       status:              form.status,
       observacoes:         form.observacoes.trim(),
-      _fotoFile:           fotoBase64, // base64 (vai direto no documento Firestore)
+      _fotoFile:           fotoBase64,
     });
   };
 
@@ -568,7 +548,6 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
               style={{ display: "none" }} onChange={handleFotoChange} />
           </div>
 
-          {/* — Lightbox visualizador — */}
           {viewerOpen && fotoBase64 && (
             <FotoLightbox
               src={fotoBase64}
@@ -578,7 +557,6 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
             />
           )}
 
-          {/* — Crop modal — */}
           {cropSrc && (
             <ModalCropFoto
               src={cropSrc}
@@ -607,7 +585,6 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
                 placeholder="000.000.000-00" maxLength={14} />
               {erros.documento && <div className="form-error">{erros.documento}</div>}
             </div>
-
             <div className="form-group">
               <label className="form-label">Data de nascimento</label>
               <input type="date" className="form-input"
@@ -633,14 +610,24 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
             </div>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">Endereço</label>
-            <input type="text" className="form-input"
-              value={form.endereco} onChange={(e) => set("endereco", e.target.value)}
-              placeholder="Rua, número, bairro, cidade" />
+          {/* Instagram — campo opcional */}
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label"><Instagram size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />Instagram</label>
+              <input type="text" className="form-input"
+                value={form.instagram}
+                onChange={(e) => set("instagram", e.target.value)}
+                placeholder="@usuario (opcional)" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Endereço</label>
+              <input type="text" className="form-input"
+                value={form.endereco} onChange={(e) => set("endereco", e.target.value)}
+                placeholder="Rua, número, bairro, cidade" />
+            </div>
           </div>
 
-          {/* — Responsável (opcional) — */}
+          {/* — Responsável — */}
           <div className="mat-section-title" style={{ marginTop: 8 }}>
             <User size={14} /> Responsável (opcional, caso menor de idade)
           </div>
@@ -730,14 +717,12 @@ function ModalDetalheAluno({
   onClose, onEditar, onExcluir, onGerarMensalidade,
   podeEditar, podeExcluir, onVerFoto,
 }) {
-  /* Monta link de WhatsApp com template da config */
   const cobrarWhatsApp = (mensAlvo) => {
     const numero = onlyDigits(aluno.telefone || aluno.telefoneResponsavel || "");
     if (!numero || numero.length < 10) {
       alert("Este aluno não tem telefone válido cadastrado.");
       return;
     }
-    /* Pega a próxima mensalidade pendente, ou a específica se vier no parâmetro */
     const alvo = mensAlvo || mensalidades
       .filter(m => Number(m.valorRestante || 0) > 0)
       .sort((a, b) => (a.dataVencimento || "").localeCompare(b.dataVencimento || ""))[0];
@@ -768,10 +753,10 @@ function ModalDetalheAluno({
 
   const resumo = useMemo(() => {
     const abertas = mensalidades.filter(m => Number(m.valorRestante || 0) > 0);
-    const pagas = mensalidades.filter(m => Number(m.valorRestante || 0) <= 0);
+    const pagas   = mensalidades.filter(m => Number(m.valorRestante || 0) <= 0);
     const totalAberto = abertas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
-    const totalPago = pagas.reduce((s, m) => s + Number(m.valorPago || m.valorTotal || 0), 0);
-    const vencidas = abertas.filter(m => statusMensalidade(m) === "vencida").length;
+    const totalPago   = pagas.reduce((s, m) => s + Number(m.valorPago || m.valorTotal || 0), 0);
+    const vencidas    = abertas.filter(m => statusMensalidade(m) === "vencida").length;
     return { abertas: abertas.length, pagas: pagas.length, totalAberto, totalPago, vencidas };
   }, [mensalidades]);
 
@@ -780,7 +765,7 @@ function ModalDetalheAluno({
       <div className="modal-box modal-box-xl">
         <div className="modal-header">
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-{aluno.foto
+            {aluno.foto
               ? <img src={aluno.foto} alt={aluno.nome}
                   style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--border-h)", flexShrink: 0, cursor: onVerFoto ? "zoom-in" : "default" }}
                   onClick={() => onVerFoto?.(aluno.foto)}
@@ -801,7 +786,6 @@ function ModalDetalheAluno({
         </div>
 
         <div className="modal-body">
-          {/* — Grid de dados — */}
           <div className="mat-detail-grid">
             <div className="mat-detail-item">
               <div className="mat-detail-label"><Phone size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />Telefone</div>
@@ -811,6 +795,12 @@ function ModalDetalheAluno({
               <div className="mat-detail-label"><Mail size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />Email</div>
               <div className="mat-detail-value">{aluno.email || "—"}</div>
             </div>
+            {aluno.instagram && (
+              <div className="mat-detail-item">
+                <div className="mat-detail-label"><Instagram size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />Instagram</div>
+                <div className="mat-detail-value" style={{ color: "var(--blue)" }}>@{aluno.instagram}</div>
+              </div>
+            )}
             <div className="mat-detail-item">
               <div className="mat-detail-label"><DollarSign size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />Mensalidade</div>
               <div className="mat-detail-value">{fmtR$(aluno.valorMensalidade)}</div>
@@ -844,9 +834,7 @@ function ModalDetalheAluno({
 
           {/* — Resumo mensalidades — */}
           <div className="mat-section-title"><FileText size={14} /> Mensalidades</div>
-          <div style={{
-            display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14,
-          }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14 }}>
             <div className="mat-detail-item">
               <div className="mat-detail-label">Abertas</div>
               <div className="mat-detail-value" style={{ color: resumo.vencidas > 0 ? "var(--red)" : undefined }}>
@@ -875,7 +863,6 @@ function ModalDetalheAluno({
               <span>STATUS</span>
               <span></span>
             </div>
-
             {mensOrdenadas.length === 0 ? (
               <div className="mat-empty">
                 <Calendar size={24} color="var(--text-3)" />
@@ -946,7 +933,7 @@ function ModalDetalheAluno({
 }
 
 /* ══════════════════════════════════════════════════
-   MODAL: Configurações do módulo (template WhatsApp)
+   MODAL: Configurações (template WhatsApp)
    ══════════════════════════════════════════════════ */
 function ModalConfigMatriculas({ config, onSave, onClose }) {
   const [mensagem, setMensagem] = useState(config?.mensagemWhatsApp || MSG_WHATSAPP_DEFAULT);
@@ -972,7 +959,6 @@ function ModalConfigMatriculas({ config, onSave, onClose }) {
           </div>
           <button className="modal-close" onClick={onClose}><X size={16} /></button>
         </div>
-
         <div className="modal-body">
           <div className="form-group">
             <label className="form-label">Mensagem de cobrança</label>
@@ -986,7 +972,6 @@ function ModalConfigMatriculas({ config, onSave, onClose }) {
             </div>
           </div>
         </div>
-
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn-primary" onClick={handleSave} disabled={salvando}>
@@ -1040,7 +1025,6 @@ function ModalExcluirAluno({ aluno, mensQtd, onConfirm, onClose }) {
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════════════════════ */
 export default function Alunos() {
-  /* ── Auth via contexto (padrão ASSENT) ── */
   const { user, cargo, tenantUid, nomeUsuario } = useContext(AuthContext);
 
   const podeVer     = permMat(cargo, "ver");
@@ -1048,38 +1032,41 @@ export default function Alunos() {
   const podeEditar  = permMat(cargo, "editar");
   const podeExcluir = permMat(cargo, "excluir");
 
-  const [alunos, setAlunos] = useState([]);
-  const [mensalidades, setMensalidades] = useState([]); // a_receber com origem="mensalidade"
-  const [config, setConfig] = useState({ mensagemWhatsApp: MSG_WHATSAPP_DEFAULT });
+  const [alunos, setAlunos]           = useState([]);
+  const [mensalidades, setMensalidades] = useState([]);
+  const [config, setConfig]           = useState({ mensagemWhatsApp: MSG_WHATSAPP_DEFAULT });
+  const [loading, setLoading]         = useState(true);
 
-  const [loading, setLoading] = useState(true);
+  const [modalNovo, setModalNovo]     = useState(false);
+  const [editando, setEditando]       = useState(null);
+  const [detalhe, setDetalhe]         = useState(null);
+  const [excluindo, setExcluindo]     = useState(null);
+  const [modalConfig, setModalConfig] = useState(false);
 
-  const [modalNovo, setModalNovo]       = useState(false);
-  const [editando, setEditando]         = useState(null);
-  const [detalhe, setDetalhe]           = useState(null);
-  const [excluindo, setExcluindo]       = useState(null);
-  const [modalConfig, setModalConfig]   = useState(false);
-
-  const [search, setSearch]   = useState("");
+  const [search, setSearch]           = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
-  const [sortDir, setSortDir] = useState("asc"); // "asc" | "desc"
-  const [fotoVisualizando, setFotoVisualizando] = useState(null); // lightbox read-only
+  const [sortDir, setSortDir]         = useState("asc");
+  const [fotoVisualizando, setFotoVisualizando] = useState(null);
 
   const toggleSort = () => setSortDir(d => d === "asc" ? "desc" : "asc");
 
   /* ═══════════════════════════════════════════════════
-     Firestore listeners — segue padrão multi-tenant
+     Firestore listeners — lê /clientes filtrando por perfis
      ═══════════════════════════════════════════════════ */
   useEffect(() => {
     if (!tenantUid) { setLoading(false); return; }
 
     setLoading(true);
 
-    const alunosCol = collection(db, "users", tenantUid, "alunos");
+    /* Query: apenas documentos com perfis contendo "aluno" */
+    const alunosQuery = query(
+      collection(db, "users", tenantUid, "clientes"),
+      where("perfis", "array-contains", "aluno")
+    );
     const arCol     = collection(db, "users", tenantUid, "a_receber");
     const configRef = doc(db, "users", tenantUid, "config", "matriculas");
 
-    const unsub1 = onSnapshot(alunosCol, (snap) => {
+    const unsub1 = onSnapshot(alunosQuery, (snap) => {
       setAlunos(snap.docs.map(d => ({ docId: d.id, ...d.data() })));
       setLoading(false);
     }, () => setLoading(false));
@@ -1090,7 +1077,6 @@ export default function Alunos() {
       setMensalidades(all.filter(a => a.origem === "mensalidade"));
     }, () => {});
 
-    /* Config do módulo (template WhatsApp) */
     getDoc(configRef).then(s => {
       if (s.exists()) setConfig({ mensagemWhatsApp: MSG_WHATSAPP_DEFAULT, ...s.data() });
     }).catch(() => {});
@@ -1106,22 +1092,17 @@ export default function Alunos() {
 
     try {
       if (editando) {
-        /* EDITAR — atualiza campos do aluno */
-        const { _fotoFile, ...dadosLimpos } = dados; // _fotoFile = base64 string | null | undefined
+        /* EDITAR */
+        const { _fotoFile, ...dadosLimpos } = dados;
+        if (_fotoFile !== undefined) dadosLimpos.foto = _fotoFile;
 
-        /* Foto base64 — já está em _fotoFile como string base64 ou null */
-        if (_fotoFile !== undefined) dadosLimpos.foto = _fotoFile; // null = remover
-
-        const ref = doc(db, "users", tenantUid, "alunos", editando.docId);
+        const ref = doc(db, "users", tenantUid, "clientes", editando.docId);
         await updateDoc(ref, { ...dadosLimpos, atualizadoEm: new Date().toISOString() });
 
-        /* ── Propaga mudanças para mensalidades em aberto ──
-           Se diaVencimento ou valorMensalidade mudaram, atualiza
-           todos os registros de a_receber ainda não pagos. */
+        /* Propaga mudanças de dia/valor para mensalidades em aberto */
         const mensDoAluno = mensalidades.filter(
-          m => m.alunoId === editando.docId && Number(m.valorRestante || 0) > 0
+          m => m.clienteId === editando.docId && Number(m.valorRestante || 0) > 0
         );
-
         const diaChanged   = Number(dados.diaVencimento)   !== Number(editando.diaVencimento);
         const valorChanged = Number(dados.valorMensalidade) !== Number(editando.valorMensalidade);
 
@@ -1129,7 +1110,6 @@ export default function Alunos() {
           const agora = new Date().toISOString();
           await Promise.all(mensDoAluno.map(m => {
             const updates = { dataAtualizacao: agora };
-
             if (diaChanged && m.mesReferencia) {
               const [ano, mes] = m.mesReferencia.split("-").map(Number);
               updates.dataVencimento = calcVencimento(
@@ -1137,14 +1117,11 @@ export default function Alunos() {
                 Math.min(28, Math.max(1, Number(dados.diaVencimento)))
               );
             }
-
             if (valorChanged && Number(m.valorPago || 0) === 0) {
-              /* só recalcula se ainda não houve nenhum pagamento parcial */
               updates.valorTotal    = Number(dados.valorMensalidade);
               updates.valorRestante = Number(dados.valorMensalidade);
               updates.descricao     = `Mensalidade ${m.mesReferencia} — ${dados.nome}`;
             }
-
             return updateDoc(doc(db, "users", tenantUid, "a_receber", m.id), updates);
           }));
         }
@@ -1156,23 +1133,24 @@ export default function Alunos() {
         });
         setEditando(null);
       } else {
-        /* CRIAR — gera docId único e idSeq sequencial */
+        /* CRIAR */
         const docId = gerarDocIdAluno();
         const idSeq = proximoIdSeq(alunos);
         const agora = new Date().toISOString();
-        const { _fotoFile: _ff, ...dadosCriar } = dados; // _ff = base64 string | null
-
-        /* Foto base64 — já está em _ff como string ou null */
+        const { _fotoFile: _ff, ...dadosCriar } = dados;
         if (_ff) dadosCriar.foto = _ff;
 
-        await setDoc(doc(db, "users", tenantUid, "alunos", docId), {
-          docId, idSeq,
+        /* Grava em /clientes com perfis: ["aluno"] */
+        await setDoc(doc(db, "users", tenantUid, "clientes", docId), {
+          docId,
+          idSeq,
+          idSeqFmt: fmtIdSeq(idSeq), // "A0001" — usado em Clientes.jsx e Relatórios
+          perfis: ["aluno"],
           ...dadosCriar,
           criadoEm: agora,
           atualizadoEm: agora,
         });
 
-        /* Cria primeira mensalidade em a_receber */
         await gerarMensalidadeEmAberto({
           tenantUid,
           aluno: { docId, idSeq, ...dados },
@@ -1197,14 +1175,13 @@ export default function Alunos() {
      ═══════════════════════════════════════════════════ */
   const handleGerarMensalidade = async (aluno) => {
     if (!tenantUid) return;
-    const doAluno = mensalidades.filter(m => m.alunoId === aluno.docId);
+    const doAluno = mensalidades.filter(m => m.clienteId === aluno.docId);
     try {
       const mensCriada = await gerarMensalidadeEmAberto({
         tenantUid,
         aluno,
         mensalidadesDoAluno: doAluno,
       });
-
       if (mensCriada) {
         await logAction({
           tenantUid, nomeUsuario, cargo,
@@ -1219,19 +1196,18 @@ export default function Alunos() {
   };
 
   /* ═══════════════════════════════════════════════════
-     Excluir aluno — remove aluno + mensalidades em aberto
-     (mantém registros já pagos em Vendas/Caixa)
+     Excluir aluno — remove doc em /clientes + mensalidades em aberto
      ═══════════════════════════════════════════════════ */
   const handleExcluirAluno = async () => {
     if (!tenantUid || !excluindo) return;
     try {
       /* 1. Remove mensalidades em aberto (a_receber) */
-      const abertas = mensalidades.filter(m => m.alunoId === excluindo.docId);
+      const abertas = mensalidades.filter(m => m.clienteId === excluindo.docId);
       await Promise.all(
         abertas.map(m => deleteDoc(doc(db, "users", tenantUid, "a_receber", m.id)))
       );
-      /* 2. Remove o aluno */
-      await deleteDoc(doc(db, "users", tenantUid, "alunos", excluindo.docId));
+      /* 2. Remove o aluno de /clientes */
+      await deleteDoc(doc(db, "users", tenantUid, "clientes", excluindo.docId));
 
       await logAction({
         tenantUid, nomeUsuario, cargo,
@@ -1274,7 +1250,7 @@ export default function Alunos() {
      ═══════════════════════════════════════════════════ */
   const alunosComStatus = useMemo(() => {
     return alunos.map(a => {
-      const suas = mensalidades.filter(m => m.alunoId === a.docId);
+      const suas   = mensalidades.filter(m => m.clienteId === a.docId);
       const abertas = suas.filter(m => Number(m.valorRestante || 0) > 0);
       const proxVenc = abertas
         .map(m => m.dataVencimento)
@@ -1293,11 +1269,11 @@ export default function Alunos() {
     const q = search.trim().toLowerCase();
     return alunosComStatus.filter(a => {
       if (statusFilter !== "todos") {
-        if (statusFilter === "ativos"    && a.status !== "ativo")        return false;
-        if (statusFilter === "inativos"  && a.status === "ativo")        return false;
-        if (statusFilter === "em_dia"    && a._situacao !== "em_dia")    return false;
-        if (statusFilter === "vencendo"  && a._situacao !== "vencendo")  return false;
-        if (statusFilter === "vencidos"  && a._situacao !== "vencido")   return false;
+        if (statusFilter === "ativos"   && a.status !== "ativo")       return false;
+        if (statusFilter === "inativos" && a.status === "ativo")       return false;
+        if (statusFilter === "em_dia"   && a._situacao !== "em_dia")   return false;
+        if (statusFilter === "vencendo" && a._situacao !== "vencendo") return false;
+        if (statusFilter === "vencidos" && a._situacao !== "vencido")  return false;
       }
       if (!q) return true;
       return (
@@ -1312,16 +1288,13 @@ export default function Alunos() {
   }, [alunosComStatus, search, statusFilter, sortDir]);
 
   const kpis = useMemo(() => {
-    const total = alunos.filter(a => a.status === "ativo").length;
+    const total    = alunos.filter(a => a.status === "ativo").length;
     const emDia    = alunosComStatus.filter(a => a.status === "ativo" && a._situacao === "em_dia").length;
     const vencendo = alunosComStatus.filter(a => a.status === "ativo" && a._situacao === "vencendo").length;
     const vencidos = alunosComStatus.filter(a => a.status === "ativo" && a._situacao === "vencido").length;
     return { total, emDia, vencendo, vencidos };
   }, [alunos, alunosComStatus]);
 
-  /* ═══════════════════════════════════════════════════
-     Permissão de acesso
-     ═══════════════════════════════════════════════════ */
   if (!tenantUid) {
     return <div className="mat-empty">Carregando autenticação…</div>;
   }
@@ -1334,18 +1307,14 @@ export default function Alunos() {
     );
   }
 
-  /* ═══════════════════════════════════════════════════
-     Render
-     ═══════════════════════════════════════════════════ */
   return (
     <>
       <style>{CSS}</style>
-
       <div className="mat-root">
-        {/* Topbar */}
+
         <header className="mat-topbar">
           <div>
-            <h1>Módulo de Matrículas <span style={{ fontSize: 11, color: "var(--text-3)", fontWeight: 400 }}>v1.0</span></h1>
+            <h1>Módulo de Matrículas <span style={{ fontSize: 11, color: "var(--text-3)", fontWeight: 400 }}>v2.0</span></h1>
             <p>Gestão de alunos, mensalidades e cobrança integrada</p>
           </div>
           <div className="mat-actions">
@@ -1408,7 +1377,6 @@ export default function Alunos() {
                 </select>
               </div>
 
-              {/* Filtros rápidos para cobrança via WhatsApp */}
               <div className="mat-quick-filters">
                 <span style={{ fontSize: 11, color: "var(--text-3)", alignSelf: "center", marginRight: 2 }}>Filtro rápido:</span>
                 <button
@@ -1456,8 +1424,7 @@ export default function Alunos() {
                 <span className="mat-id">{fmtIdSeq(a.idSeq)}</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   {a.foto
-                    ? <img
-                        src={a.foto} alt={a.nome} className="aluno-avatar"
+                    ? <img src={a.foto} alt={a.nome} className="aluno-avatar"
                         style={{ cursor: "zoom-in" }}
                         onClick={(e) => { e.stopPropagation(); setFotoVisualizando(a.foto); }}
                         title="Ver foto"
@@ -1520,7 +1487,7 @@ export default function Alunos() {
       {detalhe && (
         <ModalDetalheAluno
           aluno={detalhe}
-          mensalidades={mensalidades.filter(m => m.alunoId === detalhe.docId)}
+          mensalidades={mensalidades.filter(m => m.clienteId === detalhe.docId)}
           config={config}
           onClose={() => setDetalhe(null)}
           onEditar={(a)     => { setDetalhe(null); setEditando(a); }}
@@ -1534,7 +1501,7 @@ export default function Alunos() {
       {excluindo && (
         <ModalExcluirAluno
           aluno={excluindo}
-          mensQtd={mensalidades.filter(m => m.alunoId === excluindo.docId).length}
+          mensQtd={mensalidades.filter(m => m.clienteId === excluindo.docId).length}
           onConfirm={handleExcluirAluno}
           onClose={() => setExcluindo(null)}
         />
@@ -1547,7 +1514,6 @@ export default function Alunos() {
         />
       )}
 
-      {/* Lightbox read-only (tabela + modal detalhe) */}
       {fotoVisualizando && (
         <FotoLightbox
           src={fotoVisualizando}
@@ -1558,7 +1524,6 @@ export default function Alunos() {
     </>
   );
 }
-
 
 /* ══════════════════════════════════════════════════════════════════════
    LIGHTBOX: Visualizador de foto do aluno
@@ -1596,17 +1561,16 @@ function FotoLightbox({ src, onAlterar, onRemover, onClose, readOnly = false }) 
    MODAL: Posicionar / cortar foto (drag + zoom → canvas → base64)
    ══════════════════════════════════════════════════════════════════════ */
 function ModalCropFoto({ src, onConfirm, onClose }) {
-  const SIZE      = 260; // diâmetro do círculo de preview (px)
-  const OUT_SIZE  = 400; // tamanho de saída do canvas (px)
+  const SIZE     = 260;
+  const OUT_SIZE = 400;
 
-  const imgRef    = useRef(null);
-  const stageRef  = useRef(null);
+  const imgRef   = useRef(null);
+  const stageRef = useRef(null);
   const [scale, setScale]   = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [imgNat,  setImgNat]  = useState({ w: 1, h: 1 }); // dimensões naturais
-  const dragRef   = useRef(null); // { startX, startY, ox, oy }
+  const [imgNat, setImgNat] = useState({ w: 1, h: 1 });
+  const dragRef  = useRef(null);
 
-  /* Ao carregar a imagem, ajusta escala inicial para cobrir o círculo */
   const handleImgLoad = () => {
     const img = imgRef.current;
     if (!img) return;
@@ -1617,7 +1581,6 @@ function ModalCropFoto({ src, onConfirm, onClose }) {
     setOffset({ x: 0, y: 0 });
   };
 
-  /* Drag para posicionar */
   const onMouseDown = (e) => {
     e.preventDefault();
     dragRef.current = { startX: e.clientX, startY: e.clientY, ox: offset.x, oy: offset.y };
@@ -1636,7 +1599,6 @@ function ModalCropFoto({ src, onConfirm, onClose }) {
     window.removeEventListener("mouseup",   onMouseUp);
   };
 
-  /* Touch para mobile */
   const touchRef = useRef(null);
   const onTouchStart = (e) => {
     if (e.touches.length === 1) {
@@ -1654,7 +1616,6 @@ function ModalCropFoto({ src, onConfirm, onClose }) {
     }
   };
 
-  /* Zoom com scroll */
   const onWheel = (e) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.05 : 0.05;
@@ -1662,43 +1623,26 @@ function ModalCropFoto({ src, onConfirm, onClose }) {
     setScale(s => Math.min(6, Math.max(minS, s + delta)));
   };
 
-  /* Calcular transform da img dentro do stage */
   const imgStyle = () => {
     const w = imgNat.w * scale;
     const h = imgNat.h * scale;
-    // centraliza + offset do drag
     const left = (SIZE - w) / 2 + offset.x;
     const top  = (SIZE - h) / 2 + offset.y;
     return { width: w, height: h, left, top, transform: "none" };
   };
 
-  /* Renderizar no canvas e exportar base64 */
   const confirmar = () => {
     const img = imgRef.current;
     if (!img) return;
-
     const canvas = document.createElement("canvas");
     canvas.width  = OUT_SIZE;
     canvas.height = OUT_SIZE;
     const ctx = canvas.getContext("2d");
-
-    // Área visível no stage: o que está visível no círculo SIZE×SIZE
     const scaledW = imgNat.w * scale;
     const scaledH = imgNat.h * scale;
     const left    = (SIZE - scaledW) / 2 + offset.x;
     const top     = (SIZE - scaledH) / 2 + offset.y;
-
-    // Converte para coordenadas na imagem natural
-    const ratio = OUT_SIZE / SIZE;
-    ctx.drawImage(
-      img,
-      -left  / scale,               // srcX
-      -top   / scale,               // srcY
-      SIZE   / scale,               // srcW
-      SIZE   / scale,               // srcH
-      0, 0, OUT_SIZE, OUT_SIZE      // dst
-    );
-
+    ctx.drawImage(img, -left / scale, -top / scale, SIZE / scale, SIZE / scale, 0, 0, OUT_SIZE, OUT_SIZE);
     const base64 = canvas.toDataURL("image/jpeg", 0.88);
     onConfirm(base64);
   };
@@ -1707,39 +1651,19 @@ function ModalCropFoto({ src, onConfirm, onClose }) {
     <div className="crop-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="crop-box">
         <div className="crop-title">Posicionar foto</div>
-
-        <div
-          ref={stageRef}
-          className="crop-stage"
-          style={{ width: SIZE, height: SIZE }}
-          onMouseDown={onMouseDown}
-          onWheel={onWheel}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-        >
-          <img
-            ref={imgRef}
-            src={src}
-            alt=""
-            style={imgStyle()}
-            onLoad={handleImgLoad}
-            draggable={false}
-          />
+        <div ref={stageRef} className="crop-stage" style={{ width: SIZE, height: SIZE }}
+          onMouseDown={onMouseDown} onWheel={onWheel}
+          onTouchStart={onTouchStart} onTouchMove={onTouchMove}>
+          <img ref={imgRef} src={src} alt="" style={imgStyle()} onLoad={handleImgLoad} draggable={false} />
         </div>
-
-        <div className="crop-hint">
-          Arraste para reposicionar · Scroll para zoom
-        </div>
-
+        <div className="crop-hint">Arraste para reposicionar · Scroll para zoom</div>
         <div className="crop-zoom">
           <span style={{ fontSize: 10 }}>A</span>
           <input type="range" min={0.5} max={6} step={0.01}
-            value={scale}
-            onChange={(e) => setScale(Number(e.target.value))} />
+            value={scale} onChange={(e) => setScale(Number(e.target.value))} />
           <span style={{ fontSize: 14 }}>A</span>
           <span>{Math.round(scale * 100)}%</span>
         </div>
-
         <div className="crop-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn-primary" onClick={confirmar}>
@@ -1753,19 +1677,16 @@ function ModalCropFoto({ src, onConfirm, onClose }) {
 
 /* ══════════════════════════════════════════════════════════════════════
    HELPER: gera mensalidade em aberto (a_receber) para um aluno
-   Retorna o objeto criado ou null se já existe para esse mês.
+   Grava clienteId (substitui alunoId). Retorna o objeto criado ou null.
    ══════════════════════════════════════════════════════════════════════ */
 async function gerarMensalidadeEmAberto({ tenantUid, aluno, mensalidadesDoAluno }) {
   const { ano, mes } = proximoMesParaGerar(aluno, mensalidadesDoAluno);
   const mesRef = toMesRef(ano, mes);
 
-  /* Verifica duplicidade (a_receber com mesmo aluno + mesReferencia) */
   const jaExiste = mensalidadesDoAluno.some(m => m.mesReferencia === mesRef);
   if (jaExiste) return null;
 
-  /* ── ID sequencial M0001, M0002...
-     Lê TODOS os a_receber com origem="mensalidade" para encontrar o maior
-     idSeqMens existente e garantir que não haja duplicatas. ── */
+  /* ID sequencial M0001, M0002… — lê todos para garantir unicidade */
   const arSnap = await getDocs(
     query(collection(db, "users", tenantUid, "a_receber"), where("origem", "==", "mensalidade"))
   );
@@ -1783,9 +1704,8 @@ async function gerarMensalidadeEmAberto({ tenantUid, aluno, mensalidadesDoAluno 
   const payload = {
     idSeqMens,
     origem:          "mensalidade",
-    alunoId:         aluno.docId,
-    alunoNome:       aluno.nome,
-    alunoIdSeq:      aluno.idSeq,
+    clienteId:       aluno.docId,      // referência ao documento em /clientes
+    clienteIdSeq:    aluno.idSeq,
     mesReferencia:   mesRef,
     categoria:       "Mensalidade",
     descricao:       `Mensalidade ${mesRef} — ${aluno.nome}`,
