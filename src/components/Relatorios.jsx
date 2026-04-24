@@ -14,7 +14,7 @@ import {
   ShoppingCart, Package, Users, Calendar, FileText,
   Download, Printer, AlertCircle, Loader2,
   ArrowUpRight, ArrowDownRight, Minus,
-  ChevronRight, CreditCard, Clock, Receipt, Wallet, LayoutDashboard, X,
+  ChevronRight, ChevronDown, CreditCard, Clock, Receipt, Wallet, LayoutDashboard, X,
   CheckCircle, Zap, Target, Activity, AlertTriangle, Filter, PieChart,
   Eye, EyeOff,
 } from "lucide-react";
@@ -87,9 +87,12 @@ const CSS = `
 
 /* ── Conteúdo principal ── */
 .rel-content {
-  flex: 1; overflow-y: auto; padding: 22px;
+  flex: 1; overflow-y: auto; overflow-x: hidden;
+  padding: 22px 22px 60px;
   display: flex; flex-direction: column; gap: 22px;
+  align-items: stretch;
 }
+.rel-content > * { min-height: 0; }
 .rel-content::-webkit-scrollbar { width: 3px; }
 .rel-content::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
 
