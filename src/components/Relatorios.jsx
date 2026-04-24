@@ -614,6 +614,35 @@ const CSS = `
   }
 }
 
+/* ─── DRE MOBILE ─────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* Grid de colunas: deixa o valor/pct se ajustarem ao conteúdo */
+  .dre-row {
+    grid-template-columns: 1fr auto auto;
+    padding: 9px 12px;
+    gap: 6px;
+    font-size: 12px;
+  }
+  .dre-row-cat { padding: 6px 12px; }
+  .dre-val { font-size: 12px; }
+  .dre-pct { font-size: 10px; min-width: 36px; }
+
+  /* Banner resultado: empilha no mobile */
+  .dre-resultado-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+  .dre-resultado-valor { font-size: 18px; }
+
+  /* tr-wrap: troca overflow hidden por clip seguro no mobile */
+  .tr-wrap { overflow: clip; overflow-clip-margin: 0; }
+
+  /* Padding extra para conteúdo não ficar atrás da bottom nav */
+  .rel-content { padding-bottom: 100px !important; }
+}
+
 /* Botão gatilho do dropdown */
 .rel-mobile-trigger {
   width: 100%;
