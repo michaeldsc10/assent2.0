@@ -16,12 +16,13 @@ import {
   ArrowUpRight, ArrowDownRight, Minus,
   ChevronRight, CreditCard, Clock, Receipt, Wallet, LayoutDashboard, X,
   CheckCircle, Zap, Target, Activity, AlertTriangle, Filter, PieChart,
+  Eye, EyeOff,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
 import AuthContext from "../contexts/AuthContext";
 import { Lock } from "lucide-react";
-import { collection, onSnapshot, doc, getDoc, query, where } from "firebase/firestore";
+import { collection, onSnapshot, doc, getDoc, setDoc, query, where } from "firebase/firestore";
 
 import FiltroPeriodo, { getIntervalo, dentroDoIntervalo } from "./FiltroPeriodo";
 import CardResumo from "./CardResumo";
@@ -3205,6 +3206,53 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
     return { linhas, totalAtivos, totalInativos, ticketMedio, emDia, vencidos, pendentes };
   }, [alunos, aReceber, vendas, intervalo]);
 
+  /* ── Dados para gráficos — últimos 12 meses ── */
+  const { chartMatriculas, chartReceita } = useMemo(() => {
+    const hoje = new Date();
+
+    /* Gera array dos últimos 12 meses { key: "YYYY-MM", label: "jan/25" } */
+    const meses = Array.from({ length: 12 }, (_, i) => {
+      const d = new Date(hoje.getFullYear(), hoje.getMonth() - (11 - i), 1);
+      return {
+        key:   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+        label: d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
+      };
+    });
+
+    /* Matrículas: conta alunos criados em cada mês */
+    const contagemAlunos = {};
+    alunos.forEach(a => {
+      if (!a.criadoEm) return;
+      const mesKey = String(a.criadoEm).slice(0, 7);
+      contagemAlunos[mesKey] = (contagemAlunos[mesKey] || 0) + 1;
+    });
+
+    /* Receita: soma vendas sintéticas de mensalidade por mês */
+    const receitaMes = {};
+    vendas
+      .filter(v => v.tipoVenda === "mensalidade" && v.status !== "cancelada")
+      .forEach(v => {
+        const dateStr = typeof v.data === "string"
+          ? v.data
+          : (v.data?.toDate?.()?.toISOString() || "");
+        if (!dateStr) return;
+        const mesKey = dateStr.slice(0, 7);
+        receitaMes[mesKey] = (receitaMes[mesKey] || 0) + Number(v.total || 0);
+      });
+
+    return {
+      chartMatriculas: meses.map(m => ({
+        label: m.label,
+        val:   contagemAlunos[m.key] || 0,
+        qtd:   contagemAlunos[m.key] || 0,
+      })),
+      chartReceita: meses.map(m => ({
+        label: m.label,
+        val:   receitaMes[m.key] || 0,
+      })),
+    };
+  }, [alunos, vendas]);
+
   /* Aplica filtro de situação */
   const linhasFiltradas = useMemo(() =>
     filtroSit === "todos"
@@ -3315,6 +3363,58 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
             trend="down" colorVar="var(--red)" />
         </div>
       </div>
+
+      {/* ══ Gráficos de Crescimento ══════════════════════════════════════════════════ */}
+      {(chartMatriculas.some(m => m.val > 0) || chartReceita.some(m => m.val > 0)) && (
+        <div className="rv-charts-grid">
+
+          {/* Novas Matrículas por Mês */}
+          {chartMatriculas.some(m => m.val > 0) && (
+            <div className="rv-chart-card">
+              <div className="rv-chart-header">
+                <span className="rv-chart-title">
+                  <span className="rv-chart-title-dot" style={{ background: "var(--gold)" }} />
+                  Novas Matrículas por Mês
+                </span>
+                <span style={{ fontSize: 11, color: "var(--text-3)" }}>
+                  últimos 12 meses
+                </span>
+              </div>
+              <div className="rv-chart-body" style={{ paddingTop: 44 }}>
+                <BarChartCSS
+                  dados={chartMatriculas}
+                  altura={150}
+                  cor="#C8A55E"
+                  fmtVal={(v) => `${v} aluno${v !== 1 ? "s" : ""}`}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Receita de Mensalidades por Mês */}
+          {chartReceita.some(m => m.val > 0) && (
+            <div className="rv-chart-card">
+              <div className="rv-chart-header">
+                <span className="rv-chart-title">
+                  <span className="rv-chart-title-dot" style={{ background: "var(--green)" }} />
+                  Receita de Mensalidades por Mês
+                </span>
+                <span style={{ fontSize: 11, color: "var(--text-3)" }}>
+                  últimos 12 meses
+                </span>
+              </div>
+              <div className="rv-chart-body" style={{ paddingTop: 44 }}>
+                <BarChartCSS
+                  dados={chartReceita}
+                  altura={150}
+                  cor="var(--green)"
+                />
+              </div>
+            </div>
+          )}
+
+        </div>
+      )}
 
       {/* ── Tabela inline de alunos — sem TabelaRelatorio para evitar filtro por período ── */}
       <div style={{
@@ -5047,6 +5147,10 @@ export default function Relatorios() {
   const [loading, setLoading]   = useState(true);
   const [ativo, setAtivo]       = useState("dre");
 
+  /* Relatórios ocultos — array de keys salvo no Firestore config */
+  const [ocultos,       setOcultos]       = useState(new Set());
+  const [modoGerenciar, setModoGerenciar] = useState(false);
+
   /* Filtro de período */
   const [periodo,     setPeriodo]     = useState("mes");
   const [dataInicio,  setDataInicio]  = useState("");
@@ -5106,11 +5210,35 @@ export default function Relatorios() {
     // Fallback: garantir que loading pare mesmo sem despesas
     const timeout = setTimeout(() => setLoading(false), 3000);
 
+    /* Carrega relatórios ocultos da config do tenant */
+    getDoc(doc(db, "users", tenantUid, "config", "relatorios"))
+      .then(s => {
+        if (s.exists() && Array.isArray(s.data().ocultos)) {
+          setOcultos(new Set(s.data().ocultos));
+        }
+      }).catch(() => {});
+
     return () => {
       subs.forEach((fn) => { try { fn(); } catch {} });
       clearTimeout(timeout);
     };
   }, [tenantUid]);
+
+  /* Toggle oculto + persiste no Firestore */
+  const toggleOculto = async (key) => {
+    if (!tenantUid) return;
+    const novoSet = new Set(ocultos);
+    if (novoSet.has(key)) novoSet.delete(key);
+    else novoSet.add(key);
+    setOcultos(novoSet);
+    try {
+      await setDoc(
+        doc(db, "users", tenantUid, "config", "relatorios"),
+        { ocultos: [...novoSet] },
+        { merge: true }
+      );
+    } catch {}
+  };
 
   /* Intervalo calculado */
   const intervalo = useMemo(
@@ -5178,20 +5306,89 @@ export default function Relatorios() {
         <div className="rel-body">
           {/* Sidebar de navegação */}
           <nav className="rel-nav" data-print-hide>
-            <div className="rel-nav-label">Relatórios</div>
+            {/* Header da nav com botão gerenciar (admin only) */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+              <div className="rel-nav-label" style={{ marginBottom: 0 }}>Relatórios</div>
+              {isAdmin && (
+                <button
+                  onClick={() => setModoGerenciar(v => !v)}
+                  title={modoGerenciar ? "Fechar" : "Mostrar/ocultar relatórios"}
+                  style={{
+                    background: modoGerenciar ? "rgba(200,165,94,.15)" : "transparent",
+                    border: `1px solid ${modoGerenciar ? "rgba(200,165,94,.35)" : "var(--border)"}`,
+                    borderRadius: 6, padding: "3px 7px", cursor: "pointer",
+                    color: modoGerenciar ? "var(--gold)" : "var(--text-3)",
+                    fontSize: 10, fontWeight: 600, fontFamily: "'DM Sans',sans-serif",
+                    display: "flex", alignItems: "center", gap: 4, flexShrink: 0,
+                    transition: "all .13s",
+                  }}
+                >
+                  {modoGerenciar ? <><EyeOff size={11} /> Fechar</> : <><Eye size={11} /> Gerenciar</>}
+                </button>
+              )}
+            </div>
+
+            {/* Dica do modo gerenciar */}
+            {modoGerenciar && (
+              <div style={{
+                fontSize: 10, color: "var(--text-3)", padding: "6px 10px",
+                background: "var(--s2)", borderRadius: 7, marginBottom: 6, lineHeight: 1.5,
+              }}>
+                Clique no ícone para ocultar/exibir um relatório.
+              </div>
+            )}
+
             {MENU.map((item) => {
-              const liberado = temAcesso(item.key);
+              const liberado  = temAcesso(item.key);
+              const isOculto  = ocultos.has(item.key);
+
+              /* Em modo normal: esconde os ocultos */
+              if (!modoGerenciar && isOculto) return null;
+
               return (
                 <button
                   key={item.key}
-                  className={`rel-nav-btn ${ativo === item.key && liberado ? "active" : ""}`}
-                  onClick={() => liberado && setAtivo(item.key)}
-                  title={!liberado ? "Sem permissão para este relatório" : ""}
-                  style={!liberado ? { opacity: 0.45, cursor: "not-allowed" } : {}}
+                  className={`rel-nav-btn ${ativo === item.key && liberado && !isOculto ? "active" : ""}`}
+                  onClick={() => {
+                    if (modoGerenciar) return; // clique no item não navega em modo gerenciar
+                    liberado && !isOculto && setAtivo(item.key);
+                  }}
+                  title={
+                    modoGerenciar ? (isOculto ? "Clique para exibir" : "Clique para ocultar") :
+                    !liberado ? "Sem permissão para este relatório" : ""
+                  }
+                  style={{
+                    opacity: isOculto ? 0.42 : (!liberado ? 0.45 : 1),
+                    cursor: modoGerenciar ? "default" : (!liberado || isOculto ? "not-allowed" : "pointer"),
+                    position: "relative",
+                  }}
                 >
                   {liberado ? item.icon : <Lock size={15} />}
-                  {item.label}
-                  {!liberado && <Lock size={11} style={{ marginLeft: "auto", color: "var(--text-3)" }} />}
+                  <span style={{
+                    textDecoration: isOculto && modoGerenciar ? "line-through" : "none",
+                    flex: 1, textAlign: "left",
+                  }}>
+                    {item.label}
+                  </span>
+                  {/* Controle de visibilidade no modo gerenciar */}
+                  {modoGerenciar && isAdmin && (
+                    <span
+                      onClick={(e) => { e.stopPropagation(); toggleOculto(item.key); }}
+                      title={isOculto ? "Exibir relatório" : "Ocultar relatório"}
+                      style={{
+                        marginLeft: "auto", cursor: "pointer", flexShrink: 0,
+                        color: isOculto ? "var(--text-3)" : "var(--gold)",
+                        padding: "2px 4px", borderRadius: 4,
+                        transition: "color .13s",
+                      }}
+                    >
+                      {isOculto ? <EyeOff size={13} /> : <Eye size={13} />}
+                    </span>
+                  )}
+                  {/* Cadeado de permissão (fora do modo gerenciar) */}
+                  {!modoGerenciar && !liberado && (
+                    <Lock size={11} style={{ marginLeft: "auto", color: "var(--text-3)" }} />
+                  )}
                 </button>
               );
             })}
