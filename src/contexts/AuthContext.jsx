@@ -41,6 +41,7 @@ export const PERMISSOES = {
   compras:        { admin: "vcex", financeiro: "ve",  comercial: "",    compras: "vce", operacional: "v",   vendedor: "",    suporte: ""   },
   orcamentos:     { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "v",   vendedor: "vce", suporte: "v"  },
   vendas:         { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "v",   vendedor: "vc",  suporte: ""   },
+  alunos:         { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "v",   vendedor: "v",   suporte: ""   },
   aReceber:       { admin: "vcex", financeiro: "vce", comercial: "v",   compras: "",    operacional: "",    vendedor: "",    suporte: ""   },
   caixaDiario:    { admin: "vcex", financeiro: "vce", comercial: "",    compras: "",    operacional: "vc",  vendedor: "",    suporte: ""   },
   despesas:       { admin: "vcex", financeiro: "vce", comercial: "",    compras: "vc",  operacional: "",    vendedor: "",    suporte: ""   },
