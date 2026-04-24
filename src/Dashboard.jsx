@@ -1326,7 +1326,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   };
 
   /* ── Nome do usuário ──
-     Prioridade: licencas/{uid}/name → nomeUsuario do AuthContext → email */
+     Lê licencas/{uid} → campo name (fonte de verdade do admin) */
   useEffect(() => {
     if (!uid) return;
     return onSnapshot(doc(db, "licencas", uid), (snap) => {
@@ -1340,13 +1340,13 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     });
   }, [uid, authUser, nomeUsuario]);
 
-  /* ── Avatar do usuário — users/{uid}/foto/avatar ── */
+  /* ── Avatar — users/{uid}/foto/avatar → campo base64 ── */
   useEffect(() => {
     if (!uid) return;
     return onSnapshot(doc(db, "users", uid, "foto", "avatar"), (snap) => {
       if (snap.exists()) {
-        const data = snap.data();
-        setUserAvatar(data?.url || data?.photoURL || data?.src || null);
+        const d = snap.data();
+        setUserAvatar(d?.base64 || d?.url || d?.photoURL || null);
       } else {
         setUserAvatar(null);
       }
