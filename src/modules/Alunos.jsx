@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 
 import AuthContext from "../contexts/AuthContext";
-import { logAction, LOG_ACAO, LOG_MODULO } from "../lib/logAction";
+import { logAction, LOG_ACAO } from "../lib/logAction";
 import { db } from "../lib/firebase";
 
 import {
@@ -1198,7 +1198,7 @@ export default function Alunos() {
 
         await logAction({
           tenantUid, nomeUsuario, cargo,
-          acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.MATRICULAS,
+          acao: LOG_ACAO.EDITAR, modulo: "Matrículas",
           descricao: `Editou aluno ${fmtIdSeq(editando.idSeq)} — ${dados.nome}`,
         });
         setEditando(null);
@@ -1229,7 +1229,7 @@ export default function Alunos() {
 
         await logAction({
           tenantUid, nomeUsuario, cargo,
-          acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.MATRICULAS,
+          acao: LOG_ACAO.CRIAR, modulo: "Matrículas",
           descricao: `Matriculou ${fmtIdSeq(idSeq)} — ${dados.nome} — ${fmtR$(dados.valorMensalidade)}/mês`,
         });
         setModalNovo(false);
@@ -1255,7 +1255,7 @@ export default function Alunos() {
       if (mensCriada) {
         await logAction({
           tenantUid, nomeUsuario, cargo,
-          acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.MATRICULAS,
+          acao: LOG_ACAO.CRIAR, modulo: "Matrículas",
           descricao: `Gerou mensalidade ${mensCriada.mesReferencia} — ${aluno.nome} — ${fmtR$(mensCriada.valorTotal)}`,
         });
       }
@@ -1281,7 +1281,7 @@ export default function Alunos() {
 
       await logAction({
         tenantUid, nomeUsuario, cargo,
-        acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.MATRICULAS,
+        acao: LOG_ACAO.EXCLUIR, modulo: "Matrículas",
         descricao: `Excluiu aluno ${fmtIdSeq(excluindo.idSeq)} — ${excluindo.nome} (${abertas.length} mensalidade(s) em aberto removidas)`,
       });
       setExcluindo(null);
@@ -1306,7 +1306,7 @@ export default function Alunos() {
       setConfig(c => ({ ...c, ...novaConfig }));
       await logAction({
         tenantUid, nomeUsuario, cargo,
-        acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.MATRICULAS,
+        acao: LOG_ACAO.EDITAR, modulo: "Matrículas",
         descricao: "Atualizou configurações do módulo de Matrículas",
       });
     } catch (err) {
