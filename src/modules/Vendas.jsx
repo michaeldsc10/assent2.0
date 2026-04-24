@@ -2259,7 +2259,10 @@ useEffect(() => {
     // Ordenação por coluna
     lista = [...lista].sort((a, b) => {
       let va, vb;
-      if (sortKey === "cliente") {
+      if (sortKey === "id") {
+        va = parseInt(a.id?.replace(/\D/g, "") || "0", 10);
+        vb = parseInt(b.id?.replace(/\D/g, "") || "0", 10);
+      } else if (sortKey === "cliente") {
         va = (a.cliente || "").toLowerCase();
         vb = (b.cliente || "").toLowerCase();
       } else if (sortKey === "produto") {
@@ -2277,7 +2280,10 @@ useEffect(() => {
       }
       if (va < vb) return sortDir === "asc" ? -1 : 1;
       if (va > vb) return sortDir === "asc" ? 1 : -1;
-      return 0;
+      // Desempate por criadoEm (mais recente primeiro)
+      const ca = new Date(a.criadoEm || 0);
+      const cb = new Date(b.criadoEm || 0);
+      return cb - ca;
     });
     return lista;
   }, [vendas, period, dataInicio, dataFim, search, sortKey, sortDir]);
@@ -2303,7 +2309,8 @@ useEffect(() => {
       setSortDir(d => d === "asc" ? "desc" : "asc");
     } else {
       setSortKey(key);
-      setSortDir("asc");
+      // data e id: padrão desc (mais recente/maior primeiro)
+      setSortDir(key === "data" || key === "id" ? "desc" : "asc");
     }
   };
 
@@ -2411,7 +2418,11 @@ useEffect(() => {
             </div>
 
             <div className="vd-row vd-row-head">
-              <span>ID</span>
+              <span>
+                <span className={`vd-th-sort ${sortKey === "id" ? "active" : ""}`} onClick={() => handleSort("id")}>
+                  ID <SortIcon col="id" />
+                </span>
+              </span>
               <span>
                 <span className={`vd-th-sort ${sortKey === "cliente" ? "active" : ""}`} onClick={() => handleSort("cliente")}>
                   CLIENTE <SortIcon col="cliente" />
