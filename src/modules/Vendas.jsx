@@ -2095,7 +2095,7 @@ useEffect(() => {
       console.error("[Vendas] Venda cancelada, mas erro ao remover lançamentos do Caixa:", err);
     }
 
-    /* 3. Remover A Receber vinculado a esta venda */
+    /* 3. Remover A Receber vinculado a esta venda (origin "venda" — sinal parcial) */
     try {
       const arSnap = await getDocs(
         query(
@@ -2107,6 +2107,40 @@ useEffect(() => {
       await Promise.all(arSnap.docs.map((d) => deleteDoc(d.ref)));
     } catch (err) {
       console.error("[Vendas] Venda cancelada, mas erro ao remover A Receber:", err);
+    }
+
+    /* 4. Reverter pagamento no A Receber de mensalidade vinculado a esta venda.
+          Vendas sintéticas (tipoVenda === "mensalidade") guardam aReceberDocId
+          apontando para o doc de a_receber que foi marcado como pago.
+          Ao cancelar a venda, o pagamento deve ser desfeito naquele doc. */
+    if (deletando.tipoVenda === "mensalidade" && deletando.aReceberDocId) {
+      try {
+        const arRef  = doc(db, "users", tenantUid, "a_receber", deletando.aReceberDocId);
+        const arSnap = await getDoc(arRef);
+        if (arSnap.exists()) {
+          const ar             = arSnap.data();
+          const valorRevertido = Number(deletando.total || deletando.valorRecebido || 0);
+          const novoValorPago      = Math.max(0, Number(((ar.valorPago || 0) - valorRevertido).toFixed(2)));
+          const novoValorRestante  = Math.min(
+            Number(ar.valorTotal || 0),
+            Number(((ar.valorRestante || 0) + valorRevertido).toFixed(2))
+          );
+          const novoStatus =
+            novoValorRestante <= 0
+              ? "pago"
+              : new Date(ar.dataVencimento) < new Date()
+                ? "vencido"
+                : "pendente";
+          await updateDoc(arRef, {
+            valorPago:       novoValorPago,
+            valorRestante:   novoValorRestante,
+            status:          novoStatus,
+            dataAtualizacao: new Date().toISOString(),
+          });
+        }
+      } catch (err) {
+        console.error("[Vendas] Venda cancelada, mas erro ao reverter pagamento em A Receber (mensalidade):", err);
+      }
     }
 
     await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.VENDAS, descricao: `Cancelou Venda ${vendaId}` });
@@ -2144,7 +2178,7 @@ useEffect(() => {
       console.error("[Vendas] Venda excluída, mas erro ao remover lançamentos do Caixa:", err);
     }
 
-    /* 3. Remover A Receber vinculado a esta venda */
+    /* 3. Remover A Receber vinculado a esta venda (origin "venda" — sinal parcial) */
     try {
       const arSnap = await getDocs(
         query(
@@ -2156,6 +2190,39 @@ useEffect(() => {
       await Promise.all(arSnap.docs.map((d) => deleteDoc(d.ref)));
     } catch (err) {
       console.error("[Vendas] Venda excluída, mas erro ao remover A Receber:", err);
+    }
+
+    /* 4. Reverter pagamento no A Receber de mensalidade vinculado a esta venda.
+          Mesmo comportamento de handleCancelar: desfaz o pagamento no doc original
+          para que a mensalidade volte a aparecer como pendente/vencida em A Receber. */
+    if (excluindoDef.tipoVenda === "mensalidade" && excluindoDef.aReceberDocId) {
+      try {
+        const arRef  = doc(db, "users", tenantUid, "a_receber", excluindoDef.aReceberDocId);
+        const arSnap = await getDoc(arRef);
+        if (arSnap.exists()) {
+          const ar             = arSnap.data();
+          const valorRevertido = Number(excluindoDef.total || excluindoDef.valorRecebido || 0);
+          const novoValorPago      = Math.max(0, Number(((ar.valorPago || 0) - valorRevertido).toFixed(2)));
+          const novoValorRestante  = Math.min(
+            Number(ar.valorTotal || 0),
+            Number(((ar.valorRestante || 0) + valorRevertido).toFixed(2))
+          );
+          const novoStatus =
+            novoValorRestante <= 0
+              ? "pago"
+              : new Date(ar.dataVencimento) < new Date()
+                ? "vencido"
+                : "pendente";
+          await updateDoc(arRef, {
+            valorPago:       novoValorPago,
+            valorRestante:   novoValorRestante,
+            status:          novoStatus,
+            dataAtualizacao: new Date().toISOString(),
+          });
+        }
+      } catch (err) {
+        console.error("[Vendas] Venda excluída, mas erro ao reverter pagamento em A Receber (mensalidade):", err);
+      }
     }
 
     await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.VENDAS, descricao: `Excluiu Venda ${vendaId} definitivamente` });
