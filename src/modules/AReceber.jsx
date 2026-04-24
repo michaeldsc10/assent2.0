@@ -458,26 +458,29 @@ function ModalFormConta({ conta, onSave, onClose }) {
     if (!validar()) return;
     setSalvando(true);
 
-    const valorTotal    = parseFloat(form.valorTotal.replace(",", "."));
-    const valorPago     = parseFloat(form.valorPago.replace(",", "."));
-    const valorRestante = Math.max(0, valorTotal - valorPago);
-    const status        = calcStatus(valorRestante, form.dataVencimento);
+    try {
+      const valorTotal    = parseFloat(form.valorTotal.replace(",", "."));
+      const valorPago     = parseFloat(form.valorPago.replace(",", "."));
+      const valorRestante = Math.max(0, valorTotal - valorPago);
+      const status        = calcStatus(valorRestante, form.dataVencimento);
 
-    await onSave({
-      clienteNome:    form.clienteNome.trim(),
-      descricao:      form.descricao.trim(),
-      valorTotal,
-      valorPago,
-      valorRestante,
-      dataVencimento: form.dataVencimento,
-      observacoes:    form.observacoes.trim(),
-      status,
-      // Campos para integração futura com módulo de Vendas
-      origem:         isEdit ? (conta.origem || "manual") : "manual",
-      referenciaId:   isEdit ? (conta.referenciaId || null) : null,
-    });
-
-    setSalvando(false);
+      await onSave({
+        clienteNome:    form.clienteNome.trim(),
+        descricao:      form.descricao.trim(),
+        valorTotal,
+        valorPago,
+        valorRestante,
+        dataVencimento: form.dataVencimento,
+        observacoes:    form.observacoes.trim(),
+        status,
+        // Campos para integração futura com módulo de Vendas
+        origem:         isEdit ? (conta.origem || "manual") : "manual",
+        referenciaId:   isEdit ? (conta.referenciaId || null) : null,
+      });
+    } finally {
+      // Garante reset mesmo se onSave lançar exceção
+      setSalvando(false);
+    }
   };
 
   return (
