@@ -21,7 +21,7 @@ import {
   ShoppingCart, Clock, Wallet, TrendingDown, Truck, BarChart3,
   Calendar, Settings, Zap, UserCheck, UserPlus, Search, ArrowUpRight,
   ArrowDownRight, ChevronRight, Bell, LogOut, ChevronDown,
-  PanelLeftClose, PanelLeftOpen, Menu, X, Sun, Moon, LayoutGrid,
+  PanelLeftClose, PanelLeftOpen, Menu, X, Sun, Moon, LayoutGrid, GraduationCap,
 } from "lucide-react";
 
 /* ── Módulos ───────────────────────────────────── */
@@ -90,10 +90,10 @@ const ATALHOS_TECLADO = [
   { code: "KeyC", label: "Clientes",            dbKey: "clientes"        },
   { code: "KeyP", label: "Produtos",            dbKey: "produtos"        },
   { code: "KeyS", label: "Serviços",            dbKey: "servicos"        },
-  { code: "KeyE", label: "Estoque",  dbKey: "entrada_estoque" },
+  { code: "KeyE", label: "Estoque",             dbKey: "entrada_estoque" },
   { code: "KeyV", label: "Vendas",              dbKey: "vendas"          },
   { code: "KeyF", label: "A Receber",           dbKey: "fiado"           },
-  { code: "KeyU", label: "Matriculas",           dbKey: "matriculas"           },
+  { code: "KeyH", label: "Matriculas",           dbKey: "matriculas"     },
   { code: "KeyX", label: "Caixa Diário",        dbKey: "caixa"           },
   { code: "KeyZ", label: "Despesas",            dbKey: "despesas"        },
   { code: "KeyN", label: "Fornecedores",        dbKey: "fornecedores"    },
@@ -120,6 +120,7 @@ const NAV = [
     { label: "Estoque", modulo: "entradaEstoque",   icone: ArrowDownToLine,  secao: "ESTOQUE"   },
     { label: "Vendas",          modulo: "vendas",           icone: TrendingDown,       secao: "COMERCIAL" },
     { label: "A Receber",       modulo: "aReceber",         icone: Clock,            secao: "FINANCEIRO"},
+    {label: "Matriculas",       modulo: "matriculas",       icone: GraduationCap,    secao "COMERCIAL" }, 
    { label: "Compras",         modulo: "compras",          icone: ShoppingCart,     secao: "COMERCIAL" },
     { label: "Mesas",           modulo: "mesas",            icone: LayoutGrid,       secao: "OPERAÇÕES"  },
     { label: "Caixa Diário",    modulo: "caixaDiario",      icone: Wallet,           secao: "FINANCEIRO"},
