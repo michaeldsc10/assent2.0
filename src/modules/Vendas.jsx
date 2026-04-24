@@ -1762,6 +1762,21 @@ export default function Vendas() {
   const [sortKey, setSortKey]           = useState("data");
   const [sortDir, setSortDir]           = useState("desc");
 
+  /* ── Nome real do admin (licencas/{tenantUid}/name) ──
+     O AuthContext expõe o email do Firebase Auth como displayName para admins.
+     Buscamos o nome correto no Firestore para exibir na coluna Vendedor. */
+  const [adminNome, setAdminNome] = useState("");
+  useEffect(() => {
+    if (cargo !== "admin" || !tenantUid) return;
+    getDoc(doc(db, "licencas", tenantUid))
+      .then(snap => { if (snap.exists() && snap.data().name) setAdminNome(snap.data().name); })
+      .catch(() => {});
+  }, [cargo, tenantUid]);
+
+  /* Nome efetivo do vendedor logado — admin usa adminNome, demais usam vendedorNome do contexto */
+  const vendedorNomeEfetivo = cargo === "admin"
+    ? (adminNome || nomeUsuario || vendedorNome || "")
+    : (vendedorNome || nomeUsuario || "");
 
 // Listener dos dados do Firestore (usa tenantUid do contexto)
 useEffect(() => {
@@ -2532,7 +2547,7 @@ useEffect(() => {
           uid={tenantUid}
           cargo={cargo}
           vendedorId={vendedorId}
-          vendedorNome={vendedorNome}
+          vendedorNome={vendedorNomeEfetivo}
           clientes={clientes}
           produtos={produtos}
           servicos={servicos}
@@ -2549,7 +2564,7 @@ useEffect(() => {
           uid={tenantUid}
           cargo={cargo}
           vendedorId={vendedorId}
-          vendedorNome={vendedorNome}
+          vendedorNome={vendedorNomeEfetivo}
           clientes={clientes}
           produtos={produtos}
           servicos={servicos}
