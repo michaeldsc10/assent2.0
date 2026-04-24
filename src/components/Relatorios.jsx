@@ -547,7 +547,38 @@ const CSS = `
   /* Topbar compacta */
   .rel-topbar { padding: 10px 14px; }
   .rel-topbar-title h1 { font-size: 15px; }
-  .rel-content { padding: 12px; gap: 14px; }
+  .rel-content { padding: 12px 8px 80px; gap: 14px; }
+
+  /* Tabelas: scroll horizontal no mobile */
+  .rel-mobile-table-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .rel-mobile-table-scroll::-webkit-scrollbar { height: 3px; }
+  .rel-mobile-table-scroll::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
+
+  /* InlineTable mobile: empilha header+valor por coluna → card por linha */
+  .rel-inline-table-head { display: none !important; }
+  .rel-inline-table-row {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 6px !important;
+    padding: 12px 14px !important;
+    border-bottom: 1px solid var(--border);
+    grid-template-columns: unset !important;
+  }
+  .rel-inline-table-cell {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    font-size: 12px;
+  }
+  .rel-inline-table-cell::before {
+    content: attr(data-label);
+    font-size: 9px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .06em;
+    color: var(--text-3); flex-shrink: 0; margin-right: 8px;
+  }
 }
 
 /* Dropdown wrapper — só visível no mobile */
@@ -3786,7 +3817,7 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
             </div>
           )}
 
-          {/* Tabela inline */}
+          {/* Tabela inline — desktop: grid; mobile: card por linha */}
           <div style={{ background: "var(--s1)", border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
             <div style={{ padding: "13px 18px", borderBottom: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
               <span style={{ fontFamily: "'Sora',sans-serif", fontSize: 13, fontWeight: 600, color: "var(--text)", display: "flex", alignItems: "center", gap: 8 }}>
@@ -3794,8 +3825,8 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
                 <span style={{ fontSize: 10, background: "var(--s3)", color: "var(--text-3)", padding: "2px 8px", borderRadius: 20, fontWeight: 600 }}>{linhasFiltradas.length}</span>
               </span>
             </div>
-            {/* Cabeçalho */}
-            <div style={{ display: "grid", gridTemplateColumns: "72px 1.4fr 120px 120px 110px 110px 110px", padding: "10px 18px", gap: 8, background: "var(--s2)", borderBottom: "1px solid var(--border)", fontSize: 10, fontWeight: 600, letterSpacing: ".07em", textTransform: "uppercase", color: "var(--text-3)" }}>
+            {/* Cabeçalho — oculto no mobile */}
+            <div className="rel-inline-table-head" style={{ display: "grid", gridTemplateColumns: "72px 1.4fr 120px 120px 110px 110px 110px", padding: "10px 18px", gap: 8, background: "var(--s2)", borderBottom: "1px solid var(--border)", fontSize: 10, fontWeight: 600, letterSpacing: ".07em", textTransform: "uppercase", color: "var(--text-3)" }}>
               <span>ID</span><span>Nome</span><span>Documento</span>
               <span>Mensalidade</span><span>Prox. Venc.</span>
               <span>Aberto</span><span>Situação</span>
@@ -3808,19 +3839,21 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
                   : `Nenhum aluno com situação "${filtroSit}".`}
               </div>
             ) : linhasFiltradas.map((l, i) => (
-              <div key={l.docId || i} style={{ display: "grid", gridTemplateColumns: "72px 1.4fr 120px 120px 110px 110px 110px", padding: "11px 18px", gap: 8, borderBottom: i < linhasFiltradas.length - 1 ? "1px solid var(--border)" : "none", alignItems: "center", fontSize: 12, color: "var(--text-2)", transition: "background .13s" }}
+              <div key={l.docId || i} className="rel-inline-table-row" style={{ display: "grid", gridTemplateColumns: "72px 1.4fr 120px 120px 110px 110px 110px", padding: "11px 18px", gap: 8, borderBottom: i < linhasFiltradas.length - 1 ? "1px solid var(--border)" : "none", alignItems: "center", fontSize: 12, color: "var(--text-2)", transition: "background .13s" }}
                 onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                <span style={{ fontFamily: "'JetBrains Mono','Courier New',monospace", color: "var(--text-3)", fontSize: 11 }}>{l.id}</span>
-                <span>
-                  <div style={{ color: "var(--text)", fontWeight: 500, fontSize: 13 }}>{l.nome}</div>
-                  {l.telefone !== "—" && <div style={{ color: "var(--text-3)", fontSize: 11 }}>{l.telefone}</div>}
+                <span className="rel-inline-table-cell" data-label="ID" style={{ fontFamily: "'JetBrains Mono','Courier New',monospace", color: "var(--text-3)", fontSize: 11 }}>{l.id}</span>
+                <span className="rel-inline-table-cell" data-label="Nome">
+                  <span>
+                    <div style={{ color: "var(--text)", fontWeight: 500, fontSize: 13 }}>{l.nome}</div>
+                    {l.telefone !== "—" && <div style={{ color: "var(--text-3)", fontSize: 11 }}>{l.telefone}</div>}
+                  </span>
                 </span>
-                <span>{l.documento}</span>
-                <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: "var(--text)" }}>{fmtR$(l.mensalidade)}</span>
-                <span style={{ color: l.situacao === "Vencido" ? "var(--red)" : "var(--text-2)" }}>{fmtDataLocal(l.proxVenc) || (l.abertas === 0 ? "—" : "Pendente")}</span>
-                <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: l.totalAberto > 0 ? "var(--red)" : "var(--text-3)" }}>{fmtR$(l.totalAberto)}</span>
-                <span><SituacaoPill sit={l.situacao} /></span>
+                <span className="rel-inline-table-cell" data-label="Documento">{l.documento}</span>
+                <span className="rel-inline-table-cell" data-label="Mensalidade" style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: "var(--text)" }}>{fmtR$(l.mensalidade)}</span>
+                <span className="rel-inline-table-cell" data-label="Prox. Venc." style={{ color: l.situacao === "Vencido" ? "var(--red)" : "var(--text-2)" }}>{fmtDataLocal(l.proxVenc) || (l.abertas === 0 ? "—" : "Pendente")}</span>
+                <span className="rel-inline-table-cell" data-label="Em Aberto" style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: l.totalAberto > 0 ? "var(--red)" : "var(--text-3)" }}>{fmtR$(l.totalAberto)}</span>
+                <span className="rel-inline-table-cell" data-label="Situação"><SituacaoPill sit={l.situacao} /></span>
               </div>
             ))}
           </div>
@@ -3945,7 +3978,7 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
     );
   };
 
-  /* Tabela inline genérica — evita TabelaRelatorio que filtra por data */
+  /* Tabela inline genérica — mobile: card por linha; desktop: grid */
   const InlineTable = ({ titulo, colunas, linhas, emptyMsg }) => (
     <div style={{
       background: "var(--s1)", border: "1px solid var(--border)",
@@ -3962,8 +3995,8 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
           </span>
         </span>
       </div>
-      {/* Cabeçalho */}
-      <div style={{
+      {/* Cabeçalho — oculto no mobile via CSS */}
+      <div className="rel-inline-table-head" style={{
         display: "grid",
         gridTemplateColumns: colunas.map(() => "1fr").join(" "),
         padding: "9px 18px", gap: 8,
@@ -3979,7 +4012,7 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
           {emptyMsg || "Nenhum registro encontrado."}
         </div>
       ) : linhas.map((row, i) => (
-        <div key={i} style={{
+        <div key={i} className="rel-inline-table-row" style={{
           display: "grid",
           gridTemplateColumns: colunas.map(() => "1fr").join(" "),
           padding: "10px 18px", gap: 8,
@@ -3990,7 +4023,9 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
         onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}
         onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
           {colunas.map(c => (
-            <span key={c.key}>{c.render ? c.render(row[c.key], row) : (row[c.key] ?? "—")}</span>
+            <span key={c.key} className="rel-inline-table-cell" data-label={c.label}>
+              {c.render ? c.render(row[c.key], row) : (row[c.key] ?? "—")}
+            </span>
           ))}
         </div>
       ))}
