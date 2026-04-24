@@ -42,10 +42,10 @@ const PERMISSOES_MATRICULAS = {
   admin:       { ver: true,  criar: true,  editar: true,  excluir: true  },
   financeiro:  { ver: true,  criar: false, editar: false, excluir: false },
   comercial:   { ver: true,  criar: true,  editar: true,  excluir: false },
-  operacional: { ver: true,  criar: true,  editar: true,  excluir: false },
+  operacional: { ver: false,  criar: false,  editar: false,  excluir: false },
   vendedor:    { ver: true,  criar: true,  editar: true,  excluir: false },
   compras:     { ver: false, criar: false, editar: false, excluir: false },
-  suporte:     { ver: true,  criar: false, editar: false, excluir: false },
+  suporte:     { ver: true,  criar: false, editar: true, excluir: false },
 };
 const permMat = (cargo, acao) => PERMISSOES_MATRICULAS[cargo]?.[acao] ?? false;
 
