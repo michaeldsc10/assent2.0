@@ -1696,7 +1696,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       </div>
 
       <div className="ag-content">
-        {dashView === "charts" ? renderChartsView() : (<>
+        {dashView === "charts" ? renderChartsView() : null}
+        {dashView !== "charts" && (<>
         {/* Mini Stats */}
         <div className="g4 ag-mini-cards-mobile">
           {miniStats.map((s) => (
@@ -1913,7 +1914,6 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             ))}
           </div>
         </div>
-      </div>
       </>)}
       </div>
     </>
