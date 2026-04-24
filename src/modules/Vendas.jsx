@@ -704,20 +704,20 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
   const podeEscolherVendedor = cargo === "admin" || cargo === "comercial";
 
   // Se cargo === "vendedor", sempre trava no próprio nome — em criação E edição.
-  // Somente admin/comercial podem escolher ou ver o vendedor salvo na venda.
+  // Admin/comercial podem escolher; em nova venda, pré-preenche com o próprio nome.
   const [vendedor, setVendedor] = useState(
     isVendedorCargo
       ? (vendedorNomeLogado || "")
-      : (venda?.vendedor || "")
+      : (venda?.vendedor || vendedorNomeLogado || "")
   );
   // vendedorId: ID do cadastro (V0001 etc) — usado para relatórios e comissões
   const [vendedorIdSel, setVendedorIdSel] = useState(
     isVendedorCargo
       ? (vendedorIdLogado || "")
-      : (venda?.vendedorId || "")
+      : (venda?.vendedorId || (!venda ? (vendedorIdLogado || "") : ""))
   );
   const [vendedorCargo, setVendedorCargo] = useState(
-    isVendedorCargo ? cargo : (venda?.vendedorCargo || "")
+    isVendedorCargo ? cargo : (venda?.vendedorCargo || (!venda ? cargo : ""))
   );
   const [formaPgto, setFormaPgto] = useState(venda?.formaPagamento || "");
   const [observacao, setObservacao] = useState(venda?.observacao || "");
