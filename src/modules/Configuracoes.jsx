@@ -113,7 +113,7 @@ export const ATALHOS_MAP = [
   { code: "KeyS", display: "Alt + S", key: "servicos",        hint: "Serviços"             },
   { code: "KeyE", display: "Alt + E", key: "entrada_estoque", hint: "Entrada"              },
   { code: "KeyV", display: "Alt + V", key: "vendas",          hint: "Vendas"               },
-   { code: "KeyU", display: "Alt + U", key: "matriculas",      hint: "matrícUlas (alunos)" },
+   { code: "KeyH", display: "Alt + U", key: "matriculas",      hint: "matrícUlas (alunos)" },
   { code: "KeyF", display: "Alt + F", key: "fiado",           hint: "Fiado (F de Fiado)"   },
   { code: "KeyX", display: "Alt + X", key: "caixa",           hint: "Caixa (Cx)"           },
   { code: "KeyZ", display: "Alt + Z", key: "despesas",        hint: "Despesas"             },
