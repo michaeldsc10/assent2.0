@@ -685,6 +685,7 @@ const CSS = `
     display: flex; align-items: center; justify-content: center;
     font-size: 12px; font-weight: 600; color: var(--gold);
     font-family: 'Sora', sans-serif;
+    overflow: hidden;
   }
   .ag-user-name {
     font-size: 12px; font-weight: 500; color: var(--text);
@@ -1124,6 +1125,7 @@ export default function Dashboard() {
   const [customRange,   setCustomRange]  = useState({ from: "", to: "" });
   const [module,        setModule]       = useState("Dashboard");
   const [userName,      setUserName]     = useState("Usuário");
+  const [userAvatar,    setUserAvatar]   = useState(null);
   const [menuVisivel,   setMenuVisivel]  = useState({});
   const [collapsed,     setCollapsed]    = useState(
     () => localStorage.getItem("ag_sidebar_collapsed") === "true"
@@ -1324,25 +1326,32 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   };
 
   /* ── Nome do usuário ──
-     Prioridade: nomeUsuario do AuthContext (Firestore) → fallback onSnapshot admin doc
-     Isso garante que convidados vejam o nome cadastrado pelo admin, não o email do Firebase Auth. */
+     Prioridade: licencas/{uid}/name → nomeUsuario do AuthContext → email */
   useEffect(() => {
-    // Se o AuthContext já resolveu o nome (admin ou convidado), usa direto
-    if (nomeUsuario) {
-      setUserName(nomeUsuario);
-      return;
-    }
-    // Fallback: lê o doc do admin no Firestore (caso nomeUsuario ainda não tenha carregado)
     if (!uid) return;
-    return onSnapshot(doc(db, "users", uid), (snap) => {
+    return onSnapshot(doc(db, "licencas", uid), (snap) => {
       const name =
         snap.data()?.name ||
+        nomeUsuario ||
         authUser?.displayName ||
         authUser?.email?.split("@")[0] ||
         "Usuário";
       setUserName(name);
     });
   }, [uid, authUser, nomeUsuario]);
+
+  /* ── Avatar do usuário — users/{uid}/foto/avatar ── */
+  useEffect(() => {
+    if (!uid) return;
+    return onSnapshot(doc(db, "users", uid, "foto", "avatar"), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setUserAvatar(data?.url || data?.photoURL || data?.src || null);
+      } else {
+        setUserAvatar(null);
+      }
+    }, () => setUserAvatar(null));
+  }, [uid]);
 
   /* ── Visibilidade do menu ── */
   useEffect(() => {
@@ -1990,7 +1999,11 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               onClick={() => setDropdownOpen((v) => !v)}
               role="button" aria-haspopup="true" aria-expanded={dropdownOpen}
             >
-              <div className="ag-avatar">{userInitial}</div>
+              <div className="ag-avatar">
+                {userAvatar
+                  ? <img src={userAvatar} alt={userName} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  : userInitial}
+              </div>
               <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.3 }}>
                 <span className="ag-user-name">{userName}</span>
                 {cargo && cargo !== "admin" && (
