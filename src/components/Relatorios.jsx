@@ -3584,13 +3584,48 @@ function RcrInsight({ tipo, texto }) {
 /* ══════════════════════════════════════════════════════
    RELATÓRIO: COMPRAS
    ══════════════════════════════════════════════════════ */
-function RelatorioCompras({ compras = [], intervalo }) {
+function RelatorioCompras({ compras = [], fornecedores = [], intervalo }) {
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [filtroPag,    setFiltroPag]    = useState("todos");
-  const hoje = hojeISO_rcr();
+
+  /* ── Mapa de fornecedores para lookup O(1) ── */
+  const fornMap = useMemo(() =>
+    Object.fromEntries(fornecedores.map(f => [f.id, f.nome])),
+    [fornecedores]
+  );
+
+  /* Resolve nome: doc.id → nome atual. Fallback: fornecedorNome (docs legados) */
+  const getNome = useCallback((c) =>
+    fornMap[c.fornecedorId] || c.fornecedorNome || "—",
+    [fornMap]
+  );
+
+  /* Resolve descrição: junta nomes dos itens */
+  const getDesc = (c) => {
+    if (c.itens?.length) return c.itens.map(i => i.insumoNome).filter(Boolean).join(", ");
+    return c.descricao || "—";
+  };
+
+  /* Mapa completo de labels de método (inclui valores legados) */
+  const PAG_LABELS = {
+    dinheiro:      "Dinheiro",
+    pix:           "PIX",
+    transferencia: "Transferência",
+    boleto:        "Boleto",
+    cartao_credito:"Cartão de Crédito",
+    cartao:        "Cartão (legado)",
+    parcelado:     "Parcelado (legado)",
+  };
+  const getMetodo = (c) => {
+    const base = PAG_LABELS[c.metodoPagamento] || c.metodoPagamento || "—";
+    if (c.parcelado && c.numParcelas > 1) return `${base} (${c.numParcelas}×)`;
+    return base;
+  };
+
+  const CORES = ["#C8A55E","#5b8ef0","#48c78e","#e05252","#9b59b6","#e67e22","#1abc9c","#e74c3c"];
 
   const filtrados = useMemo(() => compras.filter((c) => {
-    const d = parseDateISO(c.data || c.dataCompra || c.dataCriacao);
+    const d = parseDateISO(c.data);
     if (!dentroIntervalo_rcr(d, intervalo)) return false;
     if (filtroStatus !== "todos" && c.status !== filtroStatus) return false;
     if (filtroPag    !== "todos" && c.metodoPagamento !== filtroPag) return false;
@@ -3601,12 +3636,14 @@ function RelatorioCompras({ compras = [], intervalo }) {
   const pendentes  = useMemo(() => filtrados.filter((c) => c.status === "pendente"),  [filtrados]);
   const canceladas = useMemo(() => filtrados.filter((c) => c.status === "cancelado"), [filtrados]);
 
-  const totalGasto     = useMemo(() => pagas.reduce((s, c) => s + Number(c.valor || c.total || 0), 0), [pagas]);
-  const totalPendente  = useMemo(() => pendentes.reduce((s, c) => s + Number(c.valor || c.total || 0), 0), [pendentes]);
-  const totalCancelado = useMemo(() => canceladas.reduce((s, c) => s + Number(c.valor || c.total || 0), 0), [canceladas]);
+  /* Campo correto: valorTotal */
+  const totalGasto     = useMemo(() => pagas.reduce((s, c) => s + Number(c.valorTotal || 0), 0), [pagas]);
+  const totalPendente  = useMemo(() => pendentes.reduce((s, c) => s + Number(c.valorTotal || 0), 0), [pendentes]);
+  const totalCancelado = useMemo(() => canceladas.reduce((s, c) => s + Number(c.valorTotal || 0), 0), [canceladas]);
   const ticketMedio    = useMemo(() => pagas.length ? totalGasto / pagas.length : 0, [totalGasto, pagas]);
 
-  const evolucaoMensal = useMemo(() => agruparPorMes_rcr(pagas, "data", "valor"), [pagas]);
+  /* Campo correto: valorTotal */
+  const evolucaoMensal = useMemo(() => agruparPorMes_rcr(pagas, "data", "valorTotal"), [pagas]);
 
   const tendencia = useMemo(() => {
     if (evolucaoMensal.length < 2) return null;
@@ -3616,24 +3653,26 @@ function RelatorioCompras({ compras = [], intervalo }) {
     );
   }, [evolucaoMensal]);
 
+  /* Ranking: agrupar por fornecedorId, exibir nome resolvido */
   const rankFornecedores = useMemo(() => {
     const mapa = {};
     pagas.forEach((c) => {
-      const nome = c.fornecedor || c.nomeFornecedor || "Sem fornecedor";
-      if (!mapa[nome]) mapa[nome] = { nome, total: 0, qtd: 0 };
-      mapa[nome].total += Number(c.valor || c.total || 0);
-      mapa[nome].qtd++;
+      const key  = c.fornecedorId || c.fornecedorNome || "sem_fornecedor";
+      const nome = getNome(c);
+      if (!mapa[key]) mapa[key] = { nome, total: 0, qtd: 0 };
+      mapa[key].total += Number(c.valorTotal || 0);
+      mapa[key].qtd++;
     });
     return Object.values(mapa).sort((a, b) => b.total - a.total).slice(0, 8);
-  }, [pagas]);
+  }, [pagas, getNome]);
 
+  /* Distribuição por método */
   const distPagamento = useMemo(() => {
     const mapa = {};
-    const labels = { dinheiro: "Dinheiro", pix: "PIX", transferencia: "Transferência", boleto: "Boleto", cartao_credito: "Cartão Crédito" };
     pagas.forEach((c) => {
-      const nome = labels[c.metodoPagamento] || c.metodoPagamento || "Outro";
+      const nome = PAG_LABELS[c.metodoPagamento] || c.metodoPagamento || "Outro";
       if (!mapa[nome]) mapa[nome] = { nome, valor: 0 };
-      mapa[nome].valor += Number(c.valor || c.total || 0);
+      mapa[nome].valor += Number(c.valorTotal || 0);
     });
     return Object.values(mapa).sort((a, b) => b.valor - a.valor);
   }, [pagas]);
@@ -3643,8 +3682,8 @@ function RelatorioCompras({ compras = [], intervalo }) {
   const insights = useMemo(() => {
     const lista = [];
     if (tendencia !== null) {
-      if (tendencia > 20) lista.push({ tipo: "danger", texto: `<strong>⚠ Gastos em alta:</strong> suas compras aumentaram <strong>${Math.abs(tendencia).toFixed(1)}%</strong> vs mês anterior.` });
-      else if (tendencia < -10) lista.push({ tipo: "good", texto: `<strong>✓ Economia detectada:</strong> gastos reduziram <strong>${Math.abs(tendencia).toFixed(1)}%</strong> vs mês anterior.` });
+      if (tendencia > 20)      lista.push({ tipo: "danger", texto: `<strong>⚠ Gastos em alta:</strong> suas compras aumentaram <strong>${Math.abs(tendencia).toFixed(1)}%</strong> vs mês anterior.` });
+      else if (tendencia < -10) lista.push({ tipo: "good",  texto: `<strong>✓ Economia detectada:</strong> gastos reduziram <strong>${Math.abs(tendencia).toFixed(1)}%</strong> vs mês anterior.` });
     }
     if (rankFornecedores.length > 0 && totalGasto > 0) {
       const top = rankFornecedores[0];
@@ -3657,30 +3696,26 @@ function RelatorioCompras({ compras = [], intervalo }) {
   }, [tendencia, rankFornecedores, totalGasto, totalPendente, filtrados]);
 
   const tabelaItens = useMemo(() =>
-    [...filtrados].sort((a, b) => (parseDateISO(b.data || b.dataCompra) || "").localeCompare(parseDateISO(a.data || a.dataCompra) || "")).slice(0, 50),
+    [...filtrados].sort((a, b) => (parseDateISO(b.data) || "").localeCompare(parseDateISO(a.data) || "")).slice(0, 50),
     [filtrados]
   );
 
   const handleExport = useCallback(() => {
     exportarExcel("compras", [{
       nome: "Compras",
-      colunas: ["Data", "ID", "Fornecedor", "Descrição", "Valor (R$)", "Método", "Status"],
+      colunas: ["Data", "Fornecedor", "Itens", "Valor (R$)", "Método", "Status"],
       dados: tabelaItens.map((c) => [
-        parseDateISO(c.data || c.dataCompra) || "",
-        c.idShow || c.id || "",
-        c.fornecedor || c.nomeFornecedor || "",
-        c.descricao || c.insumo || "",
-        Number(c.valor || c.total || 0),
-        c.metodoPagamento || "",
+        parseDateISO(c.data) || "",
+        getNome(c),
+        getDesc(c),
+        Number(c.valorTotal || 0),
+        getMetodo(c),
         c.status || "",
       ]),
     }]);
-  }, [tabelaItens]);
+  }, [tabelaItens, getNome]);
 
   if (!compras.length) return <div className="rcr-empty"><ShoppingCart size={32} opacity={0.3} /><p>Nenhuma compra registrada.</p></div>;
-
-  const PAG_LABELS = { dinheiro: "Dinheiro", pix: "PIX", transferencia: "Transf.", boleto: "Boleto", cartao_credito: "Cartão" };
-  const CORES = ["#C8A55E","#5b8ef0","#48c78e","#e05252","#9b59b6","#e67e22","#1abc9c","#e74c3c"];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
@@ -3734,7 +3769,7 @@ function RelatorioCompras({ compras = [], intervalo }) {
           {pagas.length > 0 && (
             <div className="rcr-highlight-row">
               <span>Maior compra registrada</span>
-              <span className="val">{fmtR$(Math.max(...pagas.map((c) => Number(c.valor || c.total || 0))))}</span>
+              <span className="val">{fmtR$(Math.max(...pagas.map((c) => Number(c.valorTotal || 0))))}</span>
             </div>
           )}
         </div>
@@ -3788,8 +3823,7 @@ function RelatorioCompras({ compras = [], intervalo }) {
               <div className="rcr-chart-title"><div className="rcr-chart-title-dot" style={{ color: "var(--green)", background: "var(--green)" }} />Pagas vs Canceladas</div>
             </div>
             <div className="rcr-chart-body">
-              <RcrDonut dados={[{ nome: "Pagas", valor: totalGasto }, { nome: "Pendentes", valor: totalPendente }, { nome: "Canceladas", valor: totalCancelado }].filter((d) => d.valor > 0)} size={110} />
-            </div>
+              <RcrDonut dados={[{ nome: "Pagas", valor: totalGasto }, { nome: "Pendentes", valor: totalPendente }, { nome: "Canceladas", valor: totalCancelado }].filter((d) => d.valor > 0)} size={110} />            </div>
           </div>
           {evolucaoMensal.length > 1 && (
             <div className="rcr-chart-card">
@@ -3844,20 +3878,20 @@ function RelatorioCompras({ compras = [], intervalo }) {
       </div>
       <div className="rcr-table-wrap">
         <div className="rcr-table-header"><span className="rcr-table-title">Registro de Compras</span><span className="rcr-table-badge">{tabelaItens.length} registros</span></div>
-        <div className="rcr-row rcr-row-head" style={{ gridTemplateColumns: "90px 1fr 1fr 120px 110px 100px" }}>
-          <span>Data</span><span>Fornecedor</span><span>Descrição</span><span style={{ textAlign: "right" }}>Valor</span><span>Pagamento</span><span>Status</span>
+        <div className="rcr-row rcr-row-head" style={{ gridTemplateColumns: "90px 1fr 1fr 120px 140px 100px" }}>
+          <span>Data</span><span>Fornecedor</span><span>Itens</span><span style={{ textAlign: "right" }}>Valor</span><span>Pagamento</span><span>Status</span>
         </div>
         {tabelaItens.length === 0
           ? <div className="rcr-empty" style={{ padding: 40 }}><ShoppingCart size={24} opacity={0.3} /><p>Nenhuma compra com os filtros selecionados.</p></div>
           : tabelaItens.map((c) => {
-              const d = parseDateISO(c.data || c.dataCompra);
+              const d = parseDateISO(c.data);
               return (
-                <div key={c.id} className="rcr-row" style={{ gridTemplateColumns: "90px 1fr 1fr 120px 110px 100px" }}>
+                <div key={c.id} className="rcr-row" style={{ gridTemplateColumns: "90px 1fr 1fr 120px 140px 100px" }}>
                   <span>{d ? d.split("-").reverse().join("/") : "—"}</span>
-                  <span style={{ color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.fornecedor || c.nomeFornecedor || "—"}</span>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.descricao || c.insumo || "—"}</span>
-                  <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: c.status === "cancelado" ? "var(--text-3)" : "var(--text)" }}>{fmtR$(Number(c.valor || c.total || 0))}</span>
-                  <span>{PAG_LABELS[c.metodoPagamento] || c.metodoPagamento || "—"}</span>
+                  <span style={{ color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getNome(c)}</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getDesc(c)}</span>
+                  <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: c.status === "cancelado" ? "var(--text-3)" : "var(--text)" }}>{fmtR$(Number(c.valorTotal || 0))}</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getMetodo(c)}</span>
                   <span><span className={`rcr-badge ${c.status || "pendente"}`}>{c.status || "pendente"}</span></span>
                 </div>
               );
@@ -4765,7 +4799,8 @@ export default function Relatorios() {
   const [aReceber,   setAReceber]   = useState([]);
   const [vendedores, setVendedores] = useState([]);
   const [alunos,     setAlunos]     = useState([]);
-  const [compras,    setCompras]    = useState([]);
+  const [compras,      setCompras]      = useState([]);
+  const [fornecedores, setFornecedores] = useState([]);
 
   // Permissão por sub-relatório
   const temAcesso = (id) => {
@@ -4798,7 +4833,9 @@ export default function Relatorios() {
         () => {}),
       onSnapshot(col("vendedores"), (s) => setVendedores(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => {}),
-      onSnapshot(col("compras"),    (s) => setCompras(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      onSnapshot(col("compras"),      (s) => setCompras(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        () => {}),
+      onSnapshot(col("fornecedores"), (s) => setFornecedores(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
         () => {}),
     ];
 
@@ -4851,7 +4888,7 @@ export default function Relatorios() {
       case "vendedores": return <RelatorioVendedores vendas={vendas} vendedores={vendedores} intervalo={intervalo} />;
       case "alunos":       return <RelatorioAlunos alunos={alunos} aReceber={aReceber} vendas={vendas} intervalo={intervalo} />;           // ← NOVO
       case "mensalidades": return <RelatorioMensalidades alunos={alunos} aReceber={aReceber} vendas={vendas} caixa={caixa} intervalo={intervalo} />;
-      case "rel_compras":        return <RelatorioCompras compras={compras} intervalo={intervalo} />;
+      case "rel_compras":        return <RelatorioCompras compras={compras} fornecedores={fornecedores} intervalo={intervalo} />;
       case "rel_contas_receber": return <RelatorioContasReceber aReceber={aReceber} intervalo={intervalo} />;
       default:           return null;
     }
