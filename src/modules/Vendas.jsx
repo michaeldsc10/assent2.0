@@ -1,1646 +1,845 @@
 /* ═══════════════════════════════════════════════════
-   ASSENT v2.0 — Vendas.jsx
+   ASSENT v2.0 — Alunos.jsx (Módulo de Matrículas)
+   ─────────────────────────────────────────────────
    Estrutura Firestore:
-     users/{uid}/vendas/{id}        → cada venda
-     users/{uid}/produtos/{id}      → estoque (qtd atualizado)
-     users/{uid}/servicos/{id}      → serviços
-     users/{uid}                    → vendaIdCnt (contador)
+     users/{uid}/alunos/{docId}           → cada aluno
+                                            docId = aluno_{ts}_{rand}
+                                            idSeq = sequencial visual A0001…
+
+     users/{uid}/a_receber/{autoId}        → mensalidades em aberto
+                                            origem: "mensalidade"
+                                            alunoId, mesReferencia
+
+     users/{uid}/vendas/{autoId}           → mensalidades pagas
+                                            categoria: "Mensalidade"
+                                            tipoVenda: "mensalidade"
+
+     users/{uid}/config/matriculas         → template mensagem WhatsApp
    ═══════════════════════════════════════════════════ */
 
-import { useState, useEffect, useContext, useMemo, useRef } from "react";
+import { useState, useEffect, useContext, useMemo } from "react";
 import {
-  Search, Plus, Edit2, Trash2, X, Printer,
-  ShoppingCart, Package, ChevronDown, FileText,
-  Download, Copy, Filter, Calendar, Ban,
+  Search, Plus, Edit2, Trash2, X, Users,
+  MessageCircle, Calendar, CreditCard, Settings,
+  ChevronLeft, CheckCircle, AlertCircle, Clock,
+  Phone, Mail, MapPin, User, FileText, DollarSign,
 } from "lucide-react";
 
 import AuthContext from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO } from "../lib/logAction";
-import { db, auth } from "../lib/firebase";
+import { db } from "../lib/firebase";
 
 import {
   collection, doc, setDoc, deleteDoc, updateDoc,
-  onSnapshot, runTransaction, increment, getDoc, addDoc, serverTimestamp,
-  query, where, getDocs,
+  onSnapshot, getDoc, addDoc, getDocs,
+  query, where,
 } from "firebase/firestore";
 
-/* ── CSS ── */
-const CSS = `
-  /* ── Modal base (igual ao Clientes) ── */
-  .modal-overlay {
-    position: fixed; inset: 0; z-index: 1000;
-    background: rgba(0,0,0,0.78);
-    backdrop-filter: blur(5px);
-    display: flex; align-items: center; justify-content: center;
-    padding: 20px; animation: fadeIn .15s ease;
-  }
-  .modal-overlay-top { z-index: 1100; }
-  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-  @keyframes slideUp {
-    from { opacity: 0; transform: translateY(14px) }
-    to   { opacity: 1; transform: translateY(0) }
-  }
-
-  .modal-box {
-    background: var(--s1); border: 1px solid var(--border-h);
-    border-radius: 16px; width: 100%; max-width: 520px;
-    max-height: 92vh; overflow-y: auto;
-    box-shadow: 0 28px 72px rgba(0,0,0,0.65);
-    animation: slideUp .18s ease;
-  }
-  .modal-box-xl  { max-width: 820px; }
-  .modal-box-lg  { max-width: 680px; }
-  .modal-box-md  { max-width: 420px; }
-  .modal-box::-webkit-scrollbar { width: 3px; }
-  .modal-box::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
-
-  .modal-header {
-    padding: 20px 22px 16px;
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: flex-start;
-    justify-content: space-between; gap: 12px;
-    position: sticky; top: 0;
-    background: var(--s1); z-index: 2;
-  }
-  .modal-title {
-    font-family: 'Sora', sans-serif;
-    font-size: 16px; font-weight: 600; color: var(--text);
-  }
-  .modal-sub { font-size: 12px; color: var(--text-2); margin-top: 3px; }
-  .modal-close {
-    width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
-    background: var(--s3); border: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; margin-top: 2px; transition: background .13s;
-  }
-  .modal-close:hover { background: var(--s2); border-color: var(--border-h); }
-  .modal-body   { padding: 20px 22px; }
-  .modal-footer {
-    padding: 14px 22px; border-top: 1px solid var(--border);
-    display: flex; justify-content: flex-end; gap: 10px;
-    position: sticky; bottom: 0; background: var(--s1); z-index: 2;
-  }
-
-  /* ── Buttons ── */
-  .btn-primary {
-    padding: 9px 20px; border-radius: 9px;
-    background: var(--gold); color: #0a0808;
-    border: none; cursor: pointer;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 13px; font-weight: 600;
-    transition: opacity .13s, transform .1s;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .btn-primary:hover  { opacity: .88; }
-  .btn-primary:active { transform: scale(.97); }
-  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-
-  .btn-secondary {
-    padding: 9px 20px; border-radius: 9px;
-    background: var(--s3); color: var(--text-2);
-    border: 1px solid var(--border); cursor: pointer;
-    font-family: 'DM Sans', sans-serif; font-size: 13px;
-    transition: background .13s, color .13s;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .btn-secondary:hover { background: var(--s2); color: var(--text); }
-
-  .btn-danger {
-    padding: 9px 20px; border-radius: 9px;
-    background: var(--red-d); color: var(--red);
-    border: 1px solid rgba(224,82,82,.25); cursor: pointer;
-    font-family: 'DM Sans', sans-serif; font-size: 13px;
-    transition: background .13s;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .btn-danger:hover { background: rgba(224,82,82,.18); }
-  .btn-danger:disabled { opacity: .5; cursor: not-allowed; }
-
-  .btn-warning {
-    padding: 9px 20px; border-radius: 9px;
-    background: rgba(245,166,35,.12); color: #F5A623;
-    border: 1px solid rgba(245,166,35,.25); cursor: pointer;
-    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
-    transition: background .13s;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .btn-warning:hover { background: rgba(245,166,35,.2); }
-  .btn-warning:disabled { opacity: .5; cursor: not-allowed; }
-
-  .btn-icon {
-    width: 30px; height: 30px; border-radius: 7px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; border: 1px solid transparent;
-    background: transparent; transition: all .13s;
-  }
-  .btn-icon-edit { color: var(--blue); }
-  .btn-icon-edit:hover { background: var(--blue-d); border-color: rgba(91,142,240,.2); }
-  .btn-icon-del  { color: var(--red); }
-  .btn-icon-del:hover  { background: var(--red-d); border-color: rgba(224,82,82,.2); }
-  .btn-icon-cancel { color: #F5A623; }
-  .btn-icon-cancel:hover { background: rgba(245,166,35,.12); border-color: rgba(245,166,35,.25); }
-  .btn-icon-view { color: var(--text-2); }
-  .btn-icon-view:hover { background: var(--s3); border-color: var(--border-h); }
-
-  .btn-green {
-    padding: 9px 20px; border-radius: 9px;
-    background: rgba(74,222,128,.12); color: var(--green);
-    border: 1px solid rgba(74,222,128,.2); cursor: pointer;
-    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
-    transition: background .13s;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .btn-green:hover { background: rgba(74,222,128,.2); }
-
-  /* ── Forms ── */
-  .form-group { margin-bottom: 16px; }
-  .form-label {
-    display: block; font-size: 10px; font-weight: 600;
-    letter-spacing: .07em; text-transform: uppercase;
-    color: var(--text-2); margin-bottom: 7px;
-  }
-  .form-label-req { color: var(--gold); margin-left: 2px; }
-  .form-input {
-    width: 100%; background: var(--s2);
-    border: 1px solid var(--border); border-radius: 9px;
-    padding: 10px 13px; color: var(--text); font-size: 13px;
-    font-family: 'DM Sans', sans-serif;
-    outline: none; transition: border-color .15s, box-shadow .15s;
-    box-sizing: border-box;
-  }
-  .form-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(200,165,94,0.1); }
-  .form-input.err   { border-color: var(--red); }
-  .form-error { font-size: 11px; color: var(--red); margin-top: 5px; }
-  .form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
-
-  /* ── Tabs ── */
-  .vd-tabs { display:flex; gap:4px; padding:14px 22px 0; background:var(--s1); border-bottom:1px solid var(--border); flex-shrink:0; }
-  .vd-tab {
-    display:flex; align-items:center; gap:7px;
-    padding:9px 18px; border-radius:8px 8px 0 0; cursor:pointer;
-    font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500;
-    color:var(--text-3); background:transparent; border:1px solid transparent;
-    border-bottom:none; transition:all .15s; margin-bottom:-1px;
-  }
-  .vd-tab:hover { color:var(--text-2); background:var(--s2); }
-  .vd-tab.active { color:var(--gold); background:var(--s2); border-color:var(--border); border-bottom-color:var(--s2); }
-  .vd-tab.cancelada.active { color:var(--red); }
-  .vd-tab.cancelada.active .vd-tab-badge { background:rgba(224,82,82,.12); color:var(--red); }
-  .vd-tab-badge {
-    font-size:10px; background:var(--s3); color:var(--text-3);
-    padding:1px 7px; border-radius:20px; font-weight:600;
-  }
-  .vd-tab.active .vd-tab-badge { background:rgba(200,165,94,0.15); color:var(--gold); }
-
-  /* ── Row cancelada ── */
-  .vd-row-cancelada {
-    display: grid;
-    grid-template-columns: 72px 1fr 110px 110px 1fr 100px;
-    padding: 11px 18px; gap: 8px;
-    border-bottom: 1px solid var(--border);
-    align-items: center; font-size: 12px; color: var(--text-2);
-    cursor: pointer; transition: background .1s; opacity: .85;
-  }
-  .vd-row-cancelada:last-child { border-bottom: none; }
-  .vd-row-cancelada:hover { background: rgba(224,82,82,.04); }
-  .vd-row-cancelada-head { background: var(--s2); cursor: default; opacity: 1; }
-  .vd-row-cancelada-head:hover { background: var(--s2); }
-  .vd-row-cancelada-head span { font-size: 10px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
-  .vd-cancelada-tag {
-    display: inline-flex; align-items: center; gap: 4px;
-    padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600;
-    background: rgba(224,82,82,.12); border: 1px solid rgba(224,82,82,.2); color: var(--red);
-  }
-
-  /* ── Topbar ── */
-  .vd-topbar {
-    padding: 14px 22px;
-    background: var(--s1); border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 12px; flex-shrink: 0;
-  }
-  .vd-topbar-title { flex-shrink: 0; }
-  .vd-topbar-title h1 {
-    font-family: 'Sora', sans-serif; font-size: 19px; font-weight: 600;
-    color: var(--text);
-  }
-  .vd-topbar-title p { font-size: 11px; color: var(--text-2); margin-top: 2px; }
-  .vd-search {
-    display: flex; align-items: center; gap: 8px;
-    background: var(--s2); border: 1px solid var(--border);
-    border-radius: 8px; padding: 8px 12px; width: 270px; flex: 1; min-width: 180px;
-  }
-  .vd-search input {
-    background: transparent; border: none; outline: none;
-    color: var(--text); font-size: 12px; width: 100%;
-  }
-  .vd-topbar-right { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-
-  /* ── Filtros de período ── */
-  .vd-periods {
-    display: flex; align-items: center; gap: 6px;
-    padding: 12px 22px; border-bottom: 1px solid var(--border);
-    background: var(--s1); flex-wrap: wrap;
-  }
-  .vd-period-btn {
-    padding: 5px 13px; border-radius: 20px; font-size: 12px;
-    font-family: 'DM Sans', sans-serif; cursor: pointer;
-    border: 1px solid var(--border); background: var(--s2); color: var(--text-2);
-    transition: all .13s;
-  }
-  .vd-period-btn:hover { border-color: var(--border-h); color: var(--text); }
-  .vd-period-btn.active {
-    background: var(--gold); color: #0a0808;
-    border-color: var(--gold); font-weight: 600;
-  }
-  .vd-period-sep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; }
-
-  /* ── Período personalizado ── */
-  .vd-period-custom {
-    display: flex; align-items: center; gap: 8px; margin-left: 6px;
-  }
-  .vd-period-custom-label {
-    font-size: 11px; color: var(--text-3); font-family: 'DM Sans', sans-serif;
-  }
-  .vd-period-date {
-    background: var(--s2); border: 1px solid var(--border);
-    border-radius: 7px; padding: 4px 9px;
-    color: var(--text); font-size: 12px;
-    font-family: 'DM Sans', sans-serif; outline: none;
-    transition: border-color .13s;
-    cursor: pointer;
-  }
-  .vd-period-date:focus { border-color: var(--gold); }
-  .vd-period-date::-webkit-calendar-picker-indicator { opacity: .5; cursor: pointer; }
-
-
-  /* ── Tabela ── */
-  .vd-table-wrap {
-    background: var(--s1); border: 1px solid var(--border);
-    border-radius: 12px; overflow: hidden;
-  }
-  .vd-table-header {
-    padding: 13px 18px;
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  }
-  .vd-table-title {
-    font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; color: var(--text);
-    display: flex; align-items: center; gap: 8px;
-  }
-  .vd-count-badge {
-    font-family: 'Sora', sans-serif; font-size: 11px; font-weight: 600;
-    background: var(--s3); border: 1px solid var(--border-h);
-    color: var(--text-2); padding: 2px 9px; border-radius: 20px;
-  }
-  .vd-table-actions { display: flex; gap: 6px; }
-
-  .vd-export-btn {
-    display: flex; align-items: center; gap: 5px;
-    padding: 5px 11px; border-radius: 7px; font-size: 11px; font-weight: 600;
-    cursor: pointer; border: 1px solid var(--border);
-    background: var(--s2); color: var(--text-2);
-    font-family: 'DM Sans', sans-serif; transition: all .13s;
-  }
-  .vd-export-btn:hover { background: var(--s3); color: var(--text); }
-
-  .vd-row {
-    display: grid;
-    grid-template-columns: 72px 1fr 110px 180px 90px 80px 100px 80px;
-    padding: 11px 18px; gap: 8px;
-    border-bottom: 1px solid var(--border);
-    align-items: center; font-size: 12px; color: var(--text-2);
-    cursor: pointer; transition: background .1s;
-  }
-  .vd-row:last-child { border-bottom: none; }
-  .vd-row:hover { background: rgba(255,255,255,0.025); }
-  .vd-row-head { background: var(--s2); cursor: default; }
-  .vd-row-head:hover { background: var(--s2); }
-  .vd-row-head span {
-    font-size: 10px; font-weight: 500; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--text-3);
-  }
-
-  .vd-vid { font-family: 'Sora', sans-serif; font-size: 11px; color: var(--gold); font-weight: 500; }
-  .vd-cliente { color: var(--text); font-size: 13px; font-weight: 500; }
-  .vd-fp-badge {
-    display: inline-flex; align-items: center;
-    padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600;
-    background: var(--s3); border: 1px solid var(--border-h); color: var(--text-2);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px;
-  }
-  .vd-actions { display: flex; align-items: center; gap: 5px; justify-content: flex-end; }
-  .vd-total { font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 600; color: var(--green); }
-  .vd-empty, .vd-loading { padding: 56px 20px; text-align: center; color: var(--text-3); font-size: 13px; }
-
-  /* ── Modal Nova Venda ── */
-  .nv-tabs {
-    display: flex; gap: 6px; margin-bottom: 18px;
-  }
-  .nv-tab {
-    display: flex; align-items: center; gap: 6px;
-    padding: 7px 16px; border-radius: 9px; font-size: 12px; font-weight: 600;
-    cursor: pointer; border: 1px solid var(--border);
-    background: var(--s2); color: var(--text-2);
-    font-family: 'DM Sans', sans-serif; transition: all .13s;
-  }
-  .nv-tab.active {
-    background: var(--gold); color: #0a0808; border-color: var(--gold);
-  }
-  .nv-tab:not(.active):hover { background: var(--s3); color: var(--text); }
-
-  /* autocomplete */
-  .nv-autocomplete { position: relative; }
-  .nv-ac-list {
-    position: absolute; top: 100%; left: 0; right: 0; z-index: 9999;
-    background: var(--s1); border: 1px solid var(--border-h);
-    border-radius: 9px; max-height: 200px; overflow-y: auto;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.5); margin-top: 3px;
-  }
-  .nv-ac-item {
-    padding: 9px 13px; cursor: pointer; font-size: 13px; color: var(--text);
-    transition: background .1s; display: flex; align-items: center; justify-content: space-between;
-  }
-  .nv-ac-item:hover { background: var(--s2); }
-  .nv-ac-item-sub { font-size: 11px; color: var(--text-3); }
-  .nv-ac-empty { padding: 10px 13px; font-size: 12px; color: var(--text-3); text-align: center; }
-
-  /* itens da venda */
-  .nv-items-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 10px;
-  }
-  .nv-items-label {
-    font-size: 10px; font-weight: 600; letter-spacing: .07em;
-    text-transform: uppercase; color: var(--text-2);
-  }
-  .nv-add-item-btn {
-    display: flex; align-items: center; gap: 5px;
-    padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 600;
-    cursor: pointer; border: 1px solid rgba(200,165,94,.3);
-    background: rgba(200,165,94,.08); color: var(--gold);
-    font-family: 'DM Sans', sans-serif; transition: all .13s;
-  }
-  .nv-add-item-btn:hover { background: rgba(200,165,94,.14); }
-
-  .nv-item-row {
-    display: grid; grid-template-columns: 1fr 70px 110px 110px 90px 32px;
-    gap: 8px; align-items: start; margin-bottom: 8px;
-    padding: 10px; background: var(--s2); border: 1px solid var(--border);
-    border-radius: 10px;
-  }
-  .nv-item-field-label {
-    font-size: 9px; font-weight: 600; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--text-3); margin-bottom: 5px;
-  }
-  .nv-item-remove {
-    width: 28px; height: 28px; border-radius: 7px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer; border: 1px solid transparent;
-    background: transparent; color: var(--red); margin-top: 14px;
-    transition: all .13s;
-  }
-  .nv-item-remove:hover { background: var(--red-d); border-color: rgba(224,82,82,.2); }
-
-  .nv-totals-bar {
-    display: flex; gap: 16px; padding: 12px 14px;
-    background: var(--s2); border: 1px solid var(--border);
-    border-radius: 10px; margin-top: 14px; flex-wrap: wrap;
-  }
-  .nv-total-cell { display: flex; flex-direction: column; gap: 2px; }
-  .nv-total-label { font-size: 9px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
-  .nv-total-val { font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; }
-
-  .nv-section-sep {
-    height: 1px; background: var(--border); margin: 18px 0;
-  }
-
-  /* ── Modal Detalhe Venda ── */
-  .dv-meta {
-    display: grid; grid-template-columns: 1fr 1fr 1fr;
-    gap: 12px; margin-bottom: 18px;
-  }
-  .dv-meta-card {
-    background: var(--s2); border: 1px solid var(--border);
-    border-radius: 10px; padding: 10px 13px;
-  }
-  .dv-meta-label { font-size: 9px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
-  .dv-meta-val { font-size: 13px; color: var(--text); font-weight: 500; }
-  .dv-meta-obs {
-    background: var(--s2); border: 1px solid var(--border);
-    border-radius: 10px; padding: 10px 13px; margin-bottom: 18px;
-  }
-  .dv-table {
-    background: var(--s2); border: 1px solid var(--border);
-    border-radius: 10px; overflow: hidden; margin-bottom: 14px;
-  }
-  .dv-thead {
-    display: grid; grid-template-columns: 1fr 60px 110px 110px 100px 110px;
-    padding: 8px 12px; background: var(--s3);
-    border-bottom: 1px solid var(--border); gap: 8px;
-  }
-  .dv-thead span {
-    font-size: 9px; font-weight: 600; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--text-3);
-  }
-  .dv-trow {
-    display: grid; grid-template-columns: 1fr 60px 110px 110px 100px 110px;
-    padding: 10px 12px; border-bottom: 1px solid var(--border);
-    gap: 8px; font-size: 12px; color: var(--text-2);
-    align-items: center;
-  }
-  .dv-trow:last-child { border-bottom: none; }
-  .dv-nome { color: var(--text); font-weight: 500; display: flex; align-items: center; gap: 6px; }
-  .dv-totals {
-    display: flex; gap: 12px; padding: 12px 14px;
-    background: var(--s2); border: 1px solid var(--border);
-    border-radius: 10px; flex-wrap: wrap;
-  }
-  .dv-total-cell { display: flex; flex-direction: column; gap: 2px; }
-  .dv-total-label { font-size: 9px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
-  .dv-total-val { font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; }
-
-  .dv-imprimir {
-    display: flex; align-items: center; gap: 6px;
-    padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
-    cursor: pointer; border: 1px solid var(--border);
-    background: var(--s3); color: var(--text-2);
-    font-family: 'DM Sans', sans-serif; transition: all .13s;
-    margin-bottom: 16px;
-  }
-  .dv-imprimir:hover { background: var(--s2); color: var(--text); }
-
-  /* ── Confirm ── */
-  .confirm-body {
-    padding: 24px 22px; text-align: center;
-    font-size: 13px; color: var(--text-2); line-height: 1.6;
-  }
-  .confirm-icon { font-size: 28px; margin-bottom: 12px; }
-
-  /* ── Recibo Print ── */
-  /*
-   * ATENÇÃO: não usar "body > *:not(#recibo-print-root) { display:none }"
-   * porque em React o #recibo-print-root fica dentro do #root (filho do body),
-   * o que faz o #root inteiro sumir levando o recibo junto.
-   * A abordagem correta é visibility: hidden no body e visible no root do recibo,
-   * pois visibility pode ser sobreposta por filhos, diferente de display.
-   */
-  @media print {
-    body { visibility: hidden !important; }
-    #recibo-print-root {
-      visibility: visible !important;
-      display: block !important;
-      position: fixed; top: 0; left: 0; width: 100%; z-index: 99999;
-    }
-    #recibo-print-root * { visibility: visible !important; }
-    .recibo-print {
-      font-family: 'Courier New', monospace;
-      width: 80mm; margin: 0 auto; padding: 8mm;
-      font-size: 12px; color: #000 !important; background: #fff;
-    }
-    .recibo-print * { color: #000 !important; }
-  }
-  #recibo-print-root { display: none; }
-
-  /* ── Livre (venda sem produto) ── */
-  .nv-livre-info {
-    background: rgba(200,165,94,.07); border: 1px solid rgba(200,165,94,.2);
-    border-radius: 10px; padding: 11px 14px; margin-bottom: 14px;
-    font-size: 12px; color: var(--text-2);
-  }
-  .nv-livre-info strong { color: var(--gold); }
-
-  /* ── Sinal (pagamento parcial) ── */
-  .nv-sinal-box {
-    background: rgba(91,142,240,.07); border: 1px solid rgba(91,142,240,.2);
-    border-radius: 10px; padding: 12px 14px; margin-top: 10px;
-  }
-  .nv-sinal-row {
-    display: flex; justify-content: space-between; align-items: center;
-    font-size: 12px; color: var(--text-2); margin-bottom: 4px;
-  }
-  .nv-sinal-row:last-child { margin-bottom: 0; }
-  .nv-sinal-restante {
-    font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 700; color: var(--blue);
-  }
-
-  /* ── Parcelas cartão ── */
-  .nv-parcelas-wrap {
-    display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;
-  }
-  .nv-parcela-btn {
-    padding: 5px 11px; border-radius: 7px; font-size: 11px; font-weight: 600;
-    cursor: pointer; border: 1px solid var(--border);
-    background: var(--s2); color: var(--text-2);
-    font-family: 'DM Sans', sans-serif; transition: all .13s;
-    white-space: nowrap;
-  }
-  .nv-parcela-btn:hover { background: var(--s3); color: var(--text); }
-  .nv-parcela-btn.active {
-    background: rgba(200,165,94,0.15); border-color: var(--gold); color: var(--gold);
-  }
-  .nv-taxa-info {
-    font-size: 11px; color: var(--text-3); margin-top: 6px;
-  }
-  .nv-taxa-info strong { color: var(--text-2); }
-`;
-
-/* ── Helpers ── */
-const fmtR$ = (v) =>
-  `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
-
-const fmtData = (d) => {
-  if (!d) return "—";
-  try {
-    const dt = d?.toDate ? d.toDate() : new Date(d);
-    return dt.toLocaleDateString("pt-BR");
-  } catch { return String(d); }
+/* ══════════════════════════════════════════════════
+   PERMISSÕES (segue padrão Vendas/AReceber)
+   ══════════════════════════════════════════════════ */
+const PERMISSOES_MATRICULAS = {
+  admin:       { ver: true,  criar: true,  editar: true,  excluir: true  },
+  financeiro:  { ver: true,  criar: false, editar: false, excluir: false },
+  comercial:   { ver: true,  criar: true,  editar: true,  excluir: false },
+  operacional: { ver: false,  criar: false,  editar: false,  excluir: false },
+  vendedor:    { ver: true,  criar: true,  editar: true,  excluir: false },
+  compras:     { ver: false, criar: false, editar: false, excluir: false },
+  suporte:     { ver: true,  criar: false, editar: true, excluir: false },
 };
+const permMat = (cargo, acao) => PERMISSOES_MATRICULAS[cargo]?.[acao] ?? false;
 
-const gerarIdVenda = (cnt) => `V${String(cnt + 1).padStart(4, "0")}`;
+const MSG_WHATSAPP_DEFAULT =
+  "Olá [nome], tudo bem? Passando para lembrar da sua mensalidade de [mes] no valor de [valor]. " +
+  "Qualquer dúvida estou à disposição. 💙";
 
-const PERIODS = ["Tudo", "Hoje", "7 dias", "30 dias", "Este mês", "Personalizado"];
-
-function filtrarPorPeriodo(vendas, period, dataInicio = "", dataFim = "") {
-  if (period === "Tudo") return vendas;
-  if (period === "Personalizado") {
-    const ini = dataInicio ? new Date(dataInicio + "T00:00:00") : null;
-    const fim = dataFim    ? new Date(dataFim    + "T23:59:59") : null;
-    return vendas.filter(v => {
-      try {
-        const dt = v.data?.toDate ? v.data.toDate() : new Date(v.data);
-        if (ini && dt < ini) return false;
-        if (fim && dt > fim) return false;
-        return true;
-      } catch { return false; }
-    });
-  }
-  const now = new Date();
-  const start = new Date();
-  if (period === "Hoje")      { start.setHours(0, 0, 0, 0); }
-  else if (period === "7 dias")   { start.setDate(now.getDate() - 7); }
-  else if (period === "30 dias")  { start.setDate(now.getDate() - 30); }
-  else if (period === "Este mês") { start.setDate(1); start.setHours(0, 0, 0, 0); }
-  return vendas.filter(v => {
-    try {
-      const dt = v.data?.toDate ? v.data.toDate() : new Date(v.data);
-      return dt >= start;
-    } catch { return false; }
-  });
-}
-
-const FORMAS_PAGAMENTO = [
-  "Pix", "Dinheiro", "Cartão de Crédito", "Cartão de Débito",
-  "Boleto", "Transferência", "Sinal", "Parcelado", "Outro",
+const MESES_PT = [
+  "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
 ];
 
-/* Taxas padrão — usadas como fallback enquanto o Firestore carrega */
-const TAXAS_DEFAULT = {
-  debito:     1.99,
-  pix:        0,
-  credito_1:  2.99, credito_2:  3.19, credito_3:  3.39,
-  credito_4:  3.59, credito_5:  3.79, credito_6:  3.99,
-  credito_7:  4.19, credito_8:  4.39, credito_9:  4.59,
-  credito_10: 4.79, credito_11: 4.99, credito_12: 5.19,
+/* ══════════════════════════════════════════════════
+   UTILITÁRIOS
+   ══════════════════════════════════════════════════ */
+const onlyDigits = (s) => String(s || "").replace(/\D+/g, "");
+
+const fmtR$ = (v) =>
+  `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const fmtData = (iso) => {
+  if (!iso) return "—";
+  try {
+    const d = typeof iso === "string" ? new Date(iso + (iso.length === 10 ? "T12:00:00" : "")) : new Date(iso);
+    return d.toLocaleDateString("pt-BR");
+  } catch { return "—"; }
 };
 
-/* ── Recibo de impressão ── */
-function imprimirRecibo(venda) {
-  const el = document.getElementById("recibo-print-root");
-  if (!el) return;
-  const itens = venda.itens || [];
-  const subtotal  = itens.reduce((s, i) => s + (i.preco || 0) * (i.qtd || 1), 0);
-  const descontos = itens.reduce((s, i) => s + (i.desconto || 0), 0);
+const fmtTelefone = (v) => {
+  const d = onlyDigits(v).slice(0, 11);
+  if (d.length <= 2)  return d;
+  if (d.length <= 6)  return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+};
 
-  /* Informações de parcelamento e taxa */
-  const temTaxa   = venda.valorTaxa > 0;
-  const temParc   = venda.parcelas > 1;
-  const pgtoLabel = temParc
-    ? `${venda.formaPagamento} — ${venda.parcelas}x`
-    : (venda.formaPagamento || "—");
+const fmtCPF = (v) => {
+  const d = onlyDigits(v).slice(0, 11);
+  if (d.length <= 3)  return d;
+  if (d.length <= 6)  return `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length <= 9)  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+};
 
-  el.innerHTML = `
-    <div class="recibo-print">
-      <div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:8px;">ASSENT</div>
-      <div style="text-align:center;font-size:11px;margin-bottom:12px;">Recibo de Venda</div>
-      <div>ID: ${venda.id}</div>
-      <div>Data: ${fmtData(venda.data)}</div>
-      <div>Cliente: ${venda.cliente || "—"}</div>
-      <div>Pgto: ${pgtoLabel}</div>
-      <div style="border-top:1px dashed #000;margin:8px 0;"></div>
-      ${itens.map(i => `
-        <div>${i.nome || i.produto || "Item livre"}</div>
-        <div style="display:flex;justify-content:space-between;font-size:11px;">
-          <span>${i.qtd}x ${fmtR$(i.preco)}</span>
-          <span>${fmtR$((i.preco || 0) * (i.qtd || 1) - (i.desconto || 0))}</span>
-        </div>
-      `).join("")}
-      <div style="border-top:1px dashed #000;margin:8px 0;"></div>
-      ${descontos > 0 ? `<div style="display:flex;justify-content:space-between;"><span>Descontos</span><span>-${fmtR$(descontos)}</span></div>` : ""}
-      ${temTaxa ? `<div style="display:flex;justify-content:space-between;font-size:11px;color:#555;"><span>Taxa cartão (${venda.taxaPercentual}%)</span><span>${fmtR$(venda.valorTaxa)}</span></div>` : ""}
-      <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:14px;">
-        <span>TOTAL</span><span>${fmtR$(venda.total)}</span>
-      </div>
-      ${temParc ? `<div style="font-size:11px;margin-top:4px;text-align:right;">${venda.parcelas}x de ${fmtR$(venda.total / venda.parcelas)}</div>` : ""}
-      ${venda.formaPagamento === "Sinal" && venda.valorPago != null ? `
-        <div style="border-top:1px dashed #000;margin:8px 0;"></div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;">
-          <span>Sinal recebido</span><span>${fmtR$(venda.valorPago)}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:bold;">
-          <span>Restante a pagar</span><span>${fmtR$(venda.valorRestante)}</span>
-        </div>
-        ${venda.dataVencSinal ? `<div style="font-size:11px;color:#555;">Vencimento: ${venda.dataVencSinal.split("-").reverse().join("/")}</div>` : ""}
-      ` : ""}
-      ${venda.observacao ? `<div style="margin-top:10px;font-size:11px;">Obs: ${venda.observacao}</div>` : ""}
-      <div style="text-align:center;font-size:10px;margin-top:12px;">Obrigado!</div>
-    </div>
-  `;
-  window.print();
-}
+const fmtValorInput = (v) => {
+  const d = onlyDigits(v);
+  if (!d) return "";
+  const n = Number(d) / 100;
+  return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+const parseValorInput = (v) => {
+  const d = onlyDigits(v);
+  return d ? Number(d) / 100 : 0;
+};
 
-/* ── Exportar CSV ── */
-function exportarCSV(vendas) {
-  const header = "ID,Cliente,Data,Pagamento,Vendedor,Itens,Total\n";
-  const rows = vendas.map(v =>
-    `${v.id},"${v.cliente || ""}","${fmtData(v.data)}","${v.formaPagamento || ""}","${v.vendedor || ""}",${v.itens?.length || 0},${v.total || 0}`
-  ).join("\n");
-  const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = "vendas.csv"; a.click();
-  URL.revokeObjectURL(url);
-}
+/* Gerador de docId único — aluno_{timestamp}_{rand5}
+   Zero colisão: vive em subcoleção /alunos, isolada de clientes/produtos/vendas */
+const gerarDocIdAluno = () =>
+  `aluno_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
+/* Próximo idSeq visual — puramente display, dentro da subcoleção alunos */
+const proximoIdSeq = (alunos) => {
+  const max = alunos.reduce((m, a) => Math.max(m, Number(a.idSeq || 0)), 0);
+  return max + 1;
+};
+const fmtIdSeq = (n) => `A${String(n).padStart(4, "0")}`;
+
+/* YYYY-MM do mês/ano */
+const toMesRef = (ano, mes) => `${ano}-${String(mes).padStart(2, "0")}`;
+
+/* Calcula data de vencimento (YYYY-MM-DD) para um dia X, ano e mês dados.
+   Dia sempre 1–28 (validação de entrada), não precisa de clamp. */
+const calcVencimento = (ano, mes /*1-12*/, dia) =>
+  `${ano}-${String(mes).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+
+/* Dado um aluno e a data atual, retorna próximo mês (ano, mes) ainda não gerado.
+   Se não há mensalidades, inicia no mês da dataInicio. */
+const proximoMesParaGerar = (aluno, mensalidadesDoAluno) => {
+  if (!mensalidadesDoAluno.length) {
+    const base = aluno.dataInicio
+      ? new Date(aluno.dataInicio + "T12:00:00")
+      : new Date();
+    return { ano: base.getFullYear(), mes: base.getMonth() + 1 };
+  }
+  /* pega o maior mesReferencia e avança 1 mês */
+  const ordenadas = [...mensalidadesDoAluno].sort((a, b) =>
+    (a.mesReferencia || "").localeCompare(b.mesReferencia || "")
+  );
+  const ultima = ordenadas[ordenadas.length - 1];
+  const [anoStr, mesStr] = (ultima.mesReferencia || "").split("-");
+  let ano = Number(anoStr) || new Date().getFullYear();
+  let mes = Number(mesStr) || new Date().getMonth() + 1;
+  mes += 1;
+  if (mes > 12) { mes = 1; ano += 1; }
+  return { ano, mes };
+};
+
+/* Status visual da mensalidade (pendente/vencendo/vencido) */
+const statusMensalidade = (mens) => {
+  const restante = Number(mens.valorRestante ?? 0);
+  if (restante <= 0) return "paga";
+  const hoje = new Date().toISOString().slice(0, 10);
+  const venc = mens.dataVencimento || "";
+  if (venc && venc < hoje) return "vencida";
+  /* Vence em até 3 dias = "vencendo" */
+  try {
+    const dVenc = new Date(venc + "T12:00:00");
+    const dHoje = new Date(hoje + "T12:00:00");
+    const diffDias = Math.round((dVenc - dHoje) / 86400000);
+    if (diffDias <= 3) return "vencendo";
+  } catch {}
+  return "pendente";
+};
+
+/* Primeiro nome */
+const primeiroNome = (s) => String(s || "").trim().split(/\s+/)[0] || "";
 
 /* ══════════════════════════════════════════════════
-   MODAL: Nova / Editar Venda  ← VERSÃO CORRIGIDA
+   CSS
    ══════════════════════════════════════════════════ */
-function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vendedorNome: vendedorNomeLogado, clientes, produtos, servicos, vendedores, taxas, onSave, onClose }) {
-  const isEdit = !!venda;
+const CSS = `
+/* reaproveita padrão Vendas/AReceber */
+.modal-overlay { position:fixed; inset:0; z-index:1000; background:rgba(0,0,0,.78);
+  backdrop-filter:blur(5px); display:flex; align-items:center; justify-content:center;
+  padding:20px; animation:fadeIn .15s ease; }
+.modal-overlay-top { z-index:1100; }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes slideUp { from{opacity:0;transform:translateY(14px)} to{opacity:1;transform:translateY(0)} }
+.modal-box { background:var(--s1); border:1px solid var(--border-h); border-radius:16px;
+  width:100%; max-width:520px; max-height:92vh; overflow-y:auto;
+  box-shadow:0 28px 72px rgba(0,0,0,.65); animation:slideUp .18s ease; }
+.modal-box-xl { max-width:820px; }
+.modal-box-lg { max-width:680px; }
+.modal-box-md { max-width:420px; }
+.modal-box::-webkit-scrollbar { width:3px; }
+.modal-box::-webkit-scrollbar-thumb { background:var(--text-3); border-radius:2px; }
+.modal-header { padding:20px 22px 16px; border-bottom:1px solid var(--border);
+  display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+  position:sticky; top:0; background:var(--s1); z-index:2; }
+.modal-title { font-family:'Sora',sans-serif; font-size:16px; font-weight:600; color:var(--text); }
+.modal-sub { font-size:12px; color:var(--text-2); margin-top:3px; }
+.modal-close { width:30px; height:30px; border-radius:8px; flex-shrink:0;
+  background:var(--s3); border:1px solid var(--border);
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+  margin-top:2px; transition:background .13s; }
+.modal-close:hover { background:var(--s2); border-color:var(--border-h); }
+.modal-body { padding:20px 22px; }
+.modal-footer { padding:14px 22px; border-top:1px solid var(--border);
+  display:flex; justify-content:flex-end; gap:10px;
+  position:sticky; bottom:0; background:var(--s1); z-index:2; }
 
-  const [tipo, setTipo] = useState(venda?.tipo || "produto");
+/* botões — espelham Vendas */
+.btn-primary { padding:9px 20px; border-radius:9px; background:var(--gold); color:#0a0808;
+  border:none; cursor:pointer; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600;
+  transition:opacity .13s, transform .1s; display:flex; align-items:center; gap:6px; }
+.btn-primary:hover { opacity:.88; }
+.btn-primary:active { transform:scale(.97); }
+.btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+.btn-secondary { padding:9px 20px; border-radius:9px; background:var(--s3); color:var(--text-2);
+  border:1px solid var(--border); cursor:pointer; font-family:'DM Sans',sans-serif; font-size:13px;
+  transition:background .13s, color .13s; display:flex; align-items:center; gap:6px; }
+.btn-secondary:hover { background:var(--s2); color:var(--text); }
+.btn-danger { padding:9px 20px; border-radius:9px; background:var(--red-d); color:var(--red);
+  border:1px solid rgba(224,82,82,.25); cursor:pointer;
+  font-family:'DM Sans',sans-serif; font-size:13px; transition:background .13s;
+  display:flex; align-items:center; gap:6px; }
+.btn-danger:hover { background:rgba(224,82,82,.18); }
+.btn-green { padding:9px 20px; border-radius:9px;
+  background:rgba(74,222,128,.12); color:var(--green);
+  border:1px solid rgba(74,222,128,.2); cursor:pointer;
+  font-family:'DM Sans',sans-serif; font-size:13px; font-weight:600;
+  transition:background .13s; display:flex; align-items:center; gap:6px; }
+.btn-green:hover { background:rgba(74,222,128,.2); }
+.btn-icon { width:30px; height:30px; border-radius:7px;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; border:1px solid transparent;
+  background:transparent; transition:all .13s; }
+.btn-icon-edit { color:var(--blue); }
+.btn-icon-edit:hover { background:var(--blue-d); border-color:rgba(91,142,240,.2); }
+.btn-icon-del { color:var(--red); }
+.btn-icon-del:hover { background:var(--red-d); border-color:rgba(224,82,82,.2); }
+.btn-icon-wpp { color:#25D366; }
+.btn-icon-wpp:hover { background:rgba(37,211,102,.12); border-color:rgba(37,211,102,.25); }
+.btn-icon-view { color:var(--text-2); }
+.btn-icon-view:hover { background:var(--s3); border-color:var(--border-h); }
 
-  // Cabeçalho
-  const [clienteSearch, setClienteSearch] = useState(venda?.cliente || "");
-  const [clienteAC, setClienteAC] = useState(false);
-  const [dataVenda, setDataVenda] = useState(
-    venda?.data 
-      ? (venda.data?.toDate 
-          ? venda.data.toDate().toISOString().split("T")[0] 
-          : new Date(venda.data).toISOString().split("T")[0]) 
-      : new Date().toISOString().split("T")[0]
-  );
-  // Vendedor: se cargo=vendedor, sempre usa o próprio nome (não pode trocar)
-  const isVendedorCargo = cargo === "vendedor";
-  const podeEscolherVendedor = cargo === "admin" || cargo === "comercial";
+/* forms — Vendas */
+.form-group { margin-bottom:16px; }
+.form-label { display:block; font-size:10px; font-weight:600;
+  letter-spacing:.07em; text-transform:uppercase;
+  color:var(--text-2); margin-bottom:7px; }
+.form-label-req { color:var(--gold); margin-left:2px; }
+.form-input, .form-textarea { width:100%; background:var(--s2);
+  border:1px solid var(--border); border-radius:9px;
+  padding:10px 13px; color:var(--text); font-size:13px;
+  font-family:'DM Sans',sans-serif; outline:none;
+  transition:border-color .15s, box-shadow .15s; box-sizing:border-box; }
+.form-textarea { resize:vertical; min-height:80px; font-family:'DM Sans',sans-serif; }
+.form-input:focus, .form-textarea:focus { border-color:var(--gold); box-shadow:0 0 0 3px rgba(200,165,94,.1); }
+.form-input.err { border-color:var(--red); }
+.form-error { font-size:11px; color:var(--red); margin-top:5px; }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.form-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
 
-  // Se cargo === "vendedor", sempre trava no próprio nome — em criação E edição.
-  // Somente admin/comercial podem escolher ou ver o vendedor salvo na venda.
-  const [vendedor, setVendedor] = useState(
-    isVendedorCargo
-      ? (vendedorNomeLogado || "")
-      : (venda?.vendedor || "")
-  );
-  // vendedorId: ID do cadastro (V0001 etc) — usado para relatórios e comissões
-  const [vendedorIdSel, setVendedorIdSel] = useState(
-    isVendedorCargo
-      ? (vendedorIdLogado || "")
-      : (venda?.vendedorId || "")
-  );
-  const [vendedorCargo, setVendedorCargo] = useState(
-    isVendedorCargo ? cargo : (venda?.vendedorCargo || "")
-  );
-  const [formaPgto, setFormaPgto] = useState(venda?.formaPagamento || "");
-  const [observacao, setObservacao] = useState(venda?.observacao || "");
+/* ── Módulo Matrículas ── */
+.mat-root { display:flex; flex-direction:column; height:100%; min-height:0; overflow:hidden; }
+.mat-topbar { padding:14px 22px; background:var(--s1); border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; gap:14px; flex-shrink:0; }
+.mat-topbar h1 { font-family:'Sora',sans-serif; font-size:17px; font-weight:600; color:var(--text); }
+.mat-topbar p { font-size:11px; color:var(--text-2); margin-top:2px; }
+.mat-actions { display:flex; gap:8px; }
 
-  /* Parcelas — só relevante quando formaPgto === "Cartão de Crédito" */
-  const [parcelas, setParcelas] = useState(venda?.parcelas || 1);
+.mat-content { flex:1; overflow-y:auto; padding:22px;
+  display:flex; flex-direction:column; gap:20px; }
+.mat-content::-webkit-scrollbar { width:3px; }
+.mat-content::-webkit-scrollbar-thumb { background:var(--text-3); border-radius:2px; }
 
-  /* Sinal — só relevante quando formaPgto === "Sinal" */
-  const [valorSinal, setValorSinal]       = useState(venda?.valorPago != null ? String(venda.valorPago) : "");
-  const [dataVencSinal, setDataVencSinal] = useState(venda?.dataVencSinal || "");
+/* cards */
+.mat-cards { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; }
+.mat-card { background:var(--s1); border:1px solid var(--border); border-radius:12px;
+  padding:16px 18px; display:flex; flex-direction:column; gap:6px; }
+.mat-card-label { font-size:11px; color:var(--text-2); font-weight:500; }
+.mat-card-value { font-family:'Sora',sans-serif; font-size:22px; font-weight:600; color:var(--text); }
+.mat-card-value.split { display:flex; align-items:baseline; gap:6px; }
+.mat-card-value .warn { color:#F5A623; }
+.mat-card-value .danger { color:var(--red); }
+.mat-card-value .ok { color:var(--green); }
+.mat-card-value .sep { color:var(--text-3); font-size:16px; font-weight:400; }
 
-  // Itens + Venda livre
-  const [itens, setItens] = useState(
-    venda?.itens?.length ? venda.itens : [itemVazio(venda?.tipo || "produto")]
-  );
+/* busca + filtro */
+.mat-filters { display:flex; gap:10px; align-items:center; }
+.mat-search { flex:1; position:relative; }
+.mat-search svg { position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-3); }
+.mat-search input { width:100%; padding:10px 12px 10px 36px;
+  background:var(--s2); border:1px solid var(--border); border-radius:9px;
+  color:var(--text); font-size:13px; font-family:'DM Sans',sans-serif;
+  outline:none; transition:border-color .15s; box-sizing:border-box; }
+.mat-search input:focus { border-color:var(--gold); }
+.mat-filter-select { padding:10px 12px; background:var(--s2);
+  border:1px solid var(--border); border-radius:9px;
+  color:var(--text); font-size:13px; font-family:'DM Sans',sans-serif; outline:none;
+  min-width:170px; cursor:pointer; }
 
-  const [livreNome, setLivreNome] = useState(venda?.livreNome || "");
-  const [livreValor, setLivreValor] = useState(venda?.livreValor || "");
-  const [livreDesc, setLivreDesc] = useState(venda?.livreDesc || 0);
+/* tabela */
+.mat-table-wrap { background:var(--s1); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
+.mat-table-header { padding:14px 18px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.mat-table-title { font-family:'Sora',sans-serif; font-size:14px; font-weight:600;
+  color:var(--text); display:flex; align-items:center; gap:8px; }
+.mat-table-badge { font-size:10px; background:var(--s3); color:var(--text-3);
+  padding:2px 8px; border-radius:20px; font-weight:600; }
+.mat-row, .mat-row-head { display:grid;
+  grid-template-columns: 72px 1.3fr 110px 110px 110px 110px 120px;
+  gap:10px; padding:12px 18px; border-bottom:1px solid var(--border); align-items:center; }
+.mat-row-head { font-size:10px; font-weight:600; letter-spacing:.07em;
+  text-transform:uppercase; color:var(--text-3); background:var(--s2); }
+.mat-row { font-size:13px; cursor:pointer; transition:background .13s; }
+.mat-row:hover { background:var(--s2); }
+.mat-row:last-child { border-bottom:none; }
+.mat-id { font-family:'JetBrains Mono','Courier New',monospace; color:var(--text-3); font-size:12px; }
+.mat-aluno-nome { color:var(--text); font-weight:500; }
+.mat-aluno-sub { color:var(--text-3); font-size:11px; }
+.mat-valor { font-family:'JetBrains Mono','Courier New',monospace; color:var(--text); }
+.mat-actions-cell { display:flex; justify-content:flex-end; gap:4px; }
 
-  // ←←← ESTADOS NECESSÁRIOS PARA AUTOCOMPLETE
-  const [itemSearches, setItemSearches] = useState(
-    venda?.itens?.length 
-      ? venda.itens.map(i => i.nome || "") 
-      : [""]
-  );
-  const [itemAC, setItemAC] = useState(null); // índice do item com autocomplete aberto
+/* status pill */
+.mat-pill { display:inline-flex; align-items:center; gap:5px;
+  padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; }
+.mat-pill.ok { background:rgba(74,222,128,.12); color:var(--green); border:1px solid rgba(74,222,128,.2); }
+.mat-pill.warn { background:rgba(245,166,35,.12); color:#F5A623; border:1px solid rgba(245,166,35,.25); }
+.mat-pill.danger { background:rgba(224,82,82,.12); color:var(--red); border:1px solid rgba(224,82,82,.25); }
+.mat-pill.neutral { background:var(--s3); color:var(--text-3); border:1px solid var(--border); }
 
-  const [salvando, setSalvando] = useState(false);
+.mat-empty { padding:42px 18px; text-align:center; color:var(--text-3); font-size:13px; }
+.mat-empty svg { margin-bottom:8px; }
+
+/* detalhe do aluno */
+.mat-detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px; }
+.mat-detail-item { background:var(--s2); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
+.mat-detail-label { font-size:10px; font-weight:600; letter-spacing:.07em;
+  text-transform:uppercase; color:var(--text-3); margin-bottom:4px; }
+.mat-detail-value { font-size:13px; color:var(--text); word-break:break-word; }
+.mat-section-title { font-family:'Sora',sans-serif; font-size:13px; font-weight:600;
+  color:var(--text); margin:4px 0 12px; display:flex; align-items:center; gap:7px; }
+
+/* lista mensalidades dentro do modal */
+.mat-mens-list { display:flex; flex-direction:column; border:1px solid var(--border);
+  border-radius:10px; overflow:hidden; }
+.mat-mens-row { display:grid; grid-template-columns: 1fr 110px 110px 100px 60px;
+  gap:10px; padding:10px 14px; border-bottom:1px solid var(--border);
+  align-items:center; font-size:12px; }
+.mat-mens-row:last-child { border-bottom:none; }
+.mat-mens-row.head { background:var(--s2); color:var(--text-3);
+  font-size:10px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; }
+.mat-mens-mes { color:var(--text); font-weight:500; }
+.mat-mens-valor { font-family:'JetBrains Mono',monospace; color:var(--text); }
+
+@media (max-width: 900px) {
+  .mat-cards { grid-template-columns: 1fr; }
+  .form-row, .form-row-3 { grid-template-columns: 1fr; }
+  .mat-row, .mat-row-head { grid-template-columns: 60px 1fr 100px 100px; }
+  .mat-row > span:nth-child(5), .mat-row > span:nth-child(6),
+  .mat-row-head > span:nth-child(5), .mat-row-head > span:nth-child(6) { display:none; }
+  .mat-detail-grid { grid-template-columns: 1fr; }
+  .mat-mens-row { grid-template-columns: 1fr 90px 70px; }
+  .mat-mens-row > *:nth-child(4), .mat-mens-row > *:nth-child(5) { display:none; }
+}
+`;
+
+/* ══════════════════════════════════════════════════
+   MODAL: Nova / Editar Matrícula
+   ══════════════════════════════════════════════════ */
+function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
+  const isEdit = !!aluno;
+
+  const [form, setForm] = useState({
+    nome:           aluno?.nome           || "",
+    documento:      aluno?.documento      || "",
+    telefone:       aluno?.telefone       || "",
+    email:          aluno?.email          || "",
+    dataNascimento: aluno?.dataNascimento || "",
+    endereco:       aluno?.endereco       || "",
+    responsavel:         aluno?.responsavel         || "",
+    telefoneResponsavel: aluno?.telefoneResponsavel || "",
+    valorMensalidade: aluno
+      ? Number(aluno.valorMensalidade || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : "",
+    diaVencimento: aluno?.diaVencimento || "10",
+    dataInicio:    aluno?.dataInicio    || new Date().toISOString().slice(0, 10),
+    status:        aluno?.status        || "ativo",
+    observacoes:   aluno?.observacoes   || "",
+  });
   const [erros, setErros] = useState({});
 
-  function itemVazio(tipoAtual = "produto") {
-    return {
-      produtoId: "",
-      nome: "",
-      qtd: 1,
-      preco: 0,
-      custo: 0,
-      desconto: 0,
-      tipo: tipoAtual,
-    };
-  }
-
-  /* Atualiza o tipo de todos os itens quando o tipo da venda muda */
-  useEffect(() => {
-    setItens(prevItens =>
-      prevItens.map(item => ({
-        ...item,
-        tipo,
-      }))
-    );
-  }, [tipo]);
-
-  /* Autocomplete de produtos/serviços */
-  const catalogoFiltrado = (search, idx) => {
-    const lista = tipo === "servico" ? servicos : produtos;
-    if (!search.trim()) return lista.slice(0, 8);
-    const q = search.toLowerCase();
-    return lista.filter(p =>
-      p.nome?.toLowerCase().includes(q) || p.id?.toLowerCase().includes(q)
-    ).slice(0, 8);
+  const set = (k, v) => {
+    setForm(f => ({ ...f, [k]: v }));
+    if (erros[k]) setErros(er => ({ ...er, [k]: null }));
   };
-
-  const selecionarProduto = (idx, prod) => {
-    const novo = [...itens];
-    novo[idx] = {
-      ...novo[idx],
-      produtoId: prod.id,
-      nome: prod.nome,
-      preco: prod.preco || 0,
-      custo: prod.custo || prod.precoCusto || 0,
-      tipo: tipo,
-    };
-    setItens(novo);
-
-    const ns = [...itemSearches];
-    ns[idx] = prod.nome;
-    setItemSearches(ns);
-    setItemAC(null);
-  };
-
-  const atualizarItem = (idx, campo, valor) => {
-    const novo = [...itens];
-    novo[idx] = { ...novo[idx], [campo]: valor };
-    setItens(novo);
-  };
-
-  const adicionarItem = () => {
-    setItens([...itens, itemVazio(tipo)]);
-    setItemSearches([...itemSearches, ""]);
-  };
-
-  const removerItem = (idx) => {
-    if (itens.length === 1) return;
-    setItens(itens.filter((_, i) => i !== idx));
-    setItemSearches(itemSearches.filter((_, i) => i !== idx));
-  };
-
-  /* Cálculos */
-  const calculos = useMemo(() => {
-    if (tipo === "livre") {
-      const val = parseFloat(livreValor) || 0;
-      const desc = parseFloat(livreDesc) || 0;
-      return { subtotal: val, descontos: desc, custo: 0, total: val - desc, lucro: val - desc };
-    }
-    const subtotal  = itens.reduce((s, i) => s + (parseFloat(i.preco) || 0) * (parseInt(i.qtd) || 1), 0);
-    const descontos = itens.reduce((s, i) => s + (parseFloat(i.desconto) || 0), 0);
-    const custo     = itens.reduce((s, i) => s + (parseFloat(i.custo) || 0) * (parseInt(i.qtd) || 1), 0);
-    const total     = subtotal - descontos;
-    return { subtotal, descontos, custo, total, lucro: total - custo };
-  }, [itens, tipo, livreValor, livreDesc]);
-
-  /* ── Taxa de cartão/pix — calculado de forma isolada, não altera lógica de calculos ── */
-  const taxaInfo = useMemo(() => {
-    const isCredito = formaPgto === "Cartão de Crédito";
-    const isDebito  = formaPgto === "Cartão de Débito";
-    const isPix     = formaPgto === "Pix";
-
-    /* PIX: só aplica se a taxa configurada for > 0 */
-    if (isPix) {
-      const taxaPercentual = parseFloat(taxas?.pix ?? TAXAS_DEFAULT.pix ?? 0) || 0;
-      if (taxaPercentual === 0) {
-        return { taxaPercentual: 0, valorTaxa: 0, parcelas: null, exibe: false, lucroReal: calculos.lucro };
-      }
-      const valorTaxa = parseFloat((calculos.total * (taxaPercentual / 100)).toFixed(2));
-      const lucroReal = parseFloat((calculos.lucro - valorTaxa).toFixed(2));
-      return { taxaPercentual, valorTaxa, parcelas: null, exibe: true, lucroReal };
-    }
-
-    if (!isCredito && !isDebito) {
-      return { taxaPercentual: 0, valorTaxa: 0, parcelas: null, exibe: false, lucroReal: calculos.lucro };
-    }
-
-    let chave, numParcelas;
-    if (isDebito) {
-      chave = "debito";
-      numParcelas = null;
-    } else {
-      numParcelas = parcelas || 1;
-      chave = `credito_${numParcelas}`;
-    }
-
-    const taxaPercentual = parseFloat(taxas?.[chave] ?? TAXAS_DEFAULT[chave] ?? 0) || 0;
-    const valorTaxa = parseFloat((calculos.total * (taxaPercentual / 100)).toFixed(2));
-    /* Taxa é custo operacional — deduz diretamente do lucro */
-    const lucroReal = parseFloat((calculos.lucro - valorTaxa).toFixed(2));
-
-    return { taxaPercentual, valorTaxa, parcelas: numParcelas, exibe: true, lucroReal };
-  }, [formaPgto, parcelas, taxas, calculos.total, calculos.lucro]);
-
-  /* ── Sinal — cálculo isolado, não toca em calculos ── */
-  const sinalInfo = useMemo(() => {
-    if (formaPgto !== "Sinal") return { ativo: false, valorPagoNum: 0, valorRestante: 0 };
-    const valorPagoNum = parseFloat(String(valorSinal).replace(",", ".")) || 0;
-    const valorRestante = parseFloat((calculos.total - valorPagoNum).toFixed(2));
-    return { ativo: true, valorPagoNum, valorRestante };
-  }, [formaPgto, valorSinal, calculos.total]);
 
   const validar = () => {
     const e = {};
-    if (!clienteSearch.trim()) e.cliente = "Informe o cliente.";
-    if (!formaPgto) e.formaPgto = "Selecione a forma de pagamento.";
-    if (tipo === "livre") {
-      if (!livreNome.trim()) e.livreNome = "Informe uma descrição.";
-      if (!livreValor || parseFloat(livreValor) <= 0) e.livreValor = "Informe o valor.";
-    }
-    /* Validações exclusivas do Sinal */
-    if (formaPgto === "Sinal") {
-      if (!sinalInfo.valorPagoNum || sinalInfo.valorPagoNum <= 0)
-        e.valorSinal = "Informe o valor do sinal (maior que zero).";
-      else if (sinalInfo.valorPagoNum >= calculos.total)
-        e.valorSinal = "O sinal deve ser menor que o total da venda.";
-      if (!dataVencSinal)
-        e.dataVencSinal = "Data de vencimento do restante é obrigatória.";
-    }
+    if (!form.nome.trim() || form.nome.trim().length < 3)
+      e.nome = "Nome completo é obrigatório (mínimo 3 caracteres).";
+    const docDigits = onlyDigits(form.documento);
+    if (!docDigits || docDigits.length < 5)
+      e.documento = "Documento (CPF/RG) é obrigatório.";
+    const telDigits = onlyDigits(form.telefone);
+    if (!telDigits || telDigits.length < 10)
+      e.telefone = "Telefone válido é obrigatório (com DDD).";
+    const valor = parseValorInput(form.valorMensalidade);
+    if (!valor || valor <= 0)
+      e.valorMensalidade = "Valor deve ser maior que zero.";
+    const dia = Number(form.diaVencimento);
+    if (!dia || dia < 1 || dia > 28)
+      e.diaVencimento = "Dia de vencimento deve ser entre 1 e 28.";
+    if (!form.dataInicio)
+      e.dataInicio = "Data de início é obrigatória.";
+
+    /* documento duplicado (exceto o próprio aluno em edição) */
+    const duplicado = alunosExistentes.find(a =>
+      a.docId !== aluno?.docId &&
+      onlyDigits(a.documento) === docDigits
+    );
+    if (duplicado) e.documento = `Documento já cadastrado para ${duplicado.nome}.`;
+
     setErros(e);
     return Object.keys(e).length === 0;
   };
 
-  const handleSalvar = async () => {
+  const handleSubmit = () => {
     if (!validar()) return;
-    setSalvando(true);
-
-    const payload = {
-      cliente: clienteSearch.trim(),
-      data: new Date(dataVenda + "T12:00:00"),
-      vendedor:   vendedor.trim(),
-      vendedorId: vendedorIdSel || "",   // ID do cadastro — base para relatórios
-      vendedorCargo: vendedorCargo.trim(),
-      formaPagamento: formaPgto,
-      observacao: observacao.trim(),
-      tipo,
-      total: calculos.total,
-      subtotal: calculos.subtotal,
-      descontos: calculos.descontos,
-      custoTotal: calculos.custo,
-      /* Taxa é custo operacional — lucro já deduz a taxa */
-      lucroEstimado: taxaInfo.lucroReal,
-      /* ── Taxa de cartão (0 quando não é cartão — compatível com dados antigos) ── */
-      parcelas:       taxaInfo.parcelas,
-      taxaPercentual: taxaInfo.taxaPercentual,
-      valorTaxa:      taxaInfo.valorTaxa,
-      /* ── Sinal (null quando não é sinal — compatível com dados antigos) ── */
-      valorPago:      sinalInfo.ativo ? sinalInfo.valorPagoNum    : null,
-      valorRestante:  sinalInfo.ativo ? sinalInfo.valorRestante   : null,
-      dataVencSinal:  sinalInfo.ativo ? dataVencSinal             : null,
-      /* ── Controle de recebimento — regime de caixa puro ──
-         statusPagamento: "recebido" | "parcial" | "pendente"
-         valorRecebido  : valor que efetivamente entrou no caixa neste momento.
-         Vendas antigas sem este campo são tratadas como "recebido" (fallback). */
-      statusPagamento: sinalInfo.ativo
-        ? (sinalInfo.valorPagoNum > 0 ? "parcial" : "pendente")
-        : "recebido",
-      valorRecebido: sinalInfo.ativo
-        ? sinalInfo.valorPagoNum
-        : calculos.total,
-    };
-
-    if (tipo === "livre") {
-      payload.itens = [{
-        nome: livreNome.trim(),
-        qtd: 1,
-        preco: parseFloat(livreValor) || 0,
-        custo: 0,
-        desconto: parseFloat(livreDesc) || 0,
-        produtoId: null,
-        tipo: "livre",
-      }];
-      payload.livreNome = livreNome.trim();
-      payload.livreValor = parseFloat(livreValor) || 0;
-      payload.livreDesc = parseFloat(livreDesc) || 0;
-    } else {
-      payload.itens = itens.map(i => ({
-        produtoId: i.produtoId || null,
-        nome: i.nome,
-        qtd: parseInt(i.qtd) || 1,
-        preco: parseFloat(i.preco) || 0,
-        custo: parseFloat(i.custo) || 0,
-        desconto: parseFloat(i.desconto) || 0,
-        tipo,
-      }));
-    }
-
-    await onSave(payload, isEdit ? venda : null);
-    setSalvando(false);
+    onSave({
+      nome:                form.nome.trim(),
+      documento:           form.documento.trim(),
+      telefone:            form.telefone.trim(),
+      email:               form.email.trim(),
+      dataNascimento:      form.dataNascimento,
+      endereco:            form.endereco.trim(),
+      responsavel:         form.responsavel.trim(),
+      telefoneResponsavel: form.telefoneResponsavel.trim(),
+      valorMensalidade:    parseValorInput(form.valorMensalidade),
+      diaVencimento:       Number(form.diaVencimento),
+      dataInicio:          form.dataInicio,
+      status:              form.status,
+      observacoes:         form.observacoes.trim(),
+    });
   };
 
-  /* Autocomplete clientes */
-  const clientesFiltrados = useMemo(() => {
-    if (!clienteSearch.trim()) return clientes.slice(0, 6);
-    const q = clienteSearch.toLowerCase();
-    return clientes.filter(c =>
-      c.nome?.toLowerCase().includes(q) || c.cpf?.toLowerCase().includes(q)
-    ).slice(0, 6);
-  }, [clientes, clienteSearch]);
-
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-box modal-box-xl">
-
         <div className="modal-header">
           <div>
-            <div className="modal-title">{isEdit ? `Editando ${venda.id}` : "Nova Venda"}</div>
-            <div className="modal-sub">{isEdit ? "Altere os dados e salve" : "Registre uma nova venda"}</div>
+            <div className="modal-title">{isEdit ? "Editar matrícula" : "Nova matrícula"}</div>
+            <div className="modal-sub">
+              {isEdit ? `Editando ${aluno.nome}` : "Preencha os dados do aluno"}
+            </div>
           </div>
-          <button className="modal-close" onClick={onClose}>
-            <X size={14} color="var(--text-2)" />
-          </button>
+          <button className="modal-close" onClick={onClose}><X size={16} /></button>
         </div>
 
         <div className="modal-body">
+          {/* — Dados pessoais — */}
+          <div className="mat-section-title"><User size={14} /> Dados pessoais</div>
 
-          {/* Tabs tipo */}
-          <div className="nv-tabs">
-            <button className={`nv-tab ${tipo === "produto" ? "active" : ""}`} onClick={() => setTipo("produto")}>
-              <Package size={13} /> Produto
-            </button>
-            <button className={`nv-tab ${tipo === "servico" ? "active" : ""}`} onClick={() => setTipo("servico")}>
-              🎯 Serviço
-            </button>
-            <button className={`nv-tab ${tipo === "livre" ? "active" : ""}`} onClick={() => setTipo("livre")}>
-              <FileText size={13} /> Valor Livre
-            </button>
+          <div className="form-group">
+            <label className="form-label">Nome completo<span className="form-label-req">*</span></label>
+            <input type="text" className={`form-input ${erros.nome ? "err" : ""}`}
+              value={form.nome} onChange={(e) => set("nome", e.target.value)}
+              placeholder="Nome completo do aluno" autoFocus />
+            {erros.nome && <div className="form-error">{erros.nome}</div>}
           </div>
 
-          {/* Cabeçalho */}
           <div className="form-row">
-            <div className="form-group nv-autocomplete">
-              <label className="form-label">Cliente <span className="form-label-req">*</span></label>
-              <input
-                className={`form-input ${erros.cliente ? "err" : ""}`}
-                placeholder="Buscar por nome ou CPF..."
-                value={clienteSearch}
-                onChange={e => { setClienteSearch(e.target.value); setClienteAC(true); }}
-                onFocus={() => setClienteAC(true)}
-                onBlur={() => setTimeout(() => setClienteAC(false), 180)}
-                autoComplete="off"
-              />
-              {erros.cliente && <div className="form-error">{erros.cliente}</div>}
-              {clienteAC && (
-                <div className="nv-ac-list">
-                  {clientesFiltrados.length === 0
-                    ? <div className="nv-ac-empty">Nenhum cliente encontrado</div>
-                    : clientesFiltrados.map(c => (
-                        <div key={c.id} className="nv-ac-item" 
-                             onMouseDown={() => { setClienteSearch(c.nome); setClienteAC(false); }}>
-                          <span>{c.nome}</span>
-                          <span className="nv-ac-item-sub">{c.cpf || c.telefone || ""}</span>
-                        </div>
-                      ))
-                  }
-                </div>
-              )}
+            <div className="form-group">
+              <label className="form-label">Documento (CPF/RG)<span className="form-label-req">*</span></label>
+              <input type="text" className={`form-input ${erros.documento ? "err" : ""}`}
+                value={form.documento}
+                onChange={(e) => set("documento", fmtCPF(e.target.value))}
+                placeholder="000.000.000-00" maxLength={14} />
+              {erros.documento && <div className="form-error">{erros.documento}</div>}
             </div>
 
             <div className="form-group">
-              <label className="form-label">Data da Venda</label>
-              <input
-                type="date"
-                className="form-input"
-                value={dataVenda}
-                onChange={e => setDataVenda(e.target.value)}
-              />
+              <label className="form-label">Data de nascimento</label>
+              <input type="date" className="form-input"
+                value={form.dataNascimento}
+                onChange={(e) => set("dataNascimento", e.target.value)} />
             </div>
           </div>
 
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Vendedor</label>
-              {isVendedorCargo ? (
-                /* Vendedor só pode criar no próprio nome — campo bloqueado */
-                <input
-                  className="form-input"
-                  value={vendedor}
-                  disabled
-                  style={{ opacity: 0.6, cursor: "not-allowed" }}
-                />
-              ) : podeEscolherVendedor && vendedores?.length > 0 ? (
-                <select className="form-input" value={vendedor} onChange={e => {
-                  const nome = e.target.value;
-                  setVendedor(nome);
-                  const found = vendedores.find(v => (v.nome || v) === nome);
-                  setVendedorIdSel(found?.id || "");
-                  setVendedorCargo(found?.cargo || "");
-                }}>
-                  <option value="">— Nenhum / Não informado —</option>
-                  {vendedores.map(v => (
-                    <option key={v.id || v} value={v.nome || v}>{v.nome || v}</option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  className="form-input"
-                  placeholder="Nome do vendedor..."
-                  value={vendedor}
-                  onChange={e => setVendedor(e.target.value)}
-                />
-              )}
+              <label className="form-label">Telefone<span className="form-label-req">*</span></label>
+              <input type="text" className={`form-input ${erros.telefone ? "err" : ""}`}
+                value={form.telefone}
+                onChange={(e) => set("telefone", fmtTelefone(e.target.value))}
+                placeholder="(62) 99999-9999" maxLength={15} />
+              {erros.telefone && <div className="form-error">{erros.telefone}</div>}
             </div>
-
             <div className="form-group">
-              <label className="form-label">Forma de Pagamento <span className="form-label-req">*</span></label>
-              <select 
-                className={`form-input ${erros.formaPgto ? "err" : ""}`} 
-                value={formaPgto} 
-                onChange={e => {
-                  setFormaPgto(e.target.value);
-                  setParcelas(1);
-                  setValorSinal("");
-                  setDataVencSinal("");
-                }}
-              >
-                <option value="">— Selecionar —</option>
-                {FORMAS_PAGAMENTO.map(f => <option key={f} value={f}>{f}</option>)}
+              <label className="form-label">Email</label>
+              <input type="email" className="form-input"
+                value={form.email} onChange={(e) => set("email", e.target.value)}
+                placeholder="email@exemplo.com" />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Endereço</label>
+            <input type="text" className="form-input"
+              value={form.endereco} onChange={(e) => set("endereco", e.target.value)}
+              placeholder="Rua, número, bairro, cidade" />
+          </div>
+
+          {/* — Responsável (opcional) — */}
+          <div className="mat-section-title" style={{ marginTop: 8 }}>
+            <User size={14} /> Responsável (opcional, caso menor de idade)
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Nome do responsável</label>
+              <input type="text" className="form-input"
+                value={form.responsavel}
+                onChange={(e) => set("responsavel", e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Telefone do responsável</label>
+              <input type="text" className="form-input"
+                value={form.telefoneResponsavel}
+                onChange={(e) => set("telefoneResponsavel", fmtTelefone(e.target.value))}
+                placeholder="(62) 99999-9999" maxLength={15} />
+            </div>
+          </div>
+
+          {/* — Mensalidade — */}
+          <div className="mat-section-title" style={{ marginTop: 8 }}>
+            <CreditCard size={14} /> Dados da mensalidade
+          </div>
+          <div className="form-row-3">
+            <div className="form-group">
+              <label className="form-label">Valor (R$)<span className="form-label-req">*</span></label>
+              <input type="text" className={`form-input ${erros.valorMensalidade ? "err" : ""}`}
+                value={form.valorMensalidade}
+                onChange={(e) => set("valorMensalidade", fmtValorInput(e.target.value))}
+                placeholder="0,00" />
+              {erros.valorMensalidade && <div className="form-error">{erros.valorMensalidade}</div>}
+            </div>
+            <div className="form-group">
+              <label className="form-label">Dia vencimento<span className="form-label-req">*</span></label>
+              <input type="number" min={1} max={28}
+                className={`form-input ${erros.diaVencimento ? "err" : ""}`}
+                value={form.diaVencimento}
+                onChange={(e) => set("diaVencimento", e.target.value)} />
+              {erros.diaVencimento && <div className="form-error">{erros.diaVencimento}</div>}
+            </div>
+            <div className="form-group">
+              <label className="form-label">Início<span className="form-label-req">*</span></label>
+              <input type="date" className={`form-input ${erros.dataInicio ? "err" : ""}`}
+                value={form.dataInicio}
+                onChange={(e) => set("dataInicio", e.target.value)} />
+              {erros.dataInicio && <div className="form-error">{erros.dataInicio}</div>}
+            </div>
+          </div>
+
+          {isEdit && (
+            <div className="form-group">
+              <label className="form-label">Situação</label>
+              <select className="form-input" value={form.status}
+                onChange={(e) => set("status", e.target.value)}>
+                <option value="ativo">Ativo</option>
+                <option value="trancado">Trancado</option>
+                <option value="inativo">Inativo</option>
               </select>
-              {erros.formaPgto && <div className="form-error">{erros.formaPgto}</div>}
-
-              {/* Seletor de parcelas — aparece somente para Cartão de Crédito */}
-              {formaPgto === "Cartão de Crédito" && (
-                <div style={{ marginTop: 10 }}>
-                  <div className="form-label" style={{ marginBottom: 6 }}>Parcelas</div>
-                  <div className="nv-parcelas-wrap">
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map(n => {
-                      const chave = `credito_${n}`;
-                      const taxa  = parseFloat(taxas?.[chave] ?? TAXAS_DEFAULT[chave] ?? 0);
-                      return (
-                        <button
-                          key={n}
-                          type="button"
-                          className={`nv-parcela-btn ${parcelas === n ? "active" : ""}`}
-                          onClick={() => setParcelas(n)}
-                        >
-                          {n}x <span style={{ opacity: 0.7, fontSize: 10 }}>({taxa}%)</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {taxaInfo.taxaPercentual > 0 && (
-                    <div className="nv-taxa-info">
-                      Taxa de <strong>{taxaInfo.taxaPercentual}%</strong> = <strong>{fmtR$(taxaInfo.valorTaxa)}</strong> sobre o total
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Campos do Sinal — só para pagamento "Sinal" */}
-              {formaPgto === "Sinal" && (
-                <div style={{ marginTop: 12 }}>
-                  <div className="form-row" style={{ marginBottom: 0 }}>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label">
-                        Valor do Sinal (R$) <span className="form-label-req">*</span>
-                      </label>
-                      <input
-                        type="number" min="0.01" step="0.01"
-                        className={`form-input ${erros.valorSinal ? "err" : ""}`}
-                        placeholder="0,00"
-                        value={valorSinal}
-                        onChange={e => { setValorSinal(e.target.value); setErros(ev => ({ ...ev, valorSinal: "" })); }}
-                      />
-                      {erros.valorSinal && <div className="form-error">{erros.valorSinal}</div>}
-                    </div>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label">
-                        Vencimento do Restante <span className="form-label-req">*</span>
-                      </label>
-                      <input
-                        type="date"
-                        className={`form-input ${erros.dataVencSinal ? "err" : ""}`}
-                        value={dataVencSinal}
-                        onChange={e => { setDataVencSinal(e.target.value); setErros(ev => ({ ...ev, dataVencSinal: "" })); }}
-                      />
-                      {erros.dataVencSinal && <div className="form-error">{erros.dataVencSinal}</div>}
-                    </div>
-                  </div>
-
-                  {/* Resumo do sinal em tempo real */}
-                  {sinalInfo.valorPagoNum > 0 && sinalInfo.valorPagoNum < calculos.total && (
-                    <div className="nv-sinal-box">
-                      <div className="nv-sinal-row">
-                        <span>Total da venda</span>
-                        <span style={{ fontFamily: "Sora, sans-serif", fontWeight: 600, color: "var(--text)" }}>
-                          {fmtR$(calculos.total)}
-                        </span>
-                      </div>
-                      <div className="nv-sinal-row">
-                        <span>Sinal (recebido agora)</span>
-                        <span style={{ color: "var(--green)", fontFamily: "Sora, sans-serif", fontWeight: 600 }}>
-                          {fmtR$(sinalInfo.valorPagoNum)}
-                        </span>
-                      </div>
-                      <div className="nv-sinal-row">
-                        <span style={{ fontWeight: 600, color: "var(--text)" }}>Restante (A Receber)</span>
-                        <span className="nv-sinal-restante">{fmtR$(sinalInfo.valorRestante)}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
-          </div>
-
-          <div className="nv-section-sep" />
-
-          {/* Itens da venda */}
-          {tipo === "livre" ? (
-            /* ... (parte de venda livre - mantida igual) ... */
-            <>
-              <div className="nv-livre-info">
-                <strong>Venda de Valor Livre</strong> — sem produto ou serviço cadastrado.
-                Informe a descrição e o valor abaixo.
-              </div>
-              <div className="form-row-3">
-                <div className="form-group" style={{ gridColumn: "1/3" }}>
-                  <label className="form-label">Descrição <span className="form-label-req">*</span></label>
-                  <input
-                    className={`form-input ${erros.livreNome ? "err" : ""}`}
-                    placeholder="Ex: Serviço personalizado..."
-                    value={livreNome}
-                    onChange={e => setLivreNome(e.target.value)}
-                  />
-                  {erros.livreNome && <div className="form-error">{erros.livreNome}</div>}
-                </div>
-                <div className="form-group" style={{ gridColumn: "3/4" }}>
-                  <label className="form-label">Valor (R$) <span className="form-label-req">*</span></label>
-                  <input
-                    type="number" min="0" step="0.01"
-                    className={`form-input ${erros.livreValor ? "err" : ""}`}
-                    placeholder="0,00"
-                    value={livreValor}
-                    onChange={e => setLivreValor(e.target.value)}
-                  />
-                  {erros.livreValor && <div className="form-error">{erros.livreValor}</div>}
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Desconto (R$)</label>
-                  <input
-                    type="number" min="0" step="0.01"
-                    className="form-input"
-                    placeholder="0"
-                    value={livreDesc}
-                    onChange={e => setLivreDesc(e.target.value)}
-                  />
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="nv-items-header">
-                <span className="nv-items-label">Itens da Venda</span>
-                <button className="nv-add-item-btn" onClick={adicionarItem}>
-                  <Plus size={12} /> Adicionar item
-                </button>
-              </div>
-
-              {itens.map((item, idx) => (
-                <div key={idx} className="nv-item-row">
-                  <div style={{ position: "relative" }}>
-                    <div className="nv-item-field-label">
-                      {tipo === "servico" ? "Serviço" : "Produto"}
-                    </div>
-                    <input
-                      className="form-input"
-                      placeholder={`Buscar ${tipo === "servico" ? "serviço" : "produto"}...`}
-                      value={itemSearches[idx] || ""}
-                      onChange={e => {
-                        const ns = [...itemSearches];
-                        ns[idx] = e.target.value;
-                        setItemSearches(ns);
-                        /* Ao redigitar, desvincula o item do catálogo —
-                           o usuário precisa selecionar novamente para bloquear o preço */
-                        const novo = [...itens];
-                        novo[idx] = { ...novo[idx], nome: e.target.value, produtoId: "" };
-                        setItens(novo);
-                        setItemAC(idx);
-                      }}
-                      onFocus={() => setItemAC(idx)}
-                      onBlur={() => setTimeout(() => setItemAC(null), 180)}
-                      autoComplete="off"
-                    />
-                    {itemAC === idx && (
-                      <div className="nv-ac-list">
-                        {catalogoFiltrado(itemSearches[idx] || "", idx).length === 0
-                          ? <div className="nv-ac-empty">Nenhum item encontrado</div>
-                          : catalogoFiltrado(itemSearches[idx] || "", idx).map(p => (
-                              <div 
-                                key={p.id} 
-                                className="nv-ac-item" 
-                                onMouseDown={() => selecionarProduto(idx, p)}
-                              >
-                                <span>{p.nome}</span>
-                                <span className="nv-ac-item-sub">{fmtR$(p.preco || 0)}</span>
-                              </div>
-                            ))
-                        }
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <div className="nv-item-field-label">Qtd</div>
-                    <input
-                      type="number" min="1"
-                      className="form-input"
-                      value={item.qtd}
-                      onChange={e => atualizarItem(idx, "qtd", e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <div className="nv-item-field-label">
-                      Preço Unit. (R$)
-                      {item.produtoId && (
-                        <span
-                          title="Valor definido pelo cadastro — não editável"
-                          style={{ marginLeft: 5, fontSize: 10, color: "var(--text-3)", verticalAlign: "middle" }}
-                        >🔒</span>
-                      )}
-                    </div>
-                    <input
-                      type="number" min="0" step="0.01"
-                      className="form-input"
-                      value={item.preco}
-                      readOnly={!!item.produtoId}
-                      style={item.produtoId
-                        ? { opacity: 0.6, cursor: "not-allowed", background: "var(--s3)", userSelect: "none" }
-                        : {}}
-                      onChange={e => !item.produtoId && atualizarItem(idx, "preco", e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <div className="nv-item-field-label">
-                      Custo Unit. (R$)
-                      {item.produtoId && (
-                        <span
-                          title="Valor definido pelo cadastro — não editável"
-                          style={{ marginLeft: 5, fontSize: 10, color: "var(--text-3)", verticalAlign: "middle" }}
-                        >🔒</span>
-                      )}
-                    </div>
-                    <input
-                      type="number" min="0" step="0.01"
-                      className="form-input"
-                      value={item.custo}
-                      readOnly={!!item.produtoId}
-                      style={item.produtoId
-                        ? { opacity: 0.6, cursor: "not-allowed", background: "var(--s3)", userSelect: "none" }
-                        : {}}
-                      onChange={e => !item.produtoId && atualizarItem(idx, "custo", e.target.value)}
-                    />
-                  </div>
-
-                  <div>
-                    <div className="nv-item-field-label">Desconto (R$)</div>
-                    <input
-                      type="number" min="0" step="0.01"
-                      className="form-input"
-                      value={item.desconto}
-                      onChange={e => atualizarItem(idx, "desconto", e.target.value)}
-                    />
-                  </div>
-
-                  <button 
-                    className="nv-item-remove" 
-                    onClick={() => removerItem(idx)} 
-                    disabled={itens.length === 1}
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              ))}
-            </>
           )}
 
-          {/* Totais */}
-          <div className="nv-totals-bar">
-            <div className="nv-total-cell">
-              <div className="nv-total-label">Subtotal</div>
-              <div className="nv-total-val" style={{ color: "var(--text)" }}>{fmtR$(calculos.subtotal)}</div>
-            </div>
-            <div className="nv-total-cell">
-              <div className="nv-total-label">Descontos</div>
-              <div className="nv-total-val" style={{ color: "var(--red)" }}>{fmtR$(calculos.descontos)}</div>
-            </div>
-            {tipo !== "livre" && (
-              <div className="nv-total-cell">
-                <div className="nv-total-label">Custo Total</div>
-                <div className="nv-total-val" style={{ color: "var(--red)" }}>{fmtR$(calculos.custo)}</div>
-              </div>
-            )}
-            {taxaInfo.exibe && (
-              <div className="nv-total-cell">
-                <div className="nv-total-label">Taxa {formaPgto === "Pix" ? "PIX" : "Cartão"} ({taxaInfo.taxaPercentual}%)</div>
-                <div className="nv-total-val" style={{ color: "var(--red)" }}>{fmtR$(taxaInfo.valorTaxa)}</div>
-              </div>
-            )}
-            <div className="nv-total-cell">
-              <div className="nv-total-label">Total</div>
-              <div className="nv-total-val" style={{ color: "var(--green)" }}>{fmtR$(calculos.total)}</div>
-            </div>
-            <div className="nv-total-cell">
-              <div className="nv-total-label">Lucro Est.</div>
-              <div className="nv-total-val" style={{ color: "var(--gold)" }}>{fmtR$(taxaInfo.lucroReal)}</div>
-            </div>
+          <div className="form-group">
+            <label className="form-label">Observações</label>
+            <textarea className="form-textarea"
+              value={form.observacoes}
+              onChange={(e) => set("observacoes", e.target.value)}
+              placeholder="Anotações livres sobre o aluno…" />
           </div>
-
-          <div className="nv-section-sep" />
-
-          {/* Observação */}
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Observação da Venda</label>
-            <textarea
-              className="form-input"
-              style={{ resize: "vertical", minHeight: 70 }}
-              placeholder="Ex: Cliente pediu entrega..."
-              value={observacao}
-              onChange={e => setObservacao(e.target.value)}
-            />
-          </div>
-
         </div>
 
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
-            {salvando ? "Salvando..." : isEdit ? "Salvar Alterações" : "✓ Finalizar Venda"}
+          <button className="btn-primary" onClick={handleSubmit}>
+            <CheckCircle size={14} /> {isEdit ? "Salvar alterações" : "Cadastrar aluno"}
           </button>
         </div>
-
       </div>
     </div>
   );
 }
 
 /* ══════════════════════════════════════════════════
-   MODAL: Detalhe de Venda (clique na linha)
+   MODAL: Detalhe do aluno (+ mensalidades)
    ══════════════════════════════════════════════════ */
-function ModalDetalheVenda({ venda, onClose, onEditar, onCancelar, onExcluirDef, isAdmin }) {
-  if (!venda) return null;
-  const itens = venda.itens || [];
+function ModalDetalheAluno({
+  aluno, mensalidades, config,
+  onClose, onEditar, onExcluir, onGerarMensalidade,
+  podeEditar, podeExcluir,
+}) {
+  /* Monta link de WhatsApp com template da config */
+  const cobrarWhatsApp = (mensAlvo) => {
+    const numero = onlyDigits(aluno.telefone || aluno.telefoneResponsavel || "");
+    if (!numero || numero.length < 10) {
+      alert("Este aluno não tem telefone válido cadastrado.");
+      return;
+    }
+    /* Pega a próxima mensalidade pendente, ou a específica se vier no parâmetro */
+    const alvo = mensAlvo || mensalidades
+      .filter(m => Number(m.valorRestante || 0) > 0)
+      .sort((a, b) => (a.dataVencimento || "").localeCompare(b.dataVencimento || ""))[0];
 
-  const subtotal   = itens.reduce((s, i) => s + (i.preco || 0) * (i.qtd || 1), 0);
-  const descontos  = itens.reduce((s, i) => s + (i.desconto || 0), 0);
-  const custoTotal = itens.reduce((s, i) => s + (i.custo || 0) * (i.qtd || 1), 0);
-  const total      = typeof venda.total === "number" ? venda.total : subtotal - descontos;
-  const lucro      = total - custoTotal;
+    const template = config?.mensagemWhatsApp || MSG_WHATSAPP_DEFAULT;
+    let mesNome = "sua mensalidade";
+    let valorFmt = fmtR$(aluno.valorMensalidade);
+    if (alvo?.mesReferencia) {
+      const [ano, mes] = alvo.mesReferencia.split("-");
+      mesNome = `${MESES_PT[Number(mes) - 1]}/${ano}`;
+      valorFmt = fmtR$(alvo.valorRestante ?? alvo.valorTotal ?? aluno.valorMensalidade);
+    }
+    const msg = template
+      .replace(/\[nome\]/gi, primeiroNome(aluno.nome))
+      .replace(/\[mes\]/gi, mesNome)
+      .replace(/\[valor\]/gi, valorFmt);
+
+    const url = `https://wa.me/55${numero}?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  const mensOrdenadas = useMemo(() =>
+    [...mensalidades].sort((a, b) =>
+      (b.mesReferencia || "").localeCompare(a.mesReferencia || "")
+    ),
+    [mensalidades]
+  );
+
+  const resumo = useMemo(() => {
+    const abertas = mensalidades.filter(m => Number(m.valorRestante || 0) > 0);
+    const pagas = mensalidades.filter(m => Number(m.valorRestante || 0) <= 0);
+    const totalAberto = abertas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
+    const totalPago = pagas.reduce((s, m) => s + Number(m.valorPago || m.valorTotal || 0), 0);
+    const vencidas = abertas.filter(m => statusMensalidade(m) === "vencida").length;
+    return { abertas: abertas.length, pagas: pagas.length, totalAberto, totalPago, vencidas };
+  }, [mensalidades]);
 
   return (
-    <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box modal-box-lg">
-
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box modal-box-xl">
         <div className="modal-header">
           <div>
-            <div className="modal-title" style={{ color: "var(--gold)" }}>{venda.id}</div>
-            <div className="modal-sub">Detalhes da venda</div>
+            <div className="modal-title">{aluno.nome}</div>
+            <div className="modal-sub">
+              {fmtIdSeq(aluno.idSeq)} · {aluno.documento || "—"} ·{" "}
+              <span className={`mat-pill ${aluno.status === "ativo" ? "ok" : "neutral"}`}>
+                {aluno.status === "ativo" ? "Ativo" : aluno.status === "trancado" ? "Trancado" : "Inativo"}
+              </span>
+            </div>
           </div>
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            {onEditar && (
-              <button className="btn-icon btn-icon-edit" onClick={() => onEditar(venda)} title="Editar">
-                <Edit2 size={13} />
-              </button>
-            )}
-            {onCancelar && (
-              <button className="btn-icon btn-icon-cancel" onClick={() => onCancelar(venda)} title="Cancelar venda">
-                <Ban size={13} />
-              </button>
-            )}
-            {isAdmin && onExcluirDef && (
-              <button className="btn-icon btn-icon-del" onClick={() => onExcluirDef(venda)} title="Excluir permanentemente">
-                <Trash2 size={13} />
-              </button>
-            )}
-            <button className="modal-close" onClick={onClose}>
-              <X size={14} color="var(--text-2)" />
-            </button>
-          </div>
+          <button className="modal-close" onClick={onClose}><X size={16} /></button>
         </div>
 
         <div className="modal-body">
-
-          {/* Meta cards */}
-          <div className="dv-meta">
-            <div className="dv-meta-card">
-              <div className="dv-meta-label">Cliente</div>
-              <div className="dv-meta-val">{venda.cliente || "—"}</div>
+          {/* — Grid de dados — */}
+          <div className="mat-detail-grid">
+            <div className="mat-detail-item">
+              <div className="mat-detail-label"><Phone size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />Telefone</div>
+              <div className="mat-detail-value">{aluno.telefone || "—"}</div>
             </div>
-            <div className="dv-meta-card">
-              <div className="dv-meta-label">Data</div>
-              <div className="dv-meta-val">{fmtData(venda.data)}</div>
+            <div className="mat-detail-item">
+              <div className="mat-detail-label"><Mail size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />Email</div>
+              <div className="mat-detail-value">{aluno.email || "—"}</div>
             </div>
-            <div className="dv-meta-card">
-              <div className="dv-meta-label">Pagamento</div>
-              <div className="dv-meta-val">
-                {venda.formaPagamento || "—"}
-                {venda.parcelas > 1 && (
-                  <span style={{ marginLeft: 6, fontSize: 11, color: "var(--gold)" }}>
-                    {venda.parcelas}x
-                  </span>
-                )}
+            <div className="mat-detail-item">
+              <div className="mat-detail-label"><DollarSign size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />Mensalidade</div>
+              <div className="mat-detail-value">{fmtR$(aluno.valorMensalidade)}</div>
+            </div>
+            <div className="mat-detail-item">
+              <div className="mat-detail-label"><Calendar size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />Vencimento</div>
+              <div className="mat-detail-value">Todo dia {aluno.diaVencimento}</div>
+            </div>
+            {aluno.endereco && (
+              <div className="mat-detail-item" style={{ gridColumn: "1 / -1" }}>
+                <div className="mat-detail-label"><MapPin size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />Endereço</div>
+                <div className="mat-detail-value">{aluno.endereco}</div>
               </div>
+            )}
+            {(aluno.responsavel || aluno.telefoneResponsavel) && (
+              <div className="mat-detail-item" style={{ gridColumn: "1 / -1" }}>
+                <div className="mat-detail-label">Responsável</div>
+                <div className="mat-detail-value">
+                  {aluno.responsavel || "—"}
+                  {aluno.telefoneResponsavel && ` · ${aluno.telefoneResponsavel}`}
+                </div>
+              </div>
+            )}
+            {aluno.observacoes && (
+              <div className="mat-detail-item" style={{ gridColumn: "1 / -1" }}>
+                <div className="mat-detail-label">Observações</div>
+                <div className="mat-detail-value" style={{ whiteSpace: "pre-wrap" }}>{aluno.observacoes}</div>
+              </div>
+            )}
+          </div>
+
+          {/* — Resumo mensalidades — */}
+          <div className="mat-section-title"><FileText size={14} /> Mensalidades</div>
+          <div style={{
+            display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10, marginBottom: 14,
+          }}>
+            <div className="mat-detail-item">
+              <div className="mat-detail-label">Abertas</div>
+              <div className="mat-detail-value" style={{ color: resumo.vencidas > 0 ? "var(--red)" : undefined }}>
+                {resumo.abertas}{resumo.vencidas > 0 ? ` (${resumo.vencidas} vencidas)` : ""}
+              </div>
+            </div>
+            <div className="mat-detail-item">
+              <div className="mat-detail-label">Total em aberto</div>
+              <div className="mat-detail-value">{fmtR$(resumo.totalAberto)}</div>
+            </div>
+            <div className="mat-detail-item">
+              <div className="mat-detail-label">Pagas</div>
+              <div className="mat-detail-value">{resumo.pagas}</div>
+            </div>
+            <div className="mat-detail-item">
+              <div className="mat-detail-label">Total recebido</div>
+              <div className="mat-detail-value">{fmtR$(resumo.totalPago)}</div>
             </div>
           </div>
 
-          {/* Taxa — exibe somente se existir */}
-          {venda.valorTaxa > 0 && (
-            <div className="dv-meta" style={{ gridTemplateColumns: "1fr 1fr", marginTop: -6 }}>
-              <div className="dv-meta-card">
-                <div className="dv-meta-label">
-                  Taxa {venda.formaPagamento === "Pix" ? "PIX" : "Cartão"} ({venda.taxaPercentual}%)
-                </div>
-                <div className="dv-meta-val" style={{ color: "var(--red)" }}>{fmtR$(venda.valorTaxa)}</div>
+          <div className="mat-mens-list">
+            <div className="mat-mens-row head">
+              <span>MÊS REFERÊNCIA</span>
+              <span>VENCIMENTO</span>
+              <span>VALOR</span>
+              <span>STATUS</span>
+              <span></span>
+            </div>
+
+            {mensOrdenadas.length === 0 ? (
+              <div className="mat-empty">
+                <Calendar size={24} color="var(--text-3)" />
+                <p>Nenhuma mensalidade gerada ainda.</p>
               </div>
-              {venda.parcelas > 1 && (
-                <div className="dv-meta-card">
-                  <div className="dv-meta-label">Valor por Parcela</div>
-                  <div className="dv-meta-val">{fmtR$(venda.total / venda.parcelas)}</div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {venda.vendedor && (
-            <div className="dv-meta" style={{ gridTemplateColumns: "1fr", marginTop: -6 }}>
-              <div className="dv-meta-card">
-                <div className="dv-meta-label">Vendedor</div>
-                <div className="dv-meta-val">{venda.vendedor}</div>
-              </div>
-            </div>
-          )}
-
-          {venda.observacao && (
-            <div className="dv-meta-obs" style={{ marginTop: 6 }}>
-              <div className="dv-meta-label" style={{ marginBottom: 4 }}>Observação</div>
-              <div style={{ fontSize: 13, color: "var(--text-2)" }}>{venda.observacao}</div>
-            </div>
-          )}
-
-          {/* Botão imprimir */}
-          <button className="dv-imprimir" onClick={() => imprimirRecibo(venda)}>
-            <Printer size={13} /> Reimprimir Recibo
-          </button>
-
-          {/* Tabela de itens */}
-          <div className="dv-table">
-            <div className="dv-thead">
-              <span>PRODUTO / SERVIÇO</span>
-              <span style={{ textAlign: "center" }}>QTD</span>
-              <span style={{ textAlign: "right" }}>PREÇO UNIT.</span>
-              <span style={{ textAlign: "right" }}>CUSTO UNIT.</span>
-              <span style={{ textAlign: "right" }}>DESCONTO</span>
-              <span style={{ textAlign: "right" }}>TOTAL ITEM</span>
-            </div>
-            {itens.length === 0 ? (
-              <div style={{ padding: 18, textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>
-                Nenhum item nesta venda.
-              </div>
-            ) : itens.map((item, i) => {
-              const totalItem = (item.preco || 0) * (item.qtd || 1) - (item.desconto || 0);
+            ) : mensOrdenadas.map(m => {
+              const st = statusMensalidade(m);
+              const mesLabel = m.mesReferencia
+                ? `${MESES_PT[Number(m.mesReferencia.split("-")[1]) - 1]}/${m.mesReferencia.split("-")[0]}`
+                : "—";
               return (
-                <div key={i} className="dv-trow">
-                  <span className="dv-nome">
-                    {item.tipo === "servico" ? "🎯" : item.tipo === "livre" ? "📝" : <Package size={11} color="var(--text-3)" />}
-                    {item.nome || item.produto || "—"}
+                <div key={m.id} className="mat-mens-row">
+                  <span className="mat-mens-mes" style={{ textTransform: "capitalize" }}>{mesLabel}</span>
+                  <span>{fmtData(m.dataVencimento)}</span>
+                  <span className="mat-mens-valor">
+                    {fmtR$(st === "paga" ? (m.valorPago || m.valorTotal) : m.valorRestante)}
                   </span>
-                  <span style={{ textAlign: "center" }}>{item.qtd || 1}</span>
-                  <span style={{ textAlign: "right" }}>{fmtR$(item.preco)}</span>
-                  <span style={{ textAlign: "right", color: "var(--red)" }}>{fmtR$(item.custo)}</span>
-                  <span style={{ textAlign: "right" }}>{item.desconto ? fmtR$(item.desconto) : "—"}</span>
-                  <span style={{ textAlign: "right", color: "var(--green)", fontFamily: "Sora, sans-serif", fontWeight: 500 }}>
-                    {fmtR$(totalItem)}
+                  <span>
+                    {st === "paga"    && <span className="mat-pill ok">Paga</span>}
+                    {st === "pendente" && <span className="mat-pill neutral">Pendente</span>}
+                    {st === "vencendo" && <span className="mat-pill warn">Vence em breve</span>}
+                    {st === "vencida"  && <span className="mat-pill danger">Vencida</span>}
+                  </span>
+                  <span style={{ display: "flex", justifyContent: "flex-end" }}>
+                    {st !== "paga" && (
+                      <button className="btn-icon btn-icon-wpp"
+                        onClick={() => cobrarWhatsApp(m)} title="Cobrar via WhatsApp">
+                        <MessageCircle size={13} />
+                      </button>
+                    )}
                   </span>
                 </div>
               );
             })}
           </div>
 
-          {/* Totais */}
-          <div className="dv-totals">
-            <div className="dv-total-cell">
-              <div className="dv-total-label">Subtotal</div>
-              <div className="dv-total-val" style={{ color: "var(--text)" }}>{fmtR$(subtotal)}</div>
-            </div>
-            <div className="dv-total-cell">
-              <div className="dv-total-label">Descontos</div>
-              <div className="dv-total-val" style={{ color: "var(--red)" }}>{fmtR$(descontos)}</div>
-            </div>
-            <div className="dv-total-cell">
-              <div className="dv-total-label">Custo Total</div>
-              <div className="dv-total-val" style={{ color: "var(--red)" }}>{fmtR$(custoTotal)}</div>
-            </div>
-            {venda.valorTaxa > 0 && (
-              <div className="dv-total-cell">
-                <div className="dv-total-label">
-                  Taxa {venda.formaPagamento === "Pix" ? "PIX" : "Cartão"} ({venda.taxaPercentual}%)
-                </div>
-                <div className="dv-total-val" style={{ color: "var(--red)" }}>{fmtR$(venda.valorTaxa)}</div>
-              </div>
+          <div style={{ display: "flex", gap: 10, marginTop: 14, flexWrap: "wrap" }}>
+            {podeEditar && (
+              <button className="btn-secondary" onClick={() => onGerarMensalidade(aluno)}>
+                <Plus size={14} /> Gerar próxima mensalidade
+              </button>
             )}
-            <div className="dv-total-cell">
-              <div className="dv-total-label">Total</div>
-              <div className="dv-total-val" style={{ color: "var(--green)" }}>{fmtR$(total)}</div>
-            </div>
-            {/* Sinal: mostrar o que foi recebido e o que falta */}
-            {venda.formaPagamento === "Sinal" && venda.valorPago != null && (
-              <>
-                <div className="dv-total-cell">
-                  <div className="dv-total-label">Sinal Recebido</div>
-                  <div className="dv-total-val" style={{ color: "var(--green)" }}>{fmtR$(venda.valorPago)}</div>
-                </div>
-                <div className="dv-total-cell">
-                  <div className="dv-total-label">A Receber</div>
-                  <div className="dv-total-val" style={{ color: "var(--blue, #5b8ef0)" }}>{fmtR$(venda.valorRestante)}</div>
-                </div>
-              </>
-            )}
-            <div className="dv-total-cell">
-              <div className="dv-total-label">Lucro Est.</div>
-              {/* lucroEstimado já tem a taxa deduzida quando salvo pela nova lógica */}
-              <div className="dv-total-val" style={{ color: "var(--gold)" }}>
-                {fmtR$(typeof venda.lucroEstimado === "number" ? venda.lucroEstimado : lucro)}
-              </div>
+            <button className="btn-green" onClick={() => cobrarWhatsApp()}>
+              <MessageCircle size={14} /> Cobrar mensalidade
+            </button>
+          </div>
+        </div>
+
+        <div className="modal-footer">
+          {podeExcluir && (
+            <button className="btn-danger" onClick={() => onExcluir(aluno)}>
+              <Trash2 size={14} /> Excluir
+            </button>
+          )}
+          {podeEditar && (
+            <button className="btn-secondary" onClick={() => onEditar(aluno)}>
+              <Edit2 size={14} /> Editar
+            </button>
+          )}
+          <button className="btn-primary" onClick={onClose}>Fechar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════
+   MODAL: Configurações do módulo (template WhatsApp)
+   ══════════════════════════════════════════════════ */
+function ModalConfigMatriculas({ config, onSave, onClose }) {
+  const [mensagem, setMensagem] = useState(config?.mensagemWhatsApp || MSG_WHATSAPP_DEFAULT);
+  const [salvando, setSalvando] = useState(false);
+
+  const handleSave = async () => {
+    setSalvando(true);
+    try {
+      await onSave({ mensagemWhatsApp: mensagem });
+      onClose();
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box modal-box-lg">
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">Configurações do módulo</div>
+            <div className="modal-sub">Template de cobrança via WhatsApp</div>
+          </div>
+          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+        </div>
+
+        <div className="modal-body">
+          <div className="form-group">
+            <label className="form-label">Mensagem de cobrança</label>
+            <textarea className="form-textarea" style={{ minHeight: 140 }}
+              value={mensagem} onChange={(e) => setMensagem(e.target.value)} />
+            <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 8, lineHeight: 1.6 }}>
+              Variáveis disponíveis:<br />
+              <code style={{ color: "var(--gold)" }}>[nome]</code> — primeiro nome do aluno<br />
+              <code style={{ color: "var(--gold)" }}>[mes]</code> — mês da mensalidade (ex: "maio/2026")<br />
+              <code style={{ color: "var(--gold)" }}>[valor]</code> — valor formatado (ex: "R$ 250,00")
             </div>
           </div>
-
         </div>
-      </div>
-    </div>
-  );
-}
 
-
-/* ══════════════════════════════════════════════════
-   MODAL: Confirmar Cancelamento de Venda
-   ══════════════════════════════════════════════════ */
-function ModalCancelarVenda({ venda, onConfirm, onClose }) {
-  const [cancelando, setCancelando] = useState(false);
-
-  const handleConfirm = async () => {
-    setCancelando(true);
-    await onConfirm();
-    setCancelando(false);
-  };
-
-  return (
-    <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box modal-box-md">
-        <div className="modal-header">
-          <div className="modal-title">Cancelar Venda</div>
-          <button className="modal-close" onClick={onClose}>
-            <X size={14} color="var(--text-2)" />
-          </button>
-        </div>
-        <div className="confirm-body">
-          <div className="confirm-icon">🚫</div>
-          <p>
-            Deseja cancelar a venda <strong>{venda?.id}</strong>?<br />
-            <span style={{ color: "var(--gold)", fontSize: 12 }}>
-              O estoque dos produtos será restaurado automaticamente.
-            </span><br />
-            <span style={{ fontSize: 12 }}>
-              A venda ficará salva no histórico com status <strong>Cancelada</strong>.
-            </span>
-          </p>
-        </div>
         <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>Voltar</button>
-          <button className="btn-warning" onClick={handleConfirm} disabled={cancelando}>
-            {cancelando ? "Cancelando..." : <><Ban size={13} /> Cancelar Venda</>}
+          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn-primary" onClick={handleSave} disabled={salvando}>
+            <CheckCircle size={14} /> {salvando ? "Salvando…" : "Salvar"}
           </button>
         </div>
       </div>
@@ -1648,52 +847,37 @@ function ModalCancelarVenda({ venda, onConfirm, onClose }) {
   );
 }
 
-
 /* ══════════════════════════════════════════════════
-   MODAL: Excluir Venda Definitivamente (admin only)
+   MODAL: Confirmar exclusão
    ══════════════════════════════════════════════════ */
-function ModalExcluirVenda({ venda, onConfirm, onClose }) {
-  const [excluindo, setExcluindo] = useState(false);
-
-  const handleConfirm = async () => {
-    setExcluindo(true);
-    await onConfirm();
-    setExcluindo(false);
-  };
-
+function ModalExcluirAluno({ aluno, mensQtd, onConfirm, onClose }) {
+  const [digitado, setDigitado] = useState("");
   return (
-    <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="modal-overlay modal-overlay-top" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-box modal-box-md">
         <div className="modal-header">
           <div>
-            <div className="modal-title" style={{ color: "var(--red)" }}>Excluir Venda</div>
-            <div className="modal-sub">Ação irreversível — somente Admin</div>
+            <div className="modal-title">Excluir aluno</div>
+            <div className="modal-sub">Esta ação é permanente e não pode ser desfeita.</div>
           </div>
-          <button className="modal-close" onClick={onClose}>
-            <X size={14} color="var(--text-2)" />
-          </button>
+          <button className="modal-close" onClick={onClose}><X size={16} /></button>
         </div>
-        <div className="confirm-body">
-          <div className="confirm-icon">⚠️</div>
-          <p style={{ marginBottom: 14 }}>
-            Excluir essa venda irá apagar todo o histórico dela, talvez seja melhor apenas cancelar.
+        <div className="modal-body">
+          <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 12 }}>
+            Ao excluir <strong>{aluno.nome}</strong>, todas as <strong>{mensQtd}</strong> mensalidade(s)
+            pendente(s) vinculadas também serão removidas de <em>A Receber</em>.
+            As mensalidades já pagas (registradas em Vendas/Caixa) <strong>permanecem preservadas</strong>.
           </p>
-          <p>
-            Tem certeza que quer excluir a venda <strong>{venda?.id}</strong>?
+          <p style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 10 }}>
+            Digite <strong>EXCLUIR</strong> para confirmar:
           </p>
-          <div style={{
-            marginTop: 14, padding: "10px 14px",
-            background: "var(--red-d)", border: "1px solid rgba(224,82,82,.2)",
-            borderRadius: 10, fontSize: 12, color: "var(--red)", textAlign: "left",
-          }}>
-            <strong>Esta ação não pode ser desfeita.</strong><br />
-            O documento da venda será apagado permanentemente do banco de dados.
-          </div>
+          <input type="text" className="form-input"
+            value={digitado} onChange={(e) => setDigitado(e.target.value.toUpperCase())} />
         </div>
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-danger" onClick={handleConfirm} disabled={excluindo}>
-            {excluindo ? "Excluindo..." : <><Trash2 size={13} /> Excluir Permanentemente</>}
+          <button className="btn-danger" disabled={digitado !== "EXCLUIR"} onClick={onConfirm}>
+            <Trash2 size={14} /> Excluir definitivamente
           </button>
         </div>
       </div>
@@ -1701,626 +885,376 @@ function ModalExcluirVenda({ venda, onConfirm, onClose }) {
   );
 }
 
-
-
-// ---------------------------------------------------------------------------
-// Permissões por cargo
-// ---------------------------------------------------------------------------
-const PERMISSOES_VENDAS = {
-  admin:       { ver: true,  criar: true,  editar: true,  cancelar: true,  excluir: true  },
-  financeiro:  { ver: true,  criar: false, editar: false, cancelar: false, excluir: false },
-  comercial:   { ver: true,  criar: true,  editar: true,  cancelar: true,  excluir: false },
-  operacional: { ver: true,  criar: false, editar: false, cancelar: false, excluir: false },
-  vendedor:    { ver: true,  criar: true,  editar: true,  cancelar: true,  excluir: false },
-  compras:     { ver: false, criar: false, editar: false, cancelar: false, excluir: false },
-  suporte:     { ver: false, criar: false, editar: false, cancelar: false, excluir: false },
-};
-const permVendas = (cargo, acao) => PERMISSOES_VENDAS[cargo]?.[acao] ?? false;
-
-/* ═══════════════════════════════════════
+/* ══════════════════════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
-   ═══════════════════════════════════════ */
-export default function Vendas() {
-  // ── Auth via contexto — tenantUid garante acesso correto para convidados ──
-  const { user, cargo, tenantUid, vendedorId, vendedorNome, nomeUsuario, isVendedor } = useContext(AuthContext);
+   ══════════════════════════════════════════════════════════════════════ */
+export default function Alunos() {
+  /* ── Auth via contexto (padrão ASSENT) ── */
+  const { user, cargo, tenantUid, nomeUsuario } = useContext(AuthContext);
 
-  const podeCriar   = permVendas(cargo, "criar");
-  const podeEditar  = permVendas(cargo, "editar");
-  const podeCancelar = permVendas(cargo, "cancelar");
-  const podeExcluir = permVendas(cargo, "excluir"); // apenas admin
+  const podeVer     = permMat(cargo, "ver");
+  const podeCriar   = permMat(cargo, "criar");
+  const podeEditar  = permMat(cargo, "editar");
+  const podeExcluir = permMat(cargo, "excluir");
 
-  const [vendas, setVendas] = useState([]);
-  const [clientes, setClientes]   = useState([]);
-  const [produtos, setProdutos]   = useState([]);
-  const [servicos, setServicos]   = useState([]);
-  const [vendedores, setVendedores] = useState([]);
-  const [vendaIdCnt, setVendaIdCnt] = useState(0);
-  /* Taxas de cartão — carregadas uma vez do Firestore, com fallback nos defaults */
-  const [taxas, setTaxas] = useState(TAXAS_DEFAULT);
+  const [alunos, setAlunos] = useState([]);
+  const [mensalidades, setMensalidades] = useState([]); // a_receber com origem="mensalidade"
+  const [config, setConfig] = useState({ mensagemWhatsApp: MSG_WHATSAPP_DEFAULT });
 
-  const [search, setSearch]   = useState("");
-  const [period, setPeriod]   = useState("Tudo");
-  const [dataInicio, setDataInicio] = useState("");
-  const [dataFim, setDataFim]       = useState("");
   const [loading, setLoading] = useState(true);
 
-  const [modalNova, setModalNova]       = useState(false);
+  const [modalNovo, setModalNovo]       = useState(false);
   const [editando, setEditando]         = useState(null);
   const [detalhe, setDetalhe]           = useState(null);
-  const [deletando, setDeletando]       = useState(null); // fluxo de cancelar
-  const [excluindoDef, setExcluindoDef] = useState(null); // fluxo de exclusão definitiva (admin)
-  const [confirmarDepoisDetalhe, setConfirmarDepoisDetalhe] = useState(false);
-  const [tab, setTab]                   = useState("ativas");
+  const [excluindo, setExcluindo]       = useState(null);
+  const [modalConfig, setModalConfig]   = useState(false);
 
+  const [search, setSearch]   = useState("");
+  const [statusFilter, setStatusFilter] = useState("todos");
 
-// Listener dos dados do Firestore (usa tenantUid do contexto)
-useEffect(() => {
-  if (!tenantUid) {
-    setLoading(false);
-    return;
-  }
+  /* ═══════════════════════════════════════════════════
+     Firestore listeners — segue padrão multi-tenant
+     ═══════════════════════════════════════════════════ */
+  useEffect(() => {
+    if (!tenantUid) { setLoading(false); return; }
 
-  setLoading(true);
+    setLoading(true);
 
-  const userRef     = doc(db, "users", tenantUid);
-  const vendasCol   = collection(db, "users", tenantUid, "vendas");
-  const clientesCol = collection(db, "users", tenantUid, "clientes");
-  const produtosCol = collection(db, "users", tenantUid, "produtos");
-  const servicosCol = collection(db, "users", tenantUid, "servicos");
-  const vendsCol    = collection(db, "users", tenantUid, "vendedores");
+    const alunosCol = collection(db, "users", tenantUid, "alunos");
+    const arCol     = collection(db, "users", tenantUid, "a_receber");
+    const configRef = doc(db, "users", tenantUid, "config", "matriculas");
 
-  const unsub1 = onSnapshot(userRef, (snap) => {
-    if (snap.exists()) setVendaIdCnt(snap.data().vendaIdCnt || 0);
-  });
+    const unsub1 = onSnapshot(alunosCol, (snap) => {
+      setAlunos(snap.docs.map(d => ({ docId: d.id, ...d.data() })));
+      setLoading(false);
+    }, () => setLoading(false));
 
-  /* Carrega taxas de cartão uma vez (getDoc, não listener — dado estático da sessão) */
-  getDoc(doc(db, "users", tenantUid, "config", "geral"))
-    .then(snap => {
-      if (snap.exists() && snap.data().taxas) {
-        setTaxas(prev => ({ ...TAXAS_DEFAULT, ...snap.data().taxas }));
-      }
-    })
-    .catch(() => { /* mantém os TAXAS_DEFAULT em caso de falha */ });
+    /* Escuta todas as a_receber e filtra em memória — evita índice composto */
+    const unsub2 = onSnapshot(arCol, (snap) => {
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setMensalidades(all.filter(a => a.origem === "mensalidade"));
+    }, () => {});
 
-  const unsub2 = onSnapshot(vendasCol, (snap) => {
-    const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    arr.sort((a, b) => {
-      const da = a.data?.toDate ? a.data.toDate() : new Date(a.data || 0);
-      const db_ = b.data?.toDate ? b.data.toDate() : new Date(b.data || 0);
-      return db_ - da;
-    });
-    setVendas(arr);
-    setLoading(false);
-  });
+    /* Config do módulo (template WhatsApp) */
+    getDoc(configRef).then(s => {
+      if (s.exists()) setConfig({ mensagemWhatsApp: MSG_WHATSAPP_DEFAULT, ...s.data() });
+    }).catch(() => {});
 
-  const unsub3 = onSnapshot(clientesCol, (snap) => 
-    setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-  );
-  const unsub4 = onSnapshot(produtosCol, (snap) => 
-    setProdutos(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-  );
-  const unsub5 = onSnapshot(servicosCol, (snap) => 
-    setServicos(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-  );
-  const unsub6 = onSnapshot(vendsCol, (snap) => 
-    setVendedores(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-  );
+    return () => { unsub1(); unsub2(); };
+  }, [tenantUid]);
 
-  return () => {
-    unsub1();
-    unsub2();
-    unsub3();
-    unsub4();
-    unsub5();
-    unsub6();
-  };
-}, [tenantUid]);
-
-  /* ── Criar / Editar venda ── */
-  const handleSave = async (payload, vendaExistente) => {
+  /* ═══════════════════════════════════════════════════
+     Salvar aluno (criar/editar) + mensalidade inicial
+     ═══════════════════════════════════════════════════ */
+  const handleSaveAluno = async (dados) => {
     if (!tenantUid) return;
 
-    if (vendaExistente) {
-      /* EDITAR: se produto mudou, restaura estoque antigo e desconta novo.
-         IMPORTANTE: verificamos a existência do doc antes de fazer update
-         para evitar crash em itens oriundos de orçamento cujo tipo real
-         é "servico" mas foi salvo com tipo "produto" na conversão. */
-      await runTransaction(db, async (tx) => {
-        /* ── Coleta todas as refs que precisam de leitura ── */
-        const oldEntries = (vendaExistente.itens || [])
-          .filter(i => i.produtoId && i.tipo === "produto")
-          .map(i => ({ ref: doc(db, "users", tenantUid, "produtos", i.produtoId), qtd: i.qtd || 1 }));
+    try {
+      if (editando) {
+        /* EDITAR — não regenera mensalidade. Apenas atualiza campos. */
+        const ref = doc(db, "users", tenantUid, "alunos", editando.docId);
+        await updateDoc(ref, { ...dados, atualizadoEm: new Date().toISOString() });
 
-        const newEntries = (payload.itens || [])
-          .filter(i => i.produtoId && i.tipo === "produto")
-          .map(i => ({ ref: doc(db, "users", tenantUid, "produtos", i.produtoId), qtd: i.qtd || 1 }));
-
-        /* ── TODOS OS READS PRIMEIRO ── */
-        const allEntries  = [...oldEntries, ...newEntries];
-        const snaps       = await Promise.all(allEntries.map(e => tx.get(e.ref)));
-
-        /* ── TODOS OS WRITES DEPOIS ── */
-        /* Restaura estoque dos itens antigos */
-        oldEntries.forEach((e, i) => {
-          if (snaps[i].exists()) tx.update(e.ref, { estoque: increment(e.qtd) });
+        await logAction({
+          tenantUid, nomeUsuario, cargo,
+          acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.MATRICULAS,
+          descricao: `Editou aluno ${fmtIdSeq(editando.idSeq)} — ${dados.nome}`,
         });
-        /* Desconta estoque dos itens novos */
-        newEntries.forEach((e, i) => {
-          if (snaps[oldEntries.length + i].exists()) tx.update(e.ref, { estoque: increment(-e.qtd) });
+        setEditando(null);
+      } else {
+        /* CRIAR — gera docId único e idSeq sequencial */
+        const docId = gerarDocIdAluno();
+        const idSeq = proximoIdSeq(alunos);
+        const agora = new Date().toISOString();
+
+        await setDoc(doc(db, "users", tenantUid, "alunos", docId), {
+          docId, idSeq,
+          ...dados,
+          criadoEm: agora,
+          atualizadoEm: agora,
         });
-        /* Salva a venda */
-        tx.set(doc(db, "users", tenantUid, "vendas", vendaExistente.id), payload, { merge: true });
+
+        /* Cria primeira mensalidade em a_receber */
+        await gerarMensalidadeEmAberto({
+          tenantUid,
+          aluno: { docId, idSeq, ...dados },
+          mensalidadesDoAluno: [],
+        });
+
+        await logAction({
+          tenantUid, nomeUsuario, cargo,
+          acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.MATRICULAS,
+          descricao: `Matriculou ${fmtIdSeq(idSeq)} — ${dados.nome} — ${fmtR$(dados.valorMensalidade)}/mês`,
+        });
+        setModalNovo(false);
+      }
+    } catch (err) {
+      console.error("[Alunos] Erro ao salvar:", err);
+      alert("Erro ao salvar. Tente novamente.");
+    }
+  };
+
+  /* ═══════════════════════════════════════════════════
+     Gerar próxima mensalidade manualmente
+     ═══════════════════════════════════════════════════ */
+  const handleGerarMensalidade = async (aluno) => {
+    if (!tenantUid) return;
+    const doAluno = mensalidades.filter(m => m.alunoId === aluno.docId);
+    try {
+      const mensCriada = await gerarMensalidadeEmAberto({
+        tenantUid,
+        aluno,
+        mensalidadesDoAluno: doAluno,
       });
 
-      /* ── RESET FINANCEIRO ──────────────────────────────────────────────────
-         A venda foi alterada (forma de pagamento, valor, etc.).
-         Para manter o regime de caixa consistente:
-           1. Apaga TODAS as entradas de caixa vinculadas a esta venda
-           2. Apaga TODOS os documentos de a_receber vinculados a esta venda
-           3. Recria com base no novo payload (igual ao fluxo de venda nova)
-         Isso garante que o DRE nunca some valores de estados conflitantes.
-      ──────────────────────────────────────────────────────────────────────── */
-      const vendaId = vendaExistente.id;
-
-      try {
-        /* 1. Apagar entradas de caixa antigas desta venda */
-        const caixaSnap = await getDocs(
-          query(
-            collection(db, "users", tenantUid, "caixa"),
-            where("origem", "==", "venda"),
-            where("referenciaId", "==", vendaId)
-          )
-        );
-        await Promise.all(caixaSnap.docs.map((d) => deleteDoc(d.ref)));
-
-        /* 2. Apagar documentos de a_receber antigos desta venda */
-        const arSnap = await getDocs(
-          query(
-            collection(db, "users", tenantUid, "a_receber"),
-            where("origem", "==", "venda"),
-            where("referenciaId", "==", vendaId)
-          )
-        );
-        await Promise.all(arSnap.docs.map((d) => deleteDoc(d.ref)));
-
-        /* 3. Recriar entrada de caixa com base no novo payload */
-        const valorParaCaixa = Number(payload.valorRecebido ?? payload.total ?? 0);
-        if (valorParaCaixa > 0) {
-          await addDoc(collection(db, "users", tenantUid, "caixa"), {
-            tipo:           "entrada",
-            origem:         "venda",
-            referenciaId:   vendaId,
-            valor:          valorParaCaixa,
-            descricao:      `Venda ${vendaId} — ${payload.cliente || "Consumidor Final"} (editada)`,
-            formaPagamento: payload.formaPagamento,
-            data:           payload.data || new Date().toISOString(),
-            criadoEm:       new Date().toISOString(),
-          });
-        }
-
-        /* 4. Recriar a_receber se ainda há sinal pendente no novo payload */
-        if (payload.formaPagamento === "Sinal" && payload.valorRestante > 0) {
-          const now = new Date().toISOString();
-          await addDoc(collection(db, "users", tenantUid, "a_receber"), {
-            descricao:       "Venda - Pagamento pendente",
-            clienteNome:     payload.cliente || "Consumidor Final",
-            valorTotal:      payload.valorRestante,
-            valorPago:       0,
-            valorRestante:   payload.valorRestante,
-            dataVencimento:  payload.dataVencSinal,
-            status:          "pendente",
-            origem:          "venda",
-            referenciaId:    vendaId,
-            dataCriacao:     now,
-            dataAtualizacao: now,
-          });
-        }
-      } catch (errFinanceiro) {
-        /* A venda e o estoque já foram atualizados com sucesso.
-           Falha isolada no reset financeiro — loga para diagnóstico. */
-        console.error("[Vendas] Venda editada, mas erro no reset financeiro:", errFinanceiro);
-        alert(
-          `Venda ${vendaId} atualizada!\n\n` +
-          `⚠️ Não foi possível ajustar os lançamentos financeiros automaticamente. ` +
-          `Verifique manualmente as entradas de Caixa e A Receber desta venda.`
-        );
+      if (mensCriada) {
+        await logAction({
+          tenantUid, nomeUsuario, cargo,
+          acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.MATRICULAS,
+          descricao: `Gerou mensalidade ${mensCriada.mesReferencia} — ${aluno.nome} — ${fmtR$(mensCriada.valorTotal)}`,
+        });
       }
+    } catch (err) {
+      console.error("[Alunos] Erro ao gerar mensalidade:", err);
+      alert("Erro ao gerar mensalidade.");
+    }
+  };
 
-      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.VENDAS, descricao: `Editou Venda ${vendaExistente.id} — ${payload.cliente || "Consumidor Final"}` });
-      setEditando(null);
+  /* ═══════════════════════════════════════════════════
+     Excluir aluno — remove aluno + mensalidades em aberto
+     (mantém registros já pagos em Vendas/Caixa)
+     ═══════════════════════════════════════════════════ */
+  const handleExcluirAluno = async () => {
+    if (!tenantUid || !excluindo) return;
+    try {
+      /* 1. Remove mensalidades em aberto (a_receber) */
+      const abertas = mensalidades.filter(m => m.alunoId === excluindo.docId);
+      await Promise.all(
+        abertas.map(m => deleteDoc(doc(db, "users", tenantUid, "a_receber", m.id)))
+      );
+      /* 2. Remove o aluno */
+      await deleteDoc(doc(db, "users", tenantUid, "alunos", excluindo.docId));
+
+      await logAction({
+        tenantUid, nomeUsuario, cargo,
+        acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.MATRICULAS,
+        descricao: `Excluiu aluno ${fmtIdSeq(excluindo.idSeq)} — ${excluindo.nome} (${abertas.length} mensalidade(s) em aberto removidas)`,
+      });
+      setExcluindo(null);
       setDetalhe(null);
-      return;
+    } catch (err) {
+      console.error("[Alunos] Erro ao excluir:", err);
+      alert("Erro ao excluir aluno.");
     }
+  };
 
-    /* NOVA VENDA */
-    /* ── IMPORTANTE: o contador é lido do Firestore DENTRO da transação,
-       de forma atômica, para evitar que um estado React desatualizado
-       gere um ID já existente e sobrescreva uma venda cancelada. ── */
-    let novoId;
+  /* ═══════════════════════════════════════════════════
+     Salvar configuração (template WhatsApp)
+     ═══════════════════════════════════════════════════ */
+  const handleSaveConfig = async (novaConfig) => {
+    if (!tenantUid) return;
     try {
-      await runTransaction(db, async (tx) => {
-        /* Ler o contador diretamente do Firestore (valor sempre atual) */
-        const userSnap = await tx.get(doc(db, "users", tenantUid));
-        let currentCnt = userSnap.data()?.vendaIdCnt || 0;
-
-        /* ── PROTEÇÃO ANTI-COLISÃO ─────────────────────────────────────────
-           Outros módulos (ex: Mesas) podem usar um contador desatualizado e
-           criar uma venda com o mesmo ID que geraríamos agora. Para garantir
-           que nunca sobrescrevemos uma venda existente, verificamos se o ID
-           candidato já existe no Firestore e avançamos o contador até
-           encontrar um slot livre. Isso também corrige automaticamente o
-           contador caso ele tenha sido corrompido por outro módulo.
-        ─────────────────────────────────────────────────────────────────── */
-        let vendaRef;
-        let vendaSnap;
-        let tentativas = 0;
-        do {
-          novoId    = gerarIdVenda(currentCnt);
-          vendaRef  = doc(db, "users", tenantUid, "vendas", novoId);
-          vendaSnap = await tx.get(vendaRef);
-          if (vendaSnap.exists()) currentCnt++;
-          tentativas++;
-          if (tentativas > 200) throw new Error("Não foi possível encontrar um ID disponível para a venda.");
-        } while (vendaSnap.exists());
-
-        /* Descontar estoque */
-        for (const item of (payload.itens || [])) {
-          if (item.produtoId && item.tipo === "produto") {
-            const ref = doc(db, "users", tenantUid, "produtos", item.produtoId);
-            tx.update(ref, { estoque: increment(-(item.qtd || 1)) });
-          }
-        }
-        /* Criar venda no slot confirmadamente livre */
-        tx.set(vendaRef, { ...payload, criadoEm: new Date().toISOString() });
-        /* Atualizar contador para além do ID recém-usado, corrigindo qualquer
-           valor corrompido que outro módulo possa ter deixado para trás. */
-        tx.set(doc(db, "users", tenantUid), { vendaIdCnt: currentCnt + 1 }, { merge: true });
+      await setDoc(
+        doc(db, "users", tenantUid, "config", "matriculas"),
+        { ...novaConfig, atualizadoEm: new Date().toISOString() },
+        { merge: true }
+      );
+      setConfig(c => ({ ...c, ...novaConfig }));
+      await logAction({
+        tenantUid, nomeUsuario, cargo,
+        acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.MATRICULAS,
+        descricao: "Atualizou configurações do módulo de Matrículas",
       });
     } catch (err) {
-      console.error("[Vendas] Erro ao criar venda:", err);
-      alert("Erro ao registrar a venda. Tente novamente.");
-      return;
+      console.error("[Alunos] Erro ao salvar config:", err);
+      alert("Erro ao salvar configurações.");
     }
-
-    /*
-     * ── REGIME DE CAIXA: registrar valor recebido no Caixa ──
-     * Apenas o valor efetivamente recebido entra no caixa agora.
-     *   - Sinal: somente o valorRecebido (sinal parcial)
-     *   - Outros: total da venda (pagamento completo)
-     * O DRE usa SOMENTE dados do Caixa como fonte de receita.
-     */
-    const valorParaCaixa = Number(payload.valorRecebido ?? payload.total ?? 0);
-    if (valorParaCaixa > 0) {
-      try {
-        await addDoc(collection(db, "users", tenantUid, "caixa"), {
-          tipo:           "entrada",
-          origem:         "venda",
-          referenciaId:   novoId,
-          valor:          valorParaCaixa,
-          descricao:      `Venda ${novoId} — ${payload.cliente || "Consumidor Final"}`,
-          formaPagamento: payload.formaPagamento,
-          data:           payload.data || new Date().toISOString(),
-          criadoEm:       new Date().toISOString(),
-        });
-      } catch (err) {
-        console.error("[Vendas] Venda salva, mas erro ao lançar no Caixa:", err);
-        // A venda existe e é consistente — só o lançamento de caixa falhou.
-        // Não exibe alerta aqui para não poluir o fluxo normal.
-      }
-    }
-
-    /*
-     * ── Sinal: criar lançamento em A Receber APÓS a venda ser salva com sucesso ──
-     * REGRA CRÍTICA: apenas o valorPago entra como receita da venda.
-     * O valorRestante é um direito a receber — não é receita ainda.
-     * Nunca criar A Receber antes da venda (evita inconsistência).
-     */
-    if (payload.formaPagamento === "Sinal" && payload.valorRestante > 0) {
-      try {
-        const now = new Date().toISOString();
-        await addDoc(collection(db, "users", tenantUid, "a_receber"), {
-          descricao:       "Venda - Pagamento pendente",
-          clienteNome:     payload.cliente || "Consumidor Final",
-          valorTotal:      payload.valorRestante,
-          valorPago:       0,
-          valorRestante:   payload.valorRestante,
-          dataVencimento:  payload.dataVencSinal,
-          status:          "pendente",
-          origem:          "venda",
-          referenciaId:    novoId,
-          dataCriacao:     now,
-          dataAtualizacao: now,
-        });
-      } catch (err) {
-        /*
-         * A venda já foi salva. O A Receber falhou — alerta o usuário
-         * mas não desfaz a venda (ela existe e é consistente).
-         */
-        console.error("[Vendas] Venda salva, mas erro ao criar A Receber:", err);
-        alert(
-          `Venda ${novoId} registrada com sucesso!\n\n` +
-          `⚠️ Não foi possível criar o lançamento em "A Receber" automaticamente. ` +
-          `Crie manualmente o valor de R$ ${payload.valorRestante.toFixed(2).replace(".", ",")} para ${payload.cliente}.`
-        );
-      }
-    }
-
-    /* Imprimir recibo após criar */
-    imprimirRecibo({ ...payload, id: novoId });
-    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.VENDAS, descricao: `Criou Venda ${novoId} — ${payload.cliente || "Consumidor Final"} — R$ ${Number(payload.total||0).toFixed(2)}` });
-    setModalNova(false);
   };
 
-  /* ── Cancelar venda — marca como cancelada, restaura estoque e remove lançamentos financeiros ── */
-  const handleCancelar = async () => {
-    if (!tenantUid || !deletando) return;
-    const vendaId = deletando.id;
+  /* ═══════════════════════════════════════════════════
+     Derivados / filtros
+     ═══════════════════════════════════════════════════ */
+  const alunosComStatus = useMemo(() => {
+    return alunos.map(a => {
+      const suas = mensalidades.filter(m => m.alunoId === a.docId);
+      const abertas = suas.filter(m => Number(m.valorRestante || 0) > 0);
+      const proxVenc = abertas
+        .map(m => m.dataVencimento)
+        .filter(Boolean)
+        .sort()[0] || null;
 
-    /* 1. Marcar como cancelada + restaurar estoque (atômico) */
-    await runTransaction(db, async (tx) => {
-      for (const item of (deletando.itens || [])) {
-        if (item.produtoId && item.tipo === "produto") {
-          const ref = doc(db, "users", tenantUid, "produtos", item.produtoId);
-          tx.update(ref, { estoque: increment(item.qtd || 1) });
-        }
-      }
-      tx.update(doc(db, "users", tenantUid, "vendas", vendaId), {
-        status: "cancelada",
-        canceladaEm: serverTimestamp(),
-        canceladaPor: { uid: user?.uid, nome: nomeUsuario || user?.displayName || user?.email || "—", cargo },
-      });
+      let situacao = "em_dia";
+      if (abertas.some(m => statusMensalidade(m) === "vencida"))      situacao = "vencido";
+      else if (abertas.some(m => statusMensalidade(m) === "vencendo")) situacao = "vencendo";
+      else if (abertas.length === 0)                                   situacao = "em_dia";
+      return { ...a, _situacao: situacao, _proxVenc: proxVenc, _totalAberto: abertas.reduce((s, m) => s + Number(m.valorRestante || 0), 0) };
     });
+  }, [alunos, mensalidades]);
 
-    /* 2. Remover entradas do Caixa vinculadas a esta venda */
-    try {
-      const caixaSnap = await getDocs(
-        query(
-          collection(db, "users", tenantUid, "caixa"),
-          where("referenciaId", "==", vendaId),
-          where("origem", "==", "venda")
-        )
-      );
-      await Promise.all(caixaSnap.docs.map((d) => deleteDoc(d.ref)));
-    } catch (err) {
-      console.error("[Vendas] Venda cancelada, mas erro ao remover lançamentos do Caixa:", err);
-    }
-
-    /* 3. Remover A Receber vinculado a esta venda */
-    try {
-      const arSnap = await getDocs(
-        query(
-          collection(db, "users", tenantUid, "a_receber"),
-          where("referenciaId", "==", vendaId),
-          where("origem", "==", "venda")
-        )
-      );
-      await Promise.all(arSnap.docs.map((d) => deleteDoc(d.ref)));
-    } catch (err) {
-      console.error("[Vendas] Venda cancelada, mas erro ao remover A Receber:", err);
-    }
-
-    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.VENDAS, descricao: `Cancelou Venda ${vendaId}` });
-    setDeletando(null);
-    setDetalhe(null);
-  };
-
-  /* ── Excluir venda definitivamente (admin only) — apaga o documento e todo histórico ── */
-  const handleExcluirDefinitivo = async () => {
-    if (!tenantUid || !excluindoDef) return;
-    const vendaId = excluindoDef.id;
-
-    /* 1. Deletar venda + restaurar estoque (atômico) */
-    await runTransaction(db, async (tx) => {
-      for (const item of (excluindoDef.itens || [])) {
-        if (item.produtoId && item.tipo === "produto") {
-          const ref = doc(db, "users", tenantUid, "produtos", item.produtoId);
-          tx.update(ref, { estoque: increment(item.qtd || 1) });
-        }
+  const alunosFiltrados = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return alunosComStatus.filter(a => {
+      if (statusFilter !== "todos") {
+        if (statusFilter === "ativos"    && a.status !== "ativo")        return false;
+        if (statusFilter === "inativos"  && a.status === "ativo")        return false;
+        if (statusFilter === "em_dia"    && a._situacao !== "em_dia")    return false;
+        if (statusFilter === "vencendo"  && a._situacao !== "vencendo")  return false;
+        if (statusFilter === "vencidos"  && a._situacao !== "vencido")   return false;
       }
-      tx.delete(doc(db, "users", tenantUid, "vendas", vendaId));
-    });
-
-    /* 2. Remover entradas do Caixa vinculadas a esta venda */
-    try {
-      const caixaSnap = await getDocs(
-        query(
-          collection(db, "users", tenantUid, "caixa"),
-          where("referenciaId", "==", vendaId),
-          where("origem", "==", "venda")
-        )
+      if (!q) return true;
+      return (
+        a.nome?.toLowerCase().includes(q) ||
+        onlyDigits(a.documento).includes(onlyDigits(q)) ||
+        fmtIdSeq(a.idSeq).toLowerCase().includes(q)
       );
-      await Promise.all(caixaSnap.docs.map((d) => deleteDoc(d.ref)));
-    } catch (err) {
-      console.error("[Vendas] Venda excluída, mas erro ao remover lançamentos do Caixa:", err);
-    }
+    }).sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
+  }, [alunosComStatus, search, statusFilter]);
 
-    /* 3. Remover A Receber vinculado a esta venda */
-    try {
-      const arSnap = await getDocs(
-        query(
-          collection(db, "users", tenantUid, "a_receber"),
-          where("referenciaId", "==", vendaId),
-          where("origem", "==", "venda")
-        )
-      );
-      await Promise.all(arSnap.docs.map((d) => deleteDoc(d.ref)));
-    } catch (err) {
-      console.error("[Vendas] Venda excluída, mas erro ao remover A Receber:", err);
-    }
+  const kpis = useMemo(() => {
+    const total = alunos.filter(a => a.status === "ativo").length;
+    const emDia    = alunosComStatus.filter(a => a.status === "ativo" && a._situacao === "em_dia").length;
+    const vencendo = alunosComStatus.filter(a => a.status === "ativo" && a._situacao === "vencendo").length;
+    const vencidos = alunosComStatus.filter(a => a.status === "ativo" && a._situacao === "vencido").length;
+    return { total, emDia, vencendo, vencidos };
+  }, [alunos, alunosComStatus]);
 
-    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.VENDAS, descricao: `Excluiu Venda ${vendaId} definitivamente` });
-    setExcluindoDef(null);
-    setDetalhe(null);
-  };
+  /* ═══════════════════════════════════════════════════
+     Permissão de acesso
+     ═══════════════════════════════════════════════════ */
+  if (!tenantUid) {
+    return <div className="mat-empty">Carregando autenticação…</div>;
+  }
+  if (!podeVer) {
+    return (
+      <div className="mat-empty" style={{ padding: 60 }}>
+        <AlertCircle size={28} color="var(--text-3)" />
+        <p>Você não tem permissão para acessar este módulo.</p>
+      </div>
+    );
+  }
 
-  /* Filtros — ativas */
-  const vendasFiltradas = useMemo(() => {
-    let lista = filtrarPorPeriodo(vendas.filter(v => v.status !== "cancelada"), period, dataInicio, dataFim);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      lista = lista.filter(v =>
-        v.id?.toLowerCase().includes(q) ||
-        v.cliente?.toLowerCase().includes(q) ||
-        v.vendedor?.toLowerCase().includes(q)
-      );
-    }
-    return lista;
-  }, [vendas, period, dataInicio, dataFim, search]);
-
-  /* Filtros — canceladas (mesmo período e busca) */
-  const vendasCanceladas = useMemo(() => {
-    let lista = filtrarPorPeriodo(vendas.filter(v => v.status === "cancelada"), period, dataInicio, dataFim);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      lista = lista.filter(v =>
-        v.id?.toLowerCase().includes(q) ||
-        v.cliente?.toLowerCase().includes(q) ||
-        v.vendedor?.toLowerCase().includes(q)
-      );
-    }
-    return lista;
-  }, [vendas, period, dataInicio, dataFim, search]);
-
-  if (!tenantUid) return <div className="vd-loading">Carregando autenticação...</div>;
-
+  /* ═══════════════════════════════════════════════════
+     Render
+     ═══════════════════════════════════════════════════ */
   return (
     <>
       <style>{CSS}</style>
-      <div id="recibo-print-root" />
 
-      {/* ── Tabs ── */}
-      <div className="vd-tabs">
-        <button
-          className={`vd-tab ${tab === "ativas" ? "active" : ""}`}
-          onClick={() => setTab("ativas")}
-        >
-          <ShoppingCart size={14} /> Vendas
-          <span className="vd-tab-badge">{vendasFiltradas.length}</span>
-        </button>
-        <button
-          className={`vd-tab cancelada ${tab === "canceladas" ? "active" : ""}`}
-          onClick={() => setTab("canceladas")}
-        >
-          <Ban size={14} /> Canceladas
-          <span className="vd-tab-badge">{vendasCanceladas.length}</span>
-        </button>
-      </div>
-
-      {/* Topbar — search compartilhado entre abas */}
-      <header className="vd-topbar">
-        <div className="vd-topbar-title">
-          <h1>{tab === "ativas" ? "Vendas" : "Vendas Canceladas"}</h1>
-          <p>{tab === "ativas" ? "Gerencie e acompanhe todas as vendas" : "Histórico de vendas canceladas"}</p>
-        </div>
-
-        <div className="vd-search">
-          <Search size={13} color="var(--text-3)" />
-          <input
-            placeholder="Buscar por ID ou cliente..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-
-        {tab === "ativas" && podeCriar && (
-          <button onClick={() => setModalNova(true)}
-            style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: 9, background: "var(--gold)", color: "#0a0808", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, transition: "opacity .13s" }}
-          >
-            <Plus size={14} /> Nova Venda
-          </button>
-        )}
-      </header>
-
-      {/* Filtros de período — compartilhado entre abas */}
-      <div className="vd-periods">
-        {PERIODS.map(p => (
-          <button
-            key={p}
-            className={`vd-period-btn ${period === p ? "active" : ""}`}
-            onClick={() => setPeriod(p)}
-          >{p}</button>
-        ))}
-        {period === "Personalizado" && (
-          <div className="vd-period-custom">
-            <span className="vd-period-sep" />
-            <span className="vd-period-custom-label">De</span>
-            <input
-              type="date"
-              className="vd-period-date"
-              value={dataInicio}
-              max={dataFim || undefined}
-              onChange={e => setDataInicio(e.target.value)}
-            />
-            <span className="vd-period-custom-label">até</span>
-            <input
-              type="date"
-              className="vd-period-date"
-              value={dataFim}
-              min={dataInicio || undefined}
-              onChange={e => setDataFim(e.target.value)}
-            />
+      <div className="mat-root">
+        {/* Topbar */}
+        <header className="mat-topbar">
+          <div>
+            <h1>Módulo de Matrículas <span style={{ fontSize: 11, color: "var(--text-3)", fontWeight: 400 }}>v1.0</span></h1>
+            <p>Gestão de alunos, mensalidades e cobrança integrada</p>
           </div>
-        )}
-      </div>
+          <div className="mat-actions">
+            <button className="btn-secondary" onClick={() => setModalConfig(true)}>
+              <Settings size={14} /> Configurações
+            </button>
+            {podeCriar && (
+              <button className="btn-primary" onClick={() => setModalNovo(true)}>
+                <Plus size={14} /> Nova matrícula
+              </button>
+            )}
+          </div>
+        </header>
 
-      {/* ── Tabela: Vendas Ativas ── */}
-      {tab === "ativas" && (
-        <div className="ag-content">
-          <div className="vd-table-wrap">
-            <div className="vd-table-header">
-              <div className="vd-table-title">
-                Todas as vendas
-                <span className="vd-count-badge">{vendasFiltradas.length}</span>
-              </div>
-              <div className="vd-table-actions">
-                <button className="vd-export-btn" onClick={() => exportarCSV(vendasFiltradas)}>
-                  <Download size={11} /> CSV
-                </button>
+        <div className="mat-content">
+          {/* KPIs */}
+          <div className="mat-cards">
+            <div className="mat-card">
+              <span className="mat-card-label">Total de alunos ativos</span>
+              <span className="mat-card-value">{kpis.total}</span>
+            </div>
+            <div className="mat-card">
+              <span className="mat-card-label">Em dia</span>
+              <span className="mat-card-value ok" style={{ color: "var(--green)" }}>{kpis.emDia}</span>
+            </div>
+            <div className="mat-card">
+              <span className="mat-card-label">Vencendo / Vencidos</span>
+              <span className="mat-card-value split">
+                <span className="warn">{kpis.vencendo}</span>
+                <span className="sep">/</span>
+                <span className="danger">{kpis.vencidos}</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Tabela */}
+          <div className="mat-table-wrap">
+            <div className="mat-table-header">
+              <div className="mat-table-title">
+                <Users size={15} /> Alunos matriculados
+                <span className="mat-table-badge">{alunosFiltrados.length}</span>
               </div>
             </div>
 
-            <div className="vd-row vd-row-head">
+            <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border)" }}>
+              <div className="mat-filters">
+                <div className="mat-search">
+                  <Search size={14} />
+                  <input type="text" placeholder="Buscar por nome, documento ou ID…"
+                    value={search} onChange={(e) => setSearch(e.target.value)} />
+                </div>
+                <select className="mat-filter-select" value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}>
+                  <option value="todos">Todos os status</option>
+                  <option value="ativos">Ativos</option>
+                  <option value="em_dia">Em dia</option>
+                  <option value="vencendo">Vencendo</option>
+                  <option value="vencidos">Vencidos</option>
+                  <option value="inativos">Inativos/Trancados</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="mat-row-head">
               <span>ID</span>
-              <span>CLIENTE</span>
-              <span>DATA</span>
-              <span>PAGAMENTO</span>
-              <span>VENDEDOR</span>
-              <span>ITENS</span>
-              <span>TOTAL</span>
+              <span>ALUNO</span>
+              <span>DOCUMENTO</span>
+              <span>MENSALIDADE</span>
+              <span>VENCIMENTO</span>
+              <span>STATUS</span>
               <span style={{ textAlign: "right" }}>AÇÕES</span>
             </div>
 
             {loading ? (
-              <div className="vd-loading">Carregando vendas...</div>
-            ) : vendasFiltradas.length === 0 ? (
-              <div className="vd-empty">
-                <ShoppingCart size={28} color="var(--text-3)" style={{ marginBottom: 8 }} />
-                <p>Nenhuma venda encontrada.</p>
+              <div className="mat-empty">Carregando alunos…</div>
+            ) : alunosFiltrados.length === 0 ? (
+              <div className="mat-empty">
+                <Users size={28} color="var(--text-3)" />
+                <p>Nenhum aluno encontrado.</p>
               </div>
-            ) : vendasFiltradas.map(v => (
-              <div key={v.id} className="vd-row" onClick={() => setDetalhe(v)}>
-                <span className="vd-vid">{v.id}</span>
-                <span className="vd-cliente">{v.cliente || "—"}</span>
-                <span>{fmtData(v.data)}</span>
-                <span><span className="vd-fp-badge">{v.formaPagamento || "—"}</span></span>
-                <span>{v.vendedor || "—"}{v.vendedorCargo && (
-                  <span style={{ fontSize: 10, color: "var(--text-3)", marginLeft: 5 }}>({v.vendedorCargo})</span>
-                )}</span>
-                <span>{v.itens?.length || 0} item(s)</span>
-                <span className="vd-total">{fmtR$(v.total)}</span>
-                <div className="vd-actions" onClick={e => e.stopPropagation()}>
+            ) : alunosFiltrados.map(a => (
+              <div key={a.docId} className="mat-row" onClick={() => setDetalhe(a)}>
+                <span className="mat-id">{fmtIdSeq(a.idSeq)}</span>
+                <span>
+                  <div className="mat-aluno-nome">{a.nome}</div>
+                  {a.telefone && <div className="mat-aluno-sub">{a.telefone}</div>}
+                </span>
+                <span style={{ fontSize: 12, color: "var(--text-2)" }}>{a.documento || "—"}</span>
+                <span className="mat-valor">{fmtR$(a.valorMensalidade)}</span>
+                <span style={{ fontSize: 12, color: "var(--text-2)" }}>
+                  {a._proxVenc ? fmtData(a._proxVenc) : `Dia ${a.diaVencimento}`}
+                </span>
+                <span>
+                  {a.status !== "ativo" ? (
+                    <span className="mat-pill neutral">{a.status === "trancado" ? "Trancado" : "Inativo"}</span>
+                  ) : a._situacao === "vencido"  ? <span className="mat-pill danger">Vencido</span>
+                  :    a._situacao === "vencendo" ? <span className="mat-pill warn">Vencendo</span>
+                  :                                 <span className="mat-pill ok">Em dia</span>}
+                </span>
+                <div className="mat-actions-cell" onClick={(e) => e.stopPropagation()}>
+                  <button className="btn-icon btn-icon-view" onClick={() => setDetalhe(a)} title="Ver detalhes">
+                    <Search size={13} />
+                  </button>
                   {podeEditar && (
-                    <button className="btn-icon btn-icon-edit" onClick={() => setEditando(v)} title="Editar">
+                    <button className="btn-icon btn-icon-edit" onClick={() => setEditando(a)} title="Editar">
                       <Edit2 size={13} />
                     </button>
                   )}
-                  {podeCancelar && (
-                    <button className="btn-icon btn-icon-cancel" onClick={() => setDeletando(v)} title="Cancelar venda">
-                      <Ban size={13} />
-                    </button>
-                  )}
                   {podeExcluir && (
-                    <button className="btn-icon btn-icon-del" onClick={() => setExcluindoDef(v)} title="Excluir permanentemente">
+                    <button className="btn-icon btn-icon-del" onClick={() => setExcluindo(a)} title="Excluir">
                       <Trash2 size={13} />
                     </button>
                   )}
@@ -2329,139 +1263,92 @@ useEffect(() => {
             ))}
           </div>
         </div>
-      )}
-
-      {/* ── Tabela: Vendas Canceladas ── */}
-      {tab === "canceladas" && (
-        <div className="ag-content">
-          <div className="vd-table-wrap">
-            <div className="vd-table-header">
-              <div className="vd-table-title" style={{ color: "var(--red)" }}>
-                Vendas Canceladas
-                <span className="vd-count-badge" style={{ background: "rgba(224,82,82,.1)", color: "var(--red)", borderColor: "rgba(224,82,82,.2)" }}>
-                  {vendasCanceladas.length}
-                </span>
-              </div>
-              <div className="vd-table-actions">
-                <button className="vd-export-btn" onClick={() => exportarCSV(vendasCanceladas)}>
-                  <Download size={11} /> CSV
-                </button>
-              </div>
-            </div>
-
-            <div className="vd-row-cancelada vd-row-cancelada-head">
-              <span>ID</span>
-              <span>CLIENTE</span>
-              <span>DATA VENDA</span>
-              <span>TOTAL</span>
-              <span>CANCELADA POR</span>
-              <span>DATA CANCEL.</span>
-            </div>
-
-            {loading ? (
-              <div className="vd-loading">Carregando...</div>
-            ) : vendasCanceladas.length === 0 ? (
-              <div className="vd-empty">
-                <Ban size={28} color="var(--text-3)" style={{ marginBottom: 8 }} />
-                <p>{search.trim() ? "Nenhuma venda cancelada encontrada para essa busca." : "Nenhuma venda cancelada."}</p>
-              </div>
-            ) : vendasCanceladas.map(v => (
-              <div key={v.id} className="vd-row-cancelada" onClick={() => setDetalhe(v)}>
-                <span className="vd-vid">{v.id}</span>
-                <span className="vd-cliente">{v.cliente || "—"}</span>
-                <span>{fmtData(v.data)}</span>
-                <span className="vd-total" style={{ color: "var(--red)", textDecoration: "line-through", opacity: .7 }}>
-                  {fmtR$(v.total)}
-                </span>
-                <span style={{ color: "var(--text-2)" }}>
-                  {typeof v.canceladaPor === "string"
-                    ? v.canceladaPor
-                    : (v.canceladaPor?.nome || "—")}
-                  {typeof v.canceladaPor !== "string" && v.canceladaPor?.cargo && (
-                    <span style={{ fontSize: 10, color: "var(--text-3)", marginLeft: 5 }}>
-                      ({v.canceladaPor.cargo})
-                    </span>
-                  )}
-                </span>
-                <span style={{ color: "var(--text-3)" }}>
-                  {v.canceladaEm
-                    ? fmtData(v.canceladaEm?.toDate ? v.canceladaEm.toDate().toISOString().split("T")[0] : v.canceladaEm)
-                    : "—"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      </div>
 
       {/* Modais */}
-      {modalNova && (
-        <ModalNovaVenda
-          uid={tenantUid}
-          cargo={cargo}
-          vendedorId={vendedorId}
-          vendedorNome={vendedorNome}
-          clientes={clientes}
-          produtos={produtos}
-          servicos={servicos}
-          vendedores={vendedores}
-          taxas={taxas}
-          onSave={handleSave}
-          onClose={() => setModalNova(false)}
+      {modalNovo && (
+        <ModalMatricula
+          alunosExistentes={alunos}
+          onSave={handleSaveAluno}
+          onClose={() => setModalNovo(false)}
         />
       )}
-
       {editando && (
-        <ModalNovaVenda
-          venda={editando}
-          uid={tenantUid}
-          cargo={cargo}
-          vendedorId={vendedorId}
-          vendedorNome={vendedorNome}
-          clientes={clientes}
-          produtos={produtos}
-          servicos={servicos}
-          vendedores={vendedores}
-          taxas={taxas}
-          onSave={handleSave}
+        <ModalMatricula
+          aluno={editando}
+          alunosExistentes={alunos}
+          onSave={handleSaveAluno}
           onClose={() => setEditando(null)}
         />
       )}
-
       {detalhe && (
-        <ModalDetalheVenda
-          venda={detalhe}
+        <ModalDetalheAluno
+          aluno={detalhe}
+          mensalidades={mensalidades.filter(m => m.alunoId === detalhe.docId)}
+          config={config}
           onClose={() => setDetalhe(null)}
-          onEditar={
-            podeEditar && (detalhe?.status !== "cancelada" || cargo === "admin")
-              ? (v) => { setDetalhe(null); setEditando(v); }
-              : null
-          }
-          onCancelar={
-            podeCancelar && detalhe?.status !== "cancelada"
-              ? (v) => { setDetalhe(null); setDeletando(v); }
-              : null
-          }
-          onExcluirDef={podeExcluir ? (v) => { setDetalhe(null); setExcluindoDef(v); } : null}
-          isAdmin={cargo === "admin"}
+          onEditar={(a)     => { setDetalhe(null); setEditando(a); }}
+          onExcluir={(a)    => { setDetalhe(null); setExcluindo(a); }}
+          onGerarMensalidade={handleGerarMensalidade}
+          podeEditar={podeEditar}
+          podeExcluir={podeExcluir}
         />
       )}
-
-      {deletando && (
-        <ModalCancelarVenda
-          venda={deletando}
-          onConfirm={handleCancelar}
-          onClose={() => setDeletando(null)}
+      {excluindo && (
+        <ModalExcluirAluno
+          aluno={excluindo}
+          mensQtd={mensalidades.filter(m => m.alunoId === excluindo.docId).length}
+          onConfirm={handleExcluirAluno}
+          onClose={() => setExcluindo(null)}
         />
       )}
-
-      {excluindoDef && (
-        <ModalExcluirVenda
-          venda={excluindoDef}
-          onConfirm={handleExcluirDefinitivo}
-          onClose={() => setExcluindoDef(null)}
+      {modalConfig && (
+        <ModalConfigMatriculas
+          config={config}
+          onSave={handleSaveConfig}
+          onClose={() => setModalConfig(false)}
         />
       )}
     </>
   );
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   HELPER: gera mensalidade em aberto (a_receber) para um aluno
+   Retorna o objeto criado ou null se já existe para esse mês.
+   ══════════════════════════════════════════════════════════════════════ */
+async function gerarMensalidadeEmAberto({ tenantUid, aluno, mensalidadesDoAluno }) {
+  const { ano, mes } = proximoMesParaGerar(aluno, mensalidadesDoAluno);
+  const mesRef = toMesRef(ano, mes);
+
+  /* Verifica duplicidade (a_receber com mesmo aluno + mesReferencia) */
+  const jaExiste = mensalidadesDoAluno.some(m => m.mesReferencia === mesRef);
+  if (jaExiste) return null;
+
+  const dia = Math.min(28, Math.max(1, Number(aluno.diaVencimento) || 10));
+  const dataVencimento = calcVencimento(ano, mes, dia);
+  const valor = Number(aluno.valorMensalidade || 0);
+  const agora = new Date().toISOString();
+
+  const payload = {
+    origem:          "mensalidade",
+    alunoId:         aluno.docId,
+    alunoNome:       aluno.nome,
+    alunoIdSeq:      aluno.idSeq,
+    mesReferencia:   mesRef,
+    categoria:       "Mensalidade",
+    descricao:       `Mensalidade ${mesRef} — ${aluno.nome}`,
+    clienteNome:     aluno.nome,
+    valorTotal:      valor,
+    valorPago:       0,
+    valorRestante:   valor,
+    dataVencimento,
+    status:          "pendente",
+    referenciaId:    aluno.docId,
+    dataCriacao:     agora,
+    dataAtualizacao: agora,
+  };
+
+  await addDoc(collection(db, "users", tenantUid, "a_receber"), payload);
+  return payload;
 }
