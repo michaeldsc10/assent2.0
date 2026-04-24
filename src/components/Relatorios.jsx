@@ -532,6 +532,137 @@ const CSS = `
 .rel-print-header { display: none; }
 
 /* ══════════════════════════════════════════════════════
+   MOBILE — dropdown de navegação
+   ══════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  /* Oculta sidebar lateral no mobile */
+  .rel-nav { display: none !important; }
+
+  /* O body vira coluna para o dropdown ficar em cima do conteúdo */
+  .rel-body { flex-direction: column; }
+
+  /* Topbar compacta */
+  .rel-topbar { padding: 10px 14px; }
+  .rel-topbar-title h1 { font-size: 15px; }
+  .rel-content { padding: 12px; gap: 14px; }
+}
+
+/* Dropdown wrapper — só visível no mobile */
+.rel-mobile-nav {
+  display: none;
+}
+@media (max-width: 640px) {
+  .rel-mobile-nav {
+    display: block;
+    position: relative;
+    z-index: 200;
+    flex-shrink: 0;
+    padding: 10px 14px 0;
+    background: var(--s1);
+    border-bottom: 1px solid var(--border);
+  }
+}
+
+/* Botão gatilho do dropdown */
+.rel-mobile-trigger {
+  width: 100%;
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  background: var(--s2);
+  border: 1px solid var(--border-h);
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px; font-weight: 600;
+  color: var(--text);
+  transition: border-color .15s, background .15s;
+  margin-bottom: 10px;
+}
+.rel-mobile-trigger:hover { background: var(--s3); }
+.rel-mobile-trigger-icon {
+  width: 28px; height: 28px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(200,165,94,0.15); color: var(--gold);
+  flex-shrink: 0;
+}
+.rel-mobile-trigger-label { flex: 1; text-align: left; }
+.rel-mobile-trigger-chevron {
+  color: var(--text-3); transition: transform .2s ease;
+  flex-shrink: 0;
+}
+.rel-mobile-trigger-chevron.open { transform: rotate(180deg); }
+
+/* Painel dropdown */
+.rel-mobile-dropdown {
+  position: absolute;
+  top: calc(100% - 2px);
+  left: 14px; right: 14px;
+  background: var(--s1);
+  border: 1px solid var(--border-h);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.55);
+  overflow: hidden;
+  animation: rel-dd-in .15s ease;
+  z-index: 300;
+}
+@keyframes rel-dd-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Header do dropdown */
+.rel-mobile-dd-head {
+  padding: 10px 14px 8px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.rel-mobile-dd-title {
+  font-size: 9px; font-weight: 700; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--text-3);
+}
+
+/* Lista de itens */
+.rel-mobile-dd-list {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 6px;
+}
+.rel-mobile-dd-list::-webkit-scrollbar { width: 3px; }
+.rel-mobile-dd-list::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
+
+/* Item individual */
+.rel-mobile-dd-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 10px;
+  border-radius: 8px;
+  background: transparent; border: none;
+  width: 100%; text-align: left;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px; font-weight: 500;
+  color: var(--text-2);
+  transition: background .12s, color .12s;
+}
+.rel-mobile-dd-item:hover { background: var(--s2); color: var(--text); }
+.rel-mobile-dd-item.active {
+  background: rgba(200,165,94,0.12);
+  color: var(--gold);
+}
+.rel-mobile-dd-item.active .rel-mobile-dd-item-dot {
+  background: var(--gold);
+  box-shadow: 0 0 6px rgba(200,165,94,0.5);
+}
+.rel-mobile-dd-item-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--border-h); flex-shrink: 0;
+  transition: background .12s;
+}
+.rel-mobile-dd-item-text { flex: 1; }
+.rel-mobile-dd-item-lock {
+  color: var(--text-3); flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════════
    CSS — RELATÓRIO DE COMPRAS & CONTAS A RECEBER
    ══════════════════════════════════════════════════════ */
 
@@ -5448,6 +5579,20 @@ export default function Relatorios() {
   /* Impressão */
   const handlePrint = useCallback(() => window.print(), []);
 
+  /* Mobile dropdown */
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const itemAtivo = MENU.find(m => m.key === ativo);
+
+  /* Fecha dropdown ao clicar fora */
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handler = (e) => {
+      if (!e.target.closest(".rel-mobile-nav")) setMobileOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [mobileOpen]);
+
   if (!tenantUid) {
     return (
       <div className="rel-loading">
@@ -5506,6 +5651,84 @@ export default function Relatorios() {
         </header>
 
         <div className="rel-body">
+
+          {/* ── Mobile: dropdown de navegação (só aparece em telas ≤ 640px via CSS) ── */}
+          <div className="rel-mobile-nav" data-print-hide>
+            <button
+              className="rel-mobile-trigger"
+              onClick={() => setMobileOpen(v => !v)}
+              aria-expanded={mobileOpen}
+            >
+              <span className="rel-mobile-trigger-icon">
+                {itemAtivo?.icon}
+              </span>
+              <span className="rel-mobile-trigger-label">
+                {TITULO_RELATORIO[ativo] || "Selecionar relatório"}
+              </span>
+              <ChevronDown size={15} className={`rel-mobile-trigger-chevron${mobileOpen ? " open" : ""}`} />
+            </button>
+
+            {mobileOpen && (
+              <div className="rel-mobile-dropdown">
+                <div className="rel-mobile-dd-head">
+                  <span className="rel-mobile-dd-title">Relatórios</span>
+                  {isAdmin && (
+                    <button
+                      onClick={() => setModoGerenciar(v => !v)}
+                      style={{
+                        background: modoGerenciar ? "rgba(200,165,94,.15)" : "transparent",
+                        border: `1px solid ${modoGerenciar ? "rgba(200,165,94,.35)" : "var(--border)"}`,
+                        borderRadius: 6, padding: "3px 7px", cursor: "pointer",
+                        color: modoGerenciar ? "var(--gold)" : "var(--text-3)",
+                        fontSize: 10, fontWeight: 600, fontFamily: "'DM Sans',sans-serif",
+                        display: "flex", alignItems: "center", gap: 4,
+                      }}
+                    >
+                      {modoGerenciar ? <><EyeOff size={11} /> Fechar</> : <><Eye size={11} /> Gerenciar</>}
+                    </button>
+                  )}
+                </div>
+                <div className="rel-mobile-dd-list">
+                  {MENU.map((item) => {
+                    const liberado = temAcesso(item.key);
+                    const isOculto = ocultos.has(item.key);
+                    if (!modoGerenciar && isOculto) return null;
+                    return (
+                      <button
+                        key={item.key}
+                        className={`rel-mobile-dd-item${ativo === item.key && liberado ? " active" : ""}`}
+                        style={{
+                          opacity: isOculto ? 0.42 : (!liberado ? 0.5 : 1),
+                          cursor: !liberado || isOculto ? "not-allowed" : "pointer",
+                        }}
+                        onClick={() => {
+                          if (modoGerenciar) { toggleOculto(item.key); return; }
+                          if (!liberado || isOculto) return;
+                          setAtivo(item.key);
+                          setMobileOpen(false);
+                        }}
+                      >
+                        <span className="rel-mobile-dd-item-dot" />
+                        <span className="rel-mobile-dd-item-text"
+                          style={{ textDecoration: isOculto && modoGerenciar ? "line-through" : "none" }}>
+                          {item.label}
+                        </span>
+                        {modoGerenciar && isAdmin && (
+                          <span style={{ color: isOculto ? "var(--text-3)" : "var(--gold)", marginLeft: "auto" }}>
+                            {isOculto ? <EyeOff size={13} /> : <Eye size={13} />}
+                          </span>
+                        )}
+                        {!modoGerenciar && !liberado && (
+                          <Lock size={11} className="rel-mobile-dd-item-lock" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Sidebar de navegação */}
           <nav className="rel-nav" data-print-hide>
             {/* Header da nav com botão gerenciar (admin only) */}
