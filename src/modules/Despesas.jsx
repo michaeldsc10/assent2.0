@@ -174,24 +174,31 @@ const CSS = `
   }
   .btn-nova-desp:hover { opacity: .88; }
 
-  /* Container principal com scroll.
-     Funciona em 3 cenários comuns de layout:
-     1) Pai com display:flex + overflow:hidden → flex:1 + min-height:0 resolve
-     2) Pai com position:relative e altura → position:absolute inset:0 resolve
-     3) Fallback: max-height:100dvh limita ao viewport */
+  /* Container principal — não faz scroll direto.
+     O scroll fica no .desp-body interno, garantindo independência
+     do pai (App.jsx) não precisar ter overflow:hidden). */
   .desp-container {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: hidden;          /* NÃO auto — o filho .desp-body faz o scroll */
+    display: flex;
+    flex-direction: column;
+  }
+  .desp-container::-webkit-scrollbar { width: 4px; }
+  .desp-container::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
+
+  /* Área scrollável — contém tudo menos a topbar */
+  .desp-body {
     flex: 1 1 0;
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
     display: flex;
     flex-direction: column;
-    /* Garante scroll em contextos onde o pai não define altura */
-    max-height: 100dvh;
-    -webkit-overflow-scrolling: touch;
   }
-  .desp-container::-webkit-scrollbar { width: 4px; }
-  .desp-container::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
+  .desp-body::-webkit-scrollbar { width: 4px; }
+  .desp-body::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
 
   /* Topbar */
   .desp-topbar {
@@ -473,7 +480,7 @@ const CSS = `
 
   /* ── Mobile responsive ── */
   @media (max-width: 640px) {
-    .desp-container { padding-bottom: 72px; }
+    .desp-body { padding-bottom: 72px; }
 
     /* Topbar */
     .desp-topbar { padding: 12px 14px; gap: 10px; }
@@ -1697,6 +1704,7 @@ export default function Despesas({ isPro = false }) {
       </header>
 
       {/* Cards de métricas */}
+      <div className="desp-body">
       <BannerLimite total={despesas.length} limite={LIMITES_FREE.despesas} tipo="despesas" isPro={isPro} />
       <div className="desp-metrics">
         <div
@@ -1914,6 +1922,7 @@ export default function Despesas({ isPro = false }) {
           </div>
         ))}
       </div>
+      </div>{/* /desp-body */}
 
       {/* Modais */}
       {viendoDetalhes && (
