@@ -482,6 +482,7 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
     diaVencimento: aluno?.diaVencimento || "10",
     dataInicio:    aluno?.dataInicio    || new Date().toISOString().slice(0, 10),
     status:        aluno?.status        || "ativo",
+    turma:         aluno?.turma         || "",
     observacoes:   aluno?.observacoes   || "",
   });
   const [erros, setErros] = useState({});
@@ -557,6 +558,7 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
       diaVencimento:       Number(form.diaVencimento),
       dataInicio:          form.dataInicio,
       status:              form.status,
+      turma:               form.turma.trim(),
       observacoes:         form.observacoes.trim(),
       _fotoFile:           fotoBase64,
     });
@@ -744,6 +746,14 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
           )}
 
           <div className="form-group">
+            <label className="form-label">Turma / Horário</label>
+            <input className="form-input" type="text"
+              value={form.turma}
+              onChange={(e) => set("turma", e.target.value)}
+              placeholder="Ex: Turma A, Terça 19h, Equipe Juvenil…" />
+          </div>
+
+          <div className="form-group">
             <label className="form-label">Observações</label>
             <textarea className="form-textarea"
               value={form.observacoes}
@@ -882,6 +892,12 @@ function ModalDetalheAluno({
               <div className="mat-detail-item" style={{ gridColumn: "1 / -1" }}>
                 <div className="mat-detail-label">Observações</div>
                 <div className="mat-detail-value" style={{ whiteSpace: "pre-wrap" }}>{aluno.observacoes}</div>
+              </div>
+            )}
+            {aluno.turma && (
+              <div className="mat-detail-item">
+                <div className="mat-detail-label">Turma / Horário</div>
+                <div className="mat-detail-value">{aluno.turma}</div>
               </div>
             )}
           </div>
