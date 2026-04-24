@@ -5,10 +5,11 @@
      users/{uid}/alunos/{docId}           → cada aluno
                                             docId = aluno_{ts}_{rand}
                                             idSeq = sequencial visual A0001…
+                                            fotoUrl = Firebase Storage URL (opcional)
 
      users/{uid}/a_receber/{autoId}        → mensalidades em aberto
                                             origem: "mensalidade"
-                                            alunoId, mesReferencia
+                                            idSeqMens = M0001…, alunoId, mesReferencia
 
      users/{uid}/vendas/{autoId}           → mensalidades pagas
                                             categoria: "Mensalidade"
@@ -17,23 +18,26 @@
      users/{uid}/config/matriculas         → template mensagem WhatsApp
    ═══════════════════════════════════════════════════ */
 
-import { useState, useEffect, useContext, useMemo } from "react";
+import { useState, useEffect, useContext, useMemo, useRef } from "react";
 import {
   Search, Plus, Edit2, Trash2, X, Users,
   MessageCircle, Calendar, CreditCard, Settings,
   ChevronLeft, CheckCircle, AlertCircle, Clock,
-  Phone, Mail, MapPin, User, FileText, DollarSign,
+  Phone, Mail, MapPin, User, FileText, DollarSign, Camera,
 } from "lucide-react";
 
 import AuthContext from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO } from "../lib/logAction";
-import { db } from "../lib/firebase";
+import { db, storage } from "../lib/firebase";
 
 import {
   collection, doc, setDoc, deleteDoc, updateDoc,
   onSnapshot, getDoc, addDoc, getDocs,
   query, where,
 } from "firebase/firestore";
+import {
+  ref as storageRef, uploadBytes, getDownloadURL, deleteObject,
+} from "firebase/storage";
 
 /* ══════════════════════════════════════════════════
    PERMISSÕES (segue padrão Vendas/AReceber)
@@ -111,7 +115,8 @@ const proximoIdSeq = (alunos) => {
   const max = alunos.reduce((m, a) => Math.max(m, Number(a.idSeq || 0)), 0);
   return max + 1;
 };
-const fmtIdSeq = (n) => `A${String(n).padStart(4, "0")}`;
+const fmtIdSeq    = (n) => `A${String(n).padStart(4, "0")}`;
+const fmtIdSeqMens = (n) => `M${String(n).padStart(4, "0")}`;
 
 /* YYYY-MM do mês/ano */
 const toMesRef = (ano, mes) => `${ano}-${String(mes).padStart(2, "0")}`;
@@ -319,8 +324,48 @@ const CSS = `
 .mat-pill.danger { background:rgba(224,82,82,.12); color:var(--red); border:1px solid rgba(224,82,82,.25); }
 .mat-pill.neutral { background:var(--s3); color:var(--text-3); border:1px solid var(--border); }
 
+
+/* ── foto do aluno ── */
+.aluno-avatar { width:36px; height:36px; border-radius:50%; object-fit:cover;
+  border:1.5px solid var(--border-h); flex-shrink:0; }
+.aluno-avatar-placeholder { width:36px; height:36px; border-radius:50%;
+  background:var(--s3); border:1.5px solid var(--border);
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Sora',sans-serif; font-size:13px; font-weight:600;
+  color:var(--text-2); flex-shrink:0; }
+.foto-picker-wrap { display:flex; align-items:center; gap:16px; margin-bottom:20px; }
+.foto-picker-circle { width:80px; height:80px; border-radius:50%; position:relative;
+  cursor:pointer; flex-shrink:0; overflow:hidden;
+  border:2px dashed var(--border); background:var(--s2);
+  display:flex; align-items:center; justify-content:center;
+  transition:border-color .15s; }
+.foto-picker-circle:hover { border-color:var(--gold); }
+.foto-picker-circle img { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+.foto-picker-overlay { position:absolute; inset:0; border-radius:50%;
+  background:rgba(0,0,0,.55); display:flex; align-items:center;
+  justify-content:center; opacity:0; transition:opacity .15s; }
+.foto-picker-circle:hover .foto-picker-overlay { opacity:1; }
+.foto-picker-info { font-size:12px; color:var(--text-2); line-height:1.6; }
+.foto-picker-info strong { color:var(--text); display:block; margin-bottom:2px; }
+
 .mat-empty { padding:42px 18px; text-align:center; color:var(--text-3); font-size:13px; }
 .mat-empty svg { margin-bottom:8px; }
+
+/* filtros rapidos cobranca */
+.mat-quick-filters { display:flex; gap:7px; flex-wrap:wrap; margin-top:10px; }
+.mat-qbtn { display:inline-flex; align-items:center; gap:5px; padding:5px 13px;
+  border-radius:20px; font-size:12px; font-weight:600; cursor:pointer;
+  border:1px solid var(--border); background:var(--s3); color:var(--text-2);
+  transition:all .13s; white-space:nowrap; }
+.mat-qbtn:hover { background:var(--s2); color:var(--text); border-color:var(--border-h); }
+.mat-qbtn.active-warn { background:rgba(245,166,35,.13); color:#F5A623; border-color:rgba(245,166,35,.35); }
+.mat-qbtn.active-danger { background:rgba(224,82,82,.13); color:var(--red); border-color:rgba(224,82,82,.35); }
+.mat-qbtn.active-neutral { background:var(--s2); color:var(--text); border-color:var(--border-h); }
+
+/* header clicavel de ordenacao */
+.mat-col-sort { cursor:pointer; user-select:none; display:inline-flex; align-items:center; gap:4px; }
+.mat-col-sort:hover { color:var(--text-2); }
+.mat-sort-icon { font-size:10px; color:var(--gold); }
 
 /* detalhe do aluno */
 .mat-detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px; }
@@ -380,6 +425,20 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
   });
   const [erros, setErros] = useState({});
 
+  /* ── Foto ── */
+  const [fotoFile, setFotoFile]       = useState(null);
+  const [fotoPreview, setFotoPreview] = useState(aluno?.fotoUrl || null);
+  const fileInputRef = useRef(null);
+
+  const handleFotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) { alert("Selecione uma imagem válida."); return; }
+    if (file.size > 5 * 1024 * 1024) { alert("Imagem muito grande. Máximo 5 MB."); return; }
+    setFotoFile(file);
+    setFotoPreview(URL.createObjectURL(file));
+  };
+
   const set = (k, v) => {
     setForm(f => ({ ...f, [k]: v }));
     if (erros[k]) setErros(er => ({ ...er, [k]: null }));
@@ -431,6 +490,7 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
       dataInicio:          form.dataInicio,
       status:              form.status,
       observacoes:         form.observacoes.trim(),
+      _fotoFile:           fotoFile,   // arquivo para upload (não vai pro Firestore diretamente)
     });
   };
 
@@ -448,6 +508,29 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
         </div>
 
         <div className="modal-body">
+          {/* — Foto — */}
+          <div className="foto-picker-wrap">
+            <div className="foto-picker-circle" onClick={() => fileInputRef.current?.click()}>
+              {fotoPreview
+                ? <img src={fotoPreview} alt="Foto do aluno" />
+                : <Camera size={24} color="var(--text-3)" />}
+              <div className="foto-picker-overlay"><Camera size={18} color="#fff" /></div>
+            </div>
+            <div className="foto-picker-info">
+              <strong>Foto do aluno</strong>
+              Clique para selecionar uma imagem.<br />
+              JPG, PNG ou WebP · máx. 5 MB
+              {fotoPreview && (
+                <button className="btn-secondary" style={{ marginTop: 8, padding: "4px 10px", fontSize: 11 }}
+                  onClick={(e) => { e.stopPropagation(); setFotoFile(null); setFotoPreview(null); }}>
+                  Remover foto
+                </button>
+              )}
+            </div>
+            <input ref={fileInputRef} type="file" accept="image/*"
+              style={{ display: "none" }} onChange={handleFotoChange} />
+          </div>
+
           {/* — Dados pessoais — */}
           <div className="mat-section-title"><User size={14} /> Dados pessoais</div>
 
@@ -640,13 +723,18 @@ function ModalDetalheAluno({
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-box modal-box-xl">
         <div className="modal-header">
-          <div>
-            <div className="modal-title">{aluno.nome}</div>
-            <div className="modal-sub">
-              {fmtIdSeq(aluno.idSeq)} · {aluno.documento || "—"} ·{" "}
-              <span className={`mat-pill ${aluno.status === "ativo" ? "ok" : "neutral"}`}>
-                {aluno.status === "ativo" ? "Ativo" : aluno.status === "trancado" ? "Trancado" : "Inativo"}
-              </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+            {aluno.fotoUrl
+              ? <img src={aluno.fotoUrl} alt={aluno.nome} style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--border-h)", flexShrink: 0 }} />
+              : <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--s3)", border: "2px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Sora',sans-serif", fontSize: 18, fontWeight: 600, color: "var(--text-2)", flexShrink: 0 }}>{(aluno.nome || "?")[0].toUpperCase()}</div>}
+            <div>
+              <div className="modal-title">{aluno.nome}</div>
+              <div className="modal-sub">
+                {fmtIdSeq(aluno.idSeq)} · {aluno.documento || "—"} ·{" "}
+                <span className={`mat-pill ${aluno.status === "ativo" ? "ok" : "neutral"}`}>
+                  {aluno.status === "ativo" ? "Ativo" : aluno.status === "trancado" ? "Trancado" : "Inativo"}
+                </span>
+              </div>
             </div>
           </div>
           <button className="modal-close" onClick={onClose}><X size={16} /></button>
@@ -740,7 +828,10 @@ function ModalDetalheAluno({
                 : "—";
               return (
                 <div key={m.id} className="mat-mens-row">
-                  <span className="mat-mens-mes" style={{ textTransform: "capitalize" }}>{mesLabel}</span>
+                  <span className="mat-mens-mes" style={{ textTransform: "capitalize" }}>
+                    {m.idSeqMens && <span style={{ fontFamily: "monospace", fontSize: 10, color: "var(--text-3)", marginRight: 6 }}>{m.idSeqMens}</span>}
+                    {mesLabel}
+                  </span>
                   <span>{fmtData(m.dataVencimento)}</span>
                   <span className="mat-mens-valor">
                     {fmtR$(st === "paga" ? (m.valorPago || m.valorTotal) : m.valorRestante)}
@@ -911,6 +1002,9 @@ export default function Alunos() {
 
   const [search, setSearch]   = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
+  const [sortDir, setSortDir] = useState("asc"); // "asc" | "desc"
+
+  const toggleSort = () => setSortDir(d => d === "asc" ? "desc" : "asc");
 
   /* ═══════════════════════════════════════════════════
      Firestore listeners — segue padrão multi-tenant
@@ -951,9 +1045,58 @@ export default function Alunos() {
 
     try {
       if (editando) {
-        /* EDITAR — não regenera mensalidade. Apenas atualiza campos. */
+        /* EDITAR — atualiza campos do aluno */
+        const { _fotoFile, ...dadosLimpos } = dados;
+
+        /* Upload de foto se nova imagem foi selecionada */
+        if (_fotoFile) {
+          const sRef = storageRef(storage, `users/${tenantUid}/alunos/${editando.docId}/foto`);
+          await uploadBytes(sRef, _fotoFile);
+          dadosLimpos.fotoUrl = await getDownloadURL(sRef);
+        } else if (dados.fotoUrl === null && editando.fotoUrl) {
+          /* Remoção de foto */
+          try {
+            await deleteObject(storageRef(storage, `users/${tenantUid}/alunos/${editando.docId}/foto`));
+          } catch {}
+          dadosLimpos.fotoUrl = null;
+        }
+
         const ref = doc(db, "users", tenantUid, "alunos", editando.docId);
-        await updateDoc(ref, { ...dados, atualizadoEm: new Date().toISOString() });
+        await updateDoc(ref, { ...dadosLimpos, atualizadoEm: new Date().toISOString() });
+
+        /* ── Propaga mudanças para mensalidades em aberto ──
+           Se diaVencimento ou valorMensalidade mudaram, atualiza
+           todos os registros de a_receber ainda não pagos. */
+        const mensDoAluno = mensalidades.filter(
+          m => m.alunoId === editando.docId && Number(m.valorRestante || 0) > 0
+        );
+
+        const diaChanged   = Number(dados.diaVencimento)   !== Number(editando.diaVencimento);
+        const valorChanged = Number(dados.valorMensalidade) !== Number(editando.valorMensalidade);
+
+        if ((diaChanged || valorChanged) && mensDoAluno.length > 0) {
+          const agora = new Date().toISOString();
+          await Promise.all(mensDoAluno.map(m => {
+            const updates = { dataAtualizacao: agora };
+
+            if (diaChanged && m.mesReferencia) {
+              const [ano, mes] = m.mesReferencia.split("-").map(Number);
+              updates.dataVencimento = calcVencimento(
+                ano, mes,
+                Math.min(28, Math.max(1, Number(dados.diaVencimento)))
+              );
+            }
+
+            if (valorChanged && Number(m.valorPago || 0) === 0) {
+              /* só recalcula se ainda não houve nenhum pagamento parcial */
+              updates.valorTotal    = Number(dados.valorMensalidade);
+              updates.valorRestante = Number(dados.valorMensalidade);
+              updates.descricao     = `Mensalidade ${m.mesReferencia} — ${dados.nome}`;
+            }
+
+            return updateDoc(doc(db, "users", tenantUid, "a_receber", m.id), updates);
+          }));
+        }
 
         await logAction({
           tenantUid, nomeUsuario, cargo,
@@ -966,10 +1109,18 @@ export default function Alunos() {
         const docId = gerarDocIdAluno();
         const idSeq = proximoIdSeq(alunos);
         const agora = new Date().toISOString();
+        const { _fotoFile: _ff, ...dadosCriar } = dados;
+
+        /* Upload de foto inicial (se houver) */
+        if (_ff) {
+          const sRef = storageRef(storage, `users/${tenantUid}/alunos/${docId}/foto`);
+          await uploadBytes(sRef, _ff);
+          dadosCriar.fotoUrl = await getDownloadURL(sRef);
+        }
 
         await setDoc(doc(db, "users", tenantUid, "alunos", docId), {
           docId, idSeq,
-          ...dados,
+          ...dadosCriar,
           criadoEm: agora,
           atualizadoEm: agora,
         });
@@ -1107,8 +1258,11 @@ export default function Alunos() {
         onlyDigits(a.documento).includes(onlyDigits(q)) ||
         fmtIdSeq(a.idSeq).toLowerCase().includes(q)
       );
-    }).sort((a, b) => (a.nome || "").localeCompare(b.nome || ""));
-  }, [alunosComStatus, search, statusFilter]);
+    }).sort((a, b) => {
+      const cmp = (a.nome || "").localeCompare(b.nome || "", "pt-BR", { sensitivity: "base" });
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+  }, [alunosComStatus, search, statusFilter, sortDir]);
 
   const kpis = useMemo(() => {
     const total = alunos.filter(a => a.status === "ativo").length;
@@ -1206,11 +1360,36 @@ export default function Alunos() {
                   <option value="inativos">Inativos/Trancados</option>
                 </select>
               </div>
+
+              {/* Filtros rápidos para cobrança via WhatsApp */}
+              <div className="mat-quick-filters">
+                <span style={{ fontSize: 11, color: "var(--text-3)", alignSelf: "center", marginRight: 2 }}>Filtro rápido:</span>
+                <button
+                  className={`mat-qbtn ${statusFilter === "todos" ? "active-neutral" : ""}`}
+                  onClick={() => setStatusFilter("todos")}>
+                  Todos
+                </button>
+                <button
+                  className={`mat-qbtn ${statusFilter === "vencendo" ? "active-warn" : ""}`}
+                  onClick={() => setStatusFilter(statusFilter === "vencendo" ? "todos" : "vencendo")}>
+                  <Clock size={11} /> Pendentes ({kpis.vencendo})
+                </button>
+                <button
+                  className={`mat-qbtn ${statusFilter === "vencidos" ? "active-danger" : ""}`}
+                  onClick={() => setStatusFilter(statusFilter === "vencidos" ? "todos" : "vencidos")}>
+                  <AlertCircle size={11} /> Vencidos ({kpis.vencidos})
+                </button>
+              </div>
             </div>
 
             <div className="mat-row-head">
               <span>ID</span>
-              <span>ALUNO</span>
+              <span>
+                <span className="mat-col-sort" onClick={toggleSort} title={sortDir === "asc" ? "Ordenar Z→A" : "Ordenar A→Z"}>
+                  ALUNO
+                  <span className="mat-sort-icon">{sortDir === "asc" ? "▲" : "▼"}</span>
+                </span>
+              </span>
               <span>DOCUMENTO</span>
               <span>MENSALIDADE</span>
               <span>VENCIMENTO</span>
@@ -1228,9 +1407,14 @@ export default function Alunos() {
             ) : alunosFiltrados.map(a => (
               <div key={a.docId} className="mat-row" onClick={() => setDetalhe(a)}>
                 <span className="mat-id">{fmtIdSeq(a.idSeq)}</span>
-                <span>
-                  <div className="mat-aluno-nome">{a.nome}</div>
-                  {a.telefone && <div className="mat-aluno-sub">{a.telefone}</div>}
+                <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  {a.fotoUrl
+                    ? <img src={a.fotoUrl} alt={a.nome} className="aluno-avatar" />
+                    : <div className="aluno-avatar-placeholder">{(a.nome || "?")[0].toUpperCase()}</div>}
+                  <span>
+                    <div className="mat-aluno-nome">{a.nome}</div>
+                    {a.telefone && <div className="mat-aluno-sub">{a.telefone}</div>}
+                  </span>
                 </span>
                 <span style={{ fontSize: 12, color: "var(--text-2)" }}>{a.documento || "—"}</span>
                 <span className="mat-valor">{fmtR$(a.valorMensalidade)}</span>
@@ -1325,12 +1509,25 @@ async function gerarMensalidadeEmAberto({ tenantUid, aluno, mensalidadesDoAluno 
   const jaExiste = mensalidadesDoAluno.some(m => m.mesReferencia === mesRef);
   if (jaExiste) return null;
 
+  /* ── ID sequencial M0001, M0002...
+     Lê TODOS os a_receber com origem="mensalidade" para encontrar o maior
+     idSeqMens existente e garantir que não haja duplicatas. ── */
+  const arSnap = await getDocs(
+    query(collection(db, "users", tenantUid, "a_receber"), where("origem", "==", "mensalidade"))
+  );
+  const maxSeq = arSnap.docs.reduce((max, d) => {
+    const n = Number(String(d.data().idSeqMens || "M0000").replace(/\D/g, "")) || 0;
+    return Math.max(max, n);
+  }, 0);
+  const idSeqMens = fmtIdSeqMens(maxSeq + 1);
+
   const dia = Math.min(28, Math.max(1, Number(aluno.diaVencimento) || 10));
   const dataVencimento = calcVencimento(ano, mes, dia);
   const valor = Number(aluno.valorMensalidade || 0);
   const agora = new Date().toISOString();
 
   const payload = {
+    idSeqMens,
     origem:          "mensalidade",
     alunoId:         aluno.docId,
     alunoNome:       aluno.nome,
