@@ -28,16 +28,13 @@ import {
 
 import AuthContext from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO } from "../lib/logAction";
-import { db, storage } from "../lib/firebase";
+import { db } from "../lib/firebase";
 
 import {
   collection, doc, setDoc, deleteDoc, updateDoc,
   onSnapshot, getDoc, addDoc, getDocs,
   query, where,
 } from "firebase/firestore";
-import {
-  ref as storageRef, uploadBytes, getDownloadURL, deleteObject,
-} from "firebase/storage";
 
 /* ══════════════════════════════════════════════════
    PERMISSÕES (segue padrão Vendas/AReceber)
@@ -347,6 +344,27 @@ const CSS = `
 .foto-picker-circle:hover .foto-picker-overlay { opacity:1; }
 .foto-picker-info { font-size:12px; color:var(--text-2); line-height:1.6; }
 .foto-picker-info strong { color:var(--text); display:block; margin-bottom:2px; }
+/* ── crop modal ── */
+.crop-overlay { position:fixed; inset:0; z-index:1200; background:rgba(0,0,0,.88);
+  backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; }
+.crop-box { background:var(--s1); border:1px solid var(--border-h); border-radius:18px;
+  width:360px; padding:24px; display:flex; flex-direction:column; align-items:center; gap:18px;
+  box-shadow:0 28px 72px rgba(0,0,0,.7); }
+.crop-title { font-family:'Sora',sans-serif; font-size:15px; font-weight:600; color:var(--text); }
+.crop-stage { width:260px; height:260px; border-radius:50%; overflow:hidden;
+  position:relative; cursor:grab; border:3px solid var(--gold);
+  background:#111; user-select:none; }
+.crop-stage:active { cursor:grabbing; }
+.crop-stage img { position:absolute; transform-origin:center center;
+  pointer-events:none; }
+.crop-hint { font-size:11px; color:var(--text-3); text-align:center; line-height:1.6; }
+.crop-zoom { display:flex; align-items:center; gap:10px; width:100%; }
+.crop-zoom input[type=range] { flex:1; accent-color:var(--gold); }
+.crop-zoom span { font-size:11px; color:var(--text-3); min-width:36px; text-align:center; }
+.crop-footer { display:flex; gap:10px; width:100%; }
+.crop-footer .btn-primary { flex:1; justify-content:center; }
+.crop-footer .btn-secondary { justify-content:center; }
+
 
 .mat-empty { padding:42px 18px; text-align:center; color:var(--text-3); font-size:13px; }
 .mat-empty svg { margin-bottom:8px; }
@@ -425,18 +443,23 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
   });
   const [erros, setErros] = useState({});
 
-  /* ── Foto ── */
-  const [fotoFile, setFotoFile]       = useState(null);
-  const [fotoPreview, setFotoPreview] = useState(aluno?.fotoUrl || null);
+  /* ── Foto (base64, igual a Produtos) ── */
+  const [fotoBase64, setFotoBase64]   = useState(aluno?.foto || null);
+  const [cropSrc, setCropSrc]         = useState(null); // blob URL para o crop modal
   const fileInputRef = useRef(null);
 
   const handleFotoChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) { alert("Selecione uma imagem válida."); return; }
-    if (file.size > 5 * 1024 * 1024) { alert("Imagem muito grande. Máximo 5 MB."); return; }
-    setFotoFile(file);
-    setFotoPreview(URL.createObjectURL(file));
+    if (file.size > 10 * 1024 * 1024) { alert("Imagem muito grande. Máximo 10 MB."); return; }
+    setCropSrc(URL.createObjectURL(file));
+    e.target.value = "";
+  };
+
+  const handleCropConfirm = (base64) => {
+    setFotoBase64(base64);
+    setCropSrc(null);
   };
 
   const set = (k, v) => {
@@ -490,7 +513,7 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
       dataInicio:          form.dataInicio,
       status:              form.status,
       observacoes:         form.observacoes.trim(),
-      _fotoFile:           fotoFile,   // arquivo para upload (não vai pro Firestore diretamente)
+      _fotoFile:           fotoBase64, // base64 (vai direto no documento Firestore)
     });
   };
 
@@ -511,18 +534,18 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
           {/* — Foto — */}
           <div className="foto-picker-wrap">
             <div className="foto-picker-circle" onClick={() => fileInputRef.current?.click()}>
-              {fotoPreview
-                ? <img src={fotoPreview} alt="Foto do aluno" />
+              {fotoBase64
+                ? <img src={fotoBase64} alt="Foto do aluno" />
                 : <Camera size={24} color="var(--text-3)" />}
               <div className="foto-picker-overlay"><Camera size={18} color="#fff" /></div>
             </div>
             <div className="foto-picker-info">
               <strong>Foto do aluno</strong>
               Clique para selecionar uma imagem.<br />
-              JPG, PNG ou WebP · máx. 5 MB
-              {fotoPreview && (
+              Arraste para posicionar · máx. 10 MB
+              {fotoBase64 && (
                 <button className="btn-secondary" style={{ marginTop: 8, padding: "4px 10px", fontSize: 11 }}
-                  onClick={(e) => { e.stopPropagation(); setFotoFile(null); setFotoPreview(null); }}>
+                  onClick={(e) => { e.stopPropagation(); setFotoBase64(null); }}>
                   Remover foto
                 </button>
               )}
@@ -530,6 +553,15 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
             <input ref={fileInputRef} type="file" accept="image/*"
               style={{ display: "none" }} onChange={handleFotoChange} />
           </div>
+
+          {/* — Crop modal — */}
+          {cropSrc && (
+            <ModalCropFoto
+              src={cropSrc}
+              onConfirm={handleCropConfirm}
+              onClose={() => setCropSrc(null)}
+            />
+          )}
 
           {/* — Dados pessoais — */}
           <div className="mat-section-title"><User size={14} /> Dados pessoais</div>
@@ -724,8 +756,8 @@ function ModalDetalheAluno({
       <div className="modal-box modal-box-xl">
         <div className="modal-header">
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            {aluno.fotoUrl
-              ? <img src={aluno.fotoUrl} alt={aluno.nome} style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--border-h)", flexShrink: 0 }} />
+{aluno.foto
+              ? <img src={aluno.foto} alt={aluno.nome} style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--border-h)", flexShrink: 0 }} />
               : <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--s3)", border: "2px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Sora',sans-serif", fontSize: 18, fontWeight: 600, color: "var(--text-2)", flexShrink: 0 }}>{(aluno.nome || "?")[0].toUpperCase()}</div>}
             <div>
               <div className="modal-title">{aluno.nome}</div>
@@ -1046,20 +1078,10 @@ export default function Alunos() {
     try {
       if (editando) {
         /* EDITAR — atualiza campos do aluno */
-        const { _fotoFile, ...dadosLimpos } = dados;
+        const { _fotoFile, ...dadosLimpos } = dados; // _fotoFile = base64 string | null | undefined
 
-        /* Upload de foto se nova imagem foi selecionada */
-        if (_fotoFile) {
-          const sRef = storageRef(storage, `users/${tenantUid}/alunos/${editando.docId}/foto`);
-          await uploadBytes(sRef, _fotoFile);
-          dadosLimpos.fotoUrl = await getDownloadURL(sRef);
-        } else if (dados.fotoUrl === null && editando.fotoUrl) {
-          /* Remoção de foto */
-          try {
-            await deleteObject(storageRef(storage, `users/${tenantUid}/alunos/${editando.docId}/foto`));
-          } catch {}
-          dadosLimpos.fotoUrl = null;
-        }
+        /* Foto base64 — já está em _fotoFile como string base64 ou null */
+        if (_fotoFile !== undefined) dadosLimpos.foto = _fotoFile; // null = remover
 
         const ref = doc(db, "users", tenantUid, "alunos", editando.docId);
         await updateDoc(ref, { ...dadosLimpos, atualizadoEm: new Date().toISOString() });
@@ -1109,14 +1131,10 @@ export default function Alunos() {
         const docId = gerarDocIdAluno();
         const idSeq = proximoIdSeq(alunos);
         const agora = new Date().toISOString();
-        const { _fotoFile: _ff, ...dadosCriar } = dados;
+        const { _fotoFile: _ff, ...dadosCriar } = dados; // _ff = base64 string | null
 
-        /* Upload de foto inicial (se houver) */
-        if (_ff) {
-          const sRef = storageRef(storage, `users/${tenantUid}/alunos/${docId}/foto`);
-          await uploadBytes(sRef, _ff);
-          dadosCriar.fotoUrl = await getDownloadURL(sRef);
-        }
+        /* Foto base64 — já está em _ff como string ou null */
+        if (_ff) dadosCriar.foto = _ff;
 
         await setDoc(doc(db, "users", tenantUid, "alunos", docId), {
           docId, idSeq,
@@ -1408,8 +1426,8 @@ export default function Alunos() {
               <div key={a.docId} className="mat-row" onClick={() => setDetalhe(a)}>
                 <span className="mat-id">{fmtIdSeq(a.idSeq)}</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  {a.fotoUrl
-                    ? <img src={a.fotoUrl} alt={a.nome} className="aluno-avatar" />
+                  {a.foto
+                    ? <img src={a.foto} alt={a.nome} className="aluno-avatar" />
                     : <div className="aluno-avatar-placeholder">{(a.nome || "?")[0].toUpperCase()}</div>}
                   <span>
                     <div className="mat-aluno-nome">{a.nome}</div>
@@ -1494,6 +1512,166 @@ export default function Alunos() {
         />
       )}
     </>
+  );
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   MODAL: Posicionar / cortar foto (drag + zoom → canvas → base64)
+   ══════════════════════════════════════════════════════════════════════ */
+function ModalCropFoto({ src, onConfirm, onClose }) {
+  const SIZE      = 260; // diâmetro do círculo de preview (px)
+  const OUT_SIZE  = 400; // tamanho de saída do canvas (px)
+
+  const imgRef    = useRef(null);
+  const stageRef  = useRef(null);
+  const [scale, setScale]   = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [imgNat,  setImgNat]  = useState({ w: 1, h: 1 }); // dimensões naturais
+  const dragRef   = useRef(null); // { startX, startY, ox, oy }
+
+  /* Ao carregar a imagem, ajusta escala inicial para cobrir o círculo */
+  const handleImgLoad = () => {
+    const img = imgRef.current;
+    if (!img) return;
+    const w = img.naturalWidth, h = img.naturalHeight;
+    setImgNat({ w, h });
+    const minScale = Math.max(SIZE / w, SIZE / h);
+    setScale(minScale);
+    setOffset({ x: 0, y: 0 });
+  };
+
+  /* Drag para posicionar */
+  const onMouseDown = (e) => {
+    e.preventDefault();
+    dragRef.current = { startX: e.clientX, startY: e.clientY, ox: offset.x, oy: offset.y };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup",   onMouseUp);
+  };
+  const onMouseMove = (e) => {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.startX;
+    const dy = e.clientY - dragRef.current.startY;
+    setOffset({ x: dragRef.current.ox + dx, y: dragRef.current.oy + dy });
+  };
+  const onMouseUp = () => {
+    dragRef.current = null;
+    window.removeEventListener("mousemove", onMouseMove);
+    window.removeEventListener("mouseup",   onMouseUp);
+  };
+
+  /* Touch para mobile */
+  const touchRef = useRef(null);
+  const onTouchStart = (e) => {
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      touchRef.current = { startX: t.clientX, startY: t.clientY, ox: offset.x, oy: offset.y };
+    }
+  };
+  const onTouchMove = (e) => {
+    if (e.touches.length === 1 && touchRef.current) {
+      e.preventDefault();
+      const t = e.touches[0];
+      const dx = t.clientX - touchRef.current.startX;
+      const dy = t.clientY - touchRef.current.startY;
+      setOffset({ x: touchRef.current.ox + dx, y: touchRef.current.oy + dy });
+    }
+  };
+
+  /* Zoom com scroll */
+  const onWheel = (e) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.05 : 0.05;
+    const minS  = Math.max(SIZE / imgNat.w, SIZE / imgNat.h);
+    setScale(s => Math.min(6, Math.max(minS, s + delta)));
+  };
+
+  /* Calcular transform da img dentro do stage */
+  const imgStyle = () => {
+    const w = imgNat.w * scale;
+    const h = imgNat.h * scale;
+    // centraliza + offset do drag
+    const left = (SIZE - w) / 2 + offset.x;
+    const top  = (SIZE - h) / 2 + offset.y;
+    return { width: w, height: h, left, top, transform: "none" };
+  };
+
+  /* Renderizar no canvas e exportar base64 */
+  const confirmar = () => {
+    const img = imgRef.current;
+    if (!img) return;
+
+    const canvas = document.createElement("canvas");
+    canvas.width  = OUT_SIZE;
+    canvas.height = OUT_SIZE;
+    const ctx = canvas.getContext("2d");
+
+    // Área visível no stage: o que está visível no círculo SIZE×SIZE
+    const scaledW = imgNat.w * scale;
+    const scaledH = imgNat.h * scale;
+    const left    = (SIZE - scaledW) / 2 + offset.x;
+    const top     = (SIZE - scaledH) / 2 + offset.y;
+
+    // Converte para coordenadas na imagem natural
+    const ratio = OUT_SIZE / SIZE;
+    ctx.drawImage(
+      img,
+      -left  / scale,               // srcX
+      -top   / scale,               // srcY
+      SIZE   / scale,               // srcW
+      SIZE   / scale,               // srcH
+      0, 0, OUT_SIZE, OUT_SIZE      // dst
+    );
+
+    const base64 = canvas.toDataURL("image/jpeg", 0.88);
+    onConfirm(base64);
+  };
+
+  return (
+    <div className="crop-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="crop-box">
+        <div className="crop-title">Posicionar foto</div>
+
+        <div
+          ref={stageRef}
+          className="crop-stage"
+          style={{ width: SIZE, height: SIZE }}
+          onMouseDown={onMouseDown}
+          onWheel={onWheel}
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+        >
+          <img
+            ref={imgRef}
+            src={src}
+            alt=""
+            style={imgStyle()}
+            onLoad={handleImgLoad}
+            draggable={false}
+          />
+        </div>
+
+        <div className="crop-hint">
+          Arraste para reposicionar · Scroll para zoom
+        </div>
+
+        <div className="crop-zoom">
+          <span style={{ fontSize: 10 }}>A</span>
+          <input type="range" min={0.5} max={6} step={0.01}
+            value={scale}
+            onChange={(e) => setScale(Number(e.target.value))} />
+          <span style={{ fontSize: 14 }}>A</span>
+          <span>{Math.round(scale * 100)}%</span>
+        </div>
+
+        <div className="crop-footer">
+          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn-primary" onClick={confirmar}>
+            <CheckCircle size={14} /> Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
