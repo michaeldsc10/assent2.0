@@ -485,6 +485,7 @@ const RESPONSIVE_CSS = `
 @media (max-width: 720px) {
   .ag-search  { display: none !important; }
   .ag-despesa-grid { grid-template-columns: 1fr 1fr !important; }
+  .ag-mini-cards-mobile { display: none !important; }
 }
 @media (max-width: 480px) {
   .ag-despesa-grid { grid-template-columns: 1fr !important; }
@@ -1609,7 +1610,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
       <div className="ag-content">
         {/* Mini Stats */}
-        <div className="g4">
+        <div className="g4 ag-mini-cards-mobile">
           {miniStats.map((s) => (
             <div
               key={s.label}
