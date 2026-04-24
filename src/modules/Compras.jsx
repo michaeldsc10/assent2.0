@@ -89,6 +89,19 @@ const addMeses = (dateISO, meses) => {
 
 const parseBRL = (s) => parseFloat(String(s).replace(",", ".")) || 0;
 
+/**
+ * Resolve o nome do fornecedor em runtime pelo doc.id.
+ * Fallback para fornecedorNome (docs legados criados antes da v2.2).
+ */
+const getNomeFornecedor = (compra, fornecedores) => {
+  if (compra.fornecedorId) {
+    const forn = fornecedores.find(f => f.id === compra.fornecedorId);
+    if (forn) return forn.nome;
+  }
+  // fallback: docs antigos que ainda têm fornecedorNome salvo
+  return compra.fornecedorNome || "—";
+};
+
 /* ── Helpers de ID sequencial (espelham Despesas.jsx) ── */
 const gerarIdBase  = (cnt) => `D${String(cnt + 1).padStart(4, "0")}`;
 const gerarIdShow  = (cnt, parcelaAtual = null, totalParcelas = null) => {
@@ -678,7 +691,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved,
 
       const compraData = {
         fornecedorId:    form.fornecedorId,
-        fornecedorNome:  forn?.nome || "",
+        // fornecedorNome NÃO é salvo — resolvido em runtime via lookup (v2.2)
         data:            form.data,
         itens:           itensFinais,
         valorTotal,
@@ -698,7 +711,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved,
       if (isEdit) {
         /* Edição: atualiza apenas a doc de compra (sem recriar movimentações/despesas) */
         await updateDoc(doc(collection(db, "users", uid, "compras"), compra.id), compraData);
-        await logAction({ tenantUid: uid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.COMPRAS, descricao: `Editou Compra de ${compraData.fornecedorNome}` });
+        await logAction({ tenantUid: uid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.COMPRAS, descricao: `Editou Compra de ${forn?.nome || compraData.fornecedorId}` });
       } else {
         /* Criação: writeBatch atômico */
         const batch = writeBatch(db);
@@ -745,7 +758,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved,
 
         const despesaBase = {
           fornecedorId:    form.fornecedorId,
-          fornecedorNome:  forn?.nome || "Fornecedor",
+          // fornecedorNome omitido — resolvido em runtime no módulo Despesas via fornecedorId
           metodoPagamento: form.metodoPagamento,
           categoria:       "Compras",
           origem:          "compra",
@@ -1181,7 +1194,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved,
 /* ═══════════════════════════════════════════════════
    MODAL: Confirmar Cancelamento de Compra
    ═══════════════════════════════════════════════════ */
-function ModalCancelarCompra({ compra, uid, onClose }) {
+function ModalCancelarCompra({ compra, uid, nomeFornecedor, onClose }) {
   const [cancelando, setCancelando] = useState(false);
 
   const handleCancelar = async () => {
@@ -1210,7 +1223,7 @@ function ModalCancelarCompra({ compra, uid, onClose }) {
         </div>
         <div className="confirm-body">
           <div className="confirm-icon">🚫</div>
-          <p><strong>Cancelar compra de {compra.fornecedorNome}?</strong></p>
+          <p><strong>Cancelar compra de {nomeFornecedor || "—"}?</strong></p>
           <p style={{fontSize:12,marginTop:8,color:"var(--text-3)"}}>
             A compra será marcada como cancelada. As movimentações de estoque
             já registradas <strong style={{color:"var(--text)"}}>não</strong> serão revertidas automaticamente.
@@ -1231,21 +1244,22 @@ function ModalCancelarCompra({ compra, uid, onClose }) {
 /* ═══════════════════════════════════════════════════
    MODAL: Detalhes da Compra
    ═══════════════════════════════════════════════════ */
-function ModalDetalheCompra({ compra, onClose }) {
+function ModalDetalheCompra({ compra, fornecedores, onClose }) {
+  const nomeForncedor = getNomeFornecedor(compra, fornecedores);
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-box">
         <div className="modal-header">
           <div>
             <div className="modal-title">Detalhes da Compra</div>
-            <div className="modal-sub">{compra.fornecedorNome} — {fmtData(compra.data)}</div>
+            <div className="modal-sub">{nomeForncedor} — {fmtData(compra.data)}</div>
           </div>
           <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)"/></button>
         </div>
         <div className="modal-body">
           <div className="cp-detalhe-section">
             <div className="cp-detalhe-title">Informações</div>
-            <div className="cp-detalhe-row"><span>Fornecedor</span><strong>{compra.fornecedorNome}</strong></div>
+            <div className="cp-detalhe-row"><span>Fornecedor</span><strong>{nomeForncedor}</strong></div>
             <div className="cp-detalhe-row"><span>Data</span><strong>{fmtData(compra.data)}</strong></div>
             <div className="cp-detalhe-row"><span>Status</span><StatusBadgeCompra status={compra.status}/></div>
             <div className="cp-detalhe-row"><span>Método</span><strong>{fmtMetodoPag(compra.metodoPagamento)}</strong></div>
@@ -1583,16 +1597,17 @@ function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEdita
     const q = search.trim().toLowerCase();
     return compras.filter(c => {
       const passaStatus = filtroStatus === "Todos" || c.status === filtroStatus;
-      const passaBusca  = !q || c.fornecedorNome?.toLowerCase().includes(q);
+      const nomeResolvido = getNomeFornecedor(c, fornecedores).toLowerCase();
+      const passaBusca  = !q || nomeResolvido.includes(q);
       return passaStatus && passaBusca;
     }).sort((a,b) => String(b.data).localeCompare(String(a.data)));
-  }, [compras, search, filtroStatus]);
+  }, [compras, fornecedores, search, filtroStatus]);
 
   const handleDeletar = async () => {
     if (!deletando) return;
     try {
       await deleteDoc(doc(collection(db, "users", uid, "compras"), deletando.id));
-      await logAction({ tenantUid: uid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.COMPRAS, descricao: `Excluiu Compra de ${deletando.fornecedorNome || "Fornecedor"}` });
+      await logAction({ tenantUid: uid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.COMPRAS, descricao: `Excluiu Compra de ${getNomeFornecedor(deletando, fornecedores)}` });
       setDeletando(null);
     } catch (err) {
       console.error("[Compras] Erro ao excluir compra:", err);
@@ -1648,7 +1663,7 @@ function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEdita
           ) : filtradas.map(c => (
             <div key={c.id} className="cp-row-compra">
               <span>{fmtData(c.data)}</span>
-              <span style={{color:"var(--text)",fontWeight:500}}>{c.fornecedorNome}</span>
+              <span style={{color:"var(--text)",fontWeight:500}}>{getNomeFornecedor(c, fornecedores)}</span>
               <span style={{color:"var(--text-3)"}}>{c.itens?.length || 0} item{c.itens?.length !== 1 ? "s":""}</span>
               <span style={{fontFamily:"'Sora',sans-serif",fontWeight:600,color:"var(--gold)"}}>{fmtR$(c.valorTotal)}</span>
               <StatusBadgeCompra status={c.status}/>
@@ -1691,14 +1706,16 @@ function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEdita
           onClose={() => setEditando(null)} onSaved={() => {}} />
       )}
       {detalhes && (
-        <ModalDetalheCompra compra={detalhes} onClose={() => setDetalhes(null)} />
+        <ModalDetalheCompra compra={detalhes} fornecedores={fornecedores} onClose={() => setDetalhes(null)} />
       )}
       {cancelando && podeEditarV && (
-        <ModalCancelarCompra compra={cancelando} uid={uid} onClose={() => setCancelando(null)} />
+        <ModalCancelarCompra compra={cancelando} uid={uid}
+          nomeFornecedor={getNomeFornecedor(cancelando, fornecedores)}
+          onClose={() => setCancelando(null)} />
       )}
       {deletando && podeExcluirV && (
         <ModalConfirmDelete
-          titulo={`Excluir compra de ${deletando.fornecedorNome}`}
+          titulo={`Excluir compra de ${getNomeFornecedor(deletando, fornecedores)}`}
           subtitulo="As movimentações de estoque desta compra NÃO serão revertidas automaticamente."
           onConfirm={handleDeletar} onClose={() => setDeletando(null)} />
       )}
