@@ -593,6 +593,33 @@ tbody tr:hover { background: var(--surface2); }
 }
 .anuncio-preview-img-wrap img {
   width: 100%; height: 100%; object-fit: cover; display: block;
+  transform-origin: center center; transition: transform .15s, object-position .15s;
+}
+.announcement-img-zone img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  transform-origin: center center;
+}
+/* Controles de imagem */
+.img-controls {
+  display: none; margin-top: 12px;
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px;
+  display: none; flex-direction: column; gap: 10px;
+}
+.img-ctrl-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.img-ctrl-label {
+  font-size: 10px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--text3);
+  width: 68px; flex-shrink: 0;
+}
+.img-ctrl-slider {
+  flex: 1; accent-color: var(--gold); cursor: pointer; height: 4px;
+}
+.img-ctrl-val {
+  font-size: 10px; font-family: 'IBM Plex Mono', monospace;
+  color: var(--gold); width: 36px; text-align: right; flex-shrink: 0;
 }
 .anuncio-preview-btn-over {
   position: absolute; inset: 0;
@@ -1082,36 +1109,43 @@ tbody tr:hover { background: var(--surface2); }
                     <button class="img-remove-btn" id="anuncioImgRemove" title="Remover imagem">✕</button>
                   </div>
                 </div>
+
+                <!-- Controles de posição e zoom da imagem -->
+                <div class="img-controls" id="imgControls">
+                  <div class="img-ctrl-row">
+                    <span class="img-ctrl-label">Posição X</span>
+                    <input class="img-ctrl-slider" type="range" id="imgPosX" min="0" max="100" value="50">
+                    <span class="img-ctrl-val" id="imgPosXVal">50%</span>
+                  </div>
+                  <div class="img-ctrl-row">
+                    <span class="img-ctrl-label">Posição Y</span>
+                    <input class="img-ctrl-slider" type="range" id="imgPosY" min="0" max="100" value="50">
+                    <span class="img-ctrl-val" id="imgPosYVal">50%</span>
+                  </div>
+                  <div class="img-ctrl-row">
+                    <span class="img-ctrl-label">Zoom</span>
+                    <input class="img-ctrl-slider" type="range" id="imgZoom" min="100" max="200" value="100" step="5">
+                    <span class="img-ctrl-val" id="imgZoomVal">1×</span>
+                  </div>
+                </div>
               </div>
 
-              <!-- Toggle: incluir botão -->
-              <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:11px 14px;border:1px solid var(--border);border-radius:10px;background:var(--card2)">
-                <input type="checkbox" id="anuncioBtnAtivo" checked style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0">
-                <div>
-                  <div style="font-size:12px;font-weight:700;color:var(--text)">Incluir botão de ação</div>
-                  <div style="font-size:10px;color:var(--text3);margin-top:1px">Quando desativado, o anúncio não exibirá botão</div>
+              <div class="field-group" style="margin-bottom:16px" id="anuncioBtnPosGroup">
+                <div class="field-label">Posição do botão com imagem</div>
+                <div style="display:flex;gap:8px">
+                  <button class="dest-btn active" data-pos="abaixo" id="posBaixo">⬇ Abaixo da imagem</button>
+                  <button class="dest-btn" data-pos="sobreposto" id="posSobre">📌 Sobre a imagem</button>
                 </div>
               </div>
 
-              <!-- Campos do botão (ocultáveis) -->
-              <div id="anuncioBtnFields">
-                <div class="field-group" style="margin-bottom:16px" id="anuncioBtnPosGroup">
-                  <div class="field-label">Posição do botão com imagem</div>
-                  <div style="display:flex;gap:8px">
-                    <button class="dest-btn active" data-pos="abaixo" id="posBaixo">⬇ Abaixo da imagem</button>
-                    <button class="dest-btn" data-pos="sobreposto" id="posSobre">📌 Sobre a imagem</button>
-                  </div>
+              <div class="form-2col" style="margin-bottom:20px">
+                <div class="field-group">
+                  <div class="field-label">Texto do Botão</div>
+                  <input class="field-input" id="anuncioBtnTexto" type="text" placeholder="Ex: Vamos lá!" value="Vamos lá!">
                 </div>
-
-                <div class="form-2col" style="margin-bottom:20px">
-                  <div class="field-group">
-                    <div class="field-label">Texto do Botão</div>
-                    <input class="field-input" id="anuncioBtnTexto" type="text" placeholder="Ex: Vamos lá!" value="Vamos lá!">
-                  </div>
-                  <div class="field-group">
-                    <div class="field-label">URL do Botão <span style="color:var(--text3);font-weight:400">(opcional)</span></div>
-                    <input class="field-input" id="anuncioBtnUrl" type="url" placeholder="https://...">
-                  </div>
+                <div class="field-group">
+                  <div class="field-label">URL do Botão <span style="color:var(--text3);font-weight:400">(opcional)</span></div>
+                  <input class="field-input" id="anuncioBtnUrl" type="url" placeholder="https://...">
                 </div>
               </div>
 
@@ -1921,7 +1955,9 @@ function showFeedback(el, msg, color) {
 let anuncioImgBase64 = '';
 let anuncioDest      = 'todos';
 let anuncioBtnPos    = 'abaixo'; // 'abaixo' | 'sobreposto'
-let anuncioBtnAtivo  = true;    // botão é opcional
+let anuncioImgPosX   = 50;      // 0–100 %
+let anuncioImgPosY   = 50;      // 0–100 %
+let anuncioImgZoom   = 100;     // 100–200 %
 
 // ── Image upload
 /**
@@ -1992,6 +2028,7 @@ async function handleImgFile(file) {
     anuncioImgBase64 = b64;
     document.getElementById('anuncioImgPreview').src = b64;
     document.getElementById('anuncioImgPreviewWrap').style.display = 'block';
+    document.getElementById('imgControls').style.display = 'flex';
     area.style.display = 'none';
     area.innerHTML = origHTML; // restaura para próxima vez
     syncPreview();
@@ -2020,15 +2057,17 @@ document.getElementById('anuncioImgRemove').addEventListener('click', () => {
   anuncioImgBase64 = '';
   document.getElementById('anuncioImgPreview').src = '';
   document.getElementById('anuncioImgPreviewWrap').style.display = 'none';
+  document.getElementById('imgControls').style.display = 'none';
   document.getElementById('anuncioImgArea').style.display = 'block';
   document.getElementById('anuncioImgInput').value = '';
-  syncPreview();
-});
-
-// ── Toggle botão opcional
-document.getElementById('anuncioBtnAtivo').addEventListener('change', function() {
-  anuncioBtnAtivo = this.checked;
-  document.getElementById('anuncioBtnFields').style.display = this.checked ? '' : 'none';
+  // Reset sliders
+  anuncioImgPosX = 50; anuncioImgPosY = 50; anuncioImgZoom = 100;
+  document.getElementById('imgPosX').value = 50;
+  document.getElementById('imgPosY').value = 50;
+  document.getElementById('imgZoom').value = 100;
+  document.getElementById('imgPosXVal').textContent = '50%';
+  document.getElementById('imgPosYVal').textContent = '50%';
+  document.getElementById('imgZoomVal').textContent = '1×';
   syncPreview();
 });
 
@@ -2051,6 +2090,29 @@ document.querySelectorAll('[data-anuncio-dest]').forEach(btn => {
   });
 });
 
+// ── Controles de posição e zoom da imagem
+function applyImgStyle(imgEl) {
+  if (!imgEl) return;
+  imgEl.style.objectPosition = `${anuncioImgPosX}% ${anuncioImgPosY}%`;
+  imgEl.style.transform = anuncioImgZoom > 100 ? `scale(${anuncioImgZoom / 100})` : '';
+}
+
+document.getElementById('imgPosX').addEventListener('input', function() {
+  anuncioImgPosX = Number(this.value);
+  document.getElementById('imgPosXVal').textContent = anuncioImgPosX + '%';
+  syncPreview();
+});
+document.getElementById('imgPosY').addEventListener('input', function() {
+  anuncioImgPosY = Number(this.value);
+  document.getElementById('imgPosYVal').textContent = anuncioImgPosY + '%';
+  syncPreview();
+});
+document.getElementById('imgZoom').addEventListener('input', function() {
+  anuncioImgZoom = Number(this.value);
+  document.getElementById('imgZoomVal').textContent = (anuncioImgZoom / 100).toFixed(2).replace('.00','') + '×';
+  syncPreview();
+});
+
 // ── Preview ao vivo
 function syncPreview() {
   const title  = document.getElementById('anuncioTitle').value || 'Título do anúncio';
@@ -2066,17 +2128,18 @@ function syncPreview() {
   if (anuncioImgBase64) {
     imgWrap.style.display = 'block';
     document.getElementById('prevImg').src = anuncioImgBase64;
-    if (anuncioBtnAtivo && anuncioBtnPos === 'sobreposto') {
+    applyImgStyle(document.getElementById('prevImg'));
+    if (anuncioBtnPos === 'sobreposto') {
       document.getElementById('prevBtnOver').style.display  = 'flex';
       document.getElementById('prevBtnAbaixo').style.display = 'none';
     } else {
       document.getElementById('prevBtnOver').style.display  = 'none';
-      document.getElementById('prevBtnAbaixo').style.display = anuncioBtnAtivo ? '' : 'none';
+      document.getElementById('prevBtnAbaixo').style.display = '';
     }
   } else {
     imgWrap.style.display = 'none';
     document.getElementById('prevBtnOver').style.display  = 'none';
-    document.getElementById('prevBtnAbaixo').style.display = anuncioBtnAtivo ? '' : 'none';
+    document.getElementById('prevBtnAbaixo').style.display = '';
   }
 }
 
@@ -2105,17 +2168,18 @@ function openAnnouncementPreview() {
   if (anuncioImgBase64) {
     imgZone.style.display = 'block';
     document.getElementById('annImg').src = anuncioImgBase64;
-    if (anuncioBtnAtivo && anuncioBtnPos === 'sobreposto') {
+    applyImgStyle(document.getElementById('annImg'));
+    if (anuncioBtnPos === 'sobreposto') {
       btnFloat.style.display  = 'flex';
       btnBottom.style.display = 'none';
     } else {
       btnFloat.style.display  = 'none';
-      btnBottom.style.display = anuncioBtnAtivo ? '' : 'none';
+      btnBottom.style.display = '';
     }
   } else {
     imgZone.style.display   = 'none';
     btnFloat.style.display  = 'none';
-    btnBottom.style.display = anuncioBtnAtivo ? '' : 'none';
+    btnBottom.style.display = '';
   }
 
   document.getElementById('announcementModal').classList.add('open');
@@ -2150,11 +2214,13 @@ document.getElementById('btnSaveAnuncio').addEventListener('click', async () => 
     const payload = {
       titulo, mensagem,
       destinatario: anuncioDest,
-      btnAtivo: anuncioBtnAtivo,
-      btnTexto: anuncioBtnAtivo ? (btnTexto || 'Vamos lá!') : '',
-      btnUrl:   anuncioBtnAtivo ? (btnUrl   || '')          : '',
-      btnPos:   anuncioBtnAtivo ? anuncioBtnPos             : '',
+      btnTexto: btnTexto || 'Vamos lá!',
+      btnUrl: btnUrl || '',
+      btnPos: anuncioBtnPos,
       imagem: anuncioImgBase64 || '',
+      imgPosX: anuncioImgBase64 ? anuncioImgPosX : 50,
+      imgPosY: anuncioImgBase64 ? anuncioImgPosY : 50,
+      imgZoom: anuncioImgBase64 ? anuncioImgZoom : 100,
       ativo: true,
       criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
       criadoPor: auth.currentUser?.uid || ''
@@ -2167,10 +2233,7 @@ document.getElementById('btnSaveAnuncio').addEventListener('click', async () => 
     document.getElementById('anuncioMsg').value     = '';
     document.getElementById('anuncioBtnTexto').value = 'Vamos lá!';
     document.getElementById('anuncioBtnUrl').value   = '';
-    document.getElementById('anuncioBtnAtivo').checked = true;
-    anuncioBtnAtivo = true;
-    document.getElementById('anuncioBtnFields').style.display = '';
-    document.getElementById('anuncioImgRemove').click();
+    document.getElementById('anuncioImgRemove').click(); // also resets sliders via its own handler
     syncPreview();
 
     showFeedback(fb, '✓ Anúncio publicado!', 'var(--success)');
