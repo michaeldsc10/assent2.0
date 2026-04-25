@@ -638,7 +638,7 @@ tbody tr:hover { background: var(--surface2); }
 }
 .anuncio-preview-img-wrap {
   width: 100%; background: var(--surface3);
-  display: none; position: relative; max-height: 180px; overflow: hidden;
+  display: none; position: relative; height: 180px; overflow: hidden;
 }
 .anuncio-preview-img-wrap img {
   width: 100%; height: 100%; object-fit: cover; display: block;
@@ -870,7 +870,7 @@ tbody tr:hover { background: var(--surface2); }
   background: linear-gradient(90deg, transparent 0%, var(--gold) 50%, transparent 100%);
 }
 .announcement-img-zone {
-  width: 100%; max-height: 220px; overflow: hidden; display: none; position: relative;
+  width: 100%; height: 220px; overflow: hidden; display: none; position: relative;
 }
 .announcement-img-zone img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .announcement-img-zone .announcement-btn-float {
@@ -1277,8 +1277,8 @@ tbody tr:hover { background: var(--surface2); }
 
               <div class="form-2col" style="margin-bottom:20px">
                 <div class="field-group">
-                  <div class="field-label">Texto do Botão</div>
-                  <input class="field-input" id="anuncioBtnTexto" type="text" placeholder="Ex: Vamos lá!" value="Vamos lá!">
+                  <div class="field-label">Texto do Botão <span style="color:var(--text3);font-weight:400">(opcional)</span></div>
+                  <input class="field-input" id="anuncioBtnTexto" type="text" placeholder="Ex: Vamos lá! (deixe vazio para ocultar botão)">
                 </div>
                 <div class="field-group">
                   <div class="field-label">URL do Botão <span style="color:var(--text3);font-weight:400">(opcional)</span></div>
@@ -1310,6 +1310,7 @@ tbody tr:hover { background: var(--surface2); }
                   <div class="anuncio-preview-img-wrap" id="prevImgWrap">
                     <img id="prevImg" src="" alt="" style="object-position:50% 50%">
                     <video id="prevVideo" src="" muted autoplay loop playsinline style="display:none;width:100%;height:100%;object-fit:cover;"></video>
+                    <iframe id="prevYoutubeFrame" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="display:none;width:100%;height:100%;border:none;"></iframe>
                     <div class="anuncio-preview-btn-over" id="prevBtnOver" style="display:none">
                       <span class="btn-anuncio-cta" style="width:auto;padding:10px 20px;font-size:11px" id="prevBtnSobre">Vamos lá!</span>
                     </div>
@@ -1360,6 +1361,7 @@ tbody tr:hover { background: var(--surface2); }
     <div class="announcement-img-zone" id="annImgZone">
       <img id="annImg" src="" alt="">
       <video id="annVideo" src="" muted autoplay loop playsinline style="display:none;width:100%;height:100%;object-fit:cover;"></video>
+      <iframe id="annYoutubeFrame" src="" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="display:none;width:100%;height:100%;border:none;"></iframe>
       <div class="announcement-btn-float" id="annBtnFloat" style="display:none">
         <a class="btn-anuncio-cta" id="annBtnFloatLink" href="#" target="_blank" style="width:auto;padding:12px 28px">
           <span id="annBtnFloatTxt">Vamos lá!</span>
@@ -2319,20 +2321,61 @@ document.getElementById('frameZoom').addEventListener('input', function() {
   syncPreview();
 });
 
+// ── Detecta e converte URL de vídeo (YouTube ou direto)
+function parseVideoUrl(url) {
+  if (!url) return { type: 'none' };
+  // YouTube: watch?v=ID, youtu.be/ID, shorts/ID
+  const ytMatch = url.match(
+    /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/
+  );
+  if (ytMatch) {
+    return { type: 'youtube', embedUrl: `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1&mute=1&loop=1&playlist=${ytMatch[1]}` };
+  }
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return { type: 'direct', url };
+  }
+  return { type: 'none' };
+}
+
 // ── Video URL
 function handleVideoUrl(url) {
   url = (url || '').trim();
   anuncioVideoUrl = url;
   const previewW = document.getElementById('anuncioVideoPreviewWrap');
   const vid      = document.getElementById('anuncioVideoPreview');
-  if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+  const parsed   = parseVideoUrl(url);
+
+  if (parsed.type === 'direct') {
     previewW.style.display = 'block';
     vid.removeAttribute('src');
-    vid.src = url;
+    vid.src = parsed.url;
     vid.load();
+    vid.style.display = '';
+    // Se havia iframe do YouTube no preview da composer, esconde
+    const yf = document.getElementById('anuncioYoutubePreview');
+    if (yf) yf.style.display = 'none';
+  } else if (parsed.type === 'youtube') {
+    previewW.style.display = 'block';
+    vid.removeAttribute('src');
+    vid.style.display = 'none';
+    // Mostra iframe de preview do YouTube dentro do composer
+    let yf = document.getElementById('anuncioYoutubePreview');
+    if (!yf) {
+      yf = document.createElement('iframe');
+      yf.id = 'anuncioYoutubePreview';
+      yf.setAttribute('frameborder', '0');
+      yf.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
+      yf.setAttribute('allowfullscreen', '');
+      yf.style.cssText = 'width:100%;height:160px;border:none;border-radius:8px;display:block;';
+      previewW.insertBefore(yf, previewW.firstChild);
+    }
+    yf.src = parsed.embedUrl;
+    yf.style.display = '';
   } else {
     previewW.style.display = 'none';
     vid.removeAttribute('src');
+    const yf = document.getElementById('anuncioYoutubePreview');
+    if (yf) { yf.src = ''; yf.style.display = 'none'; }
   }
   syncPreview();
 }
@@ -2343,6 +2386,8 @@ function clearVideoUrl() {
   document.getElementById('anuncioVideoPreviewWrap').style.display = 'none';
   const vid = document.getElementById('anuncioVideoPreview');
   vid.removeAttribute('src');
+  const yf = document.getElementById('anuncioYoutubePreview');
+  if (yf) { yf.src = ''; yf.style.display = 'none'; }
   syncPreview();
 }
 
@@ -2369,43 +2414,60 @@ document.querySelectorAll('[data-anuncio-dest]').forEach(btn => {
 function syncPreview() {
   const title  = document.getElementById('anuncioTitle').value || 'Título do anúncio';
   const msg    = document.getElementById('anuncioMsg').value   || 'A mensagem do seu anúncio aparecerá aqui de forma clara e objetiva.';
-  const btnTxt = document.getElementById('anuncioBtnTexto').value || 'Vamos lá!';
+  const btnTxt = document.getElementById('anuncioBtnTexto').value.trim();
 
   document.getElementById('prevTitle').textContent    = title;
   document.getElementById('prevMsg').textContent      = msg;
-  document.getElementById('prevBtnTexto').textContent = btnTxt;
-  document.getElementById('prevBtnSobre').textContent  = btnTxt;
+  document.getElementById('prevBtnTexto').textContent = btnTxt || 'Vamos lá!';
+  document.getElementById('prevBtnSobre').textContent = btnTxt || 'Vamos lá!';
+
+  // Mostrar/ocultar botão quando não há texto
+  const btnAbaixo = document.getElementById('prevBtnAbaixo');
+  const btnOver   = document.getElementById('prevBtnOver');
+  const showBtn   = !!btnTxt;
 
   const imgWrap  = document.getElementById('prevImgWrap');
   const prevImg  = document.getElementById('prevImg');
   const prevVid  = document.getElementById('prevVideo');
+  const prevYT   = document.getElementById('prevYoutubeFrame');
   const hasMedia = anuncioImgBase64 || anuncioVideoUrl;
 
   if (hasMedia) {
     imgWrap.style.display = 'block';
     if (anuncioImgBase64) {
-      prevImg.src          = anuncioImgBase64;
+      prevImg.src           = anuncioImgBase64;
       prevImg.style.display = '';
-      prevVid.style.display = 'none';
-      prevVid.src           = '';
+      prevVid.style.display = 'none'; prevVid.src = '';
+      if (prevYT) { prevYT.style.display = 'none'; prevYT.src = ''; }
       applyFrameStyle();
     } else {
-      prevVid.src           = anuncioVideoUrl;
-      prevVid.style.display = '';
-      prevImg.style.display = 'none';
-      prevImg.src           = '';
+      const parsed = parseVideoUrl(anuncioVideoUrl);
+      prevImg.style.display = 'none'; prevImg.src = '';
+      if (parsed.type === 'youtube') {
+        if (prevYT) { prevYT.src = parsed.embedUrl; prevYT.style.display = ''; }
+        prevVid.style.display = 'none'; prevVid.src = '';
+      } else {
+        prevVid.src           = anuncioVideoUrl;
+        prevVid.style.display = '';
+        if (prevYT) { prevYT.style.display = 'none'; prevYT.src = ''; }
+      }
     }
-    if (anuncioBtnPos === 'sobreposto') {
-      document.getElementById('prevBtnOver').style.display   = 'flex';
-      document.getElementById('prevBtnAbaixo').style.display = 'none';
+    if (showBtn) {
+      if (anuncioBtnPos === 'sobreposto') {
+        btnOver.style.display   = 'flex';
+        btnAbaixo.style.display = 'none';
+      } else {
+        btnOver.style.display   = 'none';
+        btnAbaixo.style.display = '';
+      }
     } else {
-      document.getElementById('prevBtnOver').style.display   = 'none';
-      document.getElementById('prevBtnAbaixo').style.display = '';
+      btnOver.style.display   = 'none';
+      btnAbaixo.style.display = 'none';
     }
   } else {
-    imgWrap.style.display = 'none';
-    document.getElementById('prevBtnOver').style.display   = 'none';
-    document.getElementById('prevBtnAbaixo').style.display = '';
+    imgWrap.style.display   = 'none';
+    btnOver.style.display   = 'none';
+    btnAbaixo.style.display = showBtn ? '' : 'none';
   }
 }
 
@@ -2417,13 +2479,13 @@ function syncPreview() {
 function openAnnouncementPreview() {
   const title  = document.getElementById('anuncioTitle').value  || 'Título do anúncio';
   const msg    = document.getElementById('anuncioMsg').value    || 'A mensagem do seu anúncio aparecerá aqui.';
-  const btnTxt = document.getElementById('anuncioBtnTexto').value || 'Vamos lá!';
+  const btnTxt = document.getElementById('anuncioBtnTexto').value.trim();
   const btnUrl = document.getElementById('anuncioBtnUrl').value  || '#';
 
   document.getElementById('annTitle').textContent        = title;
   document.getElementById('annMsg').textContent          = msg;
-  document.getElementById('annBtnBottomTxt').textContent = btnTxt;
-  document.getElementById('annBtnFloatTxt').textContent  = btnTxt;
+  document.getElementById('annBtnBottomTxt').textContent = btnTxt || 'Vamos lá!';
+  document.getElementById('annBtnFloatTxt').textContent  = btnTxt || 'Vamos lá!';
   document.getElementById('annBtnBottom').href           = btnUrl || '#';
   document.getElementById('annBtnFloatLink').href        = btnUrl || '#';
 
@@ -2432,37 +2494,50 @@ function openAnnouncementPreview() {
   const btnBottom = document.getElementById('annBtnBottom');
   const annImg    = document.getElementById('annImg');
   const annVid    = document.getElementById('annVideo');
+  const annYT     = document.getElementById('annYoutubeFrame');
   const hasMedia  = anuncioImgBase64 || anuncioVideoUrl;
+  const showBtn   = !!btnTxt;
 
   if (hasMedia) {
     imgZone.style.display = 'block';
     if (anuncioImgBase64) {
       annImg.src           = anuncioImgBase64;
       annImg.style.display = '';
-      annVid.style.display = 'none';
-      annVid.src           = '';
+      annVid.style.display = 'none'; annVid.src = '';
+      if (annYT) { annYT.style.display = 'none'; annYT.src = ''; }
       // Apply framing
       const scale = frameZoom / 100;
       annImg.style.objectPosition  = `${framePosX}% ${framePosY}%`;
       annImg.style.transform       = scale > 1 ? `scale(${scale})` : '';
       annImg.style.transformOrigin = `${framePosX}% ${framePosY}%`;
     } else {
-      annVid.src           = anuncioVideoUrl;
-      annVid.style.display = '';
-      annImg.style.display = 'none';
-      annImg.src           = '';
+      const parsed = parseVideoUrl(anuncioVideoUrl);
+      annImg.style.display = 'none'; annImg.src = '';
+      if (parsed.type === 'youtube') {
+        if (annYT) { annYT.src = parsed.embedUrl; annYT.style.display = ''; }
+        annVid.style.display = 'none'; annVid.src = '';
+      } else {
+        annVid.src           = anuncioVideoUrl;
+        annVid.style.display = '';
+        if (annYT) { annYT.style.display = 'none'; annYT.src = ''; }
+      }
     }
-    if (anuncioBtnPos === 'sobreposto') {
-      btnFloat.style.display  = 'flex';
-      btnBottom.style.display = 'none';
+    if (showBtn) {
+      if (anuncioBtnPos === 'sobreposto') {
+        btnFloat.style.display  = 'flex';
+        btnBottom.style.display = 'none';
+      } else {
+        btnFloat.style.display  = 'none';
+        btnBottom.style.display = '';
+      }
     } else {
       btnFloat.style.display  = 'none';
-      btnBottom.style.display = '';
+      btnBottom.style.display = 'none';
     }
   } else {
     imgZone.style.display   = 'none';
     btnFloat.style.display  = 'none';
-    btnBottom.style.display = '';
+    btnBottom.style.display = showBtn ? '' : 'none';
   }
 
   document.getElementById('announcementModal').classList.add('open');
@@ -2497,7 +2572,7 @@ document.getElementById('btnSaveAnuncio').addEventListener('click', async () => 
     const payload = {
       titulo, mensagem,
       destinatario: anuncioDest,
-      btnTexto: btnTexto || 'Vamos lá!',
+      btnTexto: btnTexto || '',
       btnUrl:   btnUrl   || '',
       btnPos:   anuncioBtnPos,
       mediaType: anuncioMediaType,
