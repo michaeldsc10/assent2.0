@@ -42,6 +42,8 @@ export const PERMISSOES = {
   compras:        { admin: "vcex", financeiro: "ve",  comercial: "",    compras: "vce", operacional: "v",   vendedor: "",    suporte: ""   },
   orcamentos:     { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "v",   vendedor: "vce", suporte: "v"  },
   vendas:         { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "v",   vendedor: "vc",  suporte: ""   },
+  // PDV — admin: completo (incl. excluir); comercial/vendedor: criar+ver; financeiro: só ver
+  pdv:            { admin: "vcex", financeiro: "v",   comercial: "vc",  compras: "",    operacional: "",    vendedor: "vc",  suporte: "v"  },
   alunos:         { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "v",   vendedor: "v",   suporte: ""   },
   aReceber:       { admin: "vcex", financeiro: "vce", comercial: "v",   compras: "",    operacional: "",    vendedor: "",    suporte: ""   },
   caixaDiario:    { admin: "vcex", financeiro: "vce", comercial: "",    compras: "",    operacional: "vc",  vendedor: "",    suporte: ""   },
@@ -65,6 +67,7 @@ export const PERMISSOES_RELATORIOS = {
   vendas:     { admin: true, financeiro: true,  comercial: true,  compras: false, operacional: false, vendedor: true,  suporte: true  },
   clientes:   { admin: true, financeiro: false, comercial: true,  compras: false, operacional: false, vendedor: true,  suporte: true  },
   agenda:     { admin: true, financeiro: false, comercial: true,  compras: false, operacional: false, vendedor: true,  suporte: true  },
+  pdv:        { admin: true, financeiro: true,  comercial: true,  compras: false, operacional: false, vendedor: true,  suporte: true  },
 };
 
 // ─────────────────────────────────────────────
