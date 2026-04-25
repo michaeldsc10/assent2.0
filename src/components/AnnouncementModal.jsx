@@ -4,7 +4,7 @@
    Lê de: anunciosAG (Firestore) — campo ativo: true
    ═══════════════════════════════════════════════════ */
 import { useEffect, useState, useCallback } from "react";
-import { db } from "./lib/firebase"; // ajuste o caminho se necessário
+import { db } from "../lib/firebase"; // ajuste o caminho se necessário
 
 /* ─── Estilos inline (sem dependência de CSS externo) ─── */
 const STYLES = `
