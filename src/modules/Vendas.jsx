@@ -10,7 +10,7 @@
 import { useState, useEffect, useContext, useMemo, useRef } from "react";
 import {
   Search, Plus, Edit2, Trash2, X, Printer,
-  ShoppingCart, Package, ChevronDown, ChevronUp, FileText,
+  ShoppingCart, Package, ChevronDown, ChevronUp,
   Download, Copy, Filter, Calendar, Ban, ChevronsUpDown,
 } from "lucide-react";
 
@@ -528,14 +528,6 @@ const CSS = `
   .estoque-ins-badge.solicitado { background: rgba(200,165,94,.12); color: var(--gold); border: 1px solid rgba(200,165,94,.25); }
   .estoque-ins-badge.disponivel { background: var(--red-d); color: var(--red); border: 1px solid rgba(224,82,82,.25); }
 
-  /* ── Livre (venda sem produto) ── */
-  .nv-livre-info {
-    background: rgba(200,165,94,.07); border: 1px solid rgba(200,165,94,.2);
-    border-radius: 10px; padding: 11px 14px; margin-bottom: 14px;
-    font-size: 12px; color: var(--text-2);
-  }
-  .nv-livre-info strong { color: var(--gold); }
-
   /* ── Sinal (pagamento parcial) ── */
   .nv-sinal-box {
     background: rgba(91,142,240,.07); border: 1px solid rgba(91,142,240,.2);
@@ -747,14 +739,10 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
   const [valorSinal, setValorSinal]       = useState(venda?.valorPago != null ? String(venda.valorPago) : "");
   const [dataVencSinal, setDataVencSinal] = useState(venda?.dataVencSinal || "");
 
-  // Itens + Venda livre
+  // Itens da venda
   const [itens, setItens] = useState(
     venda?.itens?.length ? venda.itens : [itemVazio(venda?.tipo || "produto")]
   );
-
-  const [livreNome, setLivreNome] = useState(venda?.livreNome || "");
-  const [livreValor, setLivreValor] = useState(venda?.livreValor || "");
-  const [livreDesc, setLivreDesc] = useState(venda?.livreDesc || 0);
 
   // ←←← ESTADOS NECESSÁRIOS PARA AUTOCOMPLETE
   const [itemSearches, setItemSearches] = useState(
@@ -837,17 +825,12 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
 
   /* Cálculos */
   const calculos = useMemo(() => {
-    if (tipo === "livre") {
-      const val = parseFloat(livreValor) || 0;
-      const desc = parseFloat(livreDesc) || 0;
-      return { subtotal: val, descontos: desc, custo: 0, total: val - desc, lucro: val - desc };
-    }
     const subtotal  = itens.reduce((s, i) => s + (parseFloat(i.preco) || 0) * (parseInt(i.qtd) || 1), 0);
     const descontos = itens.reduce((s, i) => s + (parseFloat(i.desconto) || 0), 0);
     const custo     = itens.reduce((s, i) => s + (parseFloat(i.custo) || 0) * (parseInt(i.qtd) || 1), 0);
     const total     = subtotal - descontos;
     return { subtotal, descontos, custo, total, lucro: total - custo };
-  }, [itens, tipo, livreValor, livreDesc]);
+  }, [itens]);
 
   /* ── Taxa de cartão/pix — calculado de forma isolada, não altera lógica de calculos ── */
   const taxaInfo = useMemo(() => {
@@ -899,10 +882,6 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
     const e = {};
     if (!clienteSearch.trim()) e.cliente = "Informe o cliente.";
     if (!formaPgto) e.formaPgto = "Selecione a forma de pagamento.";
-    if (tipo === "livre") {
-      if (!livreNome.trim()) e.livreNome = "Informe uma descrição.";
-      if (!livreValor || parseFloat(livreValor) <= 0) e.livreValor = "Informe o valor.";
-    }
     /* Validações exclusivas do Sinal */
     if (formaPgto === "Sinal") {
       if (!sinalInfo.valorPagoNum || sinalInfo.valorPagoNum <= 0)
@@ -955,32 +934,17 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
         : calculos.total,
     };
 
-    if (tipo === "livre") {
-      payload.itens = [{
-        nome: livreNome.trim(),
-        qtd: 1,
-        preco: parseFloat(livreValor) || 0,
-        custo: 0,
-        desconto: parseFloat(livreDesc) || 0,
-        produtoId: null,
-        tipo: "livre",
-      }];
-      payload.livreNome = livreNome.trim();
-      payload.livreValor = parseFloat(livreValor) || 0;
-      payload.livreDesc = parseFloat(livreDesc) || 0;
-    } else {
-      payload.itens = itens.map(i => ({
-        produtoId: i.produtoId || null,
-        nome: i.nome,
-        qtd: parseInt(i.qtd) || 1,
-        preco: parseFloat(i.preco) || 0,
-        custo: parseFloat(i.custo) || 0,
-        desconto: parseFloat(i.desconto) || 0,
-        tipo,
-      }));
-    }
+    payload.itens = itens.map(i => ({
+      produtoId: i.produtoId || null,
+      nome: i.nome,
+      qtd: parseInt(i.qtd) || 1,
+      preco: parseFloat(i.preco) || 0,
+      custo: parseFloat(i.custo) || 0,
+      desconto: parseFloat(i.desconto) || 0,
+      tipo,
+    }));
 
-    /* ── Validação de estoque (apenas produtos, não serviços/livre) ── */
+    /* ── Validação de estoque (apenas produtos, não serviços) ── */
     if (tipo === "produto") {
       const itensInsuficientes = [];
       for (const item of payload.itens) {
@@ -1044,15 +1008,14 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
             <button className={`nv-tab ${tipo === "servico" ? "active" : ""}`} onClick={() => setTipo("servico")}>
               🎯 Serviço
             </button>
-            <button className={`nv-tab ${tipo === "livre" ? "active" : ""}`} onClick={() => setTipo("livre")}>
-              <FileText size={13} /> Valor Livre
-            </button>
           </div>
 
           {/* Cabeçalho */}
           <div className="form-row">
             <div className="form-group nv-autocomplete">
-              <label className="form-label">Cliente <span className="form-label-req">*</span></label>
+              <label className="form-label">
+                Cliente <span className="form-label-req">*</span>
+              </label>
               <input
                 className={`form-input ${erros.cliente ? "err" : ""}`}
                 placeholder="Buscar por nome ou CPF..."
@@ -1229,51 +1192,7 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
           <div className="nv-section-sep" />
 
           {/* Itens da venda */}
-          {tipo === "livre" ? (
-            /* ... (parte de venda livre - mantida igual) ... */
-            <>
-              <div className="nv-livre-info">
-                <strong>Venda de Valor Livre</strong> — sem produto ou serviço cadastrado.
-                Informe a descrição e o valor abaixo.
-              </div>
-              <div className="form-row-3">
-                <div className="form-group" style={{ gridColumn: "1/3" }}>
-                  <label className="form-label">Descrição <span className="form-label-req">*</span></label>
-                  <input
-                    className={`form-input ${erros.livreNome ? "err" : ""}`}
-                    placeholder="Ex: Serviço personalizado..."
-                    value={livreNome}
-                    onChange={e => setLivreNome(e.target.value)}
-                  />
-                  {erros.livreNome && <div className="form-error">{erros.livreNome}</div>}
-                </div>
-                <div className="form-group" style={{ gridColumn: "3/4" }}>
-                  <label className="form-label">Valor (R$) <span className="form-label-req">*</span></label>
-                  <input
-                    type="number" min="0" step="0.01"
-                    className={`form-input ${erros.livreValor ? "err" : ""}`}
-                    placeholder="0,00"
-                    value={livreValor}
-                    onChange={e => setLivreValor(e.target.value)}
-                  />
-                  {erros.livreValor && <div className="form-error">{erros.livreValor}</div>}
-                </div>
-              </div>
-              <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label">Desconto (R$)</label>
-                  <input
-                    type="number" min="0" step="0.01"
-                    className="form-input"
-                    placeholder="0"
-                    value={livreDesc}
-                    onChange={e => setLivreDesc(e.target.value)}
-                  />
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
+          <>
               <div className="nv-items-header">
                 <span className="nv-items-label">Itens da Venda</span>
                 <button className="nv-add-item-btn" onClick={adicionarItem}>
@@ -1399,7 +1318,6 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
                 </div>
               ))}
             </>
-          )}
 
           {/* Totais */}
           <div className="nv-totals-bar">
@@ -1411,12 +1329,10 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
               <div className="nv-total-label">Descontos</div>
               <div className="nv-total-val" style={{ color: "var(--red)" }}>{fmtR$(calculos.descontos)}</div>
             </div>
-            {tipo !== "livre" && (
-              <div className="nv-total-cell">
-                <div className="nv-total-label">Custo Total</div>
-                <div className="nv-total-val" style={{ color: "var(--red)" }}>{fmtR$(calculos.custo)}</div>
-              </div>
-            )}
+            <div className="nv-total-cell">
+              <div className="nv-total-label">Custo Total</div>
+              <div className="nv-total-val" style={{ color: "var(--red)" }}>{fmtR$(calculos.custo)}</div>
+            </div>
             {taxaInfo.exibe && (
               <div className="nv-total-cell">
                 <div className="nv-total-label">Taxa {formaPgto === "Pix" ? "PIX" : "Cartão"} ({taxaInfo.taxaPercentual}%)</div>
@@ -1596,7 +1512,7 @@ function ModalDetalheVenda({ venda, onClose, onEditar, onCancelar, onExcluirDef,
               return (
                 <div key={i} className="dv-trow">
                   <span className="dv-nome">
-                    {item.tipo === "servico" ? "🎯" : item.tipo === "livre" ? "📝" : <Package size={11} color="var(--text-3)" />}
+                    {item.tipo === "servico" ? "🎯" : <Package size={11} color="var(--text-3)" />}
                     {item.nome || item.produto || "—"}
                   </span>
                   <span style={{ textAlign: "center" }}>{item.qtd || 1}</span>
