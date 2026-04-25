@@ -2523,10 +2523,8 @@ document.getElementById('btnSaveAnuncio').addEventListener('click', async () => 
     document.getElementById('frameImg').src = '';
     document.getElementById('frameWidget').style.display = 'none';
     document.getElementById('anuncioImgArea').style.display = 'block';
-    document.getElementById('anuncioVideoPreviewWrap').style.display = 'none';
-    document.getElementById('anuncioVideoArea').style.display = 'block';
     document.getElementById('anuncioImgInput').value  = '';
-    document.getElementById('anuncioVideoInput').value = '';
+    clearVideoUrl();
     framePosX = 50; framePosY = 50; frameZoom = 100;
     document.getElementById('frameZoom').value = 100;
     document.getElementById('frameZoomVal').textContent = '1×';
