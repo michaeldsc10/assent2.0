@@ -20,11 +20,10 @@ import {
 } from "firebase/firestore";
 
 import { getStorage } from "firebase/storage";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 // ⚠️ Todas as chaves são lidas de variáveis de ambiente (.env)
 // Nunca commite valores reais neste arquivo.
-// Copie .env.example para .env e preencha com suas credenciais.
-// O objeto é exportado pois o módulo Usuarios.jsx usa para criar a secondary app.
 export const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -36,6 +35,17 @@ export const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+// ── App Check ──
+// Em dev, usa token de debug (aparece no console do navegador)
+if (import.meta.env.DEV) {
+  self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+}
+
+initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_SITE_KEY),
+  isTokenAutoRefreshEnabled: true,
+});
 
 export const auth    = getAuth(app);
 export const db      = getFirestore(app);
@@ -51,10 +61,10 @@ export const register = (email, password) =>
 
 export const logout = () => signOut(auth);
 
-/* ── Listener de Estado de Autenticação (usado no App.jsx / Dashboard) ── */
+/* ── Listener de Estado de Autenticação ── */
 export { onAuthStateChanged };
 
-/* ── Nova função: Verificar Licença PRO ── */
+/* ── Verificar Licença PRO ── */
 export const verificarLicencaPro = async (uid) => {
   if (!uid) return false;
 
