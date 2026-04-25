@@ -19,6 +19,7 @@ import { BannerLimite } from "../hooks/LicencaUI";
 import {
   collection, doc, setDoc, deleteDoc, onSnapshot,
   query, orderBy, writeBatch, addDoc, serverTimestamp,
+  getDocs, where,
 } from "firebase/firestore";
 
 /* ── CSS ── */
@@ -1032,10 +1033,11 @@ function ModalPagar({ despesa, onConfirm, onClose }) {
    ════════════════════════════════════════ */
 function ModalConfirmDelete({ despesa, onConfirm, onClose }) {
   const [excluindo, setExcluindo] = useState(false);
+  const isParcelada = !!(despesa.parcelado && despesa.grupoId);
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (cancelarGrupo = false) => {
     setExcluindo(true);
-    await onConfirm();
+    await onConfirm(cancelarGrupo);
     setExcluindo(false);
   };
 
@@ -1046,20 +1048,31 @@ function ModalConfirmDelete({ despesa, onConfirm, onClose }) {
           <div className="modal-title">Excluir Despesa</div>
           <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)" /></button>
         </div>
-        <div className="confirm-body">
+        <div className="confirm-body" style={{ padding: "20px 22px" }}>
           <div className="confirm-icon-wrap confirm-icon-del">
             <Trash2 size={18} color="var(--red)" />
           </div>
           <p>
-            Deseja excluir <strong>{despesa.descricao}</strong>?<br />
+            Deseja excluir <strong>{despesa.descricao}</strong>
+            {isParcelada && <> — parcela <strong>{despesa.parcelaAtual}/{despesa.totalParcelas}</strong></>}?<br />
             Esta ação não pode ser desfeita.
           </p>
+          {isParcelada && (
+            <p style={{ marginTop: 12, padding: "10px 14px", background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "var(--text-2)", lineHeight: 1.6 }}>
+              Esta despesa faz parte de uma compra parcelada. Você pode excluir apenas esta parcela ou cancelar todas as parcelas pendentes do grupo (incluindo entradas em A Receber).
+            </p>
+          )}
         </div>
-        <div className="modal-footer">
+        <div className="modal-footer" style={{ flexWrap: "wrap", gap: 8 }}>
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-danger" onClick={handleConfirm} disabled={excluindo}>
-            {excluindo ? "Excluindo..." : "Confirmar Exclusão"}
+          <button className="btn-danger" onClick={() => handleConfirm(false)} disabled={excluindo}>
+            {excluindo ? "Excluindo..." : isParcelada ? "Só esta parcela" : "Confirmar Exclusão"}
           </button>
+          {isParcelada && (
+            <button className="btn-danger" onClick={() => handleConfirm(true)} disabled={excluindo}>
+              {excluindo ? "Cancelando..." : "Cancelar todas as parcelas"}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -1556,10 +1569,53 @@ export default function Despesas({ isPro = false }) {
   };
 
   /* ── Deletar ── */
-  const handleDelete = async () => {
+  const handleDelete = async (cancelarGrupo = false) => {
     if (!tenantUid || !deletando) return;
-    await deleteDoc(doc(db, "users", tenantUid, "despesas", deletando.id));
-    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.DESPESAS, descricao: montarDescricao("excluir", "Despesa", deletando.descricao, deletando.id) });
+
+    if (cancelarGrupo && deletando.grupoId) {
+      // Cancela todas as parcelas pendentes/vencidas do grupo em "despesas"
+      const parcelas = despesas.filter(
+        d => d.grupoId === deletando.grupoId && d.status !== "pago" && d.status !== "cancelado"
+      );
+
+      const batch = writeBatch(db);
+
+      parcelas.forEach(p => {
+        batch.update(doc(db, "users", tenantUid, "despesas", p.id), { status: "cancelado" });
+      });
+
+      // Cancela entradas correspondentes em a_receber com o mesmo grupoId
+      try {
+        const snapAR = await getDocs(
+          query(
+            collection(db, "users", tenantUid, "a_receber"),
+            where("grupoId", "==", deletando.grupoId)
+          )
+        );
+        snapAR.forEach(d => {
+          if (d.data().status !== "pago") {
+            batch.update(doc(db, "users", tenantUid, "a_receber", d.id), { status: "cancelado" });
+          }
+        });
+      } catch (err) {
+        console.warn("[Despesas] Não foi possível cancelar entradas em A Receber:", err);
+      }
+
+      await batch.commit();
+      await logAction({
+        tenantUid, nomeUsuario, cargo,
+        acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.DESPESAS,
+        descricao: `Cancelou grupo parcelado: ${deletando.descricao} (grupoId: ${deletando.grupoId})`,
+      });
+    } else {
+      await deleteDoc(doc(db, "users", tenantUid, "despesas", deletando.id));
+      await logAction({
+        tenantUid, nomeUsuario, cargo,
+        acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.DESPESAS,
+        descricao: montarDescricao("excluir", "Despesa", deletando.descricao, deletando.id),
+      });
+    }
+
     setDeletando(null);
   };
 
