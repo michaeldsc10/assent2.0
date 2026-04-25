@@ -186,10 +186,13 @@ export default function AnnouncementModal({ userPlan = "free" }) {
 
         if (!compativel) return;
 
-        // não reexibe o mesmo anúncio na mesma sessão
-        const sessionKey = `ann_seen_${compativel.id}`;
-        if (sessionStorage.getItem(sessionKey)) return;
-        sessionStorage.setItem(sessionKey, "1");
+        // não reexibe o mesmo anúncio dentro de 12 horas
+        const lsKey   = `ann_seen_${compativel.id}`;
+        const lastSeen = Number(localStorage.getItem(lsKey) || 0);
+        const agora    = Date.now();
+        const DOZE_H   = 12 * 60 * 60 * 1000;
+        if (agora - lastSeen < DOZE_H) return;
+        localStorage.setItem(lsKey, String(agora));
 
         setAnuncio({ id: compativel.id, ...compativel.data() });
         setVisible(true);
