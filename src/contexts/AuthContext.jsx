@@ -1,6 +1,7 @@
 // AuthContext.jsx — ASSENT v2.0
 // Expõe: { user, cargo, tenantUid, vendedorId, vendedorNome, nomeUsuario, loadingAuth, signIn, signOut, permissoes }
 // Integrado com Firebase Auth + Firestore (estrutura multi-tenant)
+// Rate Limiting adicionado no signIn para proteção contra brute force
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import {
@@ -76,6 +77,61 @@ export const podeExcluir      = (cargo, modulo)      => !!(PERMISSOES[modulo]?.[
 export const podeVerRelatorio = (cargo, subRelatorio) => !!(PERMISSOES_RELATORIOS[subRelatorio]?.[cargo]);
 
 // ─────────────────────────────────────────────
+// Rate Limiting — proteção contra brute force
+// ─────────────────────────────────────────────
+const RL_MAX_TENTATIVAS = 5;          // tentativas antes de bloquear
+const RL_JANELA_MS      = 15 * 60 * 1000; // janela de 15 minutos
+const RL_BLOQUEIO_MS    = 15 * 60 * 1000; // tempo de bloqueio após exceder
+
+function rl_chave(email) {
+  return `assent_rl_${email.toLowerCase().trim()}`;
+}
+
+function rl_verificar(email) {
+  try {
+    const raw = localStorage.getItem(rl_chave(email));
+    if (!raw) return { bloqueado: false, tentativas: 0 };
+
+    const dados = JSON.parse(raw);
+    const agora = Date.now();
+
+    // Janela expirou — limpa automaticamente
+    if (agora - dados.inicio > RL_JANELA_MS) {
+      localStorage.removeItem(rl_chave(email));
+      return { bloqueado: false, tentativas: 0 };
+    }
+
+    if (dados.tentativas >= RL_MAX_TENTATIVAS) {
+      const restanteMs  = RL_BLOQUEIO_MS - (agora - dados.inicio);
+      const restanteMin = Math.ceil(restanteMs / 60000);
+      return { bloqueado: true, tentativas: dados.tentativas, restanteMin };
+    }
+
+    return { bloqueado: false, tentativas: dados.tentativas };
+  } catch {
+    return { bloqueado: false, tentativas: 0 };
+  }
+}
+
+function rl_registrarFalha(email) {
+  try {
+    const raw   = localStorage.getItem(rl_chave(email));
+    const dados = raw ? JSON.parse(raw) : { tentativas: 0, inicio: Date.now() };
+
+    localStorage.setItem(rl_chave(email), JSON.stringify({
+      tentativas: dados.tentativas + 1,
+      inicio:     dados.inicio ?? Date.now(),
+    }));
+  } catch { /* silencia erros de localStorage */ }
+}
+
+function rl_resetar(email) {
+  try {
+    localStorage.removeItem(rl_chave(email));
+  } catch { /* silencia */ }
+}
+
+// ─────────────────────────────────────────────
 // Context
 // ─────────────────────────────────────────────
 const AuthContext = createContext(null);
@@ -86,7 +142,7 @@ export function AuthProvider({ children }) {
   const [cargo, setCargo]                 = useState(null);  // string do cargo
   const [vendedorId, setVendedorId]       = useState(null);  // id em /vendedores
   const [vendedorNome, setVendedorNome]   = useState(null);  // nome para exibição
-  const [nomeUsuario, setNomeUsuario]     = useState(null);  // ← nome do Firestore (admin e convidados)
+  const [nomeUsuario, setNomeUsuario]     = useState(null);  // nome do Firestore (admin e convidados)
   const [loadingAuth, setLoadingAuth]     = useState(true);
 
   // ── Limpa todo o estado de sessão ──
@@ -105,7 +161,6 @@ export function AuthProvider({ children }) {
       const uid = firebaseUser.uid;
 
       // ── Passo 1: verifica se é o Admin/dono do tenant ──
-      // O Admin é identificado por ter um documento em /users/{uid} na raiz
       const adminDoc = await getDoc(doc(db, "users", uid));
       if (adminDoc.exists()) {
         setUser(firebaseUser);
@@ -113,13 +168,11 @@ export function AuthProvider({ children }) {
         setCargo(CARGOS.ADMIN);
         setVendedorId(null);
         setVendedorNome(null);
-        // Para admin: usa displayName do Firebase Auth ou email
         setNomeUsuario(firebaseUser.displayName || firebaseUser.email);
         return;
       }
 
       // ── Passo 1.5: users/{uid} não existe — pode ser Admin no primeiro acesso ──
-      // Verifica se existe licença ativa em /licencas/{uid}
       const licencaDoc = await getDoc(doc(db, "licencas", uid));
 
       if (licencaDoc.exists()) {
@@ -128,7 +181,7 @@ export function AuthProvider({ children }) {
           await firebaseSignOut(auth);
           return;
         }
-        // Licença ativa — primeiro acesso do Admin: cria o documento raiz do tenant
+        // Licença ativa — primeiro acesso do Admin
         await setDoc(doc(db, "users", uid), {
           email:    firebaseUser.email,
           criadoEm: serverTimestamp(),
@@ -144,8 +197,6 @@ export function AuthProvider({ children }) {
       }
 
       // ── Passo 2: usuário convidado — busca o tenant via índice ──
-      // Ao convidar um usuário, o Admin grava /userIndex/{uid} → { tenantUid }
-      // Isso evita varrer todos os tenants para localizar o usuário.
       const indexDoc = await getDoc(doc(db, "userIndex", uid));
       if (!indexDoc.exists()) {
         console.error("[AuthContext] userIndex não encontrado");
@@ -176,7 +227,6 @@ export function AuthProvider({ children }) {
       setUser(firebaseUser);
       setTenantUid(tUid);
       setCargo(perfil.cargo);
-      // Para convidado: nome vem do Firestore (cadastrado pelo admin ao convidar)
       setNomeUsuario(perfil.nome || firebaseUser.email);
 
       // ── Passo 4: se cargo === "vendedor", carrega dados do cadastro vinculado ──
@@ -209,15 +259,58 @@ export function AuthProvider({ children }) {
     return () => unsubscribe();
   }, [carregarPerfil, limparSessao]);
 
-  // ── signIn ──
+  // ── signIn com Rate Limiting ──
   const signIn = useCallback(async (email, password) => {
+    // ── 1. Checa se o usuário está bloqueado ──
+    const { bloqueado, restanteMin } = rl_verificar(email);
+    if (bloqueado) {
+      throw Object.assign(
+        new Error(`Muitas tentativas de login. Tente novamente em ${restanteMin} minuto${restanteMin !== 1 ? "s" : ""}.`),
+        { code: "auth/rate-limit-exceeded" }
+      );
+    }
+
     setLoadingAuth(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
+      // ── Login bem-sucedido: zera o contador do email ──
+      rl_resetar(email);
       // carregarPerfil é disparado pelo onAuthStateChanged
     } catch (err) {
       setLoadingAuth(false);
-      throw err; // repassa para o componente de login exibir o erro
+
+      // ── Registra falha apenas para erros de credencial (não para erros de rede etc.) ──
+      const errosDeCredencial = [
+        "auth/invalid-credential",
+        "auth/wrong-password",
+        "auth/user-not-found",
+        "auth/invalid-email",
+        "auth/too-many-requests",
+      ];
+
+      if (errosDeCredencial.includes(err.code)) {
+        rl_registrarFalha(email);
+
+        // Verifica quantas tentativas restam e enriquece a mensagem de erro
+        const { tentativas } = rl_verificar(email);
+        const restam = RL_MAX_TENTATIVAS - tentativas;
+
+        if (restam <= 0) {
+          throw Object.assign(
+            new Error(`Conta bloqueada por ${RL_BLOQUEIO_MS / 60000} minutos devido a muitas tentativas incorretas.`),
+            { code: "auth/rate-limit-exceeded" }
+          );
+        }
+
+        if (restam <= 2) {
+          throw Object.assign(
+            new Error(`E-mail ou senha incorretos. Atenção: mais ${restam} tentativa${restam !== 1 ? "s" : ""} antes do bloqueio temporário.`),
+            { code: err.code }
+          );
+        }
+      }
+
+      throw err; // repassa para o componente de login exibir o erro original
     }
   }, []);
 
@@ -248,7 +341,7 @@ export function AuthProvider({ children }) {
     tenantUid,      // uid do dono do tenant — raiz das queries Firestore: /users/{tenantUid}/...
     vendedorId,     // id em /vendedores — null se cargo !== "vendedor" ou sem vínculo
     vendedorNome,   // nome para exibição no select travado em Vendas.jsx
-    nomeUsuario,    // ← ADICIONADO: nome real do Firestore para exibição no header
+    nomeUsuario,    // nome real do Firestore para exibição no header
     loadingAuth,    // true enquanto o perfil ainda está sendo carregado
 
     // ── Ações ──
