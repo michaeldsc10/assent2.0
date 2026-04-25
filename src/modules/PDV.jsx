@@ -18,7 +18,7 @@ import {
   collection, query, where, getDocs, runTransaction,
   doc, orderBy, limit, getDoc,
 } from "firebase/firestore";
-import BarcodeInput from "../components/BarcodeInput";
+import BarcodeInput from "./BarcodeInput";
 import { useConfiguracoes } from "./Configuracoes";
 
 /* ─── Formata moeda BRL ─── */
@@ -158,7 +158,8 @@ export default function PDV({ onVoltar }) {
     getDoc(doc(db, "licencas", tenantUid))
       .then((snap) => {
         if (snap.exists()) {
-          const name = snap.data()?.name || snap.data()?.nome || "";
+          const d = snap.data() || {};
+          const name = d.name || d.nome || d.nomeCompleto || d.displayName || "";
           setNomeOperador(name);
         }
       })
@@ -515,7 +516,17 @@ export default function PDV({ onVoltar }) {
               <span className="pdv-operador-nome">{operadorDisplay}</span>
             </div>
             {onVoltar && (
-              <button className="pdv-btn-voltar" onClick={onVoltar} title="Voltar ao menu">
+              <button
+                onClick={onVoltar}
+                title="Voltar ao menu"
+                style={{
+                  background: "rgba(255,255,255,0.1)",
+                  border: "1.5px solid rgba(255,255,255,0.25)",
+                  borderRadius: 9, width: 36, height: 36,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: "pointer", flexShrink: 0, color: "#d0d2e8",
+                }}
+              >
                 <ArrowLeft size={16} color="#d0d2e8" strokeWidth={2.5} />
               </button>
             )}
@@ -724,7 +735,16 @@ export default function PDV({ onVoltar }) {
                         )}
                       </div>
                       <div className="pdv-item-qty">
-                        <button onClick={() => alterarQty(idx, -1)}><Minus size={12} color="#9193a5" strokeWidth={2.5} /></button>
+                        <button
+                          onClick={() => alterarQty(idx, -1)}
+                          style={{
+                            background:"rgba(255,255,255,0.08)",
+                            border:"1.5px solid rgba(255,255,255,0.2)",
+                            borderRadius:6, width:24, height:24,
+                            display:"flex", alignItems:"center", justifyContent:"center",
+                            cursor:"pointer", flexShrink:0,
+                          }}
+                        ><Minus size={12} color="#b0b2c8" strokeWidth={2.5} /></button>
                         {editandoQty === idx ? (
                           <input
                             className="pdv-qty-input"
@@ -742,7 +762,16 @@ export default function PDV({ onVoltar }) {
                             {fmtNum(item.qty)}
                           </span>
                         )}
-                        <button onClick={() => alterarQty(idx, 1)}><Plus size={12} color="#9193a5" strokeWidth={2.5} /></button>
+                        <button
+                          onClick={() => alterarQty(idx, 1)}
+                          style={{
+                            background:"rgba(255,255,255,0.08)",
+                            border:"1.5px solid rgba(255,255,255,0.2)",
+                            borderRadius:6, width:24, height:24,
+                            display:"flex", alignItems:"center", justifyContent:"center",
+                            cursor:"pointer", flexShrink:0,
+                          }}
+                        ><Plus size={12} color="#b0b2c8" strokeWidth={2.5} /></button>
                       </div>
                       <span className="pdv-item-unit">{fmt(item.precoUnit)}</span>
                       <span className="pdv-item-sub">{fmt(item.subtotal)}</span>
@@ -790,11 +819,24 @@ export default function PDV({ onVoltar }) {
               className="pdv-btn-finalizar"
               onClick={finalizarVenda}
               disabled={finalizando || carrinho.length === 0}
+              style={{
+                margin: "12px 16px 4px",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                background: "linear-gradient(135deg,#d4b06a,#c8a55e,#b8943e)",
+                color: "#0a0a0a", border: "none", borderRadius: 50,
+                padding: "15px 20px", fontSize: 15, fontWeight: 900,
+                cursor: finalizando || carrinho.length === 0 ? "not-allowed" : "pointer",
+                letterSpacing: ".04em", textTransform: "uppercase",
+                opacity: finalizando || carrinho.length === 0 ? 0.38 : 1,
+                boxShadow: "0 4px 20px rgba(200,165,94,0.35)",
+                transition: "all .2s", width: "calc(100% - 32px)",
+                fontFamily: "'DM Sans','Segoe UI',sans-serif",
+              }}
             >
               {finalizando ? (
-                <><Loader2 size={18} className="pdv-spinner" /> Finalizando...</>
+                <><Loader2 size={18} color="#0a0a0a" /> Finalizando...</>
               ) : (
-                <><Receipt size={18} /> Finalizar Venda — {fmt(total)}</>
+                <><Receipt size={18} color="#0a0a0a" /> Finalizar Venda — {fmt(total)}</>
               )}
             </button>
 
