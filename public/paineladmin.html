@@ -1084,22 +1084,34 @@ tbody tr:hover { background: var(--surface2); }
                 </div>
               </div>
 
-              <div class="field-group" style="margin-bottom:16px" id="anuncioBtnPosGroup">
-                <div class="field-label">Posição do botão com imagem</div>
-                <div style="display:flex;gap:8px">
-                  <button class="dest-btn active" data-pos="abaixo" id="posBaixo">⬇ Abaixo da imagem</button>
-                  <button class="dest-btn" data-pos="sobreposto" id="posSobre">📌 Sobre a imagem</button>
+              <!-- Toggle: incluir botão -->
+              <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:11px 14px;border:1px solid var(--border);border-radius:10px;background:var(--card2)">
+                <input type="checkbox" id="anuncioBtnAtivo" checked style="width:16px;height:16px;accent-color:var(--gold);cursor:pointer;flex-shrink:0">
+                <div>
+                  <div style="font-size:12px;font-weight:700;color:var(--text)">Incluir botão de ação</div>
+                  <div style="font-size:10px;color:var(--text3);margin-top:1px">Quando desativado, o anúncio não exibirá botão</div>
                 </div>
               </div>
 
-              <div class="form-2col" style="margin-bottom:20px">
-                <div class="field-group">
-                  <div class="field-label">Texto do Botão</div>
-                  <input class="field-input" id="anuncioBtnTexto" type="text" placeholder="Ex: Vamos lá!" value="Vamos lá!">
+              <!-- Campos do botão (ocultáveis) -->
+              <div id="anuncioBtnFields">
+                <div class="field-group" style="margin-bottom:16px" id="anuncioBtnPosGroup">
+                  <div class="field-label">Posição do botão com imagem</div>
+                  <div style="display:flex;gap:8px">
+                    <button class="dest-btn active" data-pos="abaixo" id="posBaixo">⬇ Abaixo da imagem</button>
+                    <button class="dest-btn" data-pos="sobreposto" id="posSobre">📌 Sobre a imagem</button>
+                  </div>
                 </div>
-                <div class="field-group">
-                  <div class="field-label">URL do Botão <span style="color:var(--text3);font-weight:400">(opcional)</span></div>
-                  <input class="field-input" id="anuncioBtnUrl" type="url" placeholder="https://...">
+
+                <div class="form-2col" style="margin-bottom:20px">
+                  <div class="field-group">
+                    <div class="field-label">Texto do Botão</div>
+                    <input class="field-input" id="anuncioBtnTexto" type="text" placeholder="Ex: Vamos lá!" value="Vamos lá!">
+                  </div>
+                  <div class="field-group">
+                    <div class="field-label">URL do Botão <span style="color:var(--text3);font-weight:400">(opcional)</span></div>
+                    <input class="field-input" id="anuncioBtnUrl" type="url" placeholder="https://...">
+                  </div>
                 </div>
               </div>
 
@@ -1909,6 +1921,7 @@ function showFeedback(el, msg, color) {
 let anuncioImgBase64 = '';
 let anuncioDest      = 'todos';
 let anuncioBtnPos    = 'abaixo'; // 'abaixo' | 'sobreposto'
+let anuncioBtnAtivo  = true;    // botão é opcional
 
 // ── Image upload
 /**
@@ -2012,6 +2025,13 @@ document.getElementById('anuncioImgRemove').addEventListener('click', () => {
   syncPreview();
 });
 
+// ── Toggle botão opcional
+document.getElementById('anuncioBtnAtivo').addEventListener('change', function() {
+  anuncioBtnAtivo = this.checked;
+  document.getElementById('anuncioBtnFields').style.display = this.checked ? '' : 'none';
+  syncPreview();
+});
+
 // ── Posição botão
 document.querySelectorAll('[data-pos]').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -2046,17 +2066,17 @@ function syncPreview() {
   if (anuncioImgBase64) {
     imgWrap.style.display = 'block';
     document.getElementById('prevImg').src = anuncioImgBase64;
-    if (anuncioBtnPos === 'sobreposto') {
+    if (anuncioBtnAtivo && anuncioBtnPos === 'sobreposto') {
       document.getElementById('prevBtnOver').style.display  = 'flex';
       document.getElementById('prevBtnAbaixo').style.display = 'none';
     } else {
       document.getElementById('prevBtnOver').style.display  = 'none';
-      document.getElementById('prevBtnAbaixo').style.display = '';
+      document.getElementById('prevBtnAbaixo').style.display = anuncioBtnAtivo ? '' : 'none';
     }
   } else {
     imgWrap.style.display = 'none';
     document.getElementById('prevBtnOver').style.display  = 'none';
-    document.getElementById('prevBtnAbaixo').style.display = '';
+    document.getElementById('prevBtnAbaixo').style.display = anuncioBtnAtivo ? '' : 'none';
   }
 }
 
@@ -2085,17 +2105,17 @@ function openAnnouncementPreview() {
   if (anuncioImgBase64) {
     imgZone.style.display = 'block';
     document.getElementById('annImg').src = anuncioImgBase64;
-    if (anuncioBtnPos === 'sobreposto') {
+    if (anuncioBtnAtivo && anuncioBtnPos === 'sobreposto') {
       btnFloat.style.display  = 'flex';
       btnBottom.style.display = 'none';
     } else {
       btnFloat.style.display  = 'none';
-      btnBottom.style.display = '';
+      btnBottom.style.display = anuncioBtnAtivo ? '' : 'none';
     }
   } else {
     imgZone.style.display   = 'none';
     btnFloat.style.display  = 'none';
-    btnBottom.style.display = '';
+    btnBottom.style.display = anuncioBtnAtivo ? '' : 'none';
   }
 
   document.getElementById('announcementModal').classList.add('open');
@@ -2130,9 +2150,10 @@ document.getElementById('btnSaveAnuncio').addEventListener('click', async () => 
     const payload = {
       titulo, mensagem,
       destinatario: anuncioDest,
-      btnTexto: btnTexto || 'Vamos lá!',
-      btnUrl: btnUrl || '',
-      btnPos: anuncioBtnPos,
+      btnAtivo: anuncioBtnAtivo,
+      btnTexto: anuncioBtnAtivo ? (btnTexto || 'Vamos lá!') : '',
+      btnUrl:   anuncioBtnAtivo ? (btnUrl   || '')          : '',
+      btnPos:   anuncioBtnAtivo ? anuncioBtnPos             : '',
       imagem: anuncioImgBase64 || '',
       ativo: true,
       criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
@@ -2146,6 +2167,9 @@ document.getElementById('btnSaveAnuncio').addEventListener('click', async () => 
     document.getElementById('anuncioMsg').value     = '';
     document.getElementById('anuncioBtnTexto').value = 'Vamos lá!';
     document.getElementById('anuncioBtnUrl').value   = '';
+    document.getElementById('anuncioBtnAtivo').checked = true;
+    anuncioBtnAtivo = true;
+    document.getElementById('anuncioBtnFields').style.display = '';
     document.getElementById('anuncioImgRemove').click();
     syncPreview();
 
