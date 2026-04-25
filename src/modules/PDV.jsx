@@ -516,19 +516,23 @@ export default function PDV({ onVoltar }) {
               <span className="pdv-operador-nome">{operadorDisplay}</span>
             </div>
             {onVoltar && (
-              <button
+              <span
+                role="button"
+                tabIndex={0}
                 onClick={onVoltar}
                 title="Voltar ao menu"
+                onKeyDown={e => e.key === "Enter" && onVoltar()}
                 style={{
-                  background: "rgba(255,255,255,0.1)",
-                  border: "1.5px solid rgba(255,255,255,0.25)",
+                  background: "rgba(255,255,255,0.12)",
+                  border: "1.5px solid rgba(255,255,255,0.28)",
                   borderRadius: 9, width: 36, height: 36,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: "pointer", flexShrink: 0, color: "#d0d2e8",
+                  cursor: "pointer", flexShrink: 0,
+                  userSelect: "none",
                 }}
               >
                 <ArrowLeft size={16} color="#d0d2e8" strokeWidth={2.5} />
-              </button>
+              </span>
             )}
           </div>
         </header>
@@ -735,16 +739,20 @@ export default function PDV({ onVoltar }) {
                         )}
                       </div>
                       <div className="pdv-item-qty">
-                        <button
+                        <span
+                          role="button"
+                          tabIndex={0}
                           onClick={() => alterarQty(idx, -1)}
                           style={{
-                            background:"rgba(255,255,255,0.08)",
-                            border:"1.5px solid rgba(255,255,255,0.2)",
+                            background:"rgba(255,255,255,0.1)",
+                            border:"1.5px solid rgba(255,255,255,0.22)",
                             borderRadius:6, width:24, height:24,
                             display:"flex", alignItems:"center", justifyContent:"center",
                             cursor:"pointer", flexShrink:0,
+                            color:"#c0c2d8", fontSize:16, fontWeight:300,
+                            lineHeight:1, userSelect:"none",
                           }}
-                        ><Minus size={12} color="#b0b2c8" strokeWidth={2.5} /></button>
+                        >−</span>
                         {editandoQty === idx ? (
                           <input
                             className="pdv-qty-input"
@@ -762,16 +770,20 @@ export default function PDV({ onVoltar }) {
                             {fmtNum(item.qty)}
                           </span>
                         )}
-                        <button
+                        <span
+                          role="button"
+                          tabIndex={0}
                           onClick={() => alterarQty(idx, 1)}
                           style={{
-                            background:"rgba(255,255,255,0.08)",
-                            border:"1.5px solid rgba(255,255,255,0.2)",
+                            background:"rgba(255,255,255,0.1)",
+                            border:"1.5px solid rgba(255,255,255,0.22)",
                             borderRadius:6, width:24, height:24,
                             display:"flex", alignItems:"center", justifyContent:"center",
                             cursor:"pointer", flexShrink:0,
+                            color:"#c0c2d8", fontSize:16, fontWeight:300,
+                            lineHeight:1, userSelect:"none",
                           }}
-                        ><Plus size={12} color="#b0b2c8" strokeWidth={2.5} /></button>
+                        >+</span>
                       </div>
                       <span className="pdv-item-unit">{fmt(item.precoUnit)}</span>
                       <span className="pdv-item-sub">{fmt(item.subtotal)}</span>
@@ -815,22 +827,30 @@ export default function PDV({ onVoltar }) {
             </div>
 
             {/* Botão finalizar */}
-            <button
-              className="pdv-btn-finalizar"
-              onClick={finalizarVenda}
-              disabled={finalizando || carrinho.length === 0}
+            <span
+              role="button"
+              tabIndex={carrinho.length === 0 ? -1 : 0}
+              onClick={!finalizando && carrinho.length > 0 ? finalizarVenda : undefined}
+              onKeyDown={e => e.key === "Enter" && !finalizando && carrinho.length > 0 && finalizarVenda()}
               style={{
                 margin: "12px 16px 4px",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-                background: "linear-gradient(135deg,#d4b06a,#c8a55e,#b8943e)",
-                color: "#0a0a0a", border: "none", borderRadius: 50,
-                padding: "15px 20px", fontSize: 15, fontWeight: 900,
+                background: "linear-gradient(135deg, #d4b06a 0%, #c8a55e 60%, #b8943e 100%)",
+                color: "#0a0a0a",
+                border: "none",
+                borderRadius: "50px",
+                padding: "15px 20px",
+                fontSize: 15,
+                fontWeight: 900,
                 cursor: finalizando || carrinho.length === 0 ? "not-allowed" : "pointer",
-                letterSpacing: ".04em", textTransform: "uppercase",
+                letterSpacing: ".05em",
+                textTransform: "uppercase",
                 opacity: finalizando || carrinho.length === 0 ? 0.38 : 1,
-                boxShadow: "0 4px 20px rgba(200,165,94,0.35)",
-                transition: "all .2s", width: "calc(100% - 32px)",
+                boxShadow: "0 4px 24px rgba(200,165,94,0.4), 0 1px 0 rgba(255,255,255,0.15) inset",
+                width: "calc(100% - 32px)",
                 fontFamily: "'DM Sans','Segoe UI',sans-serif",
+                userSelect: "none",
+                transition: "box-shadow .2s, opacity .2s",
               }}
             >
               {finalizando ? (
@@ -838,7 +858,7 @@ export default function PDV({ onVoltar }) {
               ) : (
                 <><Receipt size={18} color="#0a0a0a" /> Finalizar Venda — {fmt(total)}</>
               )}
-            </button>
+            </span>
 
             {carrinho.length > 0 && (
               <button className="pdv-btn-cancelar" onClick={limparVenda}>
