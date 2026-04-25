@@ -66,10 +66,12 @@ const STYLES = `
   border-color: #D4AF37;
 }
 .ann-img-zone {
-  width: 100%; max-height: 230px;
+  width: 100%; height: 230px;
   overflow: hidden; position: relative;
 }
 .ann-img-zone img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ann-img-zone video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ann-img-zone iframe { width: 100%; height: 100%; border: none; display: block; }
 .ann-img-overlay {
   position: absolute; inset: 0;
   background: rgba(0,0,0,0.42);
@@ -134,6 +136,25 @@ const ArrowIcon = () => (
   </svg>
 );
 
+/* ─── Helper: detecta YouTube e converte para embed ── */
+function parseVideoUrl(url) {
+  if (!url) return { type: "none" };
+  const ytMatch = url.match(
+    /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/
+  );
+  if (ytMatch) {
+    const id = ytMatch[1];
+    return {
+      type: "youtube",
+      embedUrl: `https://www.youtube.com/embed/${id}?autoplay=1&mute=1&loop=1&playlist=${id}`,
+    };
+  }
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return { type: "direct", url };
+  }
+  return { type: "none" };
+}
+
 export default function AnnouncementModal({ userPlan = "free" }) {
   const [anuncio, setAnuncio] = useState(null);
   const [visible, setVisible] = useState(false);
@@ -194,16 +215,33 @@ export default function AnnouncementModal({ userPlan = "free" }) {
   const {
     titulo,
     mensagem,
-    imagem   = "",
-    btnTexto = "Vamos lá!",
-    btnUrl   = "",
-    btnPos   = "abaixo",
+    imagem    = "",
+    videoUrl  = "",
+    btnTexto  = "",
+    btnUrl    = "",
+    btnPos    = "abaixo",
+    imgPosX   = 50,
+    imgPosY   = 50,
+    imgZoom   = 100,
   } = anuncio;
 
+  const videoInfo     = parseVideoUrl(videoUrl);
   const temImagem     = Boolean(imagem);
-  const btnSobreposto = temImagem && btnPos === "sobreposto";
+  const temVideo      = videoInfo.type !== "none";
+  const temMedia      = temImagem || temVideo;
+  const btnSobreposto = temMedia && btnPos === "sobreposto";
+  const mostrarBtn    = Boolean(btnTexto);
+
+  // Aplica enquadramento salvo pelo admin
+  const imgStyle = temImagem ? {
+    width: "100%", height: "100%", objectFit: "cover", display: "block",
+    objectPosition: `${imgPosX}% ${imgPosY}%`,
+    transform: imgZoom > 100 ? `scale(${imgZoom / 100})` : undefined,
+    transformOrigin: `${imgPosX}% ${imgPosY}%`,
+  } : {};
 
   function BotaoCTA({ className = "" }) {
+    if (!mostrarBtn) return null;
     const cls = `ann-cta ${className}`;
     return btnUrl ? (
       <a href={btnUrl} target="_blank" rel="noopener noreferrer" className={cls}>
@@ -225,10 +263,26 @@ export default function AnnouncementModal({ userPlan = "free" }) {
 
         <button className="ann-close" onClick={close} aria-label="Fechar">✕</button>
 
-        {temImagem && (
+        {temMedia && (
           <div className="ann-img-zone">
-            <img src={imagem} alt={titulo} />
-            {btnSobreposto && (
+            {temImagem && (
+              <img src={imagem} alt={titulo} style={imgStyle} />
+            )}
+            {!temImagem && videoInfo.type === "direct" && (
+              <video
+                src={videoInfo.url}
+                autoPlay muted loop playsInline
+              />
+            )}
+            {!temImagem && videoInfo.type === "youtube" && (
+              <iframe
+                src={videoInfo.embedUrl}
+                title={titulo}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            )}
+            {btnSobreposto && mostrarBtn && (
               <div className="ann-img-overlay">
                 <BotaoCTA className="ann-cta-float" />
               </div>
