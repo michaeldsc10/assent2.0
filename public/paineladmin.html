@@ -8,6 +8,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 /* ════════════════════════════════════════
@@ -593,33 +594,6 @@ tbody tr:hover { background: var(--surface2); }
 }
 .anuncio-preview-img-wrap img {
   width: 100%; height: 100%; object-fit: cover; display: block;
-  transform-origin: center center; transition: transform .15s, object-position .15s;
-}
-.announcement-img-zone img {
-  width: 100%; height: 100%; object-fit: cover; display: block;
-  transform-origin: center center;
-}
-/* Controles de imagem */
-.img-controls {
-  display: none; margin-top: 12px;
-  background: var(--card2); border: 1px solid var(--border);
-  border-radius: 10px; padding: 12px 14px;
-  display: none; flex-direction: column; gap: 10px;
-}
-.img-ctrl-row {
-  display: flex; align-items: center; gap: 10px;
-}
-.img-ctrl-label {
-  font-size: 10px; font-weight: 700; letter-spacing: .05em;
-  text-transform: uppercase; color: var(--text3);
-  width: 68px; flex-shrink: 0;
-}
-.img-ctrl-slider {
-  flex: 1; accent-color: var(--gold); cursor: pointer; height: 4px;
-}
-.img-ctrl-val {
-  font-size: 10px; font-family: 'IBM Plex Mono', monospace;
-  color: var(--gold); width: 36px; text-align: right; flex-shrink: 0;
 }
 .anuncio-preview-btn-over {
   position: absolute; inset: 0;
@@ -668,6 +642,98 @@ tbody tr:hover { background: var(--surface2); }
   transform: translateY(-1px);
 }
 /* Upload de imagem */
+.media-tabs {
+  display: flex; gap: 6px; margin-bottom: 12px;
+}
+.media-tab-btn {
+  flex: 1; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--card2); color: var(--text3); font-size: 12px; font-weight: 600;
+  cursor: pointer; font-family: 'Syne', sans-serif; transition: all .15s;
+}
+.media-tab-btn.active {
+  border-color: var(--gold); color: var(--gold); background: var(--gold-glow);
+}
+
+/* Frame/enquadrar widget */
+.frame-widget {
+  display: none; margin-top: 10px;
+  border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+}
+.frame-box {
+  width: 100%; height: 150px; overflow: hidden; position: relative;
+  cursor: grab; background: var(--surface3); user-select: none;
+}
+.frame-box:active { cursor: grabbing; }
+.frame-box img {
+  position: absolute; width: 100%; height: 100%;
+  object-fit: cover; object-position: 50% 50%;
+  pointer-events: none; user-select: none; draggable: false;
+}
+.frame-hint {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,0.55); border-radius: 20px; padding: 3px 10px;
+  font-size: 10px; color: rgba(255,255,255,0.8); white-space: nowrap;
+  pointer-events: none; transition: opacity .3s;
+}
+.frame-toolbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; background: var(--card2); border-top: 1px solid var(--border);
+}
+.frame-toolbar-label {
+  font-size: 10px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--text3); flex-shrink: 0;
+}
+.frame-zoom-slider {
+  flex: 1; accent-color: var(--gold); cursor: pointer;
+}
+.frame-zoom-val {
+  font-size: 10px; font-family: 'IBM Plex Mono', monospace;
+  color: var(--gold); width: 28px; text-align: right; flex-shrink: 0;
+}
+.frame-remove {
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text3); font-size: 11px; padding: 3px 8px; cursor: pointer;
+  font-family: 'Syne', sans-serif; transition: all .13s; flex-shrink: 0;
+}
+.frame-remove:hover { border-color: var(--danger); color: var(--danger); }
+
+/* Video upload */
+.video-upload-area {
+  border: 1.5px dashed var(--border); border-radius: 10px; padding: 28px 16px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; cursor: pointer; background: var(--card2); transition: border-color .15s;
+  position: relative;
+}
+.video-upload-area:hover { border-color: var(--gold); }
+.video-upload-area input[type=file] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer;
+}
+.video-preview-wrap {
+  display: none; margin-top: 10px; position: relative;
+}
+.video-preview-wrap video {
+  width: 100%; max-height: 160px; border-radius: 8px;
+  object-fit: cover; background: #000; display: block;
+}
+.video-remove-btn {
+  position: absolute; top: 6px; right: 6px;
+  background: rgba(0,0,0,0.7); border: none; border-radius: 50%;
+  color: #fff; width: 24px; height: 24px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; transition: background .13s;
+}
+.video-remove-btn:hover { background: var(--danger); }
+.video-upload-progress {
+  display: none; margin-top: 8px;
+  background: var(--card2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px;
+}
+.video-progress-bar-wrap {
+  height: 4px; background: var(--surface3); border-radius: 2px; overflow: hidden; margin-top: 6px;
+}
+.video-progress-bar { height: 100%; background: var(--gold); border-radius: 2px; width: 0%; transition: width .2s; }
+.video-progress-label { font-size: 11px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; }
+
 .img-upload-area {
   border: 2px dashed var(--border2); border-radius: 10px;
   padding: 24px 16px; text-align: center; cursor: pointer;
@@ -1096,36 +1162,55 @@ tbody tr:hover { background: var(--surface2); }
               </div>
 
               <div class="field-group" style="margin-bottom:16px">
-                <div class="field-label">Imagem <span style="color:var(--text3);font-weight:400">(opcional)</span></div>
-                <div id="anuncioImgArea" class="img-upload-area">
-                  <input type="file" id="anuncioImgInput" accept="image/jpeg,image/png,image/gif,image/webp">
-                  <div class="img-upload-icon">🖼</div>
-                  <div class="img-upload-label">Clique ou arraste uma imagem</div>
-                  <div class="img-upload-sub">JPG, PNG, WebP — máx. 800KB recomendado</div>
+                <div class="field-label">Mídia <span style="color:var(--text3);font-weight:400">(opcional)</span></div>
+
+                <!-- Tabs imagem / vídeo -->
+                <div class="media-tabs">
+                  <button class="media-tab-btn active" id="tabImgBtn" onclick="switchMediaTab('img')">🖼 Imagem</button>
+                  <button class="media-tab-btn" id="tabVideoBtn" onclick="switchMediaTab('video')">🎬 Vídeo curto</button>
                 </div>
-                <div id="anuncioImgPreviewWrap" style="display:none; margin-top:10px">
-                  <div class="img-thumb-wrap" style="width:100%">
-                    <img id="anuncioImgPreview" class="img-thumb" src="" alt="preview">
-                    <button class="img-remove-btn" id="anuncioImgRemove" title="Remover imagem">✕</button>
+
+                <!-- Painel imagem -->
+                <div id="mediaPanelImg">
+                  <div id="anuncioImgArea" class="img-upload-area">
+                    <input type="file" id="anuncioImgInput" accept="image/jpeg,image/png,image/gif,image/webp">
+                    <div class="img-upload-icon">🖼</div>
+                    <div class="img-upload-label">Clique ou arraste uma imagem</div>
+                    <div class="img-upload-sub">JPG, PNG, WebP — máx. 800KB recomendado</div>
+                  </div>
+
+                  <!-- Framing widget — aparece após upload -->
+                  <div class="frame-widget" id="frameWidget">
+                    <div class="frame-box" id="frameBox">
+                      <img id="frameImg" src="" alt="" draggable="false">
+                      <div class="frame-hint" id="frameHint">↕↔ Arraste para enquadrar</div>
+                    </div>
+                    <div class="frame-toolbar">
+                      <span class="frame-toolbar-label">Zoom</span>
+                      <input class="frame-zoom-slider" type="range" id="frameZoom" min="100" max="250" value="100" step="5">
+                      <span class="frame-zoom-val" id="frameZoomVal">1×</span>
+                      <button class="frame-remove" id="anuncioImgRemove">✕ Remover</button>
+                    </div>
                   </div>
                 </div>
 
-                <!-- Controles de posição e zoom da imagem -->
-                <div class="img-controls" id="imgControls">
-                  <div class="img-ctrl-row">
-                    <span class="img-ctrl-label">Posição X</span>
-                    <input class="img-ctrl-slider" type="range" id="imgPosX" min="0" max="100" value="50">
-                    <span class="img-ctrl-val" id="imgPosXVal">50%</span>
+                <!-- Painel vídeo -->
+                <div id="mediaPanelVideo" style="display:none">
+                  <div class="video-upload-area" id="anuncioVideoArea">
+                    <input type="file" id="anuncioVideoInput" accept="video/mp4,video/webm,video/quicktime">
+                    <div style="font-size:22px">🎬</div>
+                    <div class="img-upload-label">Clique para selecionar o vídeo</div>
+                    <div class="img-upload-sub">MP4, WebM — máx. 50MB</div>
                   </div>
-                  <div class="img-ctrl-row">
-                    <span class="img-ctrl-label">Posição Y</span>
-                    <input class="img-ctrl-slider" type="range" id="imgPosY" min="0" max="100" value="50">
-                    <span class="img-ctrl-val" id="imgPosYVal">50%</span>
+                  <div class="video-upload-progress" id="videoProgress">
+                    <div class="video-progress-label" id="videoProgressLabel">Enviando vídeo...</div>
+                    <div class="video-progress-bar-wrap">
+                      <div class="video-progress-bar" id="videoProgressBar"></div>
+                    </div>
                   </div>
-                  <div class="img-ctrl-row">
-                    <span class="img-ctrl-label">Zoom</span>
-                    <input class="img-ctrl-slider" type="range" id="imgZoom" min="100" max="200" value="100" step="5">
-                    <span class="img-ctrl-val" id="imgZoomVal">1×</span>
+                  <div class="video-preview-wrap" id="anuncioVideoPreviewWrap">
+                    <video id="anuncioVideoPreview" controls muted></video>
+                    <button class="video-remove-btn" id="anuncioVideoRemove" title="Remover vídeo">✕</button>
                   </div>
                 </div>
               </div>
@@ -1171,7 +1256,8 @@ tbody tr:hover { background: var(--surface2); }
                 <div class="anuncio-modal-preview" id="anuncioPreviewCard">
                   <div class="anuncio-preview-close">✕</div>
                   <div class="anuncio-preview-img-wrap" id="prevImgWrap">
-                    <img id="prevImg" src="" alt="">
+                    <img id="prevImg" src="" alt="" style="object-position:50% 50%">
+                    <video id="prevVideo" src="" muted autoplay loop playsinline style="display:none;width:100%;height:100%;object-fit:cover;"></video>
                     <div class="anuncio-preview-btn-over" id="prevBtnOver" style="display:none">
                       <span class="btn-anuncio-cta" style="width:auto;padding:10px 20px;font-size:11px" id="prevBtnSobre">Vamos lá!</span>
                     </div>
@@ -1221,6 +1307,7 @@ tbody tr:hover { background: var(--surface2); }
     <button class="announcement-close" id="announcementClose">✕</button>
     <div class="announcement-img-zone" id="annImgZone">
       <img id="annImg" src="" alt="">
+      <video id="annVideo" src="" muted autoplay loop playsinline style="display:none;width:100%;height:100%;object-fit:cover;"></video>
       <div class="announcement-btn-float" id="annBtnFloat" style="display:none">
         <a class="btn-anuncio-cta" id="annBtnFloatLink" href="#" target="_blank" style="width:auto;padding:12px 28px">
           <span id="annBtnFloatTxt">Vamos lá!</span>
@@ -1311,7 +1398,7 @@ tbody tr:hover { background: var(--surface2); }
 //  As credenciais ficam nas env vars da Vercel.
 //  Arquivo da rota: /api/firebase-config.js
 // ══════════════════════════════════════════════
-let auth, db;
+let auth, db, storage;
 
 async function initFirebase() {
   try {
@@ -1320,8 +1407,9 @@ async function initFirebase() {
     const firebaseConfig = await res.json();
 
     firebase.initializeApp(firebaseConfig);
-    auth = firebase.auth();
-db   = firebase.firestore();
+    auth    = firebase.auth();
+db      = firebase.firestore();
+storage = firebase.storage();
 await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
     // Inicia os listeners de auth após o Firebase estar pronto
@@ -1953,11 +2041,13 @@ function showFeedback(el, msg, color) {
 //  ANÚNCIOS MODAIS
 // ══════════════════════════════════════════════
 let anuncioImgBase64 = '';
+let anuncioVideoUrl  = '';       // URL Firebase Storage
+let anuncioMediaType = 'img';    // 'img' | 'video'
 let anuncioDest      = 'todos';
 let anuncioBtnPos    = 'abaixo'; // 'abaixo' | 'sobreposto'
-let anuncioImgPosX   = 50;      // 0–100 %
-let anuncioImgPosY   = 50;      // 0–100 %
-let anuncioImgZoom   = 100;     // 100–200 %
+// Framing state
+let framePosX = 50, framePosY = 50, frameZoom = 100;
+let frameDragging = false, frameDragStartX, frameDragStartY, framePosXStart, framePosYStart;
 
 // ── Image upload
 /**
@@ -2026,11 +2116,18 @@ async function handleImgFile(file) {
   try {
     const b64 = await comprimirImagem(file);
     anuncioImgBase64 = b64;
-    document.getElementById('anuncioImgPreview').src = b64;
-    document.getElementById('anuncioImgPreviewWrap').style.display = 'block';
-    document.getElementById('imgControls').style.display = 'flex';
+    // Framing widget
+    const fw = document.getElementById('frameWidget');
+    const fi = document.getElementById('frameImg');
+    fi.src = b64;
+    fw.style.display = 'block';
     area.style.display = 'none';
     area.innerHTML = origHTML; // restaura para próxima vez
+    // reset frame state
+    framePosX = 50; framePosY = 50; frameZoom = 100;
+    applyFrameStyle();
+    document.getElementById('frameZoom').value = 100;
+    document.getElementById('frameZoomVal').textContent = '1×';
     syncPreview();
   } catch(err) {
     area.innerHTML = origHTML;
@@ -2055,19 +2152,165 @@ imgArea.addEventListener('drop', e => {
 
 document.getElementById('anuncioImgRemove').addEventListener('click', () => {
   anuncioImgBase64 = '';
-  document.getElementById('anuncioImgPreview').src = '';
-  document.getElementById('anuncioImgPreviewWrap').style.display = 'none';
-  document.getElementById('imgControls').style.display = 'none';
+  document.getElementById('frameImg').src = '';
+  document.getElementById('frameWidget').style.display = 'none';
   document.getElementById('anuncioImgArea').style.display = 'block';
   document.getElementById('anuncioImgInput').value = '';
-  // Reset sliders
-  anuncioImgPosX = 50; anuncioImgPosY = 50; anuncioImgZoom = 100;
-  document.getElementById('imgPosX').value = 50;
-  document.getElementById('imgPosY').value = 50;
-  document.getElementById('imgZoom').value = 100;
-  document.getElementById('imgPosXVal').textContent = '50%';
-  document.getElementById('imgPosYVal').textContent = '50%';
-  document.getElementById('imgZoomVal').textContent = '1×';
+  framePosX = 50; framePosY = 50; frameZoom = 100;
+  syncPreview();
+});
+
+// ── Media tab switch
+function switchMediaTab(tab) {
+  anuncioMediaType = tab;
+  document.getElementById('mediaPanelImg').style.display   = tab === 'img'   ? '' : 'none';
+  document.getElementById('mediaPanelVideo').style.display = tab === 'video' ? '' : 'none';
+  document.getElementById('tabImgBtn').classList.toggle('active',   tab === 'img');
+  document.getElementById('tabVideoBtn').classList.toggle('active',  tab === 'video');
+  // Clear other media when switching
+  if (tab === 'img') {
+    anuncioVideoUrl = '';
+    document.getElementById('anuncioVideoPreviewWrap').style.display = 'none';
+    document.getElementById('anuncioVideoArea').style.display = 'block';
+    document.getElementById('anuncioVideoProgress') && (document.getElementById('videoProgress').style.display = 'none');
+  } else {
+    anuncioImgBase64 = '';
+    document.getElementById('frameWidget').style.display = 'none';
+    document.getElementById('anuncioImgArea').style.display = 'block';
+  }
+  syncPreview();
+}
+
+// ── Framing widget: apply style
+function applyFrameStyle() {
+  const img = document.getElementById('frameImg');
+  if (!img) return;
+  const scale = frameZoom / 100;
+  img.style.objectPosition = `${framePosX}% ${framePosY}%`;
+  img.style.transform = scale > 1 ? `scale(${scale})` : '';
+  img.style.transformOrigin = `${framePosX}% ${framePosY}%`;
+  // Sync preview img too
+  const pv = document.getElementById('prevImg');
+  if (pv) {
+    pv.style.objectPosition = `${framePosX}% ${framePosY}%`;
+    pv.style.transform = scale > 1 ? `scale(${scale})` : '';
+    pv.style.transformOrigin = `${framePosX}% ${framePosY}%`;
+  }
+}
+
+// ── Framing widget: drag to reposition
+(function() {
+  const box = document.getElementById('frameBox');
+  const hint = document.getElementById('frameHint');
+  let hintHidden = false;
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  box.addEventListener('mousedown', e => {
+    frameDragging = true;
+    frameDragStartX = e.clientX;
+    frameDragStartY = e.clientY;
+    framePosXStart  = framePosX;
+    framePosYStart  = framePosY;
+    if (!hintHidden) { hint.style.opacity = '0'; hintHidden = true; }
+    e.preventDefault();
+  });
+
+  // Touch support
+  box.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    frameDragging = true;
+    frameDragStartX = t.clientX;
+    frameDragStartY = t.clientY;
+    framePosXStart  = framePosX;
+    framePosYStart  = framePosY;
+    if (!hintHidden) { hint.style.opacity = '0'; hintHidden = true; }
+  }, { passive: true });
+
+  function onMove(dx, dy) {
+    if (!frameDragging) return;
+    const rect = box.getBoundingClientRect();
+    const sensitivity = 120 / Math.max(frameZoom / 100, 1);
+    framePosX = clamp(framePosXStart - (dx / rect.width)  * sensitivity, 0, 100);
+    framePosY = clamp(framePosYStart - (dy / rect.height) * sensitivity, 0, 100);
+    applyFrameStyle();
+  }
+
+  document.addEventListener('mousemove', e => { if (frameDragging) onMove(e.clientX - frameDragStartX, e.clientY - frameDragStartY); });
+  document.addEventListener('mouseup',   () => { frameDragging = false; });
+  document.addEventListener('touchmove', e => {
+    const t = e.touches[0];
+    onMove(t.clientX - frameDragStartX, t.clientY - frameDragStartY);
+  }, { passive: true });
+  document.addEventListener('touchend', () => { frameDragging = false; });
+})();
+
+// ── Framing widget: zoom slider
+document.getElementById('frameZoom').addEventListener('input', function() {
+  frameZoom = Number(this.value);
+  document.getElementById('frameZoomVal').textContent = (frameZoom / 100).toFixed(2).replace('.00','') + '×';
+  applyFrameStyle();
+  syncPreview();
+});
+
+// ── Video upload
+document.getElementById('anuncioVideoInput').addEventListener('change', async function() {
+  const file = this.files[0];
+  if (!file) return;
+  if (file.size > 50 * 1024 * 1024) { alert('Vídeo muito grande. Máx. 50MB.'); return; }
+
+  const progress  = document.getElementById('videoProgress');
+  const bar       = document.getElementById('videoProgressBar');
+  const label     = document.getElementById('videoProgressLabel');
+  const previewW  = document.getElementById('anuncioVideoPreviewWrap');
+  const area      = document.getElementById('anuncioVideoArea');
+
+  progress.style.display = 'block';
+  area.style.display = 'none';
+  bar.style.width = '0%';
+  label.textContent = 'Enviando vídeo...';
+
+  try {
+    const ext  = file.name.split('.').pop();
+    const path = `anuncios/videos/${Date.now()}.${ext}`;
+    const ref  = storage.ref(path);
+    const task = ref.put(file);
+
+    task.on('state_changed',
+      snap => {
+        const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
+        bar.style.width = pct + '%';
+        label.textContent = `Enviando... ${pct}%`;
+      },
+      err => {
+        progress.style.display = 'none';
+        area.style.display = 'block';
+        alert('Erro ao enviar vídeo: ' + err.message);
+      },
+      async () => {
+        anuncioVideoUrl = await ref.getDownloadURL();
+        progress.style.display = 'none';
+        previewW.style.display = 'block';
+        const vid = document.getElementById('anuncioVideoPreview');
+        vid.src = anuncioVideoUrl;
+        vid.load();
+        syncPreview();
+        label.textContent = '✓ Enviado!';
+      }
+    );
+  } catch(e) {
+    progress.style.display = 'none';
+    area.style.display = 'block';
+    alert('Erro: ' + e.message);
+  }
+});
+
+document.getElementById('anuncioVideoRemove').addEventListener('click', () => {
+  anuncioVideoUrl = '';
+  document.getElementById('anuncioVideoPreview').src = '';
+  document.getElementById('anuncioVideoPreviewWrap').style.display = 'none';
+  document.getElementById('anuncioVideoArea').style.display = 'block';
+  document.getElementById('anuncioVideoInput').value = '';
   syncPreview();
 });
 
@@ -2090,55 +2333,46 @@ document.querySelectorAll('[data-anuncio-dest]').forEach(btn => {
   });
 });
 
-// ── Controles de posição e zoom da imagem
-function applyImgStyle(imgEl) {
-  if (!imgEl) return;
-  imgEl.style.objectPosition = `${anuncioImgPosX}% ${anuncioImgPosY}%`;
-  imgEl.style.transform = anuncioImgZoom > 100 ? `scale(${anuncioImgZoom / 100})` : '';
-}
-
-document.getElementById('imgPosX').addEventListener('input', function() {
-  anuncioImgPosX = Number(this.value);
-  document.getElementById('imgPosXVal').textContent = anuncioImgPosX + '%';
-  syncPreview();
-});
-document.getElementById('imgPosY').addEventListener('input', function() {
-  anuncioImgPosY = Number(this.value);
-  document.getElementById('imgPosYVal').textContent = anuncioImgPosY + '%';
-  syncPreview();
-});
-document.getElementById('imgZoom').addEventListener('input', function() {
-  anuncioImgZoom = Number(this.value);
-  document.getElementById('imgZoomVal').textContent = (anuncioImgZoom / 100).toFixed(2).replace('.00','') + '×';
-  syncPreview();
-});
-
 // ── Preview ao vivo
 function syncPreview() {
   const title  = document.getElementById('anuncioTitle').value || 'Título do anúncio';
   const msg    = document.getElementById('anuncioMsg').value   || 'A mensagem do seu anúncio aparecerá aqui de forma clara e objetiva.';
   const btnTxt = document.getElementById('anuncioBtnTexto').value || 'Vamos lá!';
 
-  document.getElementById('prevTitle').textContent   = title;
-  document.getElementById('prevMsg').textContent     = msg;
+  document.getElementById('prevTitle').textContent    = title;
+  document.getElementById('prevMsg').textContent      = msg;
   document.getElementById('prevBtnTexto').textContent = btnTxt;
   document.getElementById('prevBtnSobre').textContent  = btnTxt;
 
-  const imgWrap = document.getElementById('prevImgWrap');
-  if (anuncioImgBase64) {
+  const imgWrap  = document.getElementById('prevImgWrap');
+  const prevImg  = document.getElementById('prevImg');
+  const prevVid  = document.getElementById('prevVideo');
+  const hasMedia = anuncioImgBase64 || anuncioVideoUrl;
+
+  if (hasMedia) {
     imgWrap.style.display = 'block';
-    document.getElementById('prevImg').src = anuncioImgBase64;
-    applyImgStyle(document.getElementById('prevImg'));
+    if (anuncioImgBase64) {
+      prevImg.src          = anuncioImgBase64;
+      prevImg.style.display = '';
+      prevVid.style.display = 'none';
+      prevVid.src           = '';
+      applyFrameStyle();
+    } else {
+      prevVid.src           = anuncioVideoUrl;
+      prevVid.style.display = '';
+      prevImg.style.display = 'none';
+      prevImg.src           = '';
+    }
     if (anuncioBtnPos === 'sobreposto') {
-      document.getElementById('prevBtnOver').style.display  = 'flex';
+      document.getElementById('prevBtnOver').style.display   = 'flex';
       document.getElementById('prevBtnAbaixo').style.display = 'none';
     } else {
-      document.getElementById('prevBtnOver').style.display  = 'none';
+      document.getElementById('prevBtnOver').style.display   = 'none';
       document.getElementById('prevBtnAbaixo').style.display = '';
     }
   } else {
     imgWrap.style.display = 'none';
-    document.getElementById('prevBtnOver').style.display  = 'none';
+    document.getElementById('prevBtnOver').style.display   = 'none';
     document.getElementById('prevBtnAbaixo').style.display = '';
   }
 }
@@ -2154,8 +2388,8 @@ function openAnnouncementPreview() {
   const btnTxt = document.getElementById('anuncioBtnTexto').value || 'Vamos lá!';
   const btnUrl = document.getElementById('anuncioBtnUrl').value  || '#';
 
-  document.getElementById('annTitle').textContent       = title;
-  document.getElementById('annMsg').textContent         = msg;
+  document.getElementById('annTitle').textContent        = title;
+  document.getElementById('annMsg').textContent          = msg;
   document.getElementById('annBtnBottomTxt').textContent = btnTxt;
   document.getElementById('annBtnFloatTxt').textContent  = btnTxt;
   document.getElementById('annBtnBottom').href           = btnUrl || '#';
@@ -2164,11 +2398,28 @@ function openAnnouncementPreview() {
   const imgZone   = document.getElementById('annImgZone');
   const btnFloat  = document.getElementById('annBtnFloat');
   const btnBottom = document.getElementById('annBtnBottom');
+  const annImg    = document.getElementById('annImg');
+  const annVid    = document.getElementById('annVideo');
+  const hasMedia  = anuncioImgBase64 || anuncioVideoUrl;
 
-  if (anuncioImgBase64) {
+  if (hasMedia) {
     imgZone.style.display = 'block';
-    document.getElementById('annImg').src = anuncioImgBase64;
-    applyImgStyle(document.getElementById('annImg'));
+    if (anuncioImgBase64) {
+      annImg.src           = anuncioImgBase64;
+      annImg.style.display = '';
+      annVid.style.display = 'none';
+      annVid.src           = '';
+      // Apply framing
+      const scale = frameZoom / 100;
+      annImg.style.objectPosition  = `${framePosX}% ${framePosY}%`;
+      annImg.style.transform       = scale > 1 ? `scale(${scale})` : '';
+      annImg.style.transformOrigin = `${framePosX}% ${framePosY}%`;
+    } else {
+      annVid.src           = anuncioVideoUrl;
+      annVid.style.display = '';
+      annImg.style.display = 'none';
+      annImg.src           = '';
+    }
     if (anuncioBtnPos === 'sobreposto') {
       btnFloat.style.display  = 'flex';
       btnBottom.style.display = 'none';
@@ -2215,12 +2466,14 @@ document.getElementById('btnSaveAnuncio').addEventListener('click', async () => 
       titulo, mensagem,
       destinatario: anuncioDest,
       btnTexto: btnTexto || 'Vamos lá!',
-      btnUrl: btnUrl || '',
-      btnPos: anuncioBtnPos,
-      imagem: anuncioImgBase64 || '',
-      imgPosX: anuncioImgBase64 ? anuncioImgPosX : 50,
-      imgPosY: anuncioImgBase64 ? anuncioImgPosY : 50,
-      imgZoom: anuncioImgBase64 ? anuncioImgZoom : 100,
+      btnUrl:   btnUrl   || '',
+      btnPos:   anuncioBtnPos,
+      mediaType: anuncioMediaType,
+      imagem:    anuncioImgBase64 || '',
+      videoUrl:  anuncioVideoUrl  || '',
+      imgPosX:   anuncioImgBase64 ? framePosX  : 50,
+      imgPosY:   anuncioImgBase64 ? framePosY  : 50,
+      imgZoom:   anuncioImgBase64 ? frameZoom  : 100,
       ativo: true,
       criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
       criadoPor: auth.currentUser?.uid || ''
@@ -2229,11 +2482,23 @@ document.getElementById('btnSaveAnuncio').addEventListener('click', async () => 
     await db.collection('anunciosAG').add(payload);
 
     // Reset form
-    document.getElementById('anuncioTitle').value   = '';
-    document.getElementById('anuncioMsg').value     = '';
+    document.getElementById('anuncioTitle').value    = '';
+    document.getElementById('anuncioMsg').value      = '';
     document.getElementById('anuncioBtnTexto').value = 'Vamos lá!';
     document.getElementById('anuncioBtnUrl').value   = '';
-    document.getElementById('anuncioImgRemove').click(); // also resets sliders via its own handler
+    // Reset media
+    anuncioImgBase64 = ''; anuncioVideoUrl = '';
+    document.getElementById('frameImg').src = '';
+    document.getElementById('frameWidget').style.display = 'none';
+    document.getElementById('anuncioImgArea').style.display = 'block';
+    document.getElementById('anuncioVideoPreviewWrap').style.display = 'none';
+    document.getElementById('anuncioVideoArea').style.display = 'block';
+    document.getElementById('anuncioImgInput').value  = '';
+    document.getElementById('anuncioVideoInput').value = '';
+    framePosX = 50; framePosY = 50; frameZoom = 100;
+    document.getElementById('frameZoom').value = 100;
+    document.getElementById('frameZoomVal').textContent = '1×';
+    switchMediaTab('img');
     syncPreview();
 
     showFeedback(fb, '✓ Anúncio publicado!', 'var(--success)');
