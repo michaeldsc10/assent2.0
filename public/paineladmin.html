@@ -556,6 +556,205 @@ tbody tr:hover { background: var(--surface2); }
 }
 
 /* ════════════════════════════════════════
+   ANÚNCIOS MODAIS
+════════════════════════════════════════ */
+.anuncio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+.anuncio-composer {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 28px;
+}
+.anuncio-preview-wrap {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 28px; position: sticky; top: 80px;
+}
+.preview-label {
+  font-size: 9px; letter-spacing: 2px; color: var(--text3);
+  text-transform: uppercase; font-family: 'IBM Plex Mono', monospace;
+  margin-bottom: 16px;
+}
+.anuncio-preview-frame {
+  background: rgba(0,0,0,0.4); border-radius: 10px;
+  padding: 20px; display: flex; align-items: center; justify-content: center;
+  min-height: 300px; position: relative;
+}
+.anuncio-modal-preview {
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: 16px; width: 100%; max-width: 340px;
+  overflow: hidden; position: relative;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.anuncio-modal-preview::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+.anuncio-preview-img-wrap {
+  width: 100%; background: var(--surface3);
+  display: none; position: relative; max-height: 180px; overflow: hidden;
+}
+.anuncio-preview-img-wrap img {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.anuncio-preview-btn-over {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.35);
+}
+.anuncio-preview-content {
+  padding: 22px 20px 20px;
+}
+.anuncio-preview-title {
+  font-size: 15px; font-weight: 700; color: var(--text);
+  margin-bottom: 8px; line-height: 1.3;
+}
+.anuncio-preview-msg {
+  font-size: 12px; color: var(--text2); line-height: 1.55; margin-bottom: 18px;
+}
+.anuncio-preview-close {
+  position: absolute; top: 10px; right: 10px;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--surface3); border: 1px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--text2); cursor: pointer;
+}
+/* O botão bonitinho do anúncio */
+.btn-anuncio-cta {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; padding: 13px 20px;
+  background: linear-gradient(135deg, var(--gold-dark) 0%, var(--gold) 60%, var(--gold-light) 100%);
+  border: none; border-radius: 10px;
+  color: #050505; font-family: 'Syne', sans-serif;
+  font-size: 13px; font-weight: 700; letter-spacing: 1.5px;
+  cursor: pointer; transition: all .25s;
+  text-decoration: none; text-transform: uppercase;
+  box-shadow: 0 4px 20px rgba(212,175,55,0.35), 0 1px 0 rgba(255,255,255,0.15) inset;
+  position: relative; overflow: hidden;
+}
+.btn-anuncio-cta::before {
+  content: '';
+  position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+  transform: skewX(-20deg); transition: left .5s;
+}
+.btn-anuncio-cta:hover::before { left: 160%; }
+.btn-anuncio-cta:hover {
+  box-shadow: 0 6px 28px rgba(212,175,55,0.5), 0 1px 0 rgba(255,255,255,0.2) inset;
+  transform: translateY(-1px);
+}
+/* Upload de imagem */
+.img-upload-area {
+  border: 2px dashed var(--border2); border-radius: 10px;
+  padding: 24px 16px; text-align: center; cursor: pointer;
+  transition: border-color .2s, background .2s;
+  position: relative;
+}
+.img-upload-area:hover, .img-upload-area.drag-over {
+  border-color: var(--gold); background: var(--gold-glow);
+}
+.img-upload-area input[type=file] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.img-upload-icon { font-size: 28px; margin-bottom: 8px; }
+.img-upload-label { font-size: 12px; color: var(--text2); }
+.img-upload-sub { font-size: 10px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; margin-top: 4px; }
+.img-thumb-wrap { position: relative; display: inline-block; }
+.img-thumb { width: 100%; max-height: 140px; object-fit: cover; border-radius: 8px; }
+.img-remove-btn {
+  position: absolute; top: -8px; right: -8px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--danger); border: none; color: #fff;
+  font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+/* Lista de anúncios */
+.anuncio-list { margin-top: 20px; }
+.anuncio-item {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 18px 20px;
+  display: flex; align-items: center; gap: 16px; margin-bottom: 10px;
+  transition: border-color .2s;
+}
+.anuncio-item:hover { border-color: var(--border2); }
+.anuncio-item-thumb {
+  width: 52px; height: 52px; border-radius: 8px;
+  background: var(--surface2); border: 1px solid var(--border);
+  flex-shrink: 0; overflow: hidden; display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: var(--text3);
+}
+.anuncio-item-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.anuncio-item-info { flex: 1; min-width: 0; }
+.anuncio-item-title { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.anuncio-item-msg { font-size: 11px; color: var(--text2); margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.anuncio-item-meta { font-size: 10px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; margin-top: 5px; }
+.anuncio-item-actions { display: flex; gap: 8px; flex-shrink: 0; }
+.toggle-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 20px; font-size: 10px; font-weight: 700;
+  font-family: 'IBM Plex Mono', monospace; cursor: pointer; border: 1.5px solid;
+  transition: all .15s; letter-spacing: 1px;
+}
+.toggle-pill.ativo { color: var(--success); border-color: rgba(34,197,94,.3); background: rgba(34,197,94,.08); }
+.toggle-pill.inativo { color: var(--text3); border-color: var(--border2); background: transparent; }
+.btn-icon-sm {
+  width: 30px; height: 30px; border-radius: 7px;
+  border: 1px solid var(--border2); background: transparent;
+  color: var(--text2); cursor: pointer; display: flex; align-items: center;
+  justify-content: center; font-size: 13px; transition: all .15s;
+}
+.btn-icon-sm:hover { border-color: var(--danger); color: var(--danger); background: rgba(239,68,68,0.08); }
+
+/* ════════════════════════════════════════
+   ANNOUNCEMENT MODAL (shown to end users)
+════════════════════════════════════════ */
+#announcementModal {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.75); backdrop-filter: blur(10px);
+  z-index: 500; align-items: center; justify-content: center;
+  animation: fadeBg .3s ease;
+}
+#announcementModal.open { display: flex; }
+@keyframes fadeBg { from { opacity: 0; } to { opacity: 1; } }
+.announcement-box {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 20px; width: 440px; max-width: 94vw;
+  overflow: hidden; position: relative;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(212,175,55,0.1);
+  animation: slideUp .35s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(28px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.announcement-box::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent 0%, var(--gold) 50%, transparent 100%);
+}
+.announcement-img-zone {
+  width: 100%; max-height: 220px; overflow: hidden; display: none; position: relative;
+}
+.announcement-img-zone img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.announcement-img-zone .announcement-btn-float {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.4);
+}
+.announcement-content { padding: 28px 28px 24px; }
+.announcement-title {
+  font-size: 19px; font-weight: 800; color: var(--text);
+  line-height: 1.25; margin-bottom: 10px;
+}
+.announcement-msg {
+  font-size: 14px; color: var(--text2); line-height: 1.6; margin-bottom: 24px;
+}
+.announcement-close {
+  position: absolute; top: 12px; right: 14px;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: rgba(255,255,255,0.07); border: 1px solid var(--border2);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; color: var(--text2); transition: all .2s; z-index: 2;
+}
+.announcement-close:hover { background: rgba(255,255,255,0.14); color: var(--text); border-color: var(--gold); }
+
+/* ════════════════════════════════════════
    RESPONSIVE
 ════════════════════════════════════════ */
 @media (max-width: 1280px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -647,6 +846,15 @@ tbody tr:hover { background: var(--surface2); }
             <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
           </svg>
           <span>Notificações</span>
+        </div>
+
+        <div class="nav-item" data-view="anuncios">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <rect x="2" y="7" width="20" height="14" rx="2"/>
+            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/>
+            <line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/>
+          </svg>
+          <span>Anúncios</span>
         </div>
       </nav>
 
@@ -838,10 +1046,152 @@ tbody tr:hover { background: var(--surface2); }
           </div>
         </div>
 
+        <!-- ───── ANÚNCIOS MODAIS ───── -->
+        <div class="view" id="view-anuncios">
+
+          <div class="anuncio-grid">
+
+            <!-- Composer -->
+            <div class="anuncio-composer">
+              <div class="card-title" style="margin-bottom:6px">Criar Anúncio Modal</div>
+              <div style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-bottom:22px;letter-spacing:.5px">
+                Exibido automaticamente ao cliente entrar no sistema
+              </div>
+
+              <div class="field-group" style="margin-bottom:16px">
+                <div class="field-label">Título</div>
+                <input class="field-input" id="anuncioTitle" type="text" placeholder="Ex: Nova funcionalidade disponível! 🚀">
+              </div>
+
+              <div class="field-group" style="margin-bottom:16px">
+                <div class="field-label">Mensagem</div>
+                <textarea class="field-input field-textarea" id="anuncioMsg" placeholder="Descreva o anúncio de forma clara e objetiva..."></textarea>
+              </div>
+
+              <div class="field-group" style="margin-bottom:16px">
+                <div class="field-label">Imagem <span style="color:var(--text3);font-weight:400">(opcional)</span></div>
+                <div id="anuncioImgArea" class="img-upload-area">
+                  <input type="file" id="anuncioImgInput" accept="image/jpeg,image/png,image/gif,image/webp">
+                  <div class="img-upload-icon">🖼</div>
+                  <div class="img-upload-label">Clique ou arraste uma imagem</div>
+                  <div class="img-upload-sub">JPG, PNG, WebP — máx. 800KB recomendado</div>
+                </div>
+                <div id="anuncioImgPreviewWrap" style="display:none; margin-top:10px">
+                  <div class="img-thumb-wrap" style="width:100%">
+                    <img id="anuncioImgPreview" class="img-thumb" src="" alt="preview">
+                    <button class="img-remove-btn" id="anuncioImgRemove" title="Remover imagem">✕</button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="field-group" style="margin-bottom:16px" id="anuncioBtnPosGroup">
+                <div class="field-label">Posição do botão com imagem</div>
+                <div style="display:flex;gap:8px">
+                  <button class="dest-btn active" data-pos="abaixo" id="posBaixo">⬇ Abaixo da imagem</button>
+                  <button class="dest-btn" data-pos="sobreposto" id="posSobre">📌 Sobre a imagem</button>
+                </div>
+              </div>
+
+              <div class="form-2col" style="margin-bottom:20px">
+                <div class="field-group">
+                  <div class="field-label">Texto do Botão</div>
+                  <input class="field-input" id="anuncioBtnTexto" type="text" placeholder="Ex: Vamos lá!" value="Vamos lá!">
+                </div>
+                <div class="field-group">
+                  <div class="field-label">URL do Botão <span style="color:var(--text3);font-weight:400">(opcional)</span></div>
+                  <input class="field-input" id="anuncioBtnUrl" type="url" placeholder="https://...">
+                </div>
+              </div>
+
+              <div class="field-group" style="margin-bottom:22px">
+                <div class="field-label">Destinatários</div>
+                <div class="dest-row" style="margin-bottom:0">
+                  <button class="dest-btn active" data-anuncio-dest="todos">📢 Todos</button>
+                  <button class="dest-btn" data-anuncio-dest="pro">⭐ Apenas PRO</button>
+                  <button class="dest-btn" data-anuncio-dest="free">👤 Apenas Free</button>
+                </div>
+              </div>
+
+              <div style="display:flex;align-items:center;gap:12px">
+                <button class="btn-primary" id="btnSaveAnuncio">Publicar Anúncio</button>
+                <span class="feedback-msg" id="anuncioFeedback"></span>
+              </div>
+            </div>
+
+            <!-- Preview -->
+            <div class="anuncio-preview-wrap">
+              <div class="preview-label">Pré-visualização ao vivo</div>
+              <div class="anuncio-preview-frame">
+                <div class="anuncio-modal-preview" id="anuncioPreviewCard">
+                  <div class="anuncio-preview-close">✕</div>
+                  <div class="anuncio-preview-img-wrap" id="prevImgWrap">
+                    <img id="prevImg" src="" alt="">
+                    <div class="anuncio-preview-btn-over" id="prevBtnOver" style="display:none">
+                      <span class="btn-anuncio-cta" style="width:auto;padding:10px 20px;font-size:11px" id="prevBtnSobre">Vamos lá!</span>
+                    </div>
+                  </div>
+                  <div class="anuncio-preview-content">
+                    <div class="anuncio-preview-title" id="prevTitle">Título do anúncio</div>
+                    <div class="anuncio-preview-msg" id="prevMsg">A mensagem do seu anúncio aparecerá aqui de forma clara e objetiva para o cliente.</div>
+                    <button class="btn-anuncio-cta" id="prevBtnAbaixo">
+                      <span id="prevBtnTexto">Vamos lá!</span>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div style="text-align:center;margin-top:14px">
+                <button onclick="openAnnouncementPreview()" style="
+                  background:none; border:1px solid var(--gold-border); border-radius:8px;
+                  color:var(--gold); font-family:'Syne',sans-serif; font-size:11px; font-weight:600;
+                  padding:7px 16px; cursor:pointer; letter-spacing:1px;
+                  transition:background .15s; text-transform:uppercase;
+                " onmouseover="this.style.background='var(--gold-glow)'" onmouseout="this.style.background='none'">
+                  👁 Ver modal em tamanho real
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Lista de anúncios -->
+          <div style="margin-top:24px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+              <div class="card-title">Anúncios Publicados</div>
+              <span style="font-size:10px;color:var(--text3);font-family:'IBM Plex Mono',monospace">Apenas 1 ativo por vez · o mais recente é exibido</span>
+            </div>
+            <div id="anuncioList"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+          </div>
+        </div>
+
       </div><!-- /content-area -->
     </div><!-- /mainContent -->
   </div><!-- /app-layout -->
 </div><!-- /mainApp -->
+
+<!-- ANNOUNCEMENT PREVIEW MODAL (admin) -->
+<div id="announcementModal">
+  <div class="announcement-box">
+    <button class="announcement-close" id="announcementClose">✕</button>
+    <div class="announcement-img-zone" id="annImgZone">
+      <img id="annImg" src="" alt="">
+      <div class="announcement-btn-float" id="annBtnFloat" style="display:none">
+        <a class="btn-anuncio-cta" id="annBtnFloatLink" href="#" target="_blank" style="width:auto;padding:12px 28px">
+          <span id="annBtnFloatTxt">Vamos lá!</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </a>
+      </div>
+    </div>
+    <div class="announcement-content">
+      <div class="announcement-title" id="annTitle">Título</div>
+      <div class="announcement-msg" id="annMsg">Mensagem</div>
+      <a class="btn-anuncio-cta" id="annBtnBottom" href="#" target="_blank">
+        <span id="annBtnBottomTxt">Vamos lá!</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+      </a>
+    </div>
+  </div>
+</div>
 
 <!-- MEMBER MODAL -->
 <div id="memberModal">
@@ -970,7 +1320,7 @@ document.getElementById('themeBtn').addEventListener('click', () => {
 // ══════════════════════════════════════════════
 //  NAVEGAÇÃO
 // ══════════════════════════════════════════════
-const viewLabels = { dashboard:'Dashboard', members:'Membros', expro:'Ex-PRO — Recuperação', notifications:'Notificações' };
+const viewLabels = { dashboard:'Dashboard', members:'Membros', expro:'Ex-PRO — Recuperação', notifications:'Notificações', anuncios:'Anúncios Modais' };
 document.querySelectorAll('.nav-item[data-view]').forEach(item => {
   item.addEventListener('click', () => {
     document.querySelectorAll('.nav-item[data-view]').forEach(n => n.classList.remove('active'));
@@ -1085,6 +1435,7 @@ function enterApp(user) {
   document.getElementById('userAvatar').textContent = name[0].toUpperCase();
   loadAllMembers();
   loadNotifications();
+  loadAnuncios();
 }
 
 document.getElementById('btnLogout').addEventListener('click', async () => {
@@ -1550,6 +1901,270 @@ document.getElementById('btnSendNotif').addEventListener('click', async () => {
 function showFeedback(el, msg, color) {
   el.textContent = msg; el.style.color = color; el.style.display = 'inline';
   setTimeout(() => { el.style.display = 'none'; }, 3500);
+}
+
+// ══════════════════════════════════════════════
+//  ANÚNCIOS MODAIS
+// ══════════════════════════════════════════════
+let anuncioImgBase64 = '';
+let anuncioDest      = 'todos';
+let anuncioBtnPos    = 'abaixo'; // 'abaixo' | 'sobreposto'
+
+// ── Image upload
+document.getElementById('anuncioImgInput').addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    alert('Imagem muito grande. Use até 2MB.');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    anuncioImgBase64 = e.target.result;
+    document.getElementById('anuncioImgPreview').src = anuncioImgBase64;
+    document.getElementById('anuncioImgPreviewWrap').style.display = 'block';
+    document.getElementById('anuncioImgArea').style.display = 'none';
+    syncPreview();
+  };
+  reader.readAsDataURL(file);
+});
+
+// Drag & drop
+const imgArea = document.getElementById('anuncioImgArea');
+imgArea.addEventListener('dragover', e => { e.preventDefault(); imgArea.classList.add('drag-over'); });
+imgArea.addEventListener('dragleave', () => imgArea.classList.remove('drag-over'));
+imgArea.addEventListener('drop', e => {
+  e.preventDefault(); imgArea.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) {
+    document.getElementById('anuncioImgInput').files;
+    const dt = new DataTransfer(); dt.items.add(file);
+    document.getElementById('anuncioImgInput').files = dt.files;
+    document.getElementById('anuncioImgInput').dispatchEvent(new Event('change'));
+  }
+});
+
+document.getElementById('anuncioImgRemove').addEventListener('click', () => {
+  anuncioImgBase64 = '';
+  document.getElementById('anuncioImgPreview').src = '';
+  document.getElementById('anuncioImgPreviewWrap').style.display = 'none';
+  document.getElementById('anuncioImgArea').style.display = 'block';
+  document.getElementById('anuncioImgInput').value = '';
+  syncPreview();
+});
+
+// ── Posição botão
+document.querySelectorAll('[data-pos]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-pos]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    anuncioBtnPos = btn.dataset.pos;
+    syncPreview();
+  });
+});
+
+// ── Destinatários anúncio
+document.querySelectorAll('[data-anuncio-dest]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('[data-anuncio-dest]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    anuncioDest = btn.dataset.anuncioDest;
+  });
+});
+
+// ── Preview ao vivo
+function syncPreview() {
+  const title  = document.getElementById('anuncioTitle').value || 'Título do anúncio';
+  const msg    = document.getElementById('anuncioMsg').value   || 'A mensagem do seu anúncio aparecerá aqui de forma clara e objetiva.';
+  const btnTxt = document.getElementById('anuncioBtnTexto').value || 'Vamos lá!';
+
+  document.getElementById('prevTitle').textContent   = title;
+  document.getElementById('prevMsg').textContent     = msg;
+  document.getElementById('prevBtnTexto').textContent = btnTxt;
+  document.getElementById('prevBtnSobre').textContent  = btnTxt;
+
+  const imgWrap = document.getElementById('prevImgWrap');
+  if (anuncioImgBase64) {
+    imgWrap.style.display = 'block';
+    document.getElementById('prevImg').src = anuncioImgBase64;
+    if (anuncioBtnPos === 'sobreposto') {
+      document.getElementById('prevBtnOver').style.display  = 'flex';
+      document.getElementById('prevBtnAbaixo').style.display = 'none';
+    } else {
+      document.getElementById('prevBtnOver').style.display  = 'none';
+      document.getElementById('prevBtnAbaixo').style.display = '';
+    }
+  } else {
+    imgWrap.style.display = 'none';
+    document.getElementById('prevBtnOver').style.display  = 'none';
+    document.getElementById('prevBtnAbaixo').style.display = '';
+  }
+}
+
+['anuncioTitle','anuncioMsg','anuncioBtnTexto'].forEach(id => {
+  document.getElementById(id).addEventListener('input', syncPreview);
+});
+
+// ── Preview modal tamanho real
+function openAnnouncementPreview() {
+  const title  = document.getElementById('anuncioTitle').value  || 'Título do anúncio';
+  const msg    = document.getElementById('anuncioMsg').value    || 'A mensagem do seu anúncio aparecerá aqui.';
+  const btnTxt = document.getElementById('anuncioBtnTexto').value || 'Vamos lá!';
+  const btnUrl = document.getElementById('anuncioBtnUrl').value  || '#';
+
+  document.getElementById('annTitle').textContent       = title;
+  document.getElementById('annMsg').textContent         = msg;
+  document.getElementById('annBtnBottomTxt').textContent = btnTxt;
+  document.getElementById('annBtnFloatTxt').textContent  = btnTxt;
+  document.getElementById('annBtnBottom').href           = btnUrl || '#';
+  document.getElementById('annBtnFloatLink').href        = btnUrl || '#';
+
+  const imgZone   = document.getElementById('annImgZone');
+  const btnFloat  = document.getElementById('annBtnFloat');
+  const btnBottom = document.getElementById('annBtnBottom');
+
+  if (anuncioImgBase64) {
+    imgZone.style.display = 'block';
+    document.getElementById('annImg').src = anuncioImgBase64;
+    if (anuncioBtnPos === 'sobreposto') {
+      btnFloat.style.display  = 'flex';
+      btnBottom.style.display = 'none';
+    } else {
+      btnFloat.style.display  = 'none';
+      btnBottom.style.display = '';
+    }
+  } else {
+    imgZone.style.display   = 'none';
+    btnFloat.style.display  = 'none';
+    btnBottom.style.display = '';
+  }
+
+  document.getElementById('announcementModal').classList.add('open');
+}
+
+document.getElementById('announcementClose').addEventListener('click', () => {
+  document.getElementById('announcementModal').classList.remove('open');
+});
+document.getElementById('announcementModal').addEventListener('click', e => {
+  if (e.target.id === 'announcementModal') document.getElementById('announcementModal').classList.remove('open');
+});
+
+// ── Salvar anúncio no Firestore
+document.getElementById('btnSaveAnuncio').addEventListener('click', async () => {
+  const titulo  = document.getElementById('anuncioTitle').value.trim();
+  const mensagem = document.getElementById('anuncioMsg').value.trim();
+  const btnTexto = document.getElementById('anuncioBtnTexto').value.trim();
+  const btnUrl   = document.getElementById('anuncioBtnUrl').value.trim();
+  const fb       = document.getElementById('anuncioFeedback');
+
+  if (!titulo || !mensagem) {
+    showFeedback(fb, 'Preencha título e mensagem.', 'var(--danger)'); return;
+  }
+  if (btnUrl && !btnUrl.startsWith('http')) {
+    showFeedback(fb, 'URL inválida. Use https://...', 'var(--danger)'); return;
+  }
+
+  const btn = document.getElementById('btnSaveAnuncio');
+  btn.textContent = 'Publicando...'; btn.disabled = true;
+
+  try {
+    const payload = {
+      titulo, mensagem,
+      destinatario: anuncioDest,
+      btnTexto: btnTexto || 'Vamos lá!',
+      btnUrl: btnUrl || '',
+      btnPos: anuncioBtnPos,
+      imagem: anuncioImgBase64 || '',
+      ativo: true,
+      criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+      criadoPor: auth.currentUser?.uid || ''
+    };
+
+    await db.collection('anunciosAG').add(payload);
+
+    // Reset form
+    document.getElementById('anuncioTitle').value   = '';
+    document.getElementById('anuncioMsg').value     = '';
+    document.getElementById('anuncioBtnTexto').value = 'Vamos lá!';
+    document.getElementById('anuncioBtnUrl').value   = '';
+    document.getElementById('anuncioImgRemove').click();
+    syncPreview();
+
+    showFeedback(fb, '✓ Anúncio publicado!', 'var(--success)');
+    loadAnuncios();
+  } catch(e) {
+    showFeedback(fb, 'Erro ao publicar.', 'var(--danger)');
+    console.error(e);
+  } finally {
+    btn.textContent = 'Publicar Anúncio'; btn.disabled = false;
+  }
+});
+
+// ── Carregar lista de anúncios
+async function loadAnuncios() {
+  const container = document.getElementById('anuncioList');
+  try {
+    const snap = await db.collection('anunciosAG').orderBy('criadoEm','desc').get();
+    if (snap.empty) {
+      container.innerHTML = '<div class="empty">Nenhum anúncio criado ainda.</div>';
+      return;
+    }
+
+    const destLabel = { todos:'📢 Todos', pro:'⭐ PRO', free:'👤 Free' };
+    container.innerHTML = snap.docs.map(doc => {
+      const d  = doc.data();
+      const id = doc.id;
+      const dt = d.criadoEm?.toDate ? fmtDate(d.criadoEm.toDate()) : '—';
+      const ativo = d.ativo !== false;
+      return `
+        <div class="anuncio-item" id="anuncio-${id}">
+          <div class="anuncio-item-thumb">
+            ${d.imagem ? `<img src="${d.imagem}" alt="">` : '📢'}
+          </div>
+          <div class="anuncio-item-info">
+            <div class="anuncio-item-title">${esc(d.titulo)}</div>
+            <div class="anuncio-item-msg">${esc(d.mensagem)}</div>
+            <div class="anuncio-item-meta">${dt} · ${destLabel[d.destinatario]||'Todos'} · Botão: "${esc(d.btnTexto||'Vamos lá!')}"</div>
+          </div>
+          <div class="anuncio-item-actions">
+            <button class="toggle-pill ${ativo ? 'ativo':'inativo'}"
+              onclick="toggleAnuncio('${id}', ${ativo})">
+              ${ativo ? '● Ativo':'○ Inativo'}
+            </button>
+            <button class="btn-icon-sm" onclick="deleteAnuncio('${id}')" title="Excluir">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3,6 5,6 21,6"/><path d="M19,6v14a2,2,0,0,1-2,2H7a2,2,0,0,1-2-2V6m3,0V4a1,1,0,0,1,1-1h4a1,1,0,0,1,1,1v2"/>
+              </svg>
+            </button>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    container.innerHTML = '<div class="empty">Erro ao carregar anúncios.</div>';
+    console.error(e);
+  }
+}
+
+async function toggleAnuncio(id, currentAtivo) {
+  try {
+    await db.collection('anunciosAG').doc(id).update({ ativo: !currentAtivo });
+    loadAnuncios();
+  } catch(e) { alert('Erro ao atualizar status.'); }
+}
+
+function deleteAnuncio(id) {
+  showConfirm({
+    title: 'Excluir anúncio?',
+    msg: 'O anúncio será removido permanentemente e não aparecerá mais para nenhum usuário.',
+    icon: '🗑',
+    okLabel: 'Excluir',
+    onOk: async () => {
+      try {
+        await db.collection('anunciosAG').doc(id).delete();
+        loadAnuncios();
+      } catch(e) { alert('Erro ao excluir.'); }
+    }
+  });
 }
 
 // ══════════════════════════════════════════════
