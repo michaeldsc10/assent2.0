@@ -23,7 +23,7 @@ function AppShell() {
 
   /* Determina o plano do usuário para filtrar destinatários do anúncio.
      Ajuste a lógica conforme o campo que indica PRO no seu AuthContext.
-     Exemplos: cargo === "pro", licencas?.pro === true, etc. */
+     Exemplos: cargo === "pro", licenca?.pro === true, etc. */
   const userPlan = cargo === "pro" ? "pro" : "free";
 
   if (loading) {
