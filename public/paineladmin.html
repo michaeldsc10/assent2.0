@@ -806,6 +806,106 @@ tbody tr:hover { background: var(--surface2); }
   font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center;
   box-shadow: 0 2px 6px rgba(0,0,0,0.4);
 }
+/* ════════════════════════════════════════
+   BUSCA LOCAL (dentro de abas)
+════════════════════════════════════════ */
+.local-search-wrap {
+  position: relative; flex: 1; max-width: 320px;
+}
+.local-search-wrap svg {
+  position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  color: var(--text3); pointer-events: none;
+}
+.local-search-input {
+  width: 100%; padding: 8px 12px 8px 34px;
+  background: var(--surface2); border: 1px solid var(--border2);
+  border-radius: 8px; color: var(--text);
+  font-family: 'Syne', sans-serif; font-size: 13px;
+  outline: none; transition: border-color .2s, box-shadow .2s;
+}
+.local-search-input:focus {
+  border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold-glow);
+}
+
+/* ════════════════════════════════════════
+   LOGS — LISTA DE MEMBROS
+════════════════════════════════════════ */
+.logs-member-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+  transition: background .12s;
+}
+.logs-member-row:last-child { border-bottom: none; }
+.logs-member-row:hover { background: var(--surface2); }
+.logs-member-info { flex: 1; min-width: 0; }
+.btn-log-access {
+  padding: 6px 14px; border-radius: 7px;
+  background: var(--gold-glow); border: 1px solid var(--gold-border);
+  color: var(--gold); font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; font-weight: 700; letter-spacing: 1px;
+  cursor: pointer; text-transform: uppercase;
+  transition: background .15s, border-color .15s;
+  flex-shrink: 0;
+}
+.btn-log-access:hover { background: rgba(212,175,55,0.22); border-color: var(--gold); }
+
+/* ════════════════════════════════════════
+   MODAL DE LOG
+════════════════════════════════════════ */
+#logModal {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.75); backdrop-filter: blur(8px);
+  z-index: 300; align-items: flex-start; justify-content: center;
+  padding: 40px 16px;
+}
+#logModal.open { display: flex; }
+.log-modal-box {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 18px; width: 100%; max-width: 720px;
+  max-height: calc(100vh - 80px);
+  display: flex; flex-direction: column;
+  box-shadow: 0 32px 80px rgba(0,0,0,.5); position: relative; overflow: hidden;
+}
+.log-modal-box::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+.log-modal-head {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px; flex-shrink: 0;
+}
+.log-modal-title { font-size: 15px; font-weight: 700; flex: 1; }
+.log-modal-close {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--surface2); border: 1px solid var(--border2);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; color: var(--text2); transition: all .15s;
+}
+.log-modal-close:hover { border-color: var(--gold); color: var(--text); }
+.log-modal-search { padding: 14px 24px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.log-modal-body { flex: 1; overflow-y: auto; padding: 0; }
+.log-entry {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: 13px 24px; border-bottom: 1px solid var(--border);
+  transition: background .1s;
+}
+.log-entry:hover { background: var(--surface2); }
+.log-entry:last-child { border-bottom: none; }
+.log-time {
+  font-size: 10px; font-family: 'IBM Plex Mono', monospace;
+  color: var(--text3); white-space: nowrap; padding-top: 2px; flex-shrink: 0; min-width: 120px;
+}
+.log-modulo {
+  font-size: 9px; font-family: 'IBM Plex Mono', monospace;
+  padding: 2px 7px; border-radius: 4px; letter-spacing: 1px;
+  font-weight: 700; flex-shrink: 0; align-self: flex-start; margin-top: 1px;
+  text-transform: uppercase;
+}
+.log-acao { font-size: 13px; font-weight: 500; }
+.log-detalhe { font-size: 11px; color: var(--text2); margin-top: 3px; font-family: 'IBM Plex Mono', monospace; }
+.log-empty { text-align: center; padding: 60px 20px; color: var(--text3); font-size: 12px; font-family: 'IBM Plex Mono', monospace; }
+
 /* Lista de anúncios */
 .anuncio-list { margin-top: 20px; }
 .anuncio-item {
@@ -997,6 +1097,17 @@ tbody tr:hover { background: var(--surface2); }
           </svg>
           <span>Anúncios</span>
         </div>
+
+        <div class="nav-item" data-view="logs">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14,2 14,8 20,8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+            <line x1="10" y1="9" x2="8" y2="9"/>
+          </svg>
+          <span>Logs</span>
+        </div>
       </nav>
 
       <div class="sidebar-bottom">
@@ -1101,10 +1212,19 @@ tbody tr:hover { background: var(--surface2); }
           <div class="table-card">
             <div class="table-card-header">
               <div class="card-title">Todos os Membros</div>
-              <div class="filter-pills">
-                <button class="filter-pill active" data-filter="all">Todos</button>
-                <button class="filter-pill" data-filter="pro">PRO</button>
-                <button class="filter-pill" data-filter="free">Free</button>
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                <!-- Busca local dentro da aba Membros -->
+                <div class="local-search-wrap">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  <input class="local-search-input" id="membersSearch" type="text" placeholder="Buscar por nome, email ou empresa...">
+                </div>
+                <div class="filter-pills">
+                  <button class="filter-pill active" data-filter="all">Todos</button>
+                  <button class="filter-pill" data-filter="pro">PRO</button>
+                  <button class="filter-pill" data-filter="free">Free</button>
+                </div>
               </div>
             </div>
             <div id="membersTable"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
@@ -1349,10 +1469,50 @@ tbody tr:hover { background: var(--surface2); }
           </div>
         </div>
 
+        <!-- ───── LOGS ───── -->
+        <div class="view" id="view-logs">
+          <div class="table-card">
+            <div class="table-card-header">
+              <div class="card-title">Logs por Cliente</div>
+              <div class="local-search-wrap">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input class="local-search-input" id="logsSearch" type="text" placeholder="Buscar cliente...">
+              </div>
+            </div>
+            <div id="logsMemberList"><div class="loading"><div class="spinner"></div>Carregando...</div></div>
+          </div>
+        </div>
+
       </div><!-- /content-area -->
     </div><!-- /mainContent -->
   </div><!-- /app-layout -->
 </div><!-- /mainApp -->
+
+<!-- LOG MODAL -->
+<div id="logModal">
+  <div class="log-modal-box">
+    <div class="log-modal-head">
+      <div>
+        <div class="log-modal-title" id="logModalTitle">—</div>
+        <div style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-top:3px" id="logModalEmail"></div>
+      </div>
+      <button class="log-modal-close" id="logModalClose">✕</button>
+    </div>
+    <div class="log-modal-search">
+      <div class="local-search-wrap" style="max-width:100%">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input class="local-search-input" id="logEntrySearch" type="text" placeholder="Buscar nos logs (ação, módulo, detalhe)...">
+      </div>
+    </div>
+    <div class="log-modal-body" id="logModalBody">
+      <div class="log-empty">Selecione um cliente para ver os logs.</div>
+    </div>
+  </div>
+</div>
 
 <!-- ANNOUNCEMENT PREVIEW MODAL (admin) -->
 <div id="announcementModal">
@@ -1496,6 +1656,8 @@ let allMembers      = [];
 let timeDays        = 30;   // 0 = tudo
 let memberFilter    = 'all';
 let searchQ         = '';
+let membersLocalSearch = '';
+let logsSearch      = '';
 let chartPeriodMo   = 6;
 let selectedDest    = 'todos';
 let growthChart     = null;
@@ -1514,7 +1676,7 @@ document.getElementById('themeBtn').addEventListener('click', () => {
 // ══════════════════════════════════════════════
 //  NAVEGAÇÃO
 // ══════════════════════════════════════════════
-const viewLabels = { dashboard:'Dashboard', members:'Membros', expro:'Ex-PRO — Recuperação', notifications:'Notificações', anuncios:'Anúncios Modais' };
+const viewLabels = { dashboard:'Dashboard', members:'Membros', expro:'Ex-PRO — Recuperação', notifications:'Notificações', anuncios:'Anúncios Modais', logs:'Logs do Sistema' };
 document.querySelectorAll('.nav-item[data-view]').forEach(item => {
   item.addEventListener('click', () => {
     document.querySelectorAll('.nav-item[data-view]').forEach(n => n.classList.remove('active'));
@@ -1522,6 +1684,7 @@ document.querySelectorAll('.nav-item[data-view]').forEach(item => {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.getElementById('view-' + item.dataset.view).classList.add('active');
     document.getElementById('topbarTitle').textContent = viewLabels[item.dataset.view];
+    if (item.dataset.view === 'logs') renderLogsMemberList();
   });
 });
 
@@ -1564,6 +1727,18 @@ document.getElementById('searchInput').addEventListener('input', e => {
   searchQ = e.target.value.toLowerCase().trim();
   renderMembersTable();
   renderRecentTable();
+});
+
+// Busca local dentro da aba Membros
+document.getElementById('membersSearch').addEventListener('input', e => {
+  membersLocalSearch = e.target.value.toLowerCase().trim();
+  renderMembersTable();
+});
+
+// Busca local na lista de clientes da aba Logs
+document.getElementById('logsSearch').addEventListener('input', e => {
+  logsSearch = e.target.value.toLowerCase().trim();
+  renderLogsMemberList();
 });
 
 // Destinatários
@@ -1621,44 +1796,12 @@ function showLoginError(msg) {
   el.textContent = msg; el.style.display = 'block';
 }
 
-async function enterApp(user) {
+function enterApp(user) {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('mainApp').style.display = 'block';
-
-  // Busca nome e foto do Firestore
-  try {
-    const [licSnap, fotoSnap] = await Promise.all([
-      db.collection('licencas').doc(user.uid).get(),
-      db.collection('users').doc(user.uid).collection('foto').doc('avatar').get()
-    ]);
-
-    const name = (licSnap.exists && licSnap.data().name)
-      || user.displayName
-      || user.email?.split('@')[0]
-      || 'Admin';
-
-    document.getElementById('userName').textContent = name;
-
-    const avatarEl = document.getElementById('userAvatar');
-    const base64   = fotoSnap.exists ? fotoSnap.data().base64 : null;
-    if (base64) {
-      avatarEl.innerHTML = '';
-      avatarEl.style.padding = '0';
-      avatarEl.style.overflow = 'hidden';
-      const img = document.createElement('img');
-      img.src = base64;
-      img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;';
-      avatarEl.appendChild(img);
-    } else {
-      avatarEl.textContent = name[0].toUpperCase();
-    }
-  } catch(e) {
-    // Fallback silencioso
-    const name = user.displayName || user.email?.split('@')[0] || 'Admin';
-    document.getElementById('userName').textContent = name;
-    document.getElementById('userAvatar').textContent = name[0].toUpperCase();
-  }
-
+  const name = user.displayName || user.email?.split('@')[0] || 'Admin';
+  document.getElementById('userName').textContent = name;
+  document.getElementById('userAvatar').textContent = name[0].toUpperCase();
   loadAllMembers();
   loadNotifications();
   loadAnuncios();
@@ -1800,7 +1943,16 @@ function renderMembersTable() {
   let list = [...allMembers];
   if (memberFilter === 'pro')  list = list.filter(m => m.pro);
   if (memberFilter === 'free') list = list.filter(m => !m.pro);
-  list = bySearch(list);
+  list = bySearch(list); // busca global do topbar
+  // busca local dentro da aba Membros
+  if (membersLocalSearch) {
+    list = list.filter(m =>
+      m.name.toLowerCase().includes(membersLocalSearch) ||
+      m.email.toLowerCase().includes(membersLocalSearch) ||
+      (m.nomeEmpresa||'').toLowerCase().includes(membersLocalSearch) ||
+      (m.cnpj||'').includes(membersLocalSearch)
+    );
+  }
   list.sort((a,b) => (b.criadoEm||0) - (a.criadoEm||0));
   mountTable('membersTable', list);
 }
@@ -2714,6 +2866,159 @@ function deleteAnuncio(id) {
     }
   });
 }
+
+// ══════════════════════════════════════════════
+//  LOGS — LISTA DE CLIENTES
+// ══════════════════════════════════════════════
+function renderLogsMemberList() {
+  const el = document.getElementById('logsMemberList');
+  if (!el) return;
+
+  let list = [...allMembers].sort((a,b) => (a.name||'').localeCompare(b.name||''));
+
+  if (logsSearch) {
+    list = list.filter(m =>
+      m.name.toLowerCase().includes(logsSearch) ||
+      m.email.toLowerCase().includes(logsSearch) ||
+      (m.nomeEmpresa||'').toLowerCase().includes(logsSearch)
+    );
+  }
+
+  if (!list.length) {
+    el.innerHTML = '<div class="empty">Nenhum cliente encontrado.</div>'; return;
+  }
+
+  el.innerHTML = list.map(m => `
+    <div class="logs-member-row">
+      <div>
+        ${m.foto
+          ? `<img class="member-avatar" src="${m.foto}" alt="" style="width:38px;height:38px;border-radius:50%;object-fit:cover;border:1.5px solid var(--border2);">`
+          : `<div class="member-avatar-placeholder">${(m.name||'?')[0].toUpperCase()}</div>`
+        }
+      </div>
+      <div class="logs-member-info">
+        <div class="member-name">${esc(m.name)}</div>
+        <div class="member-email">${esc(m.email)}</div>
+        ${m.nomeEmpresa ? `<div style="font-size:11px;color:var(--text3);margin-top:2px">${esc(m.nomeEmpresa)}</div>` : ''}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        ${m.pro ? '<span class="pro-badge">★ PRO</span>' : '<span class="free-badge">FREE</span>'}
+        <button class="btn-log-access" onclick="openLogModal('${m.uid}','${esc(m.name)}','${esc(m.email)}')">
+          Acessar Log
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Estado do modal de log
+let currentLogUid      = null;
+let allLogEntries      = [];
+let logEntrySearchQ    = '';
+
+// Cores por módulo
+const LOG_MODULE_COLORS = {
+  vendas:     { bg:'rgba(34,197,94,0.1)',   color:'#22c55e' },
+  caixa:      { bg:'rgba(245,158,11,0.1)',  color:'#f59e0b' },
+  despesas:   { bg:'rgba(239,68,68,0.1)',   color:'#ef4444' },
+  clientes:   { bg:'rgba(91,142,240,0.1)',  color:'#5b8ef0' },
+  produtos:   { bg:'rgba(167,139,250,0.1)', color:'#a78bfa' },
+  agenda:     { bg:'rgba(20,184,166,0.1)',  color:'#14b8a6' },
+  estoque:    { bg:'rgba(251,146,60,0.1)',  color:'#fb923c' },
+  config:     { bg:'rgba(156,163,175,0.1)', color:'#9ca3af' },
+  default:    { bg:'rgba(212,175,55,0.1)',  color:'#D4AF37'  },
+};
+
+function logModuleStyle(mod) {
+  const key = (mod||'').toLowerCase();
+  const c = LOG_MODULE_COLORS[key] || LOG_MODULE_COLORS.default;
+  return `background:${c.bg};color:${c.color}`;
+}
+
+async function openLogModal(uid, name, email) {
+  currentLogUid   = uid;
+  allLogEntries   = [];
+  logEntrySearchQ = '';
+  document.getElementById('logEntrySearch').value = '';
+  document.getElementById('logModalTitle').textContent = name;
+  document.getElementById('logModalEmail').textContent = email;
+  document.getElementById('logModalBody').innerHTML =
+    '<div class="log-empty"><div class="spinner" style="margin:0 auto 12px"></div>Carregando logs...</div>';
+  document.getElementById('logModal').classList.add('open');
+
+  try {
+    // Tenta buscar em users/{uid}/logs (campo timestamp desc)
+    const snap = await db
+      .collection('users').doc(uid)
+      .collection('logs')
+      .orderBy('timestamp', 'desc')
+      .limit(500)
+      .get();
+
+    if (snap.empty) {
+      document.getElementById('logModalBody').innerHTML =
+        '<div class="log-empty">Nenhum log encontrado para este cliente.</div>';
+      return;
+    }
+
+    allLogEntries = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderLogEntries();
+  } catch(e) {
+    console.error('Erro ao buscar logs:', e);
+    document.getElementById('logModalBody').innerHTML =
+      `<div class="log-empty">Erro ao carregar logs.<br><span style="color:var(--text3);font-size:10px">${e.message}</span></div>`;
+  }
+}
+
+function renderLogEntries() {
+  const q = logEntrySearchQ.toLowerCase();
+  let entries = allLogEntries;
+
+  if (q) {
+    entries = entries.filter(e =>
+      (e.acao||e.action||e.tipo||'').toLowerCase().includes(q) ||
+      (e.modulo||e.module||'').toLowerCase().includes(q) ||
+      (e.detalhes||e.detalhe||e.details||e.descricao||'').toLowerCase().includes(q) ||
+      (e.usuario||e.user||'').toLowerCase().includes(q)
+    );
+  }
+
+  if (!entries.length) {
+    document.getElementById('logModalBody').innerHTML =
+      '<div class="log-empty">Nenhum log encontrado para essa busca.</div>';
+    return;
+  }
+
+  document.getElementById('logModalBody').innerHTML = entries.map(e => {
+    const ts = e.timestamp?.toDate ? e.timestamp.toDate() : (e.timestamp ? new Date(e.timestamp) : null);
+    const timeStr = ts ? ts.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', second:'2-digit' }) : '—';
+    const modulo  = e.modulo || e.module || '';
+    const acao    = e.acao   || e.action || e.tipo || e.tipo_acao || '—';
+    const detalhe = e.detalhes || e.detalhe || e.details || e.descricao || '';
+    const usuario = e.usuario  || e.user   || '';
+    return `
+      <div class="log-entry">
+        <div class="log-time">${timeStr}</div>
+        ${modulo ? `<div class="log-modulo" style="${logModuleStyle(modulo)}">${esc(modulo)}</div>` : ''}
+        <div style="flex:1;min-width:0">
+          <div class="log-acao">${esc(acao)}</div>
+          ${detalhe ? `<div class="log-detalhe">${esc(detalhe)}</div>` : ''}
+          ${usuario ? `<div class="log-detalhe" style="color:var(--text3)">por ${esc(usuario)}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+document.getElementById('logModalClose').addEventListener('click', () => {
+  document.getElementById('logModal').classList.remove('open');
+});
+document.getElementById('logModal').addEventListener('click', e => {
+  if (e.target.id === 'logModal') document.getElementById('logModal').classList.remove('open');
+});
+document.getElementById('logEntrySearch').addEventListener('input', e => {
+  logEntrySearchQ = e.target.value.toLowerCase().trim();
+  renderLogEntries();
+});
 
 // ══════════════════════════════════════════════
 //  MODAL DE MEMBRO
