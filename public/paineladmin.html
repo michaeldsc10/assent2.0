@@ -1621,12 +1621,44 @@ function showLoginError(msg) {
   el.textContent = msg; el.style.display = 'block';
 }
 
-function enterApp(user) {
+async function enterApp(user) {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('mainApp').style.display = 'block';
-  const name = user.displayName || user.email?.split('@')[0] || 'Admin';
-  document.getElementById('userName').textContent = name;
-  document.getElementById('userAvatar').textContent = name[0].toUpperCase();
+
+  // Busca nome e foto do Firestore
+  try {
+    const [licSnap, fotoSnap] = await Promise.all([
+      db.collection('licencas').doc(user.uid).get(),
+      db.collection('users').doc(user.uid).collection('foto').doc('avatar').get()
+    ]);
+
+    const name = (licSnap.exists && licSnap.data().name)
+      || user.displayName
+      || user.email?.split('@')[0]
+      || 'Admin';
+
+    document.getElementById('userName').textContent = name;
+
+    const avatarEl = document.getElementById('userAvatar');
+    const base64   = fotoSnap.exists ? fotoSnap.data().base64 : null;
+    if (base64) {
+      avatarEl.innerHTML = '';
+      avatarEl.style.padding = '0';
+      avatarEl.style.overflow = 'hidden';
+      const img = document.createElement('img');
+      img.src = base64;
+      img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;';
+      avatarEl.appendChild(img);
+    } else {
+      avatarEl.textContent = name[0].toUpperCase();
+    }
+  } catch(e) {
+    // Fallback silencioso
+    const name = user.displayName || user.email?.split('@')[0] || 'Admin';
+    document.getElementById('userName').textContent = name;
+    document.getElementById('userAvatar').textContent = name[0].toUpperCase();
+  }
+
   loadAllMembers();
   loadNotifications();
   loadAnuncios();
