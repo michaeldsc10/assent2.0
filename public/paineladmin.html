@@ -2979,7 +2979,8 @@ function renderLogEntries() {
       (e.acao||e.action||e.tipo||'').toLowerCase().includes(q) ||
       (e.modulo||e.module||'').toLowerCase().includes(q) ||
       (e.detalhes||e.detalhe||e.details||e.descricao||'').toLowerCase().includes(q) ||
-      (e.usuario||e.user||'').toLowerCase().includes(q)
+      (e.nomeUsuario||e.usuario||e.user||'').toLowerCase().includes(q) ||
+      (e.cargo||'').toLowerCase().includes(q)
     );
   }
 
@@ -2995,7 +2996,8 @@ function renderLogEntries() {
     const modulo  = e.modulo || e.module || '';
     const acao    = e.acao   || e.action || e.tipo || e.tipo_acao || '—';
     const detalhe = e.detalhes || e.detalhe || e.details || e.descricao || '';
-    const usuario = e.usuario  || e.user   || '';
+    const usuario = e.nomeUsuario || e.usuario || e.user || '';
+    const cargo   = e.cargo || '';
     return `
       <div class="log-entry">
         <div class="log-time">${timeStr}</div>
@@ -3003,7 +3005,7 @@ function renderLogEntries() {
         <div style="flex:1;min-width:0">
           <div class="log-acao">${esc(acao)}</div>
           ${detalhe ? `<div class="log-detalhe">${esc(detalhe)}</div>` : ''}
-          ${usuario ? `<div class="log-detalhe" style="color:var(--text3)">por ${esc(usuario)}</div>` : ''}
+          ${usuario ? `<div class="log-detalhe" style="color:var(--text3)">por ${esc(usuario)}${cargo ? ` <span style="color:var(--text3);opacity:.6">(${esc(cargo)})</span>` : ''}</div>` : ''}
         </div>
       </div>`;
   }).join('');
