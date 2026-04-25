@@ -1,12 +1,18 @@
 /* ═══════════════════════════════════════════════════
-   AnnouncementModal.jsx
-   Exibe o anúncio modal ativo ao usuário entrar.
-   Lê de: anunciosAG (Firestore) — campo ativo: true
+   AnnouncementModal.jsx  —  Firebase SDK modular (v9+)
    ═══════════════════════════════════════════════════ */
 import { useEffect, useState, useCallback } from "react";
-import { db } from "../lib/firebase"; // ajuste o caminho se necessário
+import { db } from "../firebase";
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
+  getDocs,
+} from "firebase/firestore";
 
-/* ─── Estilos inline (sem dependência de CSS externo) ─── */
+/* ─── Estilos ─────────────────────────────────────── */
 const STYLES = `
 @keyframes ann-fade-in  { from { opacity:0 } to { opacity:1 } }
 @keyframes ann-slide-up {
@@ -17,7 +23,6 @@ const STYLES = `
   0%   { left: -100% }
   100% { left:  180% }
 }
-
 .ann-overlay {
   position: fixed; inset: 0; z-index: 9999;
   background: rgba(0,0,0,0.80);
@@ -27,7 +32,6 @@ const STYLES = `
   padding: 16px;
   animation: ann-fade-in .25s ease;
 }
-
 .ann-box {
   position: relative;
   background: #0D0D0D;
@@ -36,19 +40,15 @@ const STYLES = `
   width: 100%; max-width: 460px;
   max-height: 90vh;
   overflow: hidden;
-  box-shadow:
-    0 40px 100px rgba(0,0,0,0.7),
-    0 0 0 1px rgba(212,175,55,0.08);
+  box-shadow: 0 40px 100px rgba(0,0,0,0.7), 0 0 0 1px rgba(212,175,55,0.08);
   animation: ann-slide-up .38s cubic-bezier(0.34,1.4,0.64,1);
 }
-
 .ann-box::before {
   content: '';
   position: absolute; top: 0; left: 0; right: 0; height: 2px;
   background: linear-gradient(90deg, transparent 0%, #D4AF37 50%, transparent 100%);
   z-index: 2;
 }
-
 .ann-close {
   position: absolute; top: 13px; right: 14px; z-index: 10;
   width: 30px; height: 30px; border-radius: 50%;
@@ -65,36 +65,28 @@ const STYLES = `
   color: #EAEAEA;
   border-color: #D4AF37;
 }
-
 .ann-img-zone {
   width: 100%; max-height: 230px;
   overflow: hidden; position: relative;
 }
-.ann-img-zone img {
-  width: 100%; height: 100%; object-fit: cover; display: block;
-}
+.ann-img-zone img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ann-img-overlay {
   position: absolute; inset: 0;
   background: rgba(0,0,0,0.42);
   display: flex; align-items: center; justify-content: center;
 }
-
 .ann-content { padding: 26px 26px 24px; }
-
 .ann-title {
   font-family: 'Cinzel', 'Cormorant Garamond', Georgia, serif;
   font-size: 20px; font-weight: 700;
-  color: #EAEAEA; line-height: 1.25;
-  margin-bottom: 10px;
+  color: #EAEAEA; line-height: 1.25; margin-bottom: 10px;
 }
-
 .ann-msg {
   font-family: 'DM Sans', 'Inter', system-ui, sans-serif;
   font-size: 14px; color: #999;
   line-height: 1.65; margin-bottom: 22px;
   white-space: pre-wrap;
 }
-
 .ann-cta {
   display: inline-flex; align-items: center; justify-content: center; gap: 9px;
   width: 100%; padding: 14px 22px;
@@ -142,11 +134,6 @@ const ArrowIcon = () => (
   </svg>
 );
 
-/* ═══════════════════════════════════════════════════
-   Props:
-     userPlan  — "pro" | "free"  (default: "free")
-                 usado para filtrar destinatário do anúncio
-   ═══════════════════════════════════════════════════ */
 export default function AnnouncementModal({ userPlan = "free" }) {
   const [anuncio, setAnuncio] = useState(null);
   const [visible, setVisible] = useState(false);
@@ -156,16 +143,18 @@ export default function AnnouncementModal({ userPlan = "free" }) {
 
     async function fetchAnuncio() {
       try {
-        const snap = await db
-          .collection("anunciosAG")
-          .where("ativo", "==", true)
-          .orderBy("criadoEm", "desc")
-          .limit(10)
-          .get();
+        // SDK modular v9+ — sem .collection() no objeto db
+        const q = query(
+          collection(db, "anunciosAG"),
+          where("ativo", "==", true),
+          orderBy("criadoEm", "desc"),
+          limit(10)
+        );
+        const snap = await getDocs(q);
 
         if (snap.empty) return;
 
-        // filtra pelo destinatário no cliente para evitar índice composto
+        // filtra destinatário no cliente (evita índice composto)
         const compativel = snap.docs.find((doc) => {
           const dest = doc.data().destinatario || "todos";
           if (dest === "todos") return true;
@@ -176,7 +165,7 @@ export default function AnnouncementModal({ userPlan = "free" }) {
 
         if (!compativel) return;
 
-        // não reexibe o mesmo anúncio na mesma sessão do navegador
+        // não reexibe o mesmo anúncio na mesma sessão
         const sessionKey = `ann_seen_${compativel.id}`;
         if (sessionStorage.getItem(sessionKey)) return;
         sessionStorage.setItem(sessionKey, "1");
@@ -193,7 +182,6 @@ export default function AnnouncementModal({ userPlan = "free" }) {
 
   const close = useCallback(() => setVisible(false), []);
 
-  // fecha com Escape
   useEffect(() => {
     if (!visible) return;
     const onKey = (e) => { if (e.key === "Escape") close(); };
@@ -206,25 +194,23 @@ export default function AnnouncementModal({ userPlan = "free" }) {
   const {
     titulo,
     mensagem,
-    imagem    = "",
-    btnTexto  = "Vamos lá!",
-    btnUrl    = "",
-    btnPos    = "abaixo", // 'abaixo' | 'sobreposto'
+    imagem   = "",
+    btnTexto = "Vamos lá!",
+    btnUrl   = "",
+    btnPos   = "abaixo",
   } = anuncio;
 
   const temImagem     = Boolean(imagem);
   const btnSobreposto = temImagem && btnPos === "sobreposto";
 
   function BotaoCTA({ className = "" }) {
-    const sharedProps = {
-      className: `ann-cta ${className}`,
-    };
+    const cls = `ann-cta ${className}`;
     return btnUrl ? (
-      <a href={btnUrl} target="_blank" rel="noopener noreferrer" {...sharedProps}>
+      <a href={btnUrl} target="_blank" rel="noopener noreferrer" className={cls}>
         {btnTexto} <ArrowIcon />
       </a>
     ) : (
-      <button {...sharedProps} onClick={close}>
+      <button className={cls} onClick={close}>
         {btnTexto} <ArrowIcon />
       </button>
     );
@@ -239,7 +225,6 @@ export default function AnnouncementModal({ userPlan = "free" }) {
 
         <button className="ann-close" onClick={close} aria-label="Fechar">✕</button>
 
-        {/* Imagem + botão sobreposto */}
         {temImagem && (
           <div className="ann-img-zone">
             <img src={imagem} alt={titulo} />
@@ -251,7 +236,6 @@ export default function AnnouncementModal({ userPlan = "free" }) {
           </div>
         )}
 
-        {/* Texto + botão abaixo */}
         <div className="ann-content">
           <div className="ann-title" id="ann-title">{titulo}</div>
           <div className="ann-msg">{mensagem}</div>
