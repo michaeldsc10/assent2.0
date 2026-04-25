@@ -223,6 +223,13 @@ export default function PDV({ onVoltar }) {
     credito:  "Cartão de Crédito",
   };
 
+  /* ─── Total do carrinho ─── */
+  const total = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
+  const troco =
+    formaPag === "dinheiro" && valorRecebido
+      ? parseFloat(valorRecebido.replace(",", ".")) - total
+      : null;
+
   const taxas = config?.taxas || {};
 
   const taxaPct = (() => {
@@ -234,16 +241,8 @@ export default function PDV({ onVoltar }) {
     }
   })();
 
-  const valorTaxa   = parseFloat((total * (taxaPct / 100)).toFixed(2));
+  const valorTaxa    = parseFloat((total * (taxaPct / 100)).toFixed(2));
   const totalLiquido = parseFloat((total - valorTaxa).toFixed(2));
-
-
-  /* ─── Total do carrinho ─── */
-  const total = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
-  const troco =
-    formaPag === "dinheiro" && valorRecebido
-      ? parseFloat(valorRecebido.replace(",", ".")) - total
-      : null;
 
   /* ══════════════════════════════════
      BUSCA POR CÓDIGO DE BARRAS
