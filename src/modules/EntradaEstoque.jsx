@@ -449,7 +449,7 @@ function Toast({ msg, tipo }) {
 /* ══════════════════════════════════════════════════════
    MODAL: Criar / Editar Entrada
    ══════════════════════════════════════════════════════ */
-function ModalEntrada({ tenantUid, produtos, fornecedores, movimentacao, onSalvo, onClose }) {
+function ModalEntrada({ tenantUid, nomeUsuario, cargo, produtos, fornecedores, movimentacao, onSalvo, onClose }) {
   const isEdit = !!movimentacao;
 
   const [form, setForm] = useState({
@@ -531,7 +531,7 @@ function ModalEntrada({ tenantUid, produtos, fornecedores, movimentacao, onSalvo
             estoqueNovo:     novoEst,
           });
         });
-        await logAction({ tenantUid, nomeUsuario: "—", cargo: "—", acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.ENTRADA_ESTOQUE, descricao: `Editou entrada de ${form.quantidade} un. de ${produtos.find(p=>p._docId===form.produtoId||p.id===form.produtoId)?.nome||form.produtoId}` });
+        await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.ENTRADA_ESTOQUE, descricao: `Editou entrada de ${form.quantidade} un. de ${produtos.find(p=>p._docId===form.produtoId||p.id===form.produtoId)?.nome||form.produtoId}` });
         onSalvo("Entrada atualizada com sucesso!");
       } else {
         const movRef = doc(collection(db, "users", tenantUid, "movimentacoes_estoque"));
@@ -562,7 +562,7 @@ function ModalEntrada({ tenantUid, produtos, fornecedores, movimentacao, onSalvo
             estoqueNovo:     qtdN,
           });
         });
-        await logAction({ tenantUid, nomeUsuario: "—", cargo: "—", acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.ENTRADA_ESTOQUE, descricao: `Registrou entrada de ${form.quantidade} un. de ${produtos.find(p=>p._docId===form.produtoId||p.id===form.produtoId)?.nome||form.produtoId}` });
+        await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.ENTRADA_ESTOQUE, descricao: `Registrou entrada de ${form.quantidade} un. de ${produtos.find(p=>p._docId===form.produtoId||p.id===form.produtoId)?.nome||form.produtoId}` });
         onSalvo("Entrada registrada com sucesso!");
       }
       onClose();
@@ -1013,7 +1013,7 @@ function ModalSaida({ tenantUid, nomeUsuario, cargo, produtos, onSalvo, onClose 
 /* ══════════════════════════════════════════════════════
    MODAL: Confirmar Exclusão de Entrada
    ══════════════════════════════════════════════════════ */
-function ModalConfirmDelete({ tenantUid, movimentacao, produtos, onSalvo, onClose }) {
+function ModalConfirmDelete({ tenantUid, nomeUsuario, cargo, movimentacao, produtos, onSalvo, onClose }) {
   const [excluindo, setExcluindo] = useState(false);
   const [errGlobal, setErrGlobal] = useState("");
 
@@ -1043,7 +1043,7 @@ function ModalConfirmDelete({ tenantUid, movimentacao, produtos, onSalvo, onClos
         tx.delete(movRef);
       });
 
-      await logAction({ tenantUid, nomeUsuario: "—", cargo: "—", acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.ENTRADA_ESTOQUE, descricao: `Excluiu entrada de ${movimentacao.quantidade} un. de ${movimentacao.produtoNome||movimentacao.produtoId}` });
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.ENTRADA_ESTOQUE, descricao: `Excluiu entrada de ${movimentacao.quantidade} un. de ${movimentacao.produtoNome||movimentacao.produtoId}` });
       onSalvo("Entrada excluída e estoque revertido.");
       onClose();
     } catch (err) {
@@ -1434,6 +1434,8 @@ export default function EntradaEstoque() {
       {modalNovo && (
         <ModalEntrada
           tenantUid={tenantUid}
+          nomeUsuario={nomeUsuario}
+          cargo={cargo}
           produtos={produtos}
           fornecedores={fornecedores}
           movimentacao={null}
@@ -1446,6 +1448,8 @@ export default function EntradaEstoque() {
       {editando && editando.tipo === "entrada" && (
         <ModalEntrada
           tenantUid={tenantUid}
+          nomeUsuario={nomeUsuario}
+          cargo={cargo}
           produtos={produtos}
           fornecedores={fornecedores}
           movimentacao={editando}
@@ -1470,6 +1474,8 @@ export default function EntradaEstoque() {
       {deletando && (
         <ModalConfirmDelete
           tenantUid={tenantUid}
+          nomeUsuario={nomeUsuario}
+          cargo={cargo}
           movimentacao={deletando}
           produtos={produtos}
           onSalvo={(msg) => { showToast(msg, "sucesso"); setDeletando(null); }}
