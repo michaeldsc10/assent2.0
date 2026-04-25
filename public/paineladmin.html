@@ -2321,17 +2321,18 @@ document.getElementById('frameZoom').addEventListener('input', function() {
 
 // ── Video URL
 function handleVideoUrl(url) {
-  url = url.trim();
+  url = (url || '').trim();
   anuncioVideoUrl = url;
   const previewW = document.getElementById('anuncioVideoPreviewWrap');
   const vid      = document.getElementById('anuncioVideoPreview');
-  if (url) {
+  if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
     previewW.style.display = 'block';
+    vid.removeAttribute('src');
     vid.src = url;
     vid.load();
   } else {
     previewW.style.display = 'none';
-    vid.src = '';
+    vid.removeAttribute('src');
   }
   syncPreview();
 }
@@ -2340,7 +2341,8 @@ function clearVideoUrl() {
   anuncioVideoUrl = '';
   document.getElementById('anuncioVideoUrlInput').value = '';
   document.getElementById('anuncioVideoPreviewWrap').style.display = 'none';
-  document.getElementById('anuncioVideoPreview').src = '';
+  const vid = document.getElementById('anuncioVideoPreview');
+  vid.removeAttribute('src');
   syncPreview();
 }
 
