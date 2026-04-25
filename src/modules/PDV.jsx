@@ -18,7 +18,7 @@ import {
   collection, query, where, getDocs, runTransaction,
   doc, orderBy, limit,
 } from "firebase/firestore";
-import BarcodeInput from "./BarcodeInput";
+import BarcodeInput from "../components/BarcodeInput";
 import { useConfiguracoes } from "./Configuracoes";
 
 /* ─── Formata moeda BRL ─── */
