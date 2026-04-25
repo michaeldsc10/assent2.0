@@ -5026,7 +5026,7 @@ const PERMISSOES_RELATORIO = {
   vendedores:          ["financeiro", "comercial"],
   rel_compras:         ["financeiro", "compras"],
   rel_contas_receber:  ["financeiro", "comercial"],
-  pdv:                 ["financeiro", "comercial", "vendedor"],
+  pdv:                 ["financeiro", "comercial", "vendedor", "suporte"],
 };
 
 const MENU = [
