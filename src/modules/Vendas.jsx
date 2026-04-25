@@ -510,6 +510,24 @@ const CSS = `
   }
   #recibo-print-root { display: none; }
 
+  /* ── Modal Estoque Insuficiente ── */
+  .estoque-ins-list {
+    margin: 14px 0 0; display: flex; flex-direction: column; gap: 8px;
+  }
+  .estoque-ins-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--s2); border: 1px solid rgba(224,82,82,.2);
+    border-radius: 10px; padding: 10px 14px; gap: 12px;
+  }
+  .estoque-ins-nome { font-size: 13px; color: var(--text); font-weight: 500; flex: 1; }
+  .estoque-ins-qtds { display: flex; gap: 10px; flex-shrink: 0; }
+  .estoque-ins-badge {
+    font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 12px;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .estoque-ins-badge.solicitado { background: rgba(200,165,94,.12); color: var(--gold); border: 1px solid rgba(200,165,94,.25); }
+  .estoque-ins-badge.disponivel { background: var(--red-d); color: var(--red); border: 1px solid rgba(224,82,82,.25); }
+
   /* ── Livre (venda sem produto) ── */
   .nv-livre-info {
     background: rgba(200,165,94,.07); border: 1px solid rgba(200,165,94,.2);
@@ -748,6 +766,7 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
 
   const [salvando, setSalvando] = useState(false);
   const [erros, setErros] = useState({});
+  const [estoqueInsuficienteInfo, setEstoqueInsuficienteInfo] = useState(null); // [{nome, qtdPedida, estoqueAtual}]
 
   function itemVazio(tipoAtual = "produto") {
     return {
@@ -961,6 +980,32 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
       }));
     }
 
+    /* ── Validação de estoque (apenas produtos, não serviços/livre) ── */
+    if (tipo === "produto") {
+      const itensInsuficientes = [];
+      for (const item of payload.itens) {
+        if (!item.produtoId) continue;
+        // Busca o produto na lista local (já carregada do Firestore via onSnapshot)
+        const prod = produtos.find(p => p.id === item.produtoId);
+        const estoqueAtual = prod?.estoque ?? prod?.qtd ?? 0;
+        const qtdPedida    = item.qtd || 1;
+        // Para edição, devolve o estoque do item antigo antes de comparar
+        let estoqueEfetivo = estoqueAtual;
+        if (isEdit && venda?.itens) {
+          const itemAntigo = venda.itens.find(a => a.produtoId === item.produtoId);
+          if (itemAntigo) estoqueEfetivo = estoqueAtual + (itemAntigo.qtd || 1);
+        }
+        if (qtdPedida > estoqueEfetivo) {
+          itensInsuficientes.push({ nome: item.nome || prod?.nome || item.produtoId, qtdPedida, estoqueAtual: estoqueEfetivo });
+        }
+      }
+      if (itensInsuficientes.length > 0) {
+        setSalvando(false);
+        setEstoqueInsuficienteInfo(itensInsuficientes);
+        return;
+      }
+    }
+
     await onSave(payload, isEdit ? venda : null);
     setSalvando(false);
   };
@@ -975,6 +1020,7 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
   }, [clientes, clienteSearch]);
 
   return (
+    <>
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-box modal-box-xl">
 
@@ -1412,6 +1458,14 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
 
       </div>
     </div>
+
+    {estoqueInsuficienteInfo && (
+      <ModalEstoqueInsuficiente
+        itensInsuficientes={estoqueInsuficienteInfo}
+        onClose={() => setEstoqueInsuficienteInfo(null)}
+      />
+    )}
+  </>
   );
 }
 
@@ -1711,6 +1765,52 @@ function ModalExcluirVenda({ venda, onConfirm, onClose }) {
 
 
 
+/* ══════════════════════════════════════════════════
+   MODAL: Estoque Insuficiente
+   ══════════════════════════════════════════════════ */
+function ModalEstoqueInsuficiente({ itensInsuficientes, onClose }) {
+  return (
+    <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box modal-box-md">
+        <div className="modal-header">
+          <div>
+            <div className="modal-title" style={{ color: "var(--red)" }}>Estoque Insuficiente</div>
+            <div className="modal-sub">Não foi possível concluir a venda</div>
+          </div>
+          <button className="modal-close" onClick={onClose}>
+            <X size={14} color="var(--text-2)" />
+          </button>
+        </div>
+        <div className="modal-body">
+          <div style={{ fontSize: 13, color: "var(--text-2)", lineHeight: 1.6, marginBottom: 4 }}>
+            Os seguintes produtos não possuem estoque suficiente para essa venda:
+          </div>
+          <div className="estoque-ins-list">
+            {itensInsuficientes.map((item, i) => (
+              <div key={i} className="estoque-ins-item">
+                <span className="estoque-ins-nome">{item.nome}</span>
+                <div className="estoque-ins-qtds">
+                  <span className="estoque-ins-badge solicitado">Pedido: {item.qtdPedida}</span>
+                  <span className="estoque-ins-badge disponivel">Disponível: {item.estoqueAtual}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: 16, fontSize: 12, color: "var(--text-3)" }}>
+            Ajuste as quantidades ou reponha o estoque antes de finalizar a venda.
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn-primary" onClick={onClose}>
+            OK — Voltar para a Venda
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 // ---------------------------------------------------------------------------
 // Permissões por cargo
 // ---------------------------------------------------------------------------
@@ -1850,7 +1950,9 @@ useEffect(() => {
          IMPORTANTE: verificamos a existência do doc antes de fazer update
          para evitar crash em itens oriundos de orçamento cujo tipo real
          é "servico" mas foi salvo com tipo "produto" na conversão. */
-      await runTransaction(db, async (tx) => {
+      let erroEstoqueEdit = null;
+      try {
+        await runTransaction(db, async (tx) => {
         /* ── Coleta todas as refs que precisam de leitura ── */
         const oldEntries = (vendaExistente.itens || [])
           .filter(i => i.produtoId && i.tipo === "produto")
@@ -1864,6 +1966,39 @@ useEffect(() => {
         const allEntries  = [...oldEntries, ...newEntries];
         const snaps       = await Promise.all(allEntries.map(e => tx.get(e.ref)));
 
+        /* ── VALIDAÇÃO DE ESTOQUE LÍQUIDO (edição) ──
+           Calcula o estoque efetivo = atual + devolvido pelos itens antigos
+           e verifica se o novo item cabe. Agrupa por produtoId para
+           suportar o mesmo produto em múltiplas linhas. */
+        const estoqueMap = {}; // produtoId → estoqueEfetivo
+        // Inicializa com estoque atual lido do Firestore
+        allEntries.forEach((e, i) => {
+          const id = e.ref.id;
+          if (!(id in estoqueMap) && snaps[i].exists()) {
+            estoqueMap[id] = snaps[i].data()?.estoque ?? 0;
+          }
+        });
+        // Adiciona de volta o que será devolvido pelos itens antigos
+        oldEntries.forEach(e => {
+          if (e.ref.id in estoqueMap) estoqueMap[e.ref.id] += e.qtd;
+        });
+        // Verifica se os novos itens cabem
+        const insuficientesEdit = [];
+        newEntries.forEach(e => {
+          const id = e.ref.id;
+          const disp = estoqueMap[id] ?? 0;
+          if (e.qtd > disp) {
+            const snap = snaps[allEntries.findIndex(a => a.ref.id === id)];
+            const nome = snap?.data()?.nome || id;
+            insuficientesEdit.push({ nome, qtdPedida: e.qtd, estoqueAtual: disp });
+            // Subtrai mesmo assim para evitar duplicidade de erros se o produto aparecer mais de uma vez
+          }
+          if (id in estoqueMap) estoqueMap[id] -= e.qtd;
+        });
+        if (insuficientesEdit.length > 0) {
+          throw Object.assign(new Error("ESTOQUE_INSUFICIENTE_EDIT"), { itens: insuficientesEdit });
+        }
+
         /* ── TODOS OS WRITES DEPOIS ── */
         /* Restaura estoque dos itens antigos */
         oldEntries.forEach((e, i) => {
@@ -1876,6 +2011,17 @@ useEffect(() => {
         /* Salva a venda */
         tx.set(doc(db, "users", tenantUid, "vendas", vendaExistente.id), payload, { merge: true });
       });
+      } catch (errTx) {
+        if (errTx.message === "ESTOQUE_INSUFICIENTE_EDIT") {
+          // Já bloqueado antes pelo handleSalvar do modal — esta é só a barreira Firestore.
+          // Se chegar aqui (raro), exibe alert simples.
+          alert("Estoque insuficiente para um ou mais produtos. A venda não foi salva.");
+          return;
+        }
+        console.error("[Vendas] Erro na transação de edição:", errTx);
+        alert("Erro ao salvar a venda. Tente novamente.");
+        return;
+      }
 
       /* ── RESET FINANCEIRO ──────────────────────────────────────────────────
          A venda foi alterada (forma de pagamento, valor, etc.).
@@ -1988,13 +2134,28 @@ useEffect(() => {
           if (tentativas > 200) throw new Error("Não foi possível encontrar um ID disponível para a venda.");
         } while (vendaSnap.exists());
 
-        /* Descontar estoque */
-        for (const item of (payload.itens || [])) {
-          if (item.produtoId && item.tipo === "produto") {
-            const ref = doc(db, "users", tenantUid, "produtos", item.produtoId);
-            tx.update(ref, { estoque: increment(-(item.qtd || 1)) });
+        /* ── Verificar e descontar estoque ── */
+        const itensProduto = (payload.itens || []).filter(i => i.produtoId && i.tipo === "produto");
+        const prodRefs   = itensProduto.map(i => doc(db, "users", tenantUid, "produtos", i.produtoId));
+        const prodSnaps  = await Promise.all(prodRefs.map(r => tx.get(r)));
+
+        /* Valida estoque DENTRO da transação — dado mais fresco do Firestore */
+        const insuficientes = [];
+        itensProduto.forEach((item, idx) => {
+          if (!prodSnaps[idx].exists()) return;
+          const estoqueReal = prodSnaps[idx].data()?.estoque ?? 0;
+          if ((item.qtd || 1) > estoqueReal) {
+            insuficientes.push({ nome: item.nome || item.produtoId, qtdPedida: item.qtd || 1, estoqueAtual: estoqueReal });
           }
+        });
+        if (insuficientes.length > 0) {
+          throw Object.assign(new Error("ESTOQUE_INSUFICIENTE"), { itens: insuficientes });
         }
+
+        /* Descontar estoque */
+        itensProduto.forEach((item, idx) => {
+          tx.update(prodRefs[idx], { estoque: increment(-(item.qtd || 1)) });
+        });
         /* Criar venda no slot confirmadamente livre */
         tx.set(vendaRef, { ...payload, criadoEm: new Date().toISOString() });
         /* Atualizar contador para além do ID recém-usado, corrigindo qualquer
@@ -2003,6 +2164,11 @@ useEffect(() => {
       });
     } catch (err) {
       console.error("[Vendas] Erro ao criar venda:", err);
+      if (err.message === "ESTOQUE_INSUFICIENTE") {
+        // A validação local já exibiu o modal — aqui é só a barreira do Firestore.
+        // Nada a fazer; o modal no ModalNovaVenda já foi disparado antes do onSave.
+        return;
+      }
       alert("Erro ao registrar a venda. Tente novamente.");
       return;
     }
