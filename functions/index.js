@@ -492,12 +492,12 @@ async function processarTenant(db, tenantUid, agora) {
 
   const [vendasAtual, vendasAnterior, alunosAtual, alunosAnterior] = await Promise.all([
     vendasRef
-      .where("criadoEm", ">=", Timestamp.fromDate(inicioAtual))
-      .where("criadoEm", "<=", Timestamp.fromDate(fimAtual))
+      .where("data", ">=", Timestamp.fromDate(inicioAtual))
+      .where("data", "<=", Timestamp.fromDate(fimAtual))
       .get(),
     vendasRef
-      .where("criadoEm", ">=", Timestamp.fromDate(inicioAnterior))
-      .where("criadoEm", "<=", Timestamp.fromDate(fimAnterior))
+      .where("data", ">=", Timestamp.fromDate(inicioAnterior))
+      .where("data", "<=", Timestamp.fromDate(fimAnterior))
       .get(),
     alunosRef
       .where("criadoEm", ">=", Timestamp.fromDate(inicioAtual))
