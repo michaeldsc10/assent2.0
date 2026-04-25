@@ -404,6 +404,54 @@ tbody tr:hover { background: var(--surface2); }
 .member-name { font-weight: 600; }
 .member-email { font-size: 12px; color: var(--text2); font-family: 'IBM Plex Mono', monospace; margin-top: 2px; }
 .mono-sm { font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--text2); }
+.member-cell { display: flex; align-items: center; gap: 12px; }
+.member-avatar {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  object-fit: cover; border: 1.5px solid var(--border2);
+  cursor: pointer; transition: border-color .2s, transform .2s;
+}
+.member-avatar:hover { border-color: var(--gold); transform: scale(1.08); }
+.member-avatar-placeholder {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  background: var(--surface3); border: 1.5px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: var(--text3);
+}
+/* Modal foto no modal do membro */
+.modal-avatar-wrap {
+  display: flex; justify-content: center; margin-bottom: 24px;
+}
+.modal-avatar {
+  width: 88px; height: 88px; border-radius: 50%;
+  object-fit: cover; border: 2px solid var(--gold-border);
+  cursor: pointer; transition: border-color .2s, transform .15s;
+  box-shadow: 0 0 0 4px var(--gold-glow);
+}
+.modal-avatar:hover { border-color: var(--gold); transform: scale(1.04); }
+/* Lightbox */
+#photoLightbox {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.88); backdrop-filter: blur(10px);
+  z-index: 500; align-items: center; justify-content: center;
+  cursor: zoom-out;
+}
+#photoLightbox.open { display: flex; }
+#photoLightbox img {
+  max-width: 90vw; max-height: 90vh;
+  border-radius: 14px; border: 1px solid rgba(255,255,255,.1);
+  box-shadow: 0 40px 100px rgba(0,0,0,.6);
+  animation: lbIn .18s ease;
+}
+@keyframes lbIn { from { opacity:0; transform: scale(.92); } to { opacity:1; transform: scale(1); } }
+#photoLightboxClose {
+  position: fixed; top: 20px; right: 24px;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.15);
+  color: #fff; font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .2s;
+}
+#photoLightboxClose:hover { background: rgba(255,255,255,.2); }
 
 /* ════════════════════════════════════════
    EX-PRO
@@ -1326,6 +1374,12 @@ tbody tr:hover { background: var(--surface2); }
   </div>
 </div>
 
+<!-- PHOTO LIGHTBOX -->
+<div id="photoLightbox" onclick="closeLightbox()">
+  <button id="photoLightboxClose" onclick="closeLightbox()">✕</button>
+  <img id="photoLightboxImg" src="" alt="Foto do membro">
+</div>
+
 <!-- MEMBER MODAL -->
 <div id="memberModal">
   <div class="modal-box">
@@ -1592,12 +1646,14 @@ async function loadAllMembers() {
       const lic = docSnap.data();
       const uid = docSnap.id;
       try {
-        const [userDoc, configDoc] = await Promise.all([
+        const [userDoc, configDoc, fotoDoc] = await Promise.all([
           db.collection('users').doc(uid).get(),
-          db.collection('users').doc(uid).collection('config').doc('geral').get()
+          db.collection('users').doc(uid).collection('config').doc('geral').get(),
+          db.collection('users').doc(uid).collection('foto').doc('avatar').get()
         ]);
         const u = userDoc.exists   ? userDoc.data()   : {};
         const c = configDoc.exists ? configDoc.data() : {};
+        const f = fotoDoc.exists   ? fotoDoc.data()   : {};
         return {
           uid,
           ativo:          lic.ativo      || false,
@@ -1607,16 +1663,16 @@ async function loadAllMembers() {
           proExpiradoEm:  toDate(lic.proExpiradoEm),
           // proAtivadoEm: toDate(lic.proAtivadoEm),  // disponível quando estrutura estiver pronta
           email:          u.email        || '',
-          name:           u.name || u.nome || u.email?.split('@')[0] || 'Sem nome',
-          
+          name:           lic.name       || u.name || u.nome || u.email?.split('@')[0] || 'Sem nome',
+          foto:           f.base64       || '',
           endereco:       c.empresa?.endereco || c.endereço || '',
-          telefone:    c.empresa?.telefone    || '',   // ✅
-         cnpj:        c.empresa?.cnpj        || '',   // ✅
-         nomeEmpresa: c.empresa?.nomeEmpresa || '',   // ✅
+          telefone:       c.empresa?.telefone    || '',
+          cnpj:           c.empresa?.cnpj        || '',
+          nomeEmpresa:    c.empresa?.nomeEmpresa || '',
         };
       } catch {
         return { uid, ativo:true, pro:lic.pro||false, admin:false, criadoEm:null, proExpiradoEm:null,
-                 email:'', name:'—', telefone:'', endereco:'', cnpj:'', nomeEmpresa:'' };
+                 email:'', name: lic.name||'—', foto:'', telefone:'', endereco:'', cnpj:'', nomeEmpresa:'' };
       }
     }));
 
@@ -1761,8 +1817,16 @@ function mountTable(containerId, list) {
         ${list.map(m => `
           <tr data-uid="${m.uid}">
             <td>
-              <div class="member-name">${esc(m.name)}</div>
-              <div class="member-email">${esc(m.email)}</div>
+              <div class="member-cell">
+                ${m.foto
+                  ? `<img class="member-avatar" src="${m.foto}" alt="" onclick="event.stopPropagation();openLightbox('${m.foto}')">`
+                  : `<div class="member-avatar-placeholder">${(m.name||'?')[0].toUpperCase()}</div>`
+                }
+                <div>
+                  <div class="member-name">${esc(m.name)}</div>
+                  <div class="member-email">${esc(m.email)}</div>
+                </div>
+              </div>
             </td>
             <td><span style="font-size:13px">${esc(m.nomeEmpresa)||'—'}</span></td>
             <td class="mono-sm">${esc(m.telefone)||'—'}</td>
@@ -2590,6 +2654,12 @@ function openModal(m) {
 
   document.getElementById('modalBody').innerHTML = `
 
+    <!-- Foto do membro -->
+    ${m.foto ? `
+    <div class="modal-avatar-wrap">
+      <img class="modal-avatar" src="${m.foto}" alt="Foto de ${esc(m.name)}" onclick="openLightbox('${m.foto}')">
+    </div>` : ''}
+
     <!-- Dados Pessoais -->
     <div class="modal-section">
       <div class="section-label">Dados Pessoais</div>
@@ -2709,6 +2779,21 @@ document.getElementById('memberModal').addEventListener('click', e => {
   if (e.target.id === 'memberModal') closeModal();
 });
 function closeModal() { document.getElementById('memberModal').classList.remove('open'); }
+
+// ══════════════════════════════════════════════
+//  LIGHTBOX DE FOTO
+// ══════════════════════════════════════════════
+function openLightbox(src) {
+  document.getElementById('photoLightboxImg').src = src;
+  document.getElementById('photoLightbox').classList.add('open');
+}
+function closeLightbox() {
+  document.getElementById('photoLightbox').classList.remove('open');
+  document.getElementById('photoLightboxImg').src = '';
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeLightbox();
+});
 
 // ══════════════════════════════════════════════
 //  UTILIDADES
