@@ -180,7 +180,8 @@ ${venda.cliente ? `<div class="total-row"><span>Cliente</span><span>${venda.clie
    COMPONENTE PRINCIPAL
    ═══════════════════════════════════════════════════ */
 export default function PDV({ onVoltar }) {
-  const { tenantUid, vendedorNome, vendedorId, cargo } = useAuth();
+  const { tenantUid, vendedorNome, vendedorId, cargo, user } = useAuth();
+  const nomeOperador = vendedorNome || user?.displayName || user?.email?.split('@')[0] || "Operador";
   const { config, loading: cfgLoading } = useConfiguracoes(tenantUid);
 
   /* ── Dados da empresa (logo + nome) ── */
@@ -562,11 +563,11 @@ export default function PDV({ onVoltar }) {
           <div className="pdv-header-right">
             <div className="pdv-operador">
               <span className="pdv-operador-label">Operador</span>
-              <span className="pdv-operador-nome">{vendedorNome || "—"}</span>
+              <span className="pdv-operador-nome">{nomeOperador}</span>
             </div>
             {onVoltar && (
-              <button className="pdv-btn-voltar" onClick={onVoltar} title="Voltar">
-                <ArrowLeft size={16} />
+              <button className="pdv-btn-voltar" onClick={onVoltar} title="Voltar ao menu">
+                <ArrowLeft size={16} color="#c0c2d8" strokeWidth={2} />
               </button>
             )}
           </div>
