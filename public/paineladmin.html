@@ -1911,22 +1911,86 @@ let anuncioDest      = 'todos';
 let anuncioBtnPos    = 'abaixo'; // 'abaixo' | 'sobreposto'
 
 // ── Image upload
-document.getElementById('anuncioImgInput').addEventListener('change', function() {
-  const file = this.files[0];
-  if (!file) return;
-  if (file.size > 2 * 1024 * 1024) {
-    alert('Imagem muito grande. Use até 2MB.');
-    return;
-  }
-  const reader = new FileReader();
-  reader.onload = e => {
-    anuncioImgBase64 = e.target.result;
-    document.getElementById('anuncioImgPreview').src = anuncioImgBase64;
+/**
+ * Comprime uma imagem via Canvas para garantir que caiba no Firestore.
+ * Firestore: limite ~1MB por documento. Base64 aumenta ~33%, então
+ * a imagem final em base64 deve ficar abaixo de 700KB (~525KB raw).
+ *
+ * maxW / maxH  — dimensão máxima (a imagem é redimensionada proporcionalmente)
+ * quality      — qualidade JPEG 0–1
+ * Retorna: string base64 (data URL)
+ */
+function comprimirImagem(file, maxW = 1000, maxH = 600, quality = 0.72) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        // calcula dimensão final mantendo aspecto
+        let w = img.width, h = img.height;
+        if (w > maxW || h > maxH) {
+          const ratio = Math.min(maxW / w, maxH / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+
+        // primeira tentativa com quality fornecida
+        let b64 = canvas.toDataURL('image/jpeg', quality);
+
+        // se ainda > 700KB em base64 (~700*1024 chars), reduz mais
+        const limit = 700 * 1024;
+        let q = quality;
+        while (b64.length > limit && q > 0.3) {
+          q -= 0.08;
+          b64 = canvas.toDataURL('image/jpeg', q);
+        }
+
+        // último recurso: reduz dimensão pela metade
+        if (b64.length > limit) {
+          canvas.width  = Math.round(w * 0.6);
+          canvas.height = Math.round(h * 0.6);
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          b64 = canvas.toDataURL('image/jpeg', 0.65);
+        }
+
+        resolve(b64);
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleImgFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+
+  // indicador visual de processamento
+  const area = document.getElementById('anuncioImgArea');
+  const origHTML = area.innerHTML;
+  area.innerHTML = '<div style="padding:8px 0;color:var(--text2);font-size:12px;font-family:\'IBM Plex Mono\',monospace">⏳ Otimizando imagem...</div>';
+
+  try {
+    const b64 = await comprimirImagem(file);
+    anuncioImgBase64 = b64;
+    document.getElementById('anuncioImgPreview').src = b64;
     document.getElementById('anuncioImgPreviewWrap').style.display = 'block';
-    document.getElementById('anuncioImgArea').style.display = 'none';
+    area.style.display = 'none';
+    area.innerHTML = origHTML; // restaura para próxima vez
     syncPreview();
-  };
-  reader.readAsDataURL(file);
+  } catch(err) {
+    area.innerHTML = origHTML;
+    alert('Erro ao processar imagem. Tente outro arquivo.');
+    console.error(err);
+  }
+}
+
+document.getElementById('anuncioImgInput').addEventListener('change', function() {
+  handleImgFile(this.files[0]);
 });
 
 // Drag & drop
@@ -1936,12 +2000,7 @@ imgArea.addEventListener('dragleave', () => imgArea.classList.remove('drag-over'
 imgArea.addEventListener('drop', e => {
   e.preventDefault(); imgArea.classList.remove('drag-over');
   const file = e.dataTransfer.files[0];
-  if (file && file.type.startsWith('image/')) {
-    document.getElementById('anuncioImgInput').files;
-    const dt = new DataTransfer(); dt.items.add(file);
-    document.getElementById('anuncioImgInput').files = dt.files;
-    document.getElementById('anuncioImgInput').dispatchEvent(new Event('change'));
-  }
+  handleImgFile(file);
 });
 
 document.getElementById('anuncioImgRemove').addEventListener('click', () => {
