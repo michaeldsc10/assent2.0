@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import {
-  Search, Package, Edit2, Trash2, X, AlertTriangle, ImageOff,
+  Search, Package, Edit2, Trash2, X, AlertTriangle, ImageOff, Barcode,
 } from "lucide-react";
 
 import { db, storage } from "../lib/firebase";
@@ -325,6 +325,18 @@ const CSS = `
     font-size: 13px;
   }
 
+  /* Campo código de barras */
+  .barcode-input-wrap {
+    position: relative; display: flex; align-items: center;
+  }
+  .barcode-input-icon {
+    position: absolute; left: 10px; color: var(--text-3);
+    display: flex; align-items: center; pointer-events: none;
+    transition: color .15s;
+  }
+  .barcode-input-wrap:focus-within .barcode-input-icon { color: var(--gold); }
+  .barcode-input-field { padding-left: 32px !important; }
+
   /* Separador de seção no modal */
   .form-section-sep {
     border: none; border-top: 1px solid var(--border);
@@ -368,12 +380,13 @@ function ModalNovoProduto({ produto, produtos, onSave, onClose }) {
   const fotoInputRef = useRef(null);
 
   const [form, setForm] = useState({
-    nome:    produto?.nome    || "",
-    sku:     produto?.sku     || "",
-    preco:   produto?.preco != null ? fmtNum(produto.preco) : "",
-    custo:   produto?.custo  != null ? fmtNum(produto.custo) : "",
-    estoque: produto?.estoque != null ? String(produto.estoque) : "0",
-    foto:    produto?.foto    || null,
+    nome:          produto?.nome          || "",
+    sku:           produto?.sku           || "",
+    codigoBarras:  produto?.codigoBarras  || "",
+    preco:         produto?.preco  != null ? fmtNum(produto.preco)  : "",
+    custo:         produto?.custo  != null ? fmtNum(produto.custo)  : "",
+    estoque:       produto?.estoque != null ? String(produto.estoque) : "0",
+    foto:          produto?.foto          || null,
   });
 
   /* Campos da calculadora (estado local, não vão direto pro form) */
@@ -476,8 +489,9 @@ function ModalNovoProduto({ produto, produtos, onSave, onClose }) {
     const margem  = calcMargemReal(preco, custo);
 
     await onSave({
-      nome:    form.nome.trim(),
-      sku:     form.sku.trim(),
+      nome:         form.nome.trim(),
+      sku:          form.sku.trim(),
+      codigoBarras: form.codigoBarras.trim(),
       preco,
       custo,
       estoque,
@@ -542,6 +556,41 @@ function ModalNovoProduto({ produto, produtos, onSave, onClose }) {
                 onChange={(e) => set("sku", e.target.value)}
                 placeholder="ex: PF-3040-01"
               />
+            </div>
+          </div>
+
+          {/* ── Código de Barras ── */}
+          <div className="form-group">
+            <label className="form-label">
+              Código de Barras{" "}
+              <span style={{ color: "var(--text-3)", fontWeight: 400 }}>(opcional — EAN-13, QR etc.)</span>
+            </label>
+            <div className="barcode-input-wrap">
+              <span className="barcode-input-icon">
+                <Barcode size={14} />
+              </span>
+              <input
+                className="form-input barcode-input-field"
+                value={form.codigoBarras}
+                onChange={(e) => set("codigoBarras", e.target.value)}
+                placeholder="Leia com o leitor USB ou digite manualmente"
+                autoComplete="off"
+                spellCheck="false"
+                onKeyDown={(e) => {
+                  /* Leitor USB dispara Enter ao terminar — avança pro próximo campo */
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const inputs = Array.from(
+                      e.target.closest(".modal-box")?.querySelectorAll("input, select, textarea") || []
+                    );
+                    const idx = inputs.indexOf(e.target);
+                    if (idx >= 0 && inputs[idx + 1]) inputs[idx + 1].focus();
+                  }
+                }}
+              />
+            </div>
+            <div className="form-hint">
+              Compatível com leitor USB (funciona como teclado). Pressione Enter para avançar.
             </div>
           </div>
 
@@ -909,6 +958,7 @@ export default function Produtos({ isPro = false }) {
       (p) =>
         p.nome?.toLowerCase().includes(q) ||
         p.sku?.toLowerCase().includes(q) ||
+        p.codigoBarras?.toLowerCase().includes(q) ||
         p.id?.toLowerCase().includes(q)
     );
   }, [produtos, search]);
@@ -945,7 +995,7 @@ export default function Produtos({ isPro = false }) {
         <div className="pd-search">
           <Search size={13} color="var(--text-3)" />
           <input
-            placeholder="Buscar por nome, SKU ou ID..."
+            placeholder="Buscar por nome, SKU, código de barras ou ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -1007,10 +1057,15 @@ export default function Produtos({ isPro = false }) {
                 {/* ID */}
                 <span className="pd-id">{p.id}</span>
 
-                {/* Nome + SKU */}
+                {/* Nome + SKU + código de barras */}
                 <div className="pd-nome-cell">
                   <span className="pd-nome">{p.nome}</span>
                   {p.sku && <span className="pd-sku">{p.sku}</span>}
+                  {p.codigoBarras && (
+                    <span className="pd-sku" style={{ color: "var(--text-3)", fontFamily: "monospace" }}>
+                      {p.codigoBarras}
+                    </span>
+                  )}
                 </div>
 
                 {/* Preço */}
