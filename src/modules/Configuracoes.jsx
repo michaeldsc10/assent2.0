@@ -62,6 +62,7 @@ const MENU_SECTIONS = [
   { key: "servicos",        label: "Serviços",           sub: "Catálogo de serviços",     icon: "🔧", locked: false },
   { key: "entrada_estoque", label: "Estoque",             sub: "Movimentação de entrada",  icon: "📥", locked: false },
   { key: "vendas",          label: "Vendas",             sub: "PDV e registro de vendas",       icon: "🛒", locked: false },
+  { key: "pdv",            label: "PDV",                sub: "Ponto de Venda (leitor de código)", icon: "🏪", locked: false },
   { key: "mesas",           label: "Mesas",              sub: "Gestão de mesas e comandas",     icon: "🪑", locked: false },
   { key: "matriculas",      label: "Matrículas",         sub: "Alunos e mensalidades",          icon: "🎓", locked: false },
   { key: "fiado",           label: "A Receber",           sub: "Contas a receber",         icon: "💳", locked: false },
@@ -124,6 +125,7 @@ export const ATALHOS_MAP = [
   { code: "KeyO", display: "Alt + O", key: "orcamentos",      hint: "Orçamentos"           },
   { code: "KeyM", display: "Alt + M", key: "vendedores",      hint: "equipe (Membros)"     },
   { code: "KeyT", display: "Alt + T", key: "mesas",           hint: "Mesas (T de Table)"   },
+  { code: "KeyB", display: "Alt + B", key: "pdv",             hint: "PDV (B de Barcode)"   },
   { code: "KeyG", display: "Alt + G", key: "config",          hint: "confiGurações"        },
 ];
 
@@ -1088,7 +1090,7 @@ const PAGE_SIZE = 30;
 const MODULOS_LOG = [
   "Todos", "Agenda", "A Receber", "Caixa Diário", "Clientes",
   "Compras", "Configurações", "Despesas", "Entrada de Estoque",
-  "Fornecedores", "Matrículas", "Mesas", "Orçamentos", "Produtos",
+  "Fornecedores", "Matrículas", "Mesas", "Orçamentos", "PDV", "Produtos",
   "Serviços", "Usuários", "Vendas", "Vendedores",
 ];
 
