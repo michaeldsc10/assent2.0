@@ -24,7 +24,7 @@ import {
   ShoppingCart, Clock, Wallet, TrendingDown, Truck, BarChart3,
   Calendar, Settings, Zap, UserCheck, UserPlus, Search, ArrowUpRight,
   ArrowDownRight, ChevronRight, Bell, LogOut, ChevronDown,
-  PanelLeftClose, PanelLeftOpen, Menu, X, Sun, Moon, LayoutGrid, GraduationCap, TrendingUp,
+  PanelLeftClose, PanelLeftOpen, Menu, X, Sun, Moon, LayoutGrid, GraduationCap, TrendingUp, Barcode,
 } from "lucide-react";
 
 /* ── Módulos ───────────────────────────────────── */
@@ -46,6 +46,7 @@ import Usuarios      from "./modules/Usuarios.jsx";
 import Compras       from "./modules/Compras.jsx";
 import Mesas         from "./modules/Mesas.jsx";
 import Alunos        from "./modules/Alunos.jsx";
+import PDV          from "./modules/PDV.jsx";
 
 import RotaProtegida from "./contexts/RotaProtegida";
 import { usePermissao } from "./hooks/usePermissao";
@@ -86,6 +87,7 @@ const KEY_MAP = {
   "Configurações":      "config",
    "Compras":           "compras",
    "Mesas":             "mesas",
+  "PDV":              "pdv",
 };
 
 const ATALHOS_TECLADO = [
@@ -107,6 +109,7 @@ const ATALHOS_TECLADO = [
   { code: "KeyU", label: "Usuários",            dbKey: "usuarios"        },
   { code: "KeyG", label: "Configurações",       dbKey: "config"          },
   { code: "KeyT", label: "Mesas",               dbKey: "mesas"           },
+  { code: "KeyB", label: "PDV",                 dbKey: "pdv"             },
 ];
 
 const LOCKED_KEYS  = new Set(["dashboard", "config"]);
@@ -122,6 +125,7 @@ const NAV = [
   { section: "OPERAÇÕES", items: [
     { label: "Estoque", modulo: "entradaEstoque",   icone: ArrowDownToLine,  secao: "ESTOQUE"   },
     { label: "Vendas",          modulo: "vendas",           icone: TrendingDown,       secao: "COMERCIAL" },
+    { label: "PDV",            modulo: "pdv",              icone: Barcode,            secao: "COMERCIAL" },
     { label: "A Receber",       modulo: "aReceber",         icone: Clock,            secao: "FINANCEIRO"},
     {label: "Matriculas",       modulo: "alunos",       icone: GraduationCap,    secao: "COMERCIAL" }, 
    { label: "Compras",         modulo: "compras",          icone: ShoppingCart,     secao: "COMERCIAL" },
@@ -1603,6 +1607,12 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             <Alunos />
           </RotaProtegida>
             );
+      case "PDV":
+        return (
+          <RotaProtegida modulo="vendas" label="PDV">
+            <PDV onVoltar={() => setModule("Vendas")} />
+          </RotaProtegida>
+        );
       case "Configurações":
         // Configurações não precisa de RotaProtegida (acesso controlado pelo cargo admin)
         return <Configuracoes menuVisivel={menuVisivel} />;       
