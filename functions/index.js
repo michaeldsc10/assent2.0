@@ -1,6 +1,8 @@
 /* ═══════════════════════════════════════════════════
    ASSENT v2.0 — functions/index.js
    Cloud Functions com validação de cargo no servidor
+   + App Check obrigatório (enforceAppCheck)
+   + CORS restrito ao domínio da Vercel
    ═══════════════════════════════════════════════════ */
 
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
@@ -8,8 +10,23 @@ const admin = require("firebase-admin");
 
 admin.initializeApp();
 
-const db  = admin.firestore();
+const db     = admin.firestore();
 const fbAuth = admin.auth();
+
+/* ─────────────────────────────────────────────
+   CONFIGURAÇÃO GLOBAL DAS FUNÇÕES
+   enforceAppCheck → rejeita chamadas sem token App Check válido
+   cors            → só aceita requisições do seu domínio
+───────────────────────────────────────────── */
+const CALL_OPTIONS = {
+  enforceAppCheck: true,
+  cors: [
+    "https://ag.assentagencia.com.br",    // domínio próprio
+    "https://assent2-0.vercel.app",       // domínio Vercel
+    "http://localhost:5173",           // dev local (Vite padrão)
+    "http://localhost:3000",           // dev local alternativo
+  ],
+};
 
 /* ─────────────────────────────────────────────
    HELPER: Verifica se o caller é Admin legítimo
@@ -32,17 +49,13 @@ async function verificarAdmin(callerUid) {
     throw new HttpsError("permission-denied", "Licença inválida.");
   }
 
-  return callerUid; // tenantUid = uid do admin
+  return callerUid;
 }
 
 /* ─────────────────────────────────────────────
    FUNÇÃO 1: Criar Usuário
-   - Valida que o caller é admin
-   - Cria o usuário no Firebase Auth
-   - Escreve o perfil no Firestore
-   - Cria o índice reverso (userIndex)
 ───────────────────────────────────────────── */
-exports.criarUsuario = onCall(async (request) => {
+exports.criarUsuario = onCall(CALL_OPTIONS, async (request) => {
   const tenantUid = await verificarAdmin(request.auth?.uid);
 
   const { nome, email, senha, cargo, vendedorId } = request.data;
@@ -60,7 +73,6 @@ exports.criarUsuario = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "Senha deve ter no mínimo 6 caracteres.");
   }
 
-  // Verifica limite de usuários ativos (máx. 10 além do admin)
   const usuariosSnap = await db.collection(`users/${tenantUid}/usuarios`).get();
   const ativos = usuariosSnap.docs.filter(d => d.data().ativo !== false).length;
   if (ativos >= 10) {
@@ -81,7 +93,6 @@ exports.criarUsuario = onCall(async (request) => {
     throw new HttpsError("internal", "Erro ao criar usuário no Auth.");
   }
 
-  // Escreve perfil do usuário
   await db.doc(`users/${tenantUid}/usuarios/${novoUid}`).set({
     nome,
     email,
@@ -92,7 +103,6 @@ exports.criarUsuario = onCall(async (request) => {
     criadoPor: tenantUid,
   });
 
-  // Cria índice reverso para o AuthContext localizar o tenant
   await db.doc(`userIndex/${novoUid}`).set({
     tenantUid,
     criadoEm: admin.firestore.FieldValue.serverTimestamp(),
@@ -103,10 +113,8 @@ exports.criarUsuario = onCall(async (request) => {
 
 /* ─────────────────────────────────────────────
    FUNÇÃO 2: Editar Usuário
-   - Valida que o caller é admin
-   - Atualiza cargo, nome e vínculo de vendedor
 ───────────────────────────────────────────── */
-exports.editarUsuario = onCall(async (request) => {
+exports.editarUsuario = onCall(CALL_OPTIONS, async (request) => {
   const tenantUid = await verificarAdmin(request.auth?.uid);
 
   const { uid, nome, cargo, vendedorId } = request.data;
@@ -120,7 +128,6 @@ exports.editarUsuario = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "Cargo inválido.");
   }
 
-  // Garante que o usuário editado pertence ao tenant
   const usuarioSnap = await db.doc(`users/${tenantUid}/usuarios/${uid}`).get();
   if (!usuarioSnap.exists) {
     throw new HttpsError("not-found", "Usuário não encontrado nesta conta.");
@@ -138,12 +145,8 @@ exports.editarUsuario = onCall(async (request) => {
 
 /* ─────────────────────────────────────────────
    FUNÇÃO 3: Excluir Usuário
-   - Valida que o caller é admin
-   - Remove perfil do Firestore
-   - Remove índice reverso
-   - Remove conta do Firebase Auth
 ───────────────────────────────────────────── */
-exports.excluirUsuario = onCall(async (request) => {
+exports.excluirUsuario = onCall(CALL_OPTIONS, async (request) => {
   const tenantUid = await verificarAdmin(request.auth?.uid);
 
   const { uid } = request.data;
@@ -152,7 +155,6 @@ exports.excluirUsuario = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "UID do usuário é obrigatório.");
   }
 
-  // Garante que o usuário pertence ao tenant antes de excluir
   const usuarioSnap = await db.doc(`users/${tenantUid}/usuarios/${uid}`).get();
   if (!usuarioSnap.exists) {
     throw new HttpsError("not-found", "Usuário não encontrado nesta conta.");
@@ -160,15 +162,12 @@ exports.excluirUsuario = onCall(async (request) => {
 
   const nome = usuarioSnap.data().nome;
 
-  // Remove do Firestore
   await db.doc(`users/${tenantUid}/usuarios/${uid}`).delete();
   await db.doc(`userIndex/${uid}`).delete();
 
-  // Remove do Firebase Auth
   try {
     await fbAuth.deleteUser(uid);
   } catch (err) {
-    // Não falha a função se o usuário já não existia no Auth
     console.warn(`[excluirUsuario] Auth.deleteUser falhou para ${uid}:`, err.code);
   }
 
