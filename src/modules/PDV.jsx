@@ -16,9 +16,9 @@ import { db } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
 import {
   collection, query, where, getDocs, runTransaction,
-  doc, orderBy, limit,
+  doc, orderBy, limit, getDoc,
 } from "firebase/firestore";
-import BarcodeInput from "../components/BarcodeInput";
+import BarcodeInput from "./BarcodeInput";
 import { useConfiguracoes } from "./Configuracoes";
 
 /* ─── Formata moeda BRL ─── */
@@ -34,7 +34,6 @@ const fmtNum = (v) =>
 
 /* ══════════════════════════════════════════════════════
    MODAL CUPOM TÉRMICO
-   Abre uma janela de impressão 80mm sem usar o alert do browser
    ══════════════════════════════════════════════════════ */
 function ModalCupom({ venda, troco, empresa, onClose }) {
   const dataHora = new Date().toLocaleString("pt-BR", {
@@ -50,60 +49,25 @@ function ModalCupom({ venda, troco, empresa, onClose }) {
   };
 
   const imprimir = () => {
-    const win = window.open("", "cupom_pdv", "width=360,height=620,toolbar=0,menubar=0,scrollbars=1");
+    const win = window.open("", "cupom_pdv", "width=360,height=640,toolbar=0,menubar=0,scrollbars=1");
     if (!win) return;
-
     const linhaItens = (venda.itens || []).map(item =>
-      `<div class="row">
-        <span class="nome">${item.produto?.nome || item.nome || "—"}</span>
-        <span class="qtd">${item.qty}x</span>
-        <span class="val">${Number(item.subtotal || 0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span>
-      </div>`
+      `<div class="row"><span class="nome">${item.produto?.nome || item.nome || "—"}</span><span class="qtd">${item.qty}x</span><span class="val">${Number(item.subtotal||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>`
     ).join("");
-
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>Cupom #${venda.id}</title>
-<style>
-  @page { size: 80mm auto; margin: 3mm 4mm; }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Courier New', Courier, monospace; font-size: 11px; width: 72mm; color: #111; }
-  .center { text-align: center; }
-  .bold   { font-weight: bold; }
-  .empresa-nome { font-size: 14px; font-weight: bold; margin-bottom: 2px; }
-  .empresa-sub  { font-size: 10px; color: #555; }
-  .divider { border: none; border-top: 1px dashed #999; margin: 6px 0; }
-  .row { display: flex; gap: 4px; padding: 3px 0; border-bottom: 1px dotted #ddd; font-size: 11px; }
-  .row .nome { flex: 1; }
-  .row .qtd  { flex-shrink: 0; color: #555; }
-  .row .val  { flex-shrink: 0; text-align: right; font-weight: 600; }
-  .total-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; }
-  .total-grande { font-size: 14px; font-weight: bold; padding: 4px 0; }
-  .troco { font-size: 12px; font-weight: bold; }
-  .rodape { font-size: 9px; color: #777; margin-top: 4px; }
-  .num-venda { font-size: 10px; color: #555; letter-spacing: .04em; }
-</style>
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cupom</title>
+<style>@page{size:80mm auto;margin:3mm 4mm}*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Courier New',monospace;font-size:11px;width:72mm;color:#111}.center{text-align:center}.empresa-nome{font-size:14px;font-weight:bold;margin-bottom:2px}.empresa-sub{font-size:10px;color:#555}.divider{border:none;border-top:1px dashed #999;margin:6px 0}.row{display:flex;gap:4px;padding:3px 0;border-bottom:1px dotted #ddd}.row .nome{flex:1}.row .qtd{color:#555;flex-shrink:0}.row .val{flex-shrink:0;text-align:right;font-weight:600}.total-row{display:flex;justify-content:space-between;padding:2px 0}.total-grande{font-size:14px;font-weight:bold;padding:4px 0}.rodape{font-size:9px;color:#777;text-align:center;margin-top:4px}</style>
 </head><body>
-<div class="center">
-  <div class="empresa-nome">${empresa.nome || "ASSENT"}</div>
-  ${empresa.endereco ? `<div class="empresa-sub">${empresa.endereco}</div>` : ""}
-  ${empresa.telefone ? `<div class="empresa-sub">${empresa.telefone}</div>` : ""}
-</div>
-<hr class="divider">
-<div class="center num-venda">#${venda.id} &nbsp;·&nbsp; ${dataHora}</div>
-<hr class="divider">
-${linhaItens}
-<hr class="divider">
+<div class="center"><div class="empresa-nome">${empresa.nome||"ASSENT"}</div>${empresa.endereco?`<div class="empresa-sub">${empresa.endereco}</div>`:""}</div>
+<hr class="divider"><div class="center" style="font-size:10px;color:#777">#${venda.id} · ${dataHora}</div><hr class="divider">
+${linhaItens}<hr class="divider">
 <div class="total-row"><span>Subtotal</span><span>${Number(venda.total||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>
 <div class="total-row total-grande"><span>TOTAL</span><span>${Number(venda.total||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>
-${troco != null ? `<div class="total-row troco"><span>Troco</span><span>${Number(troco).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>` : ""}
+${troco!=null?`<div class="total-row"><span>Troco</span><span>${Number(troco).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>`:""}
 <hr class="divider">
-<div class="total-row"><span>Pagamento</span><span>${FORMA_LABEL_CUPOM[venda.formaPag] || venda.formaPag || "—"}</span></div>
-${venda.cliente ? `<div class="total-row"><span>Cliente</span><span>${venda.cliente}</span></div>` : ""}
-<hr class="divider">
-<div class="center rodape">Obrigado pela preferência!</div>
-<div class="center rodape">ASSENT Gestão · sistema.assent</div>
+<div class="total-row"><span>Pagamento</span><span>${FORMA_LABEL_CUPOM[venda.formaPag]||"—"}</span></div>
+${venda.cliente?`<div class="total-row"><span>Cliente</span><span>${venda.cliente}</span></div>`:""}
+<hr class="divider"><div class="rodape">Obrigado pela preferência!</div>
 </body></html>`);
-
     win.document.close();
     setTimeout(() => { win.focus(); win.print(); win.close(); }, 400);
   };
@@ -111,65 +75,37 @@ ${venda.cliente ? `<div class="total-row"><span>Cliente</span><span>${venda.clie
   return (
     <div className="cupom-overlay" onClick={onClose}>
       <div className="cupom-modal" onClick={e => e.stopPropagation()}>
-
-        {/* Header */}
         <div className="cupom-modal-header">
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:8 }}>
             <Printer size={14} color="var(--pdv-gold)" />
             <span>Cupom #{venda.id}</span>
           </div>
           <button className="cupom-close" onClick={onClose}><X size={14} /></button>
         </div>
-
-        {/* Preview do cupom — simula o papel térmico */}
         <div className="cupom-paper">
           <div className="cupom-empresa">{empresa.nome}</div>
           {empresa.endereco && <div className="cupom-sub">{empresa.endereco}</div>}
           <div className="cupom-divider" />
           <div className="cupom-meta">#{venda.id} · {dataHora}</div>
           <div className="cupom-divider" />
-
           {(venda.itens || []).map((item, i) => (
             <div key={i} className="cupom-item">
               <span className="cupom-item-nome">{item.produto?.nome || item.nome || "—"}</span>
               <span className="cupom-item-qty">{item.qty}x</span>
-              <span className="cupom-item-val">{fmt(item.subtotal)}</span>
+              <span className="cupom-item-val">{Number(item.subtotal||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span>
             </div>
           ))}
-
           <div className="cupom-divider" />
-          <div className="cupom-total-row">
-            <span>Total</span>
-            <span style={{ fontWeight: 700, color: "#111" }}>{fmt(venda.total)}</span>
-          </div>
-          {troco != null && (
-            <div className="cupom-total-row">
-              <span>Troco</span>
-              <span style={{ color: "#1a7a3c", fontWeight: 600 }}>{fmt(troco)}</span>
-            </div>
-          )}
-          <div className="cupom-total-row">
-            <span>Pagamento</span>
-            <span>{FORMA_LABEL_CUPOM[venda.formaPag] || "—"}</span>
-          </div>
-          {venda.cliente && (
-            <div className="cupom-total-row">
-              <span>Cliente</span>
-              <span>{venda.cliente}</span>
-            </div>
-          )}
+          <div className="cupom-total-row"><span>Total</span><span style={{fontWeight:700}}>{Number(venda.total||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>
+          {troco != null && <div className="cupom-total-row"><span>Troco</span><span style={{color:"#1a7a3c",fontWeight:600}}>{Number(troco).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>}
+          <div className="cupom-total-row"><span>Pagamento</span><span>{FORMA_LABEL_CUPOM[venda.formaPag]||"—"}</span></div>
+          {venda.cliente && <div className="cupom-total-row"><span>Cliente</span><span>{venda.cliente}</span></div>}
           <div className="cupom-divider" />
           <div className="cupom-rodape">Obrigado pela preferência!</div>
         </div>
-
-        {/* Footer */}
         <div className="cupom-modal-footer">
-          <button className="cupom-btn-imprimir" onClick={imprimir}>
-            <Printer size={14} /> Imprimir
-          </button>
-          <button className="cupom-btn-fechar" onClick={onClose}>
-            Fechar
-          </button>
+          <button className="cupom-btn-imprimir" onClick={imprimir}><Printer size={14}/> Imprimir</button>
+          <button className="cupom-btn-fechar" onClick={onClose}>Fechar</button>
         </div>
       </div>
     </div>
@@ -181,7 +117,6 @@ ${venda.cliente ? `<div class="total-row"><span>Cliente</span><span>${venda.clie
    ═══════════════════════════════════════════════════ */
 export default function PDV({ onVoltar }) {
   const { tenantUid, vendedorNome, vendedorId, cargo, user } = useAuth();
-  const nomeOperador = vendedorNome || user?.displayName || user?.email?.split('@')[0] || "Operador";
   const { config, loading: cfgLoading } = useConfiguracoes(tenantUid);
 
   /* ── Dados da empresa (logo + nome) ── */
@@ -212,11 +147,27 @@ export default function PDV({ onVoltar }) {
   const [showCupom, setShowCupom] = useState(false);
   const [erro, setErro] = useState("");
   const [toast, setToast] = useState(null);
-  const [editandoQty, setEditandoQty] = useState(null); // índice do item sendo editado
+  const [editandoQty, setEditandoQty] = useState(null);
+  const [nomeOperador, setNomeOperador] = useState("");
 
   const buscaRef = useRef(null);
 
-  /* ─── Mapeamento forma → label e chave de taxa ─── */
+  /* ─── Busca nome do operador em licencas/{tenantUid} ─── */
+  useEffect(() => {
+    if (!tenantUid) return;
+    getDoc(doc(db, "licencas", tenantUid))
+      .then((snap) => {
+        if (snap.exists()) {
+          const name = snap.data()?.name || snap.data()?.nome || "";
+          setNomeOperador(name);
+        }
+      })
+      .catch(() => {});
+  }, [tenantUid]);
+
+  const operadorDisplay = nomeOperador || vendedorNome || user?.displayName || user?.email?.split("@")[0] || "Operador";
+
+  /* ─── Mapeamento forma → label ─── */
   const FORMA_LABEL = {
     dinheiro: "Dinheiro",
     cartao:   "Cartão de Débito",
@@ -231,8 +182,8 @@ export default function PDV({ onVoltar }) {
       ? parseFloat(valorRecebido.replace(",", ".")) - total
       : null;
 
+  /* ─── Taxas de cartão (puxadas de config.taxas) ─── */
   const taxas = config?.taxas || {};
-
   const taxaPct = (() => {
     switch (formaPag) {
       case "cartao":  return parseFloat(taxas.debito || "0");
@@ -241,7 +192,6 @@ export default function PDV({ onVoltar }) {
       default:        return 0;
     }
   })();
-
   const valorTaxa    = parseFloat((total * (taxaPct / 100)).toFixed(2));
   const totalLiquido = parseFloat((total - valorTaxa).toFixed(2));
 
@@ -448,7 +398,6 @@ export default function PDV({ onVoltar }) {
           itens,
           total,
           pagamento,
-          // ── Campos compatíveis com Relatorios.jsx ──
           formaPagamento: FORMA_LABEL[formaPag] || formaPag,
           taxaPct:        taxaPct || 0,
           valorTaxa:      valorTaxa || 0,
@@ -458,8 +407,8 @@ export default function PDV({ onVoltar }) {
           clienteId:      cliente?.id  || null,
           status:         "ativa",
           origem:         "pdv",
-          vendedorId:     vendedorId   || null,
-          vendedorNome:   vendedorNome || null,
+          vendedorId:     vendedorId      || null,
+          vendedorNome:   nomeOperador    || null,
           criadoEm:       new Date(),
         };
 
@@ -563,11 +512,11 @@ export default function PDV({ onVoltar }) {
           <div className="pdv-header-right">
             <div className="pdv-operador">
               <span className="pdv-operador-label">Operador</span>
-              <span className="pdv-operador-nome">{nomeOperador}</span>
+              <span className="pdv-operador-nome">{operadorDisplay}</span>
             </div>
             {onVoltar && (
               <button className="pdv-btn-voltar" onClick={onVoltar} title="Voltar ao menu">
-                <ArrowLeft size={16} color="#c0c2d8" strokeWidth={2} />
+                <ArrowLeft size={16} color="#d0d2e8" strokeWidth={2.5} />
               </button>
             )}
           </div>
@@ -696,13 +645,6 @@ export default function PDV({ onVoltar }) {
                 ))}
               </div>
 
-              {/* Taxa para débito e pix */}
-              {(formaPag === "cartao" || formaPag === "pix") && taxaPct > 0 && (
-                <div className="pdv-taxa-badge" style={{ marginTop: 8 }}>
-                  Taxa {taxaPct.toFixed(2)}% · desconto de {fmt(valorTaxa)} sobre o total
-                </div>
-              )}
-
               {formaPag === "dinheiro" && (
                 <div className="pdv-pag-detalhe">
                   <label>Valor recebido</label>
@@ -735,9 +677,14 @@ export default function PDV({ onVoltar }) {
                   </div>
                   {taxaPct > 0 && (
                     <div className="pdv-taxa-badge">
-                      Taxa {taxaPct.toFixed(2)}% · desconto de {fmt(valorTaxa)}
+                      Taxa {taxaPct.toFixed(2)}% · desc. {fmt(valorTaxa)}
                     </div>
                   )}
+                </div>
+              )}
+              {(formaPag === "cartao" || formaPag === "pix") && taxaPct > 0 && (
+                <div className="pdv-taxa-badge" style={{ marginTop: 8 }}>
+                  Taxa {taxaPct.toFixed(2)}% · desc. {fmt(valorTaxa)}
                 </div>
               )}
             </div>
@@ -777,7 +724,7 @@ export default function PDV({ onVoltar }) {
                         )}
                       </div>
                       <div className="pdv-item-qty">
-                        <button onClick={() => alterarQty(idx, -1)}><Minus size={12} /></button>
+                        <button onClick={() => alterarQty(idx, -1)}><Minus size={12} color="#9193a5" strokeWidth={2.5} /></button>
                         {editandoQty === idx ? (
                           <input
                             className="pdv-qty-input"
@@ -795,7 +742,7 @@ export default function PDV({ onVoltar }) {
                             {fmtNum(item.qty)}
                           </span>
                         )}
-                        <button onClick={() => alterarQty(idx, 1)}><Plus size={12} /></button>
+                        <button onClick={() => alterarQty(idx, 1)}><Plus size={12} color="#9193a5" strokeWidth={2.5} /></button>
                       </div>
                       <span className="pdv-item-unit">{fmt(item.precoUnit)}</span>
                       <span className="pdv-item-sub">{fmt(item.subtotal)}</span>
@@ -816,7 +763,7 @@ export default function PDV({ onVoltar }) {
               </div>
               {taxaPct > 0 && (
                 <div className="pdv-total-row" style={{ color: "var(--pdv-error)", fontSize: 12 }}>
-                  <span>Taxa cartão ({taxaPct.toFixed(2)}%)</span>
+                  <span>Taxa ({taxaPct.toFixed(2)}%)</span>
                   <span>- {fmt(valorTaxa)}</span>
                 </div>
               )}
@@ -826,7 +773,7 @@ export default function PDV({ onVoltar }) {
               </div>
               {taxaPct > 0 && (
                 <div className="pdv-total-row" style={{ fontSize: 12 }}>
-                  <span style={{ color: "var(--pdv-text-3)" }}>Você recebe (líquido)</span>
+                  <span style={{ color: "var(--pdv-text-3)" }}>Você recebe</span>
                   <span style={{ color: "var(--pdv-success)", fontWeight: 600 }}>{fmt(totalLiquido)}</span>
                 </div>
               )}
@@ -940,12 +887,13 @@ const CSS = `
 .pdv-operador-label { font-size: 10px; color: var(--pdv-text-3); display: block; }
 .pdv-operador-nome  { font-size: 13px; color: var(--pdv-text-2); display: block; font-weight: 500; }
 .pdv-btn-voltar {
-  background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15);
-  color: #c0c2d8; border-radius: 8px; width: 36px; height: 36px;
-  display: flex; align-items: center; justify-content: center; cursor: pointer;
-  transition: all .2s;
+  background: rgba(255,255,255,0.09);
+  border: 1.5px solid rgba(255,255,255,0.22);
+  border-radius: 9px; width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all .2s; flex-shrink: 0;
 }
-.pdv-btn-voltar:hover { background: var(--pdv-gold-dim); border-color: var(--pdv-gold); color: var(--pdv-gold); }
+.pdv-btn-voltar:hover { background: var(--pdv-gold-dim); border-color: var(--pdv-gold); }
 
 /* ── BODY ── */
 .pdv-body {
@@ -1092,8 +1040,15 @@ const CSS = `
   margin-top: 8px; padding: 7px 11px; border-radius: 7px;
   background: rgba(224,85,85,0.08); border: 1px solid rgba(224,85,85,0.2);
   color: var(--pdv-error); font-size: 11.5px; font-weight: 500;
-  display: flex; align-items: center; gap: 5px;
 }
+.pdv-btn-cupom {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: transparent; border: 1px solid rgba(200,165,94,0.35);
+  color: var(--pdv-gold); border-radius: 8px; padding: 10px;
+  font-size: 13px; cursor: pointer; transition: all .15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.pdv-btn-cupom:hover { background: var(--pdv-gold-dim); border-color: var(--pdv-gold); }
 
 /* ── COL DIREITA ── */
 .pdv-col-right {
@@ -1139,12 +1094,15 @@ const CSS = `
   display: flex; align-items: center; gap: 4px;
 }
 .pdv-item-qty button {
-  background: rgba(255,255,255,0.05); border: 1px solid var(--pdv-border);
-  border-radius: 5px; width: 22px; height: 22px;
+  background: rgba(255,255,255,0.08);
+  border: 1.5px solid rgba(255,255,255,0.18);
+  border-radius: 6px; width: 24px; height: 24px;
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer; color: var(--pdv-text-2); transition: all .15s;
+  cursor: pointer; transition: all .15s; flex-shrink: 0;
 }
-.pdv-item-qty button:hover { background: var(--pdv-gold-dim); color: var(--pdv-gold); }
+.pdv-item-qty button:hover { background: var(--pdv-gold-dim); border-color: var(--pdv-gold); }
+.pdv-item-qty button svg { stroke: #b0b2c8; }
+.pdv-item-qty button:hover svg { stroke: var(--pdv-gold); }
 .pdv-qty-valor {
   font-size: 13px; font-weight: 500; min-width: 34px; text-align: center;
   cursor: pointer; padding: 2px 4px; border-radius: 4px;
@@ -1187,13 +1145,20 @@ const CSS = `
 .pdv-btn-finalizar {
   margin: 12px 16px 4px;
   display: flex; align-items: center; justify-content: center; gap: 10px;
-  background: var(--pdv-gold); color: #0f1117;
-  border: none; border-radius: 10px; padding: 14px;
-  font-size: 15px; font-weight: 700; cursor: pointer;
-  transition: all .2s; letter-spacing: .01em;
+  background: linear-gradient(135deg, #d4b06a 0%, #c8a55e 60%, #b8943e 100%);
+  color: #0a0a0a;
+  border: none; border-radius: 50px; padding: 15px 20px;
+  font-size: 15px; font-weight: 900; cursor: pointer;
+  letter-spacing: .04em; text-transform: uppercase;
+  transition: all .2s;
+  box-shadow: 0 4px 20px rgba(200,165,94,0.35), 0 1px 0 rgba(255,255,255,0.15) inset;
 }
-.pdv-btn-finalizar:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
-.pdv-btn-finalizar:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.pdv-btn-finalizar:hover:not(:disabled) {
+  box-shadow: 0 6px 28px rgba(200,165,94,0.55), 0 1px 0 rgba(255,255,255,0.15) inset;
+  transform: translateY(-2px);
+}
+.pdv-btn-finalizar:active:not(:disabled) { transform: translateY(0); }
+.pdv-btn-finalizar:disabled { opacity: .38; cursor: not-allowed; transform: none; box-shadow: none; }
 .pdv-btn-cancelar {
   margin: 0 16px 16px;
   display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -1246,21 +1211,10 @@ const CSS = `
 .pdv-col-left::-webkit-scrollbar-thumb,
 .pdv-carrinho-body::-webkit-scrollbar-thumb { background: var(--pdv-border); border-radius: 2px; }
 
-/* ── BOTÃO IMPRIMIR CUPOM ── */
-.pdv-btn-cupom {
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-  background: transparent; border: 1px solid rgba(200,165,94,0.35);
-  color: var(--pdv-gold); border-radius: 8px; padding: 10px;
-  font-size: 13px; cursor: pointer; transition: all .15s;
-  font-family: 'DM Sans', sans-serif;
-}
-.pdv-btn-cupom:hover { background: var(--pdv-gold-dim); border-color: var(--pdv-gold); }
-
 /* ── MODAL CUPOM ── */
 .cupom-overlay {
   position: fixed; inset: 0; z-index: 9999;
-  background: rgba(0,0,0,0.55);
-  backdrop-filter: blur(3px);
+  background: rgba(0,0,0,0.6); backdrop-filter: blur(3px);
   display: flex; align-items: center; justify-content: center;
   animation: fadeIn .15s ease;
 }
@@ -1269,52 +1223,36 @@ const CSS = `
   border-radius: 14px; width: 320px; max-height: 88vh;
   display: flex; flex-direction: column;
   box-shadow: 0 24px 64px rgba(0,0,0,0.7);
-  animation: slideUp .18s ease;
-  overflow: hidden;
+  animation: slideUp .18s ease; overflow: hidden;
 }
 .cupom-modal-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 13px 16px; border-bottom: 1px solid rgba(255,255,255,0.07);
-  font-size: 13px; font-weight: 600; color: #e8e8f0;
-  flex-shrink: 0;
+  font-size: 13px; font-weight: 600; color: #e8e8f0; flex-shrink: 0;
 }
 .cupom-close {
-  background: none; border: none; cursor: pointer;
-  color: #5c5e72; display: flex; align-items: center;
-  padding: 2px; border-radius: 5px; transition: color .13s;
+  background: none; border: none; cursor: pointer; color: #5c5e72;
+  display: flex; align-items: center; padding: 2px; border-radius: 5px;
+  transition: color .13s;
 }
 .cupom-close:hover { color: #e05555; }
-
-/* ── PAPEL TÉRMICO (preview) ── */
 .cupom-paper {
   background: #fafaf8; color: #111;
-  font-family: 'Courier New', Courier, monospace;
-  font-size: 11.5px; padding: 16px 14px;
-  overflow-y: auto; flex: 1;
-  line-height: 1.5;
+  font-family: 'Courier New', monospace; font-size: 11.5px;
+  padding: 16px 14px; overflow-y: auto; flex: 1; line-height: 1.5;
 }
 .cupom-paper::-webkit-scrollbar { width: 3px; }
 .cupom-paper::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
 .cupom-empresa { font-size: 13px; font-weight: bold; text-align: center; margin-bottom: 2px; }
 .cupom-sub { font-size: 10px; color: #666; text-align: center; }
-.cupom-meta { font-size: 10px; color: #777; text-align: center; letter-spacing: .02em; }
-.cupom-divider {
-  border: none; border-top: 1px dashed #bbb; margin: 7px 0;
-}
-.cupom-item {
-  display: flex; align-items: baseline; gap: 4px; padding: 2px 0;
-  border-bottom: 1px dotted #ddd; font-size: 11px;
-}
-.cupom-item-nome { flex: 1; color: #222; }
+.cupom-meta { font-size: 10px; color: #777; text-align: center; }
+.cupom-divider { border: none; border-top: 1px dashed #bbb; margin: 7px 0; }
+.cupom-item { display: flex; align-items: baseline; gap: 4px; padding: 2px 0; border-bottom: 1px dotted #ddd; }
+.cupom-item-nome { flex: 1; color: #222; font-size: 11px; }
 .cupom-item-qty  { color: #888; flex-shrink: 0; font-size: 10px; }
-.cupom-item-val  { flex-shrink: 0; text-align: right; font-weight: 600; min-width: 64px; }
-.cupom-total-row {
-  display: flex; justify-content: space-between;
-  font-size: 11.5px; padding: 2px 0; color: #333;
-}
+.cupom-item-val  { flex-shrink: 0; text-align: right; font-weight: 600; font-size: 11px; min-width: 64px; }
+.cupom-total-row { display: flex; justify-content: space-between; font-size: 11.5px; padding: 2px 0; color: #333; }
 .cupom-rodape { text-align: center; font-size: 10px; color: #888; margin-top: 4px; }
-
-/* ── FOOTER DO MODAL ── */
 .cupom-modal-footer {
   display: flex; gap: 8px; padding: 12px 16px;
   border-top: 1px solid rgba(255,255,255,0.07); flex-shrink: 0;
@@ -1334,7 +1272,6 @@ const CSS = `
   font-family: 'DM Sans', sans-serif; transition: all .13s;
 }
 .cupom-btn-fechar:hover { background: rgba(255,255,255,0.05); color: #e8e8f0; }
-
 @keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
 `;
