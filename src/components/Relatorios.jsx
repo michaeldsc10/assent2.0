@@ -5026,6 +5026,7 @@ const PERMISSOES_RELATORIO = {
   vendedores:          ["financeiro", "comercial"],
   rel_compras:         ["financeiro", "compras"],
   rel_contas_receber:  ["financeiro", "comercial"],
+  pdv:                 ["financeiro", "comercial", "vendedor"],
 };
 
 const MENU = [
@@ -5033,6 +5034,7 @@ const MENU = [
   { key: "financeiro", label: "Financeiro",   icon: <Wallet size={15} />         },
   { key: "lucro_ps",   label: "Produtos & Serviços", icon: <DollarSign size={15} />     },
   { key: "vendas",     label: "Vendas",       icon: <ShoppingCart size={15} />   },
+  { key: "pdv",        label: "PDV",          icon: <Receipt size={15} />        },
   { key: "vendedores", label: "Vendedores",   icon: <Users size={15} />          },
   { key: "clientes",   label: "Clientes",     icon: <Users size={15} />          },
    { key: "alunos",       label: "Alunos",         icon: <Users size={15} />        },  // ← NOVO
@@ -5058,6 +5060,7 @@ const TITULO_RELATORIO = {
   vendedores:          "Relatório de Vendedores",
   rel_compras:         "Relatório de Compras",
   rel_contas_receber:  "Relatório de Contas a Receber",
+  pdv:        "Relatório de PDV",
 };
 
 
@@ -5584,6 +5587,205 @@ function RelatorioVendedores({ vendas, vendedores, intervalo }) {
   );
 }
 
+
+/* ══════════════════════════════════════════════════════
+   RELATÓRIO: PDV
+   Filtra vendas com origem === "pdv"
+   Permissão excluir: somente admin
+   ══════════════════════════════════════════════════════ */
+function RelatorioPDV({ vendas, intervalo, isAdmin }) {
+  const vendasPDV = useMemo(() =>
+    vendas.filter((v) =>
+      v.origem === "pdv" &&
+      v.status !== "cancelada" &&
+      dentroDoIntervalo(v.data, intervalo)
+    ),
+    [vendas, intervalo]
+  );
+
+  /* KPIs */
+  const totalFaturado = vendasPDV.reduce((s, v) => s + Number(v.total || 0), 0);
+  const numVendas     = vendasPDV.length;
+  const ticketMedio   = numVendas > 0 ? totalFaturado / numVendas : 0;
+
+  /* Formas de pagamento */
+  const fpMap = {};
+  vendasPDV.forEach((v) => {
+    const fp = v.formaPagamento || "Não informado";
+    fpMap[fp] = (fpMap[fp] || 0) + Number(v.total || 0);
+  });
+  const fpList = Object.entries(fpMap)
+    .sort((a, b) => b[1] - a[1])
+    .map(([nome, val]) => ({ nome, val, pct: totalFaturado > 0 ? (val / totalFaturado) * 100 : 0 }));
+
+  const FP_COLORS = { "Dinheiro": "#3ecf8e", "Pix": "#5b8ef0", "Cartão de Débito": "#f59e0b", "Cartão de Crédito": "#c8a55e", "Transferência": "#a78bfa" };
+
+  /* Top produtos */
+  const prodMap = {};
+  vendasPDV.forEach((v) => {
+    (v.itens || []).forEach((item) => {
+      const nome = item.nome || item.produto?.nome || "—";
+      if (!prodMap[nome]) prodMap[nome] = { qtd: 0, total: 0 };
+      prodMap[nome].qtd   += Number(item.qty || item.quantidade || 1);
+      prodMap[nome].total += Number(item.subtotal || 0);
+    });
+  });
+  const topProd = Object.entries(prodMap)
+    .sort((a, b) => b[1].total - a[1].total)
+    .slice(0, 10);
+  const maxProd = topProd[0]?.[1].total || 1;
+
+  /* Export */
+  const handleExport = () => {
+    exportarExcel("pdv", [{
+      nome: "PDV",
+      colunas: ["ID", "Data", "Cliente", "Itens", "Forma Pagamento", "Total"],
+      dados: vendasPDV.map((v) => [
+        v.idVenda || v.id?.slice(0, 8).toUpperCase() || "—",
+        fmtData(v.data),
+        v.cliente || "—",
+        (v.itens || []).map(i => `${i.nome || "?"} x${i.qty || 1}`).join(", ") || "—",
+        v.formaPagamento || "—",
+        Number(v.total || 0).toFixed(2),
+      ]),
+    }]);
+  };
+
+  if (vendasPDV.length === 0) {
+    return (
+      <div className="rel-empty">
+        <Receipt size={32} color="var(--text-3)" />
+        <p>Nenhuma venda pelo PDV no período selecionado.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+
+      {/* KPIs */}
+      <div className="cr-grid">
+        <div className="cr-card">
+          <div className="cr-icon-wrap" style={{ background: "rgba(200,165,94,0.12)" }}>
+            <DollarSign size={18} color="var(--gold)" />
+          </div>
+          <div className="cr-body">
+            <div className="cr-label">Total Faturado</div>
+            <div className="cr-value" style={{ color: "var(--gold)" }}>{fmtR$(totalFaturado)}</div>
+            <div className="cr-sub">{numVendas} venda{numVendas !== 1 ? "s" : ""} pelo PDV</div>
+          </div>
+        </div>
+        <div className="cr-card">
+          <div className="cr-icon-wrap" style={{ background: "rgba(91,142,240,0.12)" }}>
+            <Receipt size={18} color="var(--blue)" />
+          </div>
+          <div className="cr-body">
+            <div className="cr-label">Nº de Vendas</div>
+            <div className="cr-value" style={{ color: "var(--blue)" }}>{numVendas}</div>
+            <div className="cr-sub">transações no período</div>
+          </div>
+        </div>
+        <div className="cr-card">
+          <div className="cr-icon-wrap" style={{ background: "rgba(62,207,142,0.12)" }}>
+            <TrendingUp size={18} color="var(--green)" />
+          </div>
+          <div className="cr-body">
+            <div className="cr-label">Ticket Médio</div>
+            <div className="cr-value" style={{ color: "var(--green)" }}>{fmtR$(ticketMedio)}</div>
+            <div className="cr-sub">por venda no PDV</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Formas de pagamento */}
+      {fpList.length > 0 && (
+        <div className="tr-wrap">
+          <div className="tr-header">
+            <span className="tr-title">Formas de Pagamento</span>
+            <span className="tr-badge">{fpList.length} tipo{fpList.length !== 1 ? "s" : ""}</span>
+          </div>
+          <div style={{ padding: "14px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
+            {fpList.map(({ nome, val, pct }) => {
+              const cor = FP_COLORS[nome] || "var(--gold)";
+              return (
+                <div key={nome} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{ width: 3, height: 28, borderRadius: 2, background: cor, flexShrink: 0 }} />
+                  <span style={{ flex: 1, fontSize: 13, color: "var(--text-2)", fontWeight: 500 }}>{nome}</span>
+                  <div style={{ width: 120, height: 4, borderRadius: 4, background: "rgba(255,255,255,0.06)", overflow: "hidden", flexShrink: 0 }}>
+                    <div style={{ width: `${pct}%`, height: "100%", borderRadius: 4, background: cor, transition: "width .5s" }} />
+                  </div>
+                  <span style={{ fontFamily: "'Sora',sans-serif", fontSize: 12, fontWeight: 700, color: "var(--text)", minWidth: 40, textAlign: "right" }}>{pct.toFixed(1)}%</span>
+                  <span style={{ fontFamily: "'Sora',sans-serif", fontSize: 12, fontWeight: 600, color: cor, minWidth: 100, textAlign: "right" }}>{fmtR$(val)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Top produtos */}
+      {topProd.length > 0 && (
+        <div className="tr-wrap">
+          <div className="tr-header">
+            <span className="tr-title">Top Produtos Vendidos no PDV</span>
+            <span className="tr-badge">{topProd.length}</span>
+          </div>
+          {topProd.map(([nome, { qtd, total }], i) => (
+            <div key={nome} className="rv-prod-row" style={{ padding: "10px 18px" }}>
+              <span className={`rv-prod-rank${i < 3 ? " top" : ""}`}>#{i + 1}</span>
+              <span className="rv-prod-name">{nome}</span>
+              <div className="rv-prod-bar-bg">
+                <div className="rv-prod-bar-fill" style={{ width: `${(total / maxProd) * 100}%` }} />
+              </div>
+              <span className="rv-prod-qtd">{qtd} un.</span>
+              <span className="rv-prod-val" style={{ color: "var(--gold)" }}>{fmtR$(total)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Tabela de transações */}
+      <div className="tr-wrap">
+        <div className="tr-header">
+          <span className="tr-title">Transações PDV</span>
+          <span className="tr-badge">{vendasPDV.length}</span>
+        </div>
+        <div className="tr-head" style={{ gridTemplateColumns: "88px 90px 1fr 1fr 120px 110px", display: "grid", padding: "9px 18px", gap: 8 }}>
+          <span>Data</span>
+          <span>ID</span>
+          <span>Cliente</span>
+          <span>Itens</span>
+          <span>Pagamento</span>
+          <span style={{ textAlign: "right" }}>Total</span>
+        </div>
+        {vendasPDV
+          .slice()
+          .sort((a, b) => new Date(b.data) - new Date(a.data))
+          .map((v) => {
+            const descItens = (v.itens || []).map(i => `${i.nome || "?"} x${i.qty || 1}`).join(", ") || "—";
+            return (
+              <div key={v.id} className="tr-row" style={{ gridTemplateColumns: "88px 90px 1fr 1fr 120px 110px" }}>
+                <span style={{ fontFamily: "'Sora',sans-serif", fontSize: 11, color: "var(--text-3)" }}>{fmtData(v.data)}</span>
+                <span style={{ fontFamily: "monospace", fontSize: 11, color: "var(--gold)" }}>{v.idVenda || v.id?.slice(0, 8).toUpperCase() || "—"}</span>
+                <span style={{ fontWeight: 500, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.cliente || "—"}</span>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-2)", fontSize: 11 }}>{descItens}</span>
+                <span style={{ fontSize: 11, color: "var(--text-3)" }}>{v.formaPagamento || "—"}</span>
+                <span style={{ textAlign: "right" }} className="val-pos">{fmtR$(v.total || 0)}</span>
+              </div>
+            );
+          })}
+      </div>
+
+      {/* Export */}
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="btn-secondary" onClick={handleExport}>
+          <Download size={13} /> Exportar Excel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ══════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL: Relatorios
    ══════════════════════════════════════════════════════ */
@@ -5746,6 +5948,7 @@ export default function Relatorios() {
      
       
      
+      case "pdv":       return <RelatorioPDV vendas={vendas} intervalo={intervalo} isAdmin={isAdmin} />;
       default:           return null;
     }
   };
