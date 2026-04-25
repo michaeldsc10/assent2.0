@@ -1244,21 +1244,25 @@ tbody tr:hover { background: var(--surface2); }
 
                 <!-- Painel vídeo -->
                 <div id="mediaPanelVideo" style="display:none">
-                  <div class="video-upload-area" id="anuncioVideoArea">
-                    <input type="file" id="anuncioVideoInput" accept="video/mp4,video/webm,video/quicktime">
-                    <div style="font-size:22px">🎬</div>
-                    <div class="img-upload-label">Clique para selecionar o vídeo</div>
-                    <div class="img-upload-sub">MP4, WebM — máx. 50MB</div>
+                  <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+                    <input class="field-input" id="anuncioVideoUrlInput" type="url"
+                      placeholder="https://... (MP4, WebM, YouTube, Drive...)"
+                      style="flex:1"
+                      oninput="handleVideoUrl(this.value)">
+                    <button onclick="clearVideoUrl()" title="Limpar" style="
+                      flex-shrink:0; padding:0 12px; height:42px; border-radius:8px;
+                      background:var(--surface2); border:1px solid var(--border2);
+                      color:var(--text3); cursor:pointer; font-size:14px;
+                      transition:color .15s, border-color .15s;
+                    " onmouseover="this.style.color='var(--danger)';this.style.borderColor='rgba(239,68,68,0.4)'"
+                       onmouseout="this.style.color='var(--text3)';this.style.borderColor='var(--border2)'">✕</button>
                   </div>
-                  <div class="video-upload-progress" id="videoProgress">
-                    <div class="video-progress-label" id="videoProgressLabel">Enviando vídeo...</div>
-                    <div class="video-progress-bar-wrap">
-                      <div class="video-progress-bar" id="videoProgressBar"></div>
-                    </div>
+                  <div style="font-size:10px;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-bottom:10px;letter-spacing:.5px">
+                    A URL é salva diretamente no Firestore — nenhum arquivo é enviado ao servidor.
                   </div>
-                  <div class="video-preview-wrap" id="anuncioVideoPreviewWrap">
+                  <div class="video-preview-wrap" id="anuncioVideoPreviewWrap" style="display:none">
                     <video id="anuncioVideoPreview" controls muted></video>
-                    <button class="video-remove-btn" id="anuncioVideoRemove" title="Remover vídeo">✕</button>
+                    <button class="video-remove-btn" id="anuncioVideoRemove" title="Remover vídeo" onclick="clearVideoUrl()">✕</button>
                   </div>
                 </div>
               </div>
@@ -2234,9 +2238,7 @@ function switchMediaTab(tab) {
   // Clear other media when switching
   if (tab === 'img') {
     anuncioVideoUrl = '';
-    document.getElementById('anuncioVideoPreviewWrap').style.display = 'none';
-    document.getElementById('anuncioVideoArea').style.display = 'block';
-    document.getElementById('anuncioVideoProgress') && (document.getElementById('videoProgress').style.display = 'none');
+    clearVideoUrl();
   } else {
     anuncioImgBase64 = '';
     document.getElementById('frameWidget').style.display = 'none';
@@ -2317,66 +2319,30 @@ document.getElementById('frameZoom').addEventListener('input', function() {
   syncPreview();
 });
 
-// ── Video upload
-document.getElementById('anuncioVideoInput').addEventListener('change', async function() {
-  const file = this.files[0];
-  if (!file) return;
-  if (file.size > 50 * 1024 * 1024) { alert('Vídeo muito grande. Máx. 50MB.'); return; }
-
-  const progress  = document.getElementById('videoProgress');
-  const bar       = document.getElementById('videoProgressBar');
-  const label     = document.getElementById('videoProgressLabel');
-  const previewW  = document.getElementById('anuncioVideoPreviewWrap');
-  const area      = document.getElementById('anuncioVideoArea');
-
-  progress.style.display = 'block';
-  area.style.display = 'none';
-  bar.style.width = '0%';
-  label.textContent = 'Enviando vídeo...';
-
-  try {
-    const ext  = file.name.split('.').pop();
-    const path = `anuncios/videos/${Date.now()}.${ext}`;
-    const ref  = storage.ref(path);
-    const task = ref.put(file);
-
-    task.on('state_changed',
-      snap => {
-        const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
-        bar.style.width = pct + '%';
-        label.textContent = `Enviando... ${pct}%`;
-      },
-      err => {
-        progress.style.display = 'none';
-        area.style.display = 'block';
-        alert('Erro ao enviar vídeo: ' + err.message);
-      },
-      async () => {
-        anuncioVideoUrl = await ref.getDownloadURL();
-        progress.style.display = 'none';
-        previewW.style.display = 'block';
-        const vid = document.getElementById('anuncioVideoPreview');
-        vid.src = anuncioVideoUrl;
-        vid.load();
-        syncPreview();
-        label.textContent = '✓ Enviado!';
-      }
-    );
-  } catch(e) {
-    progress.style.display = 'none';
-    area.style.display = 'block';
-    alert('Erro: ' + e.message);
+// ── Video URL
+function handleVideoUrl(url) {
+  url = url.trim();
+  anuncioVideoUrl = url;
+  const previewW = document.getElementById('anuncioVideoPreviewWrap');
+  const vid      = document.getElementById('anuncioVideoPreview');
+  if (url) {
+    previewW.style.display = 'block';
+    vid.src = url;
+    vid.load();
+  } else {
+    previewW.style.display = 'none';
+    vid.src = '';
   }
-});
-
-document.getElementById('anuncioVideoRemove').addEventListener('click', () => {
-  anuncioVideoUrl = '';
-  document.getElementById('anuncioVideoPreview').src = '';
-  document.getElementById('anuncioVideoPreviewWrap').style.display = 'none';
-  document.getElementById('anuncioVideoArea').style.display = 'block';
-  document.getElementById('anuncioVideoInput').value = '';
   syncPreview();
-});
+}
+
+function clearVideoUrl() {
+  anuncioVideoUrl = '';
+  document.getElementById('anuncioVideoUrlInput').value = '';
+  document.getElementById('anuncioVideoPreviewWrap').style.display = 'none';
+  document.getElementById('anuncioVideoPreview').src = '';
+  syncPreview();
+}
 
 // ── Posição botão
 document.querySelectorAll('[data-pos]').forEach(btn => {
