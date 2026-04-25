@@ -8,7 +8,8 @@ import {
   Search, Package, Edit2, Trash2, X, AlertTriangle, ImageOff,
 } from "lucide-react";
 
-import { db } from "../lib/firebase";
+import { db, storage } from "../lib/firebase";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useAuth } from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
 import { LIMITES_FREE } from "../hooks/useLicenca";
@@ -380,8 +381,10 @@ function ModalNovoProduto({ produto, produtos, onSave, onClose }) {
   const [calcMargem, setCalcMargem] = useState("");
   const precoSugerido = calcPrecoSugerido(calcCusto, calcMargem);
 
-  const [erros,    setErros]    = useState({});
-  const [salvando, setSalvando] = useState(false);
+  const [erros,       setErros]       = useState({});
+  const [salvando,    setSalvando]    = useState(false);
+  const [uploadando,  setUploadando]  = useState(false);
+  const { tenantUid } = useAuth();
 
   const set = (campo, valor) => {
     setForm(f => ({ ...f, [campo]: valor }));
@@ -395,14 +398,45 @@ function ModalNovoProduto({ produto, produtos, onSave, onClose }) {
     set("preco",  fmtNum(precoSugerido));
   };
 
-  /* Upload de foto → base64 */
-  const handleFoto = (e) => {
+  /* Upload de foto → Firebase Storage → salva só a URL */
+  const handleFoto = async (e) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => set("foto", reader.result);
-    reader.readAsDataURL(file);
+    if (!file || !tenantUid) return;
     e.target.value = "";
+
+    // Valida tamanho (máx 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Imagem muito grande. Máximo permitido: 5MB.");
+      return;
+    }
+
+    setUploadando(true);
+    try {
+      const produtoId = produto?.id || `temp_${Date.now()}`;
+      const storageRef = ref(storage, `users/${tenantUid}/produtos/${produtoId}/foto`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      set("foto", url);
+    } catch (err) {
+      console.error("Erro ao fazer upload da foto:", err);
+      alert("Erro ao enviar a imagem. Tente novamente.");
+    } finally {
+      setUploadando(false);
+    }
+  };
+
+  /* Remove foto do Storage e limpa o campo */
+  const handleRemoverFoto = async () => {
+    if (!form.foto || !tenantUid) { set("foto", null); return; }
+    try {
+      const produtoId = produto?.id || null;
+      if (produtoId) {
+        const storageRef = ref(storage, `users/${tenantUid}/produtos/${produtoId}/foto`);
+        await deleteObject(storageRef).catch(() => {}); // ignora se já não existir
+      }
+    } finally {
+      set("foto", null);
+    }
   };
 
   const validar = () => {
@@ -657,11 +691,11 @@ function ModalNovoProduto({ produto, produtos, onSave, onClose }) {
                   : <ImageOff size={16} color="var(--text-3)" />
                 }
               </div>
-              <button className="btn-foto" onClick={() => fotoInputRef.current?.click()}>
-                📷 Escolher
+              <button className="btn-foto" onClick={() => !uploadando && fotoInputRef.current?.click()} disabled={uploadando}>
+                {uploadando ? "⏳ Enviando..." : "📷 Escolher"}
               </button>
               {form.foto && (
-                <button className="btn-foto-rm" onClick={() => set("foto", null)} title="Remover foto">
+                <button className="btn-foto-rm" onClick={handleRemoverFoto} title="Remover foto">
                   <X size={12} />
                 </button>
               )}
@@ -671,6 +705,7 @@ function ModalNovoProduto({ produto, produtos, onSave, onClose }) {
                 accept="image/*"
                 style={{ display: "none" }}
                 onChange={handleFoto}
+                disabled={uploadando}
               />
             </div>
           </div>
@@ -682,13 +717,15 @@ function ModalNovoProduto({ produto, produtos, onSave, onClose }) {
           <button
             className="btn-primary"
             onClick={handleSalvar}
-            disabled={salvando}
+            disabled={salvando || uploadando}
           >
-            {salvando
-              ? "Salvando..."
-              : isEdit
-                ? "Salvar Alterações"
-                : "+ Salvar Produto"}
+            {uploadando
+              ? "Enviando foto..."
+              : salvando
+                ? "Salvando..."
+                : isEdit
+                  ? "Salvar Alterações"
+                  : "+ Salvar Produto"}
           </button>
         </div>
 
