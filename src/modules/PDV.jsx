@@ -18,7 +18,7 @@ import {
   collection, query, where, getDocs, runTransaction,
   doc, orderBy, limit,
 } from "firebase/firestore";
-import BarcodeInput from "../components/BarcodeInput";
+import BarcodeInput from "./BarcodeInput";
 import { useConfiguracoes } from "./Configuracoes";
 
 /* ─── Formata moeda BRL ─── */
@@ -69,6 +69,29 @@ export default function PDV({ onVoltar }) {
   const [editandoQty, setEditandoQty] = useState(null); // índice do item sendo editado
 
   const buscaRef = useRef(null);
+
+  /* ─── Mapeamento forma → label e chave de taxa ─── */
+  const FORMA_LABEL = {
+    dinheiro: "Dinheiro",
+    cartao:   "Cartão de Débito",
+    pix:      "Pix",
+    credito:  "Cartão de Crédito",
+  };
+
+  const taxas = config?.taxas || {};
+
+  const taxaPct = (() => {
+    switch (formaPag) {
+      case "cartao":  return parseFloat(taxas.debito || "0");
+      case "pix":     return parseFloat(taxas.pix    || "0");
+      case "credito": return parseFloat(taxas[`credito_${parcelas}`] || "0");
+      default:        return 0;
+    }
+  })();
+
+  const valorTaxa   = parseFloat((total * (taxaPct / 100)).toFixed(2));
+  const totalLiquido = parseFloat((total - valorTaxa).toFixed(2));
+
 
   /* ─── Total do carrinho ─── */
   const total = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
@@ -276,17 +299,23 @@ export default function PDV({ onVoltar }) {
         };
 
         const vendaDoc = {
-          vendaId,
+          idVenda: vendaId,
           itens,
           total,
           pagamento,
-          status: "ativa",
-          origem: "pdv",
-          clienteId: cliente?.id || null,
-          clienteNome: cliente?.nome || null,
-          vendedorId: vendedorId || null,
-          vendedorNome: vendedorNome || null,
-          criadoEm: new Date(),
+          // ── Campos compatíveis com Relatorios.jsx ──
+          formaPagamento: FORMA_LABEL[formaPag] || formaPag,
+          taxaPct:        taxaPct || 0,
+          valorTaxa:      valorTaxa || 0,
+          totalLiquido:   totalLiquido || total,
+          data:           new Date().toISOString().slice(0, 10),
+          cliente:        cliente?.nome || null,
+          clienteId:      cliente?.id  || null,
+          status:         "ativa",
+          origem:         "pdv",
+          vendedorId:     vendedorId   || null,
+          vendedorNome:   vendedorNome || null,
+          criadoEm:       new Date(),
         };
 
         transaction.set(vendaRef, vendaDoc);
@@ -510,6 +539,13 @@ export default function PDV({ onVoltar }) {
                 ))}
               </div>
 
+              {/* Taxa para débito e pix */}
+              {(formaPag === "cartao" || formaPag === "pix") && taxaPct > 0 && (
+                <div className="pdv-taxa-badge" style={{ marginTop: 8 }}>
+                  Taxa {taxaPct.toFixed(2)}% · desconto de {fmt(valorTaxa)} sobre o total
+                </div>
+              )}
+
               {formaPag === "dinheiro" && (
                 <div className="pdv-pag-detalhe">
                   <label>Valor recebido</label>
@@ -540,6 +576,11 @@ export default function PDV({ onVoltar }) {
                       </button>
                     ))}
                   </div>
+                  {taxaPct > 0 && (
+                    <div className="pdv-taxa-badge">
+                      Taxa {taxaPct.toFixed(2)}% · desconto de {fmt(valorTaxa)}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -616,10 +657,22 @@ export default function PDV({ onVoltar }) {
                 <span>Subtotal</span>
                 <span>{fmt(total)}</span>
               </div>
+              {taxaPct > 0 && (
+                <div className="pdv-total-row" style={{ color: "var(--pdv-error)", fontSize: 12 }}>
+                  <span>Taxa cartão ({taxaPct.toFixed(2)}%)</span>
+                  <span>- {fmt(valorTaxa)}</span>
+                </div>
+              )}
               <div className="pdv-total-row pdv-total-grande">
                 <span>Total a Pagar</span>
                 <span>{fmt(total)}</span>
               </div>
+              {taxaPct > 0 && (
+                <div className="pdv-total-row" style={{ fontSize: 12 }}>
+                  <span style={{ color: "var(--pdv-text-3)" }}>Você recebe (líquido)</span>
+                  <span style={{ color: "var(--pdv-success)", fontWeight: 600 }}>{fmt(totalLiquido)}</span>
+                </div>
+              )}
               {troco !== null && troco >= 0 && (
                 <div className="pdv-total-row pdv-troco-row">
                   <span>Troco</span>
@@ -730,12 +783,12 @@ const CSS = `
 .pdv-operador-label { font-size: 10px; color: var(--pdv-text-3); display: block; }
 .pdv-operador-nome  { font-size: 13px; color: var(--pdv-text-2); display: block; font-weight: 500; }
 .pdv-btn-voltar {
-  background: rgba(255,255,255,0.05); border: 1px solid var(--pdv-border);
-  color: var(--pdv-text-2); border-radius: 8px; width: 34px; height: 34px;
+  background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.15);
+  color: #c0c2d8; border-radius: 8px; width: 36px; height: 36px;
   display: flex; align-items: center; justify-content: center; cursor: pointer;
   transition: all .2s;
 }
-.pdv-btn-voltar:hover { background: var(--pdv-gold-dim); color: var(--pdv-gold); }
+.pdv-btn-voltar:hover { background: var(--pdv-gold-dim); border-color: var(--pdv-gold); color: var(--pdv-gold); }
 
 /* ── BODY ── */
 .pdv-body {
@@ -878,6 +931,12 @@ const CSS = `
   font-size: 12px; cursor: pointer; transition: all .15s;
 }
 .pdv-parcela-btn.active { background: var(--pdv-gold-dim); border-color: var(--pdv-gold); color: var(--pdv-gold); }
+.pdv-taxa-badge {
+  margin-top: 8px; padding: 7px 11px; border-radius: 7px;
+  background: rgba(224,85,85,0.08); border: 1px solid rgba(224,85,85,0.2);
+  color: var(--pdv-error); font-size: 11.5px; font-weight: 500;
+  display: flex; align-items: center; gap: 5px;
+}
 
 /* ── COL DIREITA ── */
 .pdv-col-right {
