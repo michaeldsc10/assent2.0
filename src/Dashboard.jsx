@@ -1111,13 +1111,27 @@ const CSS = `
 
 function CustomTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
+  const value = payload[0]?.value;
   return (
     <div style={{
-      background: "#1c1c24", border: "1px solid rgba(255,255,255,0.1)",
-      borderRadius: 8, padding: "8px 12px", fontSize: 12,
+      background: "rgba(18, 17, 23, 0.92)",
+      backdropFilter: "blur(12px)",
+      WebkitBackdropFilter: "blur(12px)",
+      border: "1px solid rgba(200,165,94,0.25)",
+      borderRadius: 12,
+      padding: "10px 14px",
+      fontSize: 12,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(200,165,94,0.08) inset",
+      minWidth: 130,
+      pointerEvents: "none",
     }}>
-      <p style={{ color: "#c8a55e", fontWeight: 500, marginBottom: 2 }}>{label}</p>
-      <p style={{ color: "#edeae3" }}>R$ {payload[0].value?.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
+        <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#c8a55e", boxShadow: "0 0 6px #c8a55e88" }} />
+        <span style={{ color: "rgba(200,165,94,0.8)", fontWeight: 500, fontSize: 11, letterSpacing: "0.04em" }}>{label}</span>
+      </div>
+      <div style={{ color: "#edeae3", fontWeight: 700, fontSize: 14, letterSpacing: "-0.01em" }}>
+        R$ {value?.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+      </div>
     </div>
   );
 }
@@ -1796,11 +1810,16 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     <stop offset="5%"  stopColor="#c8a55e" stopOpacity={0.22} />
                     <stop offset="95%" stopColor="#c8a55e" stopOpacity={0}    />
                   </linearGradient>
+                  <filter id="glowGoldMain">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  </filter>
                 </defs>
                 <XAxis dataKey="d" tick={{ fill: "#3a3842", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: "#3a3842", fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Area type="monotone" dataKey="v" stroke="#c8a55e" strokeWidth={2} fill="url(#gGold)" dot={false} />
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(200,165,94,0.15)", strokeWidth: 1, strokeDasharray: "4 3" }} />
+                <Area type="monotone" dataKey="v" stroke="#c8a55e" strokeWidth={2} fill="url(#gGold)" dot={false}
+                  activeDot={{ r: 5, fill: "#c8a55e", stroke: "rgba(200,165,94,0.3)", strokeWidth: 6, filter: "url(#glowGoldMain)" }} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -2001,17 +2020,36 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       if (!active || !payload?.length) return null;
       return (
         <div style={{
-          background: "var(--s2)", border: "1px solid var(--border-h)",
-          borderRadius: 10, padding: "10px 14px", fontSize: 12,
-          boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+          background: "rgba(14,13,20,0.96)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          border: "1px solid rgba(200,165,94,0.2)",
+          borderRadius: 12,
+          padding: "12px 16px",
+          fontSize: 12,
+          boxShadow: "0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04) inset",
+          minWidth: 155,
+          pointerEvents: "none",
+          animation: "tooltipIn 0.15s ease",
         }}>
-          <p style={{ color: "var(--text-3)", marginBottom: 6, fontSize: 11 }}>{label}</p>
+          <style>{`@keyframes tooltipIn { from { opacity:0; transform:translateY(4px) scale(.97); } to { opacity:1; transform:none; } }`}</style>
+          {label && (
+            <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: 8 }}>
+              {label}
+            </div>
+          )}
           {payload.map((p, i) => (
-            <p key={i} style={{ color: p.color || "var(--gold)", fontWeight: 600, margin: "2px 0" }}>
-              {p.name}: {typeof p.value === "number" && p.value > 1000
-                ? `R$ ${p.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
-                : p.value}
-            </p>
+            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, margin: "4px 0" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: p.color || "#c8a55e", boxShadow: `0 0 6px ${(p.color || "#c8a55e") + "88"}`, flexShrink: 0 }} />
+                <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{p.name}</span>
+              </div>
+              <span style={{ color: p.color || "#c8a55e", fontWeight: 700, fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+                {typeof p.value === "number" && p.value > 1000
+                  ? `R$ ${p.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                  : p.value}
+              </span>
+            </div>
           ))}
         </div>
       );
@@ -2031,10 +2069,10 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
               <XAxis dataKey="mes" tick={{ fill: "var(--text-3)", fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-              <Tooltip content={<GoldTooltip />} />
+              <Tooltip content={<GoldTooltip />} cursor={{ fill: "rgba(200,165,94,0.04)", rx: 6, stroke: "rgba(200,165,94,0.1)", strokeWidth: 1 }} />
               <Legend wrapperStyle={{ fontSize: 11, color: "var(--text-3)", paddingTop: 12 }} />
-              <Bar dataKey="receita" name="Receita" fill="#c8a55e" radius={[4, 4, 0, 0]} opacity={0.9} />
-              <Bar dataKey="custo"   name="Custo"   fill="#e05252" radius={[4, 4, 0, 0]} opacity={0.75} />
+              <Bar dataKey="receita" name="Receita" fill="#c8a55e" radius={[5, 5, 0, 0]} opacity={0.9} activeBar={{ fill: "#e8ca60", opacity: 1, filter: "drop-shadow(0 0 6px rgba(200,165,94,0.6))" }} />
+              <Bar dataKey="custo"   name="Custo"   fill="#e05252" radius={[5, 5, 0, 0]} opacity={0.75} activeBar={{ fill: "#f07070", opacity: 1, filter: "drop-shadow(0 0 6px rgba(224,82,82,0.5))" }} />
             </BarChart>
           </ResponsiveContainer>
         </Card>
@@ -2049,15 +2087,17 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             <AreaChart data={lucroData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="gLucro" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#3ecf8e" stopOpacity={0.25} />
+                  <stop offset="5%"  stopColor="#3ecf8e" stopOpacity={0.28} />
                   <stop offset="95%" stopColor="#3ecf8e" stopOpacity={0}    />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
               <XAxis dataKey="mes" tick={{ fill: "var(--text-3)", fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-              <Tooltip content={<GoldTooltip />} />
-              <Area type="monotone" dataKey="lucro" name="Lucro" stroke="#3ecf8e" strokeWidth={2.5} fill="url(#gLucro)" dot={{ fill: "#3ecf8e", r: 3, strokeWidth: 0 }} />
+              <Tooltip content={<GoldTooltip />} cursor={{ stroke: "rgba(62,207,142,0.2)", strokeWidth: 1, strokeDasharray: "4 3" }} />
+              <Area type="monotone" dataKey="lucro" name="Lucro" stroke="#3ecf8e" strokeWidth={2.5} fill="url(#gLucro)"
+                dot={{ fill: "#3ecf8e", r: 3, strokeWidth: 0, opacity: 0.7 }}
+                activeDot={{ r: 6, fill: "#3ecf8e", stroke: "rgba(62,207,142,0.3)", strokeWidth: 6 }} />
             </AreaChart>
           </ResponsiveContainer>
         </Card>
@@ -2071,16 +2111,21 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={dash.loading ? [] : dash.faturamentoPorDia} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
               <defs>
-                <linearGradient id="gLine" x1="0" y1="0" x2="1" y2="0">
+                <linearGradient id="gLine" x1="0" y1="1" x2="1" y2="0">
                   <stop offset="0%"   stopColor="#c8a55e" />
                   <stop offset="100%" stopColor="#e8ca60" />
                 </linearGradient>
+                <filter id="glowGold" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="3" result="blur" />
+                  <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                </filter>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
               <XAxis dataKey="d" tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
               <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-              <Tooltip content={<GoldTooltip />} />
-              <Line type="monotone" dataKey="v" name="Receita" stroke="url(#gLine)" strokeWidth={2.5} dot={false} activeDot={{ r: 5, fill: "#c8a55e", strokeWidth: 0 }} />
+              <Tooltip content={<GoldTooltip />} cursor={{ stroke: "rgba(200,165,94,0.18)", strokeWidth: 1, strokeDasharray: "4 3" }} />
+              <Line type="monotone" dataKey="v" name="Receita" stroke="url(#gLine)" strokeWidth={2.5} dot={false}
+                activeDot={{ r: 6, fill: "#c8a55e", stroke: "rgba(200,165,94,0.35)", strokeWidth: 7, filter: "url(#glowGold)" }} />
             </LineChart>
           </ResponsiveContainer>
         </Card>
