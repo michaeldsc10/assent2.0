@@ -1963,43 +1963,63 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
   /* ══ RENDER GRÁFICOS ══ */
   const renderChartsView = () => {
-    // Dados para os gráficos
-    const mesesLabels = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-    const hoje = new Date();
-    const ultimos6 = Array.from({ length: 6 }, (_, i) => {
-      const d = new Date(hoje.getFullYear(), hoje.getMonth() - 5 + i, 1);
-      return mesesLabels[d.getMonth()];
+    // ── Gráfico 1 e 2: Faturamento vs Custo e Lucro por período ──
+    // Usa os mesmos dados reais de faturamentoPorDia do hook,
+    // agrupando cada ponto como { mes/d, receita, custo, lucro }
+    const faturDia = dash.loading ? [] : (dash.faturamentoPorDia || []);
+
+    // Monta dados combinados: receita vem do hook, custo proporcional por dia
+    // O hook já filtra pelo período selecionado — usamos diretamente
+    const receitaData = faturDia.map((pt) => {
+      // Proporção custo/receita total para estimar custo por ponto
+      const propCusto = dash.receitaBruta > 0 ? dash.custoTotal / dash.receitaBruta : 0;
+      const receita = pt.v || 0;
+      const custo   = Math.round(receita * propCusto);
+      return { mes: pt.d, receita, custo };
     });
 
-    const receitaData = ultimos6.map((mes, i) => ({
-      mes,
-      receita: dash.receitaBruta > 0 ? Math.round(dash.receitaBruta * (0.6 + Math.random() * 0.6)) : Math.round(80000 + Math.random() * 60000),
-      custo:   dash.custoTotal > 0   ? Math.round(dash.custoTotal   * (0.6 + Math.random() * 0.6)) : Math.round(40000 + Math.random() * 30000),
+    const lucroData = receitaData.map(d => ({
+      mes: d.mes,
+      lucro: d.receita - d.custo,
     }));
 
-    const lucroData = receitaData.map(d => ({ mes: d.mes, lucro: d.receita - d.custo }));
+    // ── Radar: métricas reais normalizadas 0–100 ──
+    // Vendas: % de cumprimento vs meta (1 venda/dia útil = 100%)
+    const diasPeriodo = Math.max(1, faturDia.length);
+    const metaVendas  = diasPeriodo; // 1 venda/dia como referência
+    const scoreVendas = Math.min(100, Math.round((dash.numVendas / metaVendas) * 100));
+
+    // Clientes: proporção cadastrada (base 100 = referência de negócio saudável)
+    const scoreClientes = Math.min(100, Math.round((dash.numClientes / Math.max(1, dash.numClientes)) * 75 + (dash.numClientes > 0 ? 25 : 0)));
+
+    // Produtos: se há produtos cadastrados, score alto; zero produtos = baixo
+    const scoreProdutos = dash.numProdutos >= 10 ? 90 : dash.numProdutos >= 5 ? 72 : dash.numProdutos >= 1 ? 55 : 20;
+
+    // Serviços
+    const scoreServicos = dash.numServicos >= 5 ? 85 : dash.numServicos >= 2 ? 68 : dash.numServicos >= 1 ? 50 : 20;
+
+    // Financeiro: margem de lucro mapeada 0–100
+    const scoreFinanceiro = Math.min(100, Math.max(0, Math.round(dash.margem * 1.1)));
+
+    // Estoque: se tem produtos e tem entradas, bom; sem produtos = baixo
+    const scoreEstoque = dash.numProdutos >= 5 ? 78 : dash.numProdutos >= 1 ? 55 : 25;
 
     const radarData = [
-      { subject: "Vendas",      A: 85 },
-      { subject: "Clientes",    A: 72 },
-      { subject: "Produtos",    A: 68 },
-      { subject: "Serviços",    A: 78 },
-      { subject: "Financeiro",  A: 90 },
-      { subject: "Estoque",     A: 60 },
+      { subject: "Vendas",     A: scoreVendas     },
+      { subject: "Clientes",   A: scoreClientes   },
+      { subject: "Produtos",   A: scoreProdutos   },
+      { subject: "Serviços",   A: scoreServicos   },
+      { subject: "Financeiro", A: scoreFinanceiro },
+      { subject: "Estoque",    A: scoreEstoque    },
     ];
 
     const pieColors = ["#c8a55e", "#3ecf8e", "#5b8ef0", "#f59e0b", "#e052a0"];
-    const produtosPie = (dash.topProdutos || []).slice(0, 5).map((p, i) => ({
+    const produtosPie = (dash.topProdutos || []).slice(0, 5).map((p) => ({
       name: p.nome, value: p.total || p.qtd || 1,
     }));
-    if (produtosPie.length === 0) {
-      produtosPie.push(
-        { name: "Produto A", value: 40 },
-        { name: "Produto B", value: 30 },
-        { name: "Produto C", value: 20 },
-        { name: "Outros", value: 10 },
-      );
-    }
+    // Sem dados reais: mostra aviso em vez de dados fictícios
+    const semDados = !dash.loading && faturDia.every(pt => pt.v === 0);
+    const semProdutos = !dash.loading && produtosPie.length === 0;
 
     const Card = ({ children, title, subtitle, style = {} }) => (
       <div style={{
@@ -2055,19 +2075,27 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       );
     };
 
+    const EmptyState = ({ msg = "Nenhuma venda no período selecionado" }) => (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "32px 0", color: "var(--text-3)" }}>
+        <div style={{ fontSize: 28, opacity: 0.3 }}>📊</div>
+        <div style={{ fontSize: 12, textAlign: "center", maxWidth: 200, lineHeight: 1.5 }}>{msg}</div>
+      </div>
+    );
+
     return (
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, padding: 4 }}>
 
         {/* 1. Faturamento vs Custo — BarChart */}
         <Card
           title="Faturamento vs Custo"
-          subtitle="Comparativo dos últimos 6 meses"
+          subtitle={`Período: ${period}${period === "Personalizado" && customRange.from && customRange.to ? ` (${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")})` : ""}`}
           style={{ gridColumn: "1 / 2" }}
         >
+          {semDados ? <EmptyState /> : (
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={receitaData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barSize={14} barGap={3}>
+            <BarChart data={dash.loading ? [] : receitaData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barSize={14} barGap={3}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-              <XAxis dataKey="mes" tick={{ fill: "var(--text-3)", fontSize: 11 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="mes" tick={{ fill: "var(--text-3)", fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
               <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip content={<GoldTooltip />} cursor={{ fill: "rgba(200,165,94,0.04)", rx: 6, stroke: "rgba(200,165,94,0.1)", strokeWidth: 1 }} />
               <Legend wrapperStyle={{ fontSize: 11, color: "var(--text-3)", paddingTop: 12 }} />
@@ -2075,16 +2103,18 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               <Bar dataKey="custo"   name="Custo"   fill="#e05252" radius={[5, 5, 0, 0]} opacity={0.75} activeBar={{ fill: "#f07070", opacity: 1, filter: "drop-shadow(0 0 6px rgba(224,82,82,0.5))" }} />
             </BarChart>
           </ResponsiveContainer>
+          )}
         </Card>
 
         {/* 2. Lucro Líquido — AreaChart */}
         <Card
           title="Evolução do Lucro Líquido"
-          subtitle="Tendência mensal"
+          subtitle={`Período: ${period}`}
           style={{ gridColumn: "2 / 3" }}
         >
+          {semDados ? <EmptyState /> : (
           <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={lucroData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+            <AreaChart data={dash.loading ? [] : lucroData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="gLucro" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%"  stopColor="#3ecf8e" stopOpacity={0.28} />
@@ -2092,7 +2122,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-              <XAxis dataKey="mes" tick={{ fill: "var(--text-3)", fontSize: 11 }} axisLine={false} tickLine={false} />
+              <XAxis dataKey="mes" tick={{ fill: "var(--text-3)", fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
               <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip content={<GoldTooltip />} cursor={{ stroke: "rgba(62,207,142,0.2)", strokeWidth: 1, strokeDasharray: "4 3" }} />
               <Area type="monotone" dataKey="lucro" name="Lucro" stroke="#3ecf8e" strokeWidth={2.5} fill="url(#gLucro)"
@@ -2100,6 +2130,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 activeDot={{ r: 6, fill: "#3ecf8e", stroke: "rgba(62,207,142,0.3)", strokeWidth: 6 }} />
             </AreaChart>
           </ResponsiveContainer>
+          )}
         </Card>
 
         {/* 3. Faturamento por dia (período selecionado) — LineChart */}
@@ -2164,8 +2195,11 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           </div>
         </Card>
 
-        {/* 5. Top Produtos — Radar / Horizontal Bars */}
-        <Card title="Top Produtos Vendidos" subtitle="Por volume de receita">
+        {/* 5. Top Produtos — Horizontal Bars */}
+        <Card title="Top Produtos Vendidos" subtitle={`Por receita — ${period}`}>
+          {semProdutos ? (
+            <EmptyState msg="Nenhum produto vendido no período selecionado" />
+          ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
             {produtosPie.map((p, i) => {
               const max = produtosPie[0]?.value || 1;
@@ -2198,10 +2232,11 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               );
             })}
           </div>
+          )}
         </Card>
 
         {/* 6. Desempenho Geral — RadarChart */}
-        <Card title="Radar de Desempenho" subtitle="Saúde geral do negócio" style={{ gridColumn: "1 / 3" }}>
+        <Card title="Radar de Desempenho" subtitle={`Saúde geral — baseado nos dados do período (${period})`} style={{ gridColumn: "1 / 3" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
             <RadarChart outerRadius={110} width={300} height={260} data={radarData}>
               <PolarGrid stroke="rgba(255,255,255,0.08)" />
