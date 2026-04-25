@@ -1148,6 +1148,7 @@ export default function Dashboard() {
     () => { try { return JSON.parse(localStorage.getItem("ag_notif_lidas") || "[]"); } catch { return []; } }
   );
   const [notifDespesas, setNotifDespesas] = useState([]);
+  const [notifInsights, setNotifInsights] = useState([]);
   const notifRef = useRef(null);
   const [theme, setTheme] = useState(
     () => localStorage.getItem("ag_theme") || "dark"
@@ -1280,6 +1281,20 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     return unsub;
   }, [uid]);
 
+  /* ── Insights automáticos de negócio — gerados pela Cloud Function diária ── */
+  useEffect(() => {
+    if (!uid) return;
+    const q = query(
+      collection(db, "users", uid, "insights"),
+      orderBy("criadoEm", "desc"),
+      limit(20)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setNotifInsights(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }, () => {});
+    return unsub;
+  }, [uid]);
+
   /* ── Fecha painel de notificações ao clicar fora ── */
   useEffect(() => {
     if (!notifOpen) return;
@@ -1302,8 +1317,15 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     _ts: n.criadoEm?.toDate ? n.criadoEm.toDate().getTime() : 0,
   }));
 
+  /* Insights de negócio por tenant */
+  const notifInsightsNorm = notifInsights.map((n) => ({
+    ...n,
+    tipo: "insight",
+    _ts: n.criadoEm?.toDate ? n.criadoEm.toDate().getTime() : 0,
+  }));
+
   /* Merge cronológico: mais recente/urgente primeiro */
-  const todasNotif = [...notifDespesasNorm, ...notifSistemaNorm]
+  const todasNotif = [...notifDespesasNorm, ...notifSistemaNorm, ...notifInsightsNorm]
     .sort((a, b) => b._ts - a._ts);
 
   const notifNaoLidas = todasNotif.filter((n) => !notifLidas.includes(n.id)).length;
@@ -2237,6 +2259,75 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     <div className="ag-notif-empty">Nenhuma notificação no momento</div>
                   ) : (
                     todasNotif.map((n) => {
+                      /* ── Insight de negócio ── */
+                      if (n.tipo === "insight") {
+                        const INSIGHT_PALETTE = {
+                          faturamento_alta:     { cor: "var(--green)",  bg: "rgba(62,207,142,0.07)",  badge: "#2daa70" },
+                          produto_destaque:     { cor: "var(--green)",  bg: "rgba(62,207,142,0.07)",  badge: "#2daa70" },
+                          ticket_alta:          { cor: "var(--green)",  bg: "rgba(62,207,142,0.07)",  badge: "#2daa70" },
+                          matriculas_alta:      { cor: "var(--blue)",   bg: "rgba(91,142,240,0.07)",  badge: "#4a7de0" },
+                          faturamento_queda:    { cor: "var(--red)",    bg: "rgba(224,82,82,0.07)",   badge: "#c04040" },
+                          ticket_queda:         { cor: "var(--amber)",  bg: "rgba(245,158,11,0.07)",  badge: "#c07800" },
+                          cancelamentos_alerta: { cor: "var(--red)",    bg: "rgba(224,82,82,0.08)",   badge: "#c04040" },
+                          matriculas_queda:     { cor: "var(--amber)",  bg: "rgba(245,158,11,0.07)",  badge: "#c07800" },
+                          matriculas_zero:      { cor: "var(--amber)",  bg: "rgba(245,158,11,0.07)",  badge: "#c07800" },
+                        };
+                        const paleta = INSIGHT_PALETTE[n.tipo] || {
+                          cor: "var(--purple)", bg: "rgba(167,139,250,0.07)", badge: "#8b6ef0",
+                        };
+                        const dataInsight = n.criadoEm?.toDate ? n.criadoEm.toDate() : null;
+                        const tempoRelativo = (() => {
+                          if (!dataInsight) return "—";
+                          const diff = Date.now() - dataInsight.getTime();
+                          const d = Math.floor(diff / 86400000);
+                          const h = Math.floor(diff / 3600000);
+                          if (d >= 1) return `há ${d} dia${d > 1 ? "s" : ""}`;
+                          if (h >= 1) return `há ${h}h`;
+                          return "agora";
+                        })();
+                        return (
+                          <div
+                            key={n.id}
+                            className="ag-notif-item"
+                            style={{
+                              background: paleta.bg,
+                              borderLeft: `2px solid ${paleta.cor}`,
+                              paddingLeft: 14,
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                              <span style={{
+                                fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
+                                textTransform: "uppercase", color: "#fff",
+                                background: paleta.badge,
+                                borderRadius: 20, padding: "2px 8px", flexShrink: 0,
+                              }}>
+                                Insight
+                              </span>
+                              <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'IBM Plex Mono', monospace" }}>
+                                {tempoRelativo}
+                              </span>
+                              {n.prioridade === "high" && (
+                                <span style={{
+                                  fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
+                                  textTransform: "uppercase", color: paleta.cor,
+                                  background: paleta.bg, border: `1px solid ${paleta.cor}40`,
+                                  borderRadius: 20, padding: "2px 7px", marginLeft: "auto", flexShrink: 0,
+                                }}>
+                                  atenção
+                                </span>
+                              )}
+                            </div>
+                            <div className="ag-notif-item-title" style={{ fontSize: 13, lineHeight: 1.4 }}>
+                              {n.titulo}
+                            </div>
+                            <div className="ag-notif-item-body" style={{ marginTop: 5, fontSize: 12, lineHeight: 1.55 }}>
+                              {n.mensagem}
+                            </div>
+                          </div>
+                        );
+                      }
+
                       /* ── Alerta de despesa próxima do vencimento ── */
                       if (n.tipo === "despesa") {
                         const corUrgencia =
