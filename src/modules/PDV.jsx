@@ -9,7 +9,7 @@ import {
   Search, ShoppingCart, Trash2, Plus, Minus,
   CheckCircle, X, AlertCircle, Barcode, User,
   CreditCard, Banknote, QrCode, Package, ArrowLeft,
-  Receipt, Loader2, ChevronDown,
+  Receipt, Loader2, ChevronDown, Printer,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
@@ -31,6 +31,150 @@ const fmtNum = (v) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+/* ══════════════════════════════════════════════════════
+   MODAL CUPOM TÉRMICO
+   Abre uma janela de impressão 80mm sem usar o alert do browser
+   ══════════════════════════════════════════════════════ */
+function ModalCupom({ venda, troco, empresa, onClose }) {
+  const dataHora = new Date().toLocaleString("pt-BR", {
+    day: "2-digit", month: "2-digit", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+
+  const FORMA_LABEL_CUPOM = {
+    dinheiro: "Dinheiro",
+    cartao:   "Débito",
+    pix:      "Pix",
+    credito:  `Crédito ${venda.parcelas}x`,
+  };
+
+  const imprimir = () => {
+    const win = window.open("", "cupom_pdv", "width=360,height=620,toolbar=0,menubar=0,scrollbars=1");
+    if (!win) return;
+
+    const linhaItens = (venda.itens || []).map(item =>
+      `<div class="row">
+        <span class="nome">${item.produto?.nome || item.nome || "—"}</span>
+        <span class="qtd">${item.qty}x</span>
+        <span class="val">${Number(item.subtotal || 0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span>
+      </div>`
+    ).join("");
+
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Cupom #${venda.id}</title>
+<style>
+  @page { size: 80mm auto; margin: 3mm 4mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Courier New', Courier, monospace; font-size: 11px; width: 72mm; color: #111; }
+  .center { text-align: center; }
+  .bold   { font-weight: bold; }
+  .empresa-nome { font-size: 14px; font-weight: bold; margin-bottom: 2px; }
+  .empresa-sub  { font-size: 10px; color: #555; }
+  .divider { border: none; border-top: 1px dashed #999; margin: 6px 0; }
+  .row { display: flex; gap: 4px; padding: 3px 0; border-bottom: 1px dotted #ddd; font-size: 11px; }
+  .row .nome { flex: 1; }
+  .row .qtd  { flex-shrink: 0; color: #555; }
+  .row .val  { flex-shrink: 0; text-align: right; font-weight: 600; }
+  .total-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 11px; }
+  .total-grande { font-size: 14px; font-weight: bold; padding: 4px 0; }
+  .troco { font-size: 12px; font-weight: bold; }
+  .rodape { font-size: 9px; color: #777; margin-top: 4px; }
+  .num-venda { font-size: 10px; color: #555; letter-spacing: .04em; }
+</style>
+</head><body>
+<div class="center">
+  <div class="empresa-nome">${empresa.nome || "ASSENT"}</div>
+  ${empresa.endereco ? `<div class="empresa-sub">${empresa.endereco}</div>` : ""}
+  ${empresa.telefone ? `<div class="empresa-sub">${empresa.telefone}</div>` : ""}
+</div>
+<hr class="divider">
+<div class="center num-venda">#${venda.id} &nbsp;·&nbsp; ${dataHora}</div>
+<hr class="divider">
+${linhaItens}
+<hr class="divider">
+<div class="total-row"><span>Subtotal</span><span>${Number(venda.total||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>
+<div class="total-row total-grande"><span>TOTAL</span><span>${Number(venda.total||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>
+${troco != null ? `<div class="total-row troco"><span>Troco</span><span>${Number(troco).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>` : ""}
+<hr class="divider">
+<div class="total-row"><span>Pagamento</span><span>${FORMA_LABEL_CUPOM[venda.formaPag] || venda.formaPag || "—"}</span></div>
+${venda.cliente ? `<div class="total-row"><span>Cliente</span><span>${venda.cliente}</span></div>` : ""}
+<hr class="divider">
+<div class="center rodape">Obrigado pela preferência!</div>
+<div class="center rodape">ASSENT Gestão · sistema.assent</div>
+</body></html>`);
+
+    win.document.close();
+    setTimeout(() => { win.focus(); win.print(); win.close(); }, 400);
+  };
+
+  return (
+    <div className="cupom-overlay" onClick={onClose}>
+      <div className="cupom-modal" onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="cupom-modal-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Printer size={14} color="var(--pdv-gold)" />
+            <span>Cupom #{venda.id}</span>
+          </div>
+          <button className="cupom-close" onClick={onClose}><X size={14} /></button>
+        </div>
+
+        {/* Preview do cupom — simula o papel térmico */}
+        <div className="cupom-paper">
+          <div className="cupom-empresa">{empresa.nome}</div>
+          {empresa.endereco && <div className="cupom-sub">{empresa.endereco}</div>}
+          <div className="cupom-divider" />
+          <div className="cupom-meta">#{venda.id} · {dataHora}</div>
+          <div className="cupom-divider" />
+
+          {(venda.itens || []).map((item, i) => (
+            <div key={i} className="cupom-item">
+              <span className="cupom-item-nome">{item.produto?.nome || item.nome || "—"}</span>
+              <span className="cupom-item-qty">{item.qty}x</span>
+              <span className="cupom-item-val">{fmt(item.subtotal)}</span>
+            </div>
+          ))}
+
+          <div className="cupom-divider" />
+          <div className="cupom-total-row">
+            <span>Total</span>
+            <span style={{ fontWeight: 700, color: "#111" }}>{fmt(venda.total)}</span>
+          </div>
+          {troco != null && (
+            <div className="cupom-total-row">
+              <span>Troco</span>
+              <span style={{ color: "#1a7a3c", fontWeight: 600 }}>{fmt(troco)}</span>
+            </div>
+          )}
+          <div className="cupom-total-row">
+            <span>Pagamento</span>
+            <span>{FORMA_LABEL_CUPOM[venda.formaPag] || "—"}</span>
+          </div>
+          {venda.cliente && (
+            <div className="cupom-total-row">
+              <span>Cliente</span>
+              <span>{venda.cliente}</span>
+            </div>
+          )}
+          <div className="cupom-divider" />
+          <div className="cupom-rodape">Obrigado pela preferência!</div>
+        </div>
+
+        {/* Footer */}
+        <div className="cupom-modal-footer">
+          <button className="cupom-btn-imprimir" onClick={imprimir}>
+            <Printer size={14} /> Imprimir
+          </button>
+          <button className="cupom-btn-fechar" onClick={onClose}>
+            Fechar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ═══════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
@@ -63,7 +207,8 @@ export default function PDV({ onVoltar }) {
 
   /* ── UI states ── */
   const [finalizando, setFinalizando] = useState(false);
-  const [vendaFinalizada, setVendaFinalizada] = useState(null); // { id, total }
+  const [vendaFinalizada, setVendaFinalizada] = useState(null);
+  const [showCupom, setShowCupom] = useState(false);
   const [erro, setErro] = useState("");
   const [toast, setToast] = useState(null);
   const [editandoQty, setEditandoQty] = useState(null); // índice do item sendo editado
@@ -321,7 +466,7 @@ export default function PDV({ onVoltar }) {
         transaction.set(vendaRef, vendaDoc);
         transaction.set(counterRef, { vendas: nextNum }, { merge: true });
 
-        setVendaFinalizada({ id: vendaId, total });
+        setVendaFinalizada({ id: vendaId, total, itens: carrinho, formaPag, parcelas, cliente: cliente?.nome || null });
       });
     } catch (e) {
       console.error(e);
@@ -354,6 +499,9 @@ export default function PDV({ onVoltar }) {
                 <button className="pdv-btn-nova" onClick={limparVenda}>
                   <Plus size={18} /> Nova Venda
                 </button>
+                <button className="pdv-btn-cupom" onClick={() => setShowCupom(true)}>
+                  <Printer size={15} /> Imprimir Cupom
+                </button>
                 {onVoltar && (
                   <button className="pdv-btn-voltar-ghost" onClick={onVoltar}>
                     <ArrowLeft size={16} /> Voltar
@@ -363,6 +511,15 @@ export default function PDV({ onVoltar }) {
             </div>
           </div>
         </div>
+
+        {showCupom && (
+          <ModalCupom
+            venda={vendaFinalizada}
+            troco={troco > 0 ? troco : null}
+            empresa={{ nome: nomeEmpresa, logo: logoEmpresa, endereco: empresa.endereco, telefone: empresa.telefone }}
+            onClose={() => setShowCupom(false)}
+          />
+        )}
       </>
     );
   }
@@ -1088,4 +1245,96 @@ const CSS = `
 .pdv-carrinho-body::-webkit-scrollbar-track { background: transparent; }
 .pdv-col-left::-webkit-scrollbar-thumb,
 .pdv-carrinho-body::-webkit-scrollbar-thumb { background: var(--pdv-border); border-radius: 2px; }
+
+/* ── BOTÃO IMPRIMIR CUPOM ── */
+.pdv-btn-cupom {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  background: transparent; border: 1px solid rgba(200,165,94,0.35);
+  color: var(--pdv-gold); border-radius: 8px; padding: 10px;
+  font-size: 13px; cursor: pointer; transition: all .15s;
+  font-family: 'DM Sans', sans-serif;
+}
+.pdv-btn-cupom:hover { background: var(--pdv-gold-dim); border-color: var(--pdv-gold); }
+
+/* ── MODAL CUPOM ── */
+.cupom-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(3px);
+  display: flex; align-items: center; justify-content: center;
+  animation: fadeIn .15s ease;
+}
+.cupom-modal {
+  background: #16181f; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px; width: 320px; max-height: 88vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.7);
+  animation: slideUp .18s ease;
+  overflow: hidden;
+}
+.cupom-modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 16px; border-bottom: 1px solid rgba(255,255,255,0.07);
+  font-size: 13px; font-weight: 600; color: #e8e8f0;
+  flex-shrink: 0;
+}
+.cupom-close {
+  background: none; border: none; cursor: pointer;
+  color: #5c5e72; display: flex; align-items: center;
+  padding: 2px; border-radius: 5px; transition: color .13s;
+}
+.cupom-close:hover { color: #e05555; }
+
+/* ── PAPEL TÉRMICO (preview) ── */
+.cupom-paper {
+  background: #fafaf8; color: #111;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11.5px; padding: 16px 14px;
+  overflow-y: auto; flex: 1;
+  line-height: 1.5;
+}
+.cupom-paper::-webkit-scrollbar { width: 3px; }
+.cupom-paper::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
+.cupom-empresa { font-size: 13px; font-weight: bold; text-align: center; margin-bottom: 2px; }
+.cupom-sub { font-size: 10px; color: #666; text-align: center; }
+.cupom-meta { font-size: 10px; color: #777; text-align: center; letter-spacing: .02em; }
+.cupom-divider {
+  border: none; border-top: 1px dashed #bbb; margin: 7px 0;
+}
+.cupom-item {
+  display: flex; align-items: baseline; gap: 4px; padding: 2px 0;
+  border-bottom: 1px dotted #ddd; font-size: 11px;
+}
+.cupom-item-nome { flex: 1; color: #222; }
+.cupom-item-qty  { color: #888; flex-shrink: 0; font-size: 10px; }
+.cupom-item-val  { flex-shrink: 0; text-align: right; font-weight: 600; min-width: 64px; }
+.cupom-total-row {
+  display: flex; justify-content: space-between;
+  font-size: 11.5px; padding: 2px 0; color: #333;
+}
+.cupom-rodape { text-align: center; font-size: 10px; color: #888; margin-top: 4px; }
+
+/* ── FOOTER DO MODAL ── */
+.cupom-modal-footer {
+  display: flex; gap: 8px; padding: 12px 16px;
+  border-top: 1px solid rgba(255,255,255,0.07); flex-shrink: 0;
+}
+.cupom-btn-imprimir {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
+  background: var(--pdv-gold, #c8a55e); color: #0a0808;
+  border: none; border-radius: 8px; padding: 9px;
+  font-size: 13px; font-weight: 700; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: opacity .15s;
+}
+.cupom-btn-imprimir:hover { opacity: .88; }
+.cupom-btn-fechar {
+  padding: 9px 16px; border-radius: 8px;
+  background: transparent; border: 1px solid rgba(255,255,255,0.1);
+  color: #9193a5; font-size: 13px; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: all .13s;
+}
+.cupom-btn-fechar:hover { background: rgba(255,255,255,0.05); color: #e8e8f0; }
+
+@keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
 `;
