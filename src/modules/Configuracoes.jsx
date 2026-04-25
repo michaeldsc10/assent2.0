@@ -657,9 +657,56 @@ function SecaoEmpresa({ config, onSave }) {
   const handleLogo = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 300 * 1024) { alert("Imagem muito grande. Máx. 300KB."); return; }
+
+    const MAX_BYTES  = 300 * 1024;   // 300 KB — limite final do base64
+    const MAX_DIM    = 1200;          // largura/altura máxima em pixels
+    const MIME       = "image/jpeg";  // sempre salva como JPEG para melhor compressão
+
+    const comprimirComCanvas = (src) => {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          // 1. Calcular dimensões mantendo proporção
+          let { width, height } = img;
+          if (width > MAX_DIM || height > MAX_DIM) {
+            if (width >= height) { height = Math.round(height * MAX_DIM / width); width = MAX_DIM; }
+            else                 { width  = Math.round(width  * MAX_DIM / height); height = MAX_DIM; }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width  = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          // Fundo branco para imagens com transparência (PNG → JPEG)
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // 2. Tentar qualidades decrescentes até caber em 300 KB
+          const tentativas = [0.92, 0.85, 0.78, 0.70, 0.60, 0.50, 0.40];
+          for (const q of tentativas) {
+            const dataUrl = canvas.toDataURL(MIME, q);
+            // base64 overhead: cada 4 chars = 3 bytes
+            const bytes = Math.ceil((dataUrl.length - dataUrl.indexOf(",") - 1) * 3 / 4);
+            if (bytes <= MAX_BYTES) { resolve(dataUrl); return; }
+          }
+          // Se ainda não couber na qualidade mínima, retorna mesmo assim
+          resolve(canvas.toDataURL(MIME, 0.40));
+        };
+        img.onerror = reject;
+        img.src = src;
+      });
+    };
+
     const reader = new FileReader();
-    reader.onload = (ev) => set("logo", ev.target.result);
+    reader.onload = async (ev) => {
+      try {
+        const comprimida = await comprimirComCanvas(ev.target.result);
+        set("logo", comprimida);
+      } catch {
+        alert("Não foi possível processar a imagem. Tente outro arquivo.");
+      }
+    };
     reader.readAsDataURL(file);
   };
 
@@ -701,7 +748,7 @@ function SecaoEmpresa({ config, onSave }) {
             ) : (
               <>
                 <Camera size={22} color="var(--text-3)" />
-                <span className="logo-upload-hint">Clique para enviar a logo<br />PNG ou JPEG · Máx. 300KB</span>
+                <span className="logo-upload-hint">Clique para enviar a logo<br />PNG, JPEG ou WebP · Compactado automaticamente</span>
               </>
             )}
           </div>
