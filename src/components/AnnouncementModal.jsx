@@ -2,7 +2,7 @@
    AnnouncementModal.jsx  —  Firebase SDK modular (v9+)
    ═══════════════════════════════════════════════════ */
 import { useEffect, useState, useCallback } from "react";
-import { db } from "../firebase";
+import { db } from "../lib/firebase";
 import {
   collection,
   query,
