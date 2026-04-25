@@ -21,16 +21,12 @@ import React, { useState, useEffect, useContext, useMemo } from "react";
 import {
   collection,
   doc,
-  setDoc,
   updateDoc,
-  deleteDoc,
   onSnapshot,
-  serverTimestamp,
-  getDocs,
 } from "firebase/firestore";
-import { initializeApp, getApps } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
-import { db, firebaseConfig } from "../lib/firebase";
+import { getAuth, sendPasswordResetEmail } from "firebase/auth";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { db } from "../lib/firebase";
 import AuthContext from "../contexts/AuthContext";
 
 /* ─────────────────────────────────────────────
@@ -886,73 +882,33 @@ export default function Usuarios() {
   /* ── Contar usuários não-admin ativos ── */
   const totalAtivos = usuarios.filter((u) => u.ativo !== false).length;
 
-  /* ── Criar usuário via Firebase Auth (secondary app) + Firestore ── */
+  /* ── Criar usuário via Cloud Function (validação no servidor) ── */
   async function criarUsuario({ nome, email, senha, cargo: novoCargo, vendedorId }, setErro) {
     setSalvando(true);
     try {
-      // 1. Cria ou reutiliza a secondary app para não deslogar o Admin
-      const secondaryAppName = "assent-secondary";
-      let secondaryApp = getApps().find((a) => a.name === secondaryAppName);
-      if (!secondaryApp) {
-        secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
-      }
-      const secondaryAuth = getAuth(secondaryApp);
-
-      // 2. Cria o usuário no Firebase Auth
-      const { user: novoUser } = await createUserWithEmailAndPassword(
-        secondaryAuth, email, senha
-      );
-      const novoUid = novoUser.uid;
-
-      // 3. Sign out da secondary app (não afeta o Admin logado na primary)
-      await secondaryAuth.signOut();
-
-      // 4. Escreve o perfil na subcoleção de usuários do tenant
-      await setDoc(doc(db, "users", raiz, "usuarios", novoUid), {
-        nome,
-        email,
-        cargo:      novoCargo,
-        vendedorId: novoCargo === "vendedor" ? vendedorId : null,
-        ativo:      true,
-        criadoEm:   serverTimestamp(),
-        criadoPor:  user.uid,
-      });
-
-      // 5. Cria o índice reverso — AuthContext usa isso para identificar o tenant
-      await setDoc(doc(db, "userIndex", novoUid), {
-        tenantUid: raiz,
-        criadoEm:  serverTimestamp(),
-      });
-
+      const fn = httpsCallable(getFunctions(), "criarUsuario");
+      const { data } = await fn({ nome, email, senha, cargo: novoCargo, vendedorId });
       fecharModal();
-      mostrarToast(`Usuário "${nome}" criado com sucesso.`);
+      mostrarToast(`Usuário "${data.nome}" criado com sucesso.`);
     } catch (err) {
       console.error("[Usuarios] Erro ao criar usuário:", err);
-      if (err.code === "auth/email-already-in-use") {
-        setErro("Este e-mail já está em uso em outra conta.");
-      } else if (err.code === "auth/invalid-email") {
-        setErro("E-mail inválido.");
-      } else if (err.code === "auth/weak-password") {
-        setErro("Senha muito fraca. Use pelo menos 6 caracteres.");
-      } else {
-        setErro("Erro ao criar usuário. Tente novamente.");
-      }
+      const msg = err?.message || "";
+      if (msg.includes("já está em uso"))       setErro("Este e-mail já está em uso em outra conta.");
+      else if (msg.includes("E-mail inválido")) setErro("E-mail inválido.");
+      else if (msg.includes("6 caracteres"))    setErro("Senha muito fraca. Use pelo menos 6 caracteres.");
+      else if (msg.includes("Limite"))          setErro("Limite de 10 usuários atingido.");
+      else                                      setErro("Erro ao criar usuário. Tente novamente.");
     } finally {
       setSalvando(false);
     }
   }
 
-  /* ── Editar usuário (cargo e vendedorId) ── */
+  /* ── Editar usuário via Cloud Function (validação no servidor) ── */
   async function editarUsuario({ nome, cargo: novoCargo, vendedorId }, setErro) {
     setSalvando(true);
     try {
-      const docRef = doc(db, "users", raiz, "usuarios", usuarioEditando.uid);
-      await updateDoc(docRef, {
-        nome,
-        cargo: novoCargo,
-        vendedorId: novoCargo === "vendedor" ? vendedorId : null,
-        atualizadoEm: serverTimestamp(),
-      });
+      const fn = httpsCallable(getFunctions(), "editarUsuario");
+      await fn({ uid: usuarioEditando.uid, nome, cargo: novoCargo, vendedorId });
       fecharModal();
       mostrarToast(`Usuário "${nome}" atualizado.`);
     } catch (err) {
@@ -1012,7 +968,7 @@ export default function Usuarios() {
     }
   }
 
-  /* ── Excluir usuário (remove perfil + índice reverso) ── */
+  /* ── Excluir usuário via Cloud Function (validação no servidor) ── */
   async function excluirUsuario(usr) {
     if (!window.confirm(
       `Excluir permanentemente "${usr.nome}"?\n\n` +
@@ -1021,8 +977,8 @@ export default function Usuarios() {
       `Esta ação não pode ser desfeita.`
     )) return;
     try {
-      await deleteDoc(doc(db, "users", raiz, "usuarios", usr.uid));
-      await deleteDoc(doc(db, "userIndex", usr.uid));
+      const fn = httpsCallable(getFunctions(), "excluirUsuario");
+      await fn({ uid: usr.uid });
       mostrarToast(`"${usr.nome}" removido permanentemente.`);
     } catch (err) {
       console.error("[Usuarios] Erro ao excluir:", err);
