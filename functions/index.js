@@ -31,16 +31,160 @@ const CALL_OPTIONS = {
   ],
 };
 
-/* Opções para as funções PIX — App Check manual para não bloquear CORS no preflight */
-const CALL_OPTIONS_PIX = {
-  enforceAppCheck: false, // verificado manualmente dentro da função
-  cors: [
-    "https://ag.assentagencia.com.br",
-    "https://assent2-0.vercel.app",
-    "http://localhost:5173",
-    "http://localhost:3000",
-  ],
-};
+/* Opções para as funções PIX — onRequest com CORS manual */
+const PIX_ORIGINS = new Set([
+  "https://ag.assentagencia.com.br",
+  "https://assent2-0.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+]);
+
+/* Helper: aplica CORS e retorna false se for preflight já respondido */
+function applyCors(req, res) {
+  const origin = req.headers.origin || "";
+  const allowed = PIX_ORIGINS.has(origin) ? origin : [...PIX_ORIGINS][0];
+  res.set("Access-Control-Allow-Origin",  allowed);
+  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.set("Access-Control-Max-Age",       "3600");
+  if (req.method === "OPTIONS") { res.status(204).send(""); return false; }
+  return true;
+}
+
+/* Helper: verifica token Firebase Auth e retorna uid */
+async function verificarAuth(req) {
+  const header = req.headers.authorization || "";
+  const token  = header.startsWith("Bearer ") ? header.slice(7) : null;
+  if (!token) return null;
+  try {
+    const decoded = await fbAuth.verifyIdToken(token);
+    return decoded.uid;
+  } catch { return null; }
+}
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO 4: gerarPixQr  (onRequest — CORS manual)
+───────────────────────────────────────────── */
+exports.gerarPixQr = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    if (!applyCors(req, res)) return;
+    if (req.method !== "POST") { res.status(405).send("Method Not Allowed"); return; }
+
+    const uid = await verificarAuth(req);
+    if (!uid) { res.status(401).json({ error: "Não autenticado." }); return; }
+
+    const { tenantUid, valor, descricao } = req.body || {};
+    if (!tenantUid || valor == null) {
+      res.status(400).json({ error: "tenantUid e valor são obrigatórios." });
+      return;
+    }
+
+    const configSnap = await db.doc(`users/${tenantUid}/config/geral`).get();
+    if (!configSnap.exists) { res.status(404).json({ error: "Configuração não encontrada." }); return; }
+
+    const mpConfig = configSnap.data()?.pagamentos?.mercadopago;
+    if (!mpConfig?.ativo)        { res.status(400).json({ error: "Pagamentos PIX não ativados." }); return; }
+    if (!mpConfig?.accessToken)  { res.status(400).json({ error: "Access Token não configurado." }); return; }
+
+    const token          = mpConfig.accessToken;
+    const idempotencyKey = `assent-${tenantUid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+    let mpData;
+    try {
+      const mpRes = await fetch("https://api.mercadopago.com/v1/payments", {
+        method:  "POST",
+        headers: {
+          "Authorization":     `Bearer ${token}`,
+          "Content-Type":      "application/json",
+          "X-Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({
+          transaction_amount: parseFloat(Number(valor).toFixed(2)),
+          description:        descricao || "Venda PDV ASSENT",
+          payment_method_id:  "pix",
+          payer: { email: "pagador@assent.com.br", first_name: "Cliente", last_name: "ASSENT" },
+          notification_url:   WEBHOOK_URL,
+        }),
+      });
+      mpData = await mpRes.json();
+      if (!mpRes.ok) {
+        console.error("[gerarPixQr] Erro MP:", mpData);
+        res.status(502).json({ error: mpData?.message || `Erro Mercado Pago ${mpRes.status}` });
+        return;
+      }
+    } catch (err) {
+      console.error("[gerarPixQr] Fetch error:", err);
+      res.status(502).json({ error: "Falha ao conectar com o Mercado Pago." });
+      return;
+    }
+
+    const txData = mpData?.point_of_interaction?.transaction_data;
+    if (!txData?.qr_code_base64 || !txData?.qr_code) {
+      console.error("[gerarPixQr] QR não retornado:", mpData);
+      res.status(502).json({ error: "QR Code não retornado. Verifique se PIX está habilitado na conta MP." });
+      return;
+    }
+
+    await db.doc(`users/${tenantUid}/pagamentosQr/${mpData.id}`).set({
+      paymentId:    mpData.id,
+      tenantUid,
+      valor:        parseFloat(Number(valor).toFixed(2)),
+      status:       "pending",
+      statusDetail: null,
+      descricao:    descricao || "",
+      criadoEm:     FieldValue.serverTimestamp(),
+      atualizadoEm: FieldValue.serverTimestamp(),
+    });
+
+    console.log(`[gerarPixQr] Criado: ${mpData.id} — tenant: ${tenantUid} — R$${valor}`);
+    res.status(200).json({
+      paymentId:    mpData.id,
+      qrCodeBase64: txData.qr_code_base64,
+      qrCode:       txData.qr_code,
+    });
+  }
+);
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO 6: consultarPagamento  (onRequest — CORS manual)
+───────────────────────────────────────────── */
+exports.consultarPagamento = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    if (!applyCors(req, res)) return;
+    if (req.method !== "POST") { res.status(405).send("Method Not Allowed"); return; }
+
+    const uid = await verificarAuth(req);
+    if (!uid) { res.status(401).json({ error: "Não autenticado." }); return; }
+
+    const { tenantUid, paymentId } = req.body || {};
+    if (!tenantUid || !paymentId) {
+      res.status(400).json({ error: "tenantUid e paymentId são obrigatórios." });
+      return;
+    }
+
+    const configSnap = await db.doc(`users/${tenantUid}/config/geral`).get();
+    const token      = configSnap.data()?.pagamentos?.mercadopago?.accessToken;
+    if (!token) { res.status(400).json({ error: "Token não configurado." }); return; }
+
+    const mpRes  = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      headers: { "Authorization": `Bearer ${token}` },
+    });
+    const mpData = await mpRes.json();
+    const novoStatus = mpData.status || "unknown";
+
+    try {
+      await db.doc(`users/${tenantUid}/pagamentosQr/${paymentId}`).update({
+        status:       novoStatus,
+        statusDetail: mpData.status_detail || null,
+        atualizadoEm: FieldValue.serverTimestamp(),
+      });
+    } catch { /* doc pode não existir ainda */ }
+
+    res.status(200).json({ status: novoStatus, statusDetail: mpData.status_detail || null });
+  }
+);
 
 /* ─────────────────────────────────────────────
    HELPER: Verifica se o caller é Admin legítimo
@@ -206,224 +350,6 @@ exports.excluirUsuario = onCall(CALL_OPTIONS, async (request) => {
 
 const WEBHOOK_URL = "https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook";
 
-/* ─────────────────────────────────────────────
-   FUNÇÃO 4: gerarPixQr
-   Cria pagamento PIX no Mercado Pago e salva doc
-   no Firestore. O PDV escuta via onSnapshot.
-───────────────────────────────────────────── */
-exports.gerarPixQr = onCall(CALL_OPTIONS_PIX, async (request) => {
-  const callerUid = request.auth?.uid;
-  if (!callerUid) {
-    throw new HttpsError("unauthenticated", "Usuário não autenticado.");
-  }
-
-  // App Check manual — loga se ausente mas não bloqueia (enquanto configura o domínio)
-  if (!request.app) {
-    console.warn("[gerarPixQr] App Check token ausente — verifique se o domínio está autorizado no Firebase Console.");
-  }
-
-  const { tenantUid, valor, descricao } = request.data;
-
-  if (!tenantUid || valor == null) {
-    throw new HttpsError("invalid-argument", "tenantUid e valor são obrigatórios.");
-  }
-
-  /* Lê o token do Firestore — nunca exposto ao client */
-  const configSnap = await db.doc(`users/${tenantUid}/config/geral`).get();
-
-  if (!configSnap.exists) {
-    throw new HttpsError("not-found", "Configuração não encontrada.");
-  }
-
-  const mpConfig = configSnap.data()?.pagamentos?.mercadopago;
-
-  if (!mpConfig?.ativo) {
-    throw new HttpsError("failed-precondition", "Pagamentos PIX não estão ativados nesta conta.");
-  }
-  if (!mpConfig?.accessToken) {
-    throw new HttpsError("failed-precondition", "Access Token não configurado. Vá em Configurações → Pagamentos Online.");
-  }
-
-  const token          = mpConfig.accessToken;
-  const idempotencyKey = `assent-${tenantUid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-  /* Cria o pagamento no Mercado Pago */
-  let mpData;
-  try {
-    const mpRes = await fetch("https://api.mercadopago.com/v1/payments", {
-      method:  "POST",
-      headers: {
-        "Authorization":     `Bearer ${token}`,
-        "Content-Type":      "application/json",
-        "X-Idempotency-Key": idempotencyKey,
-      },
-      body: JSON.stringify({
-        transaction_amount: parseFloat(Number(valor).toFixed(2)),
-        description:        descricao || "Venda PDV ASSENT",
-        payment_method_id:  "pix",
-        payer: { email: "pagador@assent.com.br", first_name: "Cliente", last_name: "ASSENT" },
-        notification_url:   WEBHOOK_URL,
-      }),
-    });
-
-    mpData = await mpRes.json();
-
-    if (!mpRes.ok) {
-      console.error("[gerarPixQr] Erro Mercado Pago:", mpData);
-      throw new HttpsError("internal", mpData?.message || `Erro Mercado Pago ${mpRes.status}`);
-    }
-  } catch (err) {
-    if (err instanceof HttpsError) throw err;
-    console.error("[gerarPixQr] Fetch error:", err);
-    throw new HttpsError("internal", "Falha ao conectar com o Mercado Pago.");
-  }
-
-  const txData = mpData?.point_of_interaction?.transaction_data;
-  if (!txData?.qr_code_base64 || !txData?.qr_code) {
-    console.error("[gerarPixQr] QR não retornado:", mpData);
-    throw new HttpsError("internal", "QR Code não retornado. Verifique se PIX está habilitado na conta MP.");
-  }
-
-  /* Salva referência no Firestore — PDV escuta via onSnapshot */
-  await db.doc(`users/${tenantUid}/pagamentosQr/${mpData.id}`).set({
-    paymentId:    mpData.id,
-    tenantUid,
-    valor:        parseFloat(Number(valor).toFixed(2)),
-    status:       "pending",
-    statusDetail: null,
-    descricao:    descricao || "",
-    criadoEm:     FieldValue.serverTimestamp(),
-    atualizadoEm: FieldValue.serverTimestamp(),
-  });
-
-  console.log(`[gerarPixQr] Criado: ${mpData.id} — tenant: ${tenantUid} — R$${valor}`);
-
-  return {
-    paymentId:    mpData.id,
-    qrCodeBase64: txData.qr_code_base64,
-    qrCode:       txData.qr_code,
-  };
-});
-
-/* ─────────────────────────────────────────────
-   FUNÇÃO 5: mpWebhook
-   Recebida pelo Mercado Pago quando o pagamento
-   muda de status. Atualiza Firestore → PDV reage
-   via onSnapshot sem polling no cliente.
-
-   ⚠️ Pública intencionalmente — o MP chama de fora.
-   A validação é feita pelo paymentId no Firestore.
-───────────────────────────────────────────── */
-exports.mpWebhook = onRequest(
-  { region: "us-central1", cors: false },
-  async (req, res) => {
-    if (req.method !== "POST") {
-      res.status(405).send("Method Not Allowed");
-      return;
-    }
-
-    const { type, data } = req.body || {};
-
-    if (type !== "payment" || !data?.id) {
-      res.status(200).send("OK");
-      return;
-    }
-
-    const paymentId = Number(data.id);
-
-    try {
-      /* Localiza o tenant dono deste pagamento */
-      const snap = await db
-        .collectionGroup("pagamentosQr")
-        .where("paymentId", "==", paymentId)
-        .limit(1)
-        .get();
-
-      if (snap.empty) {
-        res.status(200).send("OK");
-        return;
-      }
-
-      const payDoc    = snap.docs[0];
-      const { tenantUid } = payDoc.data();
-
-      /* Lê token do tenant */
-      const configSnap = await db.doc(`users/${tenantUid}/config/geral`).get();
-      const token      = configSnap.data()?.pagamentos?.mercadopago?.accessToken;
-
-      if (!token) {
-        console.error(`[mpWebhook] Token ausente para tenant ${tenantUid}`);
-        res.status(200).send("OK");
-        return;
-      }
-
-      /* Confirma status diretamente na API do MP */
-      const mpRes  = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-        headers: { "Authorization": `Bearer ${token}` },
-      });
-      const mpData = await mpRes.json();
-
-      const novoStatus = mpData.status || "unknown";
-
-      /* Atualiza Firestore → onSnapshot do PDV reage */
-      await payDoc.ref.update({
-        status:       novoStatus,
-        statusDetail: mpData.status_detail || null,
-        atualizadoEm: FieldValue.serverTimestamp(),
-      });
-
-      console.log(`[mpWebhook] ${paymentId} → ${novoStatus} (tenant: ${tenantUid})`);
-      res.status(200).send("OK");
-
-    } catch (err) {
-      console.error("[mpWebhook] Erro:", err);
-      res.status(200).send("OK"); // sempre 200 pro MP não reenviar em loop
-    }
-  }
-);
-
-/* ─────────────────────────────────────────────
-   FUNÇÃO 6: consultarPagamento
-   Fallback de polling caso o webhook falhe.
-   O ModalQrPix chama a cada 8s como segurança.
-───────────────────────────────────────────── */
-exports.consultarPagamento = onCall(CALL_OPTIONS_PIX, async (request) => {
-  const callerUid = request.auth?.uid;
-  if (!callerUid) {
-    throw new HttpsError("unauthenticated", "Usuário não autenticado.");
-  }
-
-  const { tenantUid, paymentId } = request.data;
-
-  if (!tenantUid || !paymentId) {
-    throw new HttpsError("invalid-argument", "tenantUid e paymentId são obrigatórios.");
-  }
-
-  const configSnap = await db.doc(`users/${tenantUid}/config/geral`).get();
-  const token      = configSnap.data()?.pagamentos?.mercadopago?.accessToken;
-
-  if (!token) {
-    throw new HttpsError("failed-precondition", "Token não configurado.");
-  }
-
-  const mpRes  = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-    headers: { "Authorization": `Bearer ${token}` },
-  });
-  const mpData = await mpRes.json();
-
-  const novoStatus = mpData.status || "unknown";
-
-  /* Sincroniza Firestore também — mantém onSnapshot atualizado */
-  try {
-    await db.doc(`users/${tenantUid}/pagamentosQr/${paymentId}`).update({
-      status:       novoStatus,
-      statusDetail: mpData.status_detail || null,
-      atualizadoEm: FieldValue.serverTimestamp(),
-    });
-  } catch { /* doc pode não existir ainda — sem problema */ }
-
-  return { status: novoStatus, statusDetail: mpData.status_detail || null };
-});
 
 /** Variação percentual entre dois valores. Retorna null se base for 0. */
 function varPct(atual, anterior) {
