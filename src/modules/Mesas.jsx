@@ -1020,7 +1020,8 @@ function ModalPixQr({ valor, tenantUid, descricao, onClose, onPago }) {
         if (data.status === "approved") {
           clearInterval(pollingRef.current);
           setFase("pago");
-          if (onPago) onPago();
+          // Aguarda 1.5s para o operador ver a confirmação antes de fechar a mesa
+          if (onPago) setTimeout(onPago, 1500);
         }
       } catch { /* ignora falha pontual */ }
     };
@@ -1953,6 +1954,10 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
           tenantUid={uid}
           descricao={`Mesa ${mesa.numero}${clienteNome ? ` — ${clienteNome}` : ""}`}
           onClose={() => setPixQrOpen(false)}
+          onPago={() => {
+            setPixQrOpen(false);
+            fecharMesa();
+          }}
         />
       )}
     </div>
