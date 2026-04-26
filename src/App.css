@@ -125,7 +125,6 @@
    LOGIN CARD — visual premium
    ══════════════════════════════════════════════════ */
 
-/* Wrapper externo — segura a borda gradiente */
 .login-card-wrap {
   position: relative;
   width: 400px;
@@ -137,7 +136,6 @@
   to   { opacity: 1; transform: translateY(0)    scale(1);    }
 }
 
-/* Borda com gradiente branco→gold */
 .login-card-border {
   position: absolute;
   inset: -1px;
@@ -152,7 +150,7 @@
   pointer-events: none;
 }
 
-/* Card principal */
+/* Card — padding vertical aumentado para esticar na vertical */
 .login-form-card {
   position: relative;
   z-index: 1;
@@ -161,14 +159,13 @@
   -webkit-backdrop-filter: blur(32px);
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 52px 44px 44px;
+  padding: 68px 44px 60px;
   box-shadow:
     0 0 60px rgba(255, 255, 255, 0.035),
     0 40px 80px rgba(0, 0, 0, 0.85),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
-/* Linha de luz no topo do card */
 .card-light {
   position: absolute;
   top: -1px;
@@ -185,32 +182,41 @@
 /* ── Logo ──────────────────────────────────────────── */
 .logo-area {
   text-align: center;
-  margin-bottom: 44px;
+  margin-bottom: 48px;
 }
 
+/* Linha com Assent (branco) + Gestão (dourado) */
 .logo-text {
   font-family: 'Cinzel', serif;
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 400;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  margin-bottom: 10px;
+}
+
+.logo-assent {
   color: #ffffff;
-  margin-bottom: 8px;
+}
+
+.logo-gestao {
+  color: #D4AF37;
 }
 
 .logo-sub {
   font-family: 'Montserrat', sans-serif;
-  font-size: 9px;
-  letter-spacing: 0.2em;
+  font-size: 10px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(212, 175, 55, 0.5);
-  font-weight: 400;
+  color: rgba(255, 255, 255, 0.28);
+  font-weight: 300;
 }
 
 .logo-divider {
   width: 32px;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.4), transparent);
-  margin: 14px auto 0;
+  margin: 16px auto 0;
 }
 
 /* ── Campos ────────────────────────────────────────── */
@@ -242,9 +248,7 @@
   transition: border-color 0.25s, background 0.25s, box-shadow 0.25s;
 }
 
-.field input::placeholder {
-  color: rgba(255, 255, 255, 0.14);
-}
+.field input::placeholder { color: rgba(255, 255, 255, 0.14); }
 
 .field input:focus {
   border-color: rgba(255, 255, 255, 0.2);
@@ -272,7 +276,7 @@
   color: #D4AF37;
   border-color: transparent;
   box-shadow: none;
-  transform: translateY(-50%); /* cancela o translateY global do hover do button */
+  transform: translateY(-50%);
 }
 
 .eye-toggle:disabled {
@@ -280,7 +284,10 @@
   opacity: 0.4;
 }
 
-/* ── Botão principal (branco com shimmer) ──────────── */
+/* ── Botão principal ─────────────────────────────────
+   Estado padrão: branco
+   Hover: dourado com luz passando (shimmer no ::after)
+   ─────────────────────────────────────────────────── */
 .btn-login {
   width: 100%;
   margin-top: 28px;
@@ -297,9 +304,10 @@
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  transition: opacity 0.2s, transform 0.15s;
+  transition: background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, transform 0.15s ease;
 }
 
+/* Luz que passa — só ativa no hover via animação com delay 0 */
 .btn-login::after {
   content: '';
   position: absolute;
@@ -307,32 +315,46 @@
   left: -100%;
   width: 60%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
-  animation: btnShimmer 4s ease-in-out infinite 1.5s;
-}
-
-@keyframes btnShimmer {
-  0%   { left: -100%; opacity: 0; }
-  20%  { opacity: 1; }
-  80%  { opacity: 1; }
-  100% { left: 200%; opacity: 0; }
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.45),
+    transparent
+  );
+  pointer-events: none;
 }
 
 .btn-login:hover {
-  opacity: 0.88;
+  background: #D4AF37;
+  color: #000000;
+  opacity: 1;
   transform: translateY(-1px);
+  box-shadow: 0 6px 28px rgba(212, 175, 55, 0.45);
   border-color: transparent;
+}
+
+/* Shimmer dispara apenas no hover */
+.btn-login:hover::after {
+  animation: btnShimmer 0.65s ease-in-out forwards;
+}
+
+@keyframes btnShimmer {
+  0%   { left: -100%; }
+  100% { left: 200%; }
 }
 
 .btn-login:active {
   transform: translateY(0);
-  opacity: 1;
+  box-shadow: 0 3px 14px rgba(212, 175, 55, 0.3);
 }
 
 .btn-login:disabled {
   opacity: 0.55;
   cursor: not-allowed;
   transform: none;
+  background: #ffffff;
+  color: #000000;
+  box-shadow: none;
 }
 
 .btn-login span {
@@ -343,7 +365,7 @@
 /* ── Footer / Recuperação ──────────────────────────── */
 .footer-link {
   text-align: center;
-  margin-top: 22px;
+  margin-top: 24px;
   font-family: 'Montserrat', sans-serif;
   font-size: 11px;
   color: rgba(255, 255, 255, 0.2);
@@ -440,10 +462,7 @@
   overflow: hidden;
 }
 
-.btn-submit span {
-  position: relative;
-  z-index: 1;
-}
+.btn-submit span { position: relative; z-index: 1; }
 
 .btn-submit:hover {
   background: rgba(212, 175, 55, 0.12);
@@ -451,9 +470,7 @@
   transform: translateY(-1px);
 }
 
-.btn-submit:active {
-  transform: translateY(0);
-}
+.btn-submit:active { transform: translateY(0); }
 
 /* ══════════════════════════════════════════════════
    BRAND OVERLAY TEXT (login-left)
@@ -630,7 +647,7 @@
 }
 
 @keyframes explode {
-  0%   { opacity: 0; transform: scale(0);  }
-  30%  { opacity: 0.8; transform: scale(2); }
-  100% { opacity: 0; transform: scale(10); }
+  0%   { opacity: 0;   transform: scale(0);  }
+  30%  { opacity: 0.8; transform: scale(2);  }
+  100% { opacity: 0;   transform: scale(10); }
 }
