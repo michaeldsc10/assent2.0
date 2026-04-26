@@ -1747,7 +1747,7 @@ function ModalDetalheVenda({ venda, onClose, onEditar, onCancelar, onExcluirDef,
     </div>
   );
 }
-   ══════════════════════════════════════════════════ */
+   //══════════════════════════════════════════════════ */
 function ModalCancelarVenda({ venda, onConfirm, onClose }) {
   const [cancelando, setCancelando] = useState(false);
 
