@@ -17,12 +17,14 @@
 //   users/{tenantUid}/usuarios/{newUid}  → perfil do usuário
 //   userIndex/{newUid}                   → { tenantUid } (índice reverso)
 
-import React, { useState, useEffect, useContext, useMemo } from "react";
+import React, { useState, useEffect, useContext, useMemo, useRef, useCallback } from "react";
 import {
   collection,
   doc,
   updateDoc,
   onSnapshot,
+  setDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 import { getAuth, sendPasswordResetEmail } from "firebase/auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
@@ -535,8 +537,108 @@ const CSS = `
     .usr-topbar { flex-wrap: wrap; gap: 8px; }
     .usr-field-row { grid-template-columns: 1fr; }
     .usr-table th:nth-child(3),
-    .usr-table td:nth-child(3) { display: none; } /* esconde col vendedor no mobile */
+    .usr-table td:nth-child(3) { display: none; }
   }
+
+  /* ── Foto do usuário ── */
+  .usr-foto-wrap {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 4px;
+  }
+  .usr-foto-preview {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: linear-gradient(135deg, #b8952e, #e0c060);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; font-weight: 700; color: #0a0808;
+    flex-shrink: 0; cursor: pointer; overflow: hidden;
+    border: 2px solid var(--border-h);
+    transition: border-color .15s, transform .15s;
+    position: relative;
+  }
+  .usr-foto-preview:hover { border-color: var(--gold); transform: scale(1.04); }
+  .usr-foto-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .usr-foto-preview .usr-foto-overlay {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.45);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity .15s; border-radius: 50%;
+    font-size: 18px;
+  }
+  .usr-foto-preview:hover .usr-foto-overlay { opacity: 1; }
+  .usr-foto-actions { display: flex; flex-direction: column; gap: 6px; }
+  .usr-foto-btn {
+    padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 600;
+    cursor: pointer; border: 1px solid transparent; transition: background .12s, border-color .12s;
+  }
+  .usr-foto-btn.escolher {
+    background: rgba(200,165,94,0.1); color: var(--gold);
+    border-color: rgba(200,165,94,0.25);
+  }
+  .usr-foto-btn.escolher:hover { background: rgba(200,165,94,0.18); }
+  .usr-foto-btn.remover {
+    background: rgba(224,82,82,0.07); color: var(--red);
+    border-color: rgba(224,82,82,0.2);
+  }
+  .usr-foto-btn.remover:hover { background: rgba(224,82,82,0.15); }
+
+  /* ── Crop modal ── */
+  .usr-crop-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.82);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 400; padding: 20px;
+  }
+  .usr-crop-box {
+    background: var(--s1); border: 1px solid var(--border-h);
+    border-radius: 16px; width: 100%; max-width: 420px;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .usr-crop-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
+  }
+  .usr-crop-header h4 { font-size: 13px; font-weight: 600; color: var(--text); margin: 0; }
+  .usr-crop-canvas-wrap {
+    position: relative; width: 100%; aspect-ratio: 1;
+    background: #000; overflow: hidden; cursor: move;
+  }
+  .usr-crop-canvas { display: block; width: 100%; height: 100%; }
+  .usr-crop-circle-mask {
+    position: absolute; inset: 0; pointer-events: none;
+    box-shadow: 0 0 0 2000px rgba(0,0,0,0.55);
+    border-radius: 0;
+  }
+  .usr-crop-circle {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+    width: 72%; aspect-ratio: 1; border-radius: 50%;
+    box-shadow: 0 0 0 2000px rgba(0,0,0,0.55);
+    border: 2px solid rgba(200,165,94,0.7);
+  }
+  .usr-crop-controls {
+    padding: 14px 18px; display: flex; flex-direction: column; gap: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .usr-crop-zoom-row {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .usr-crop-zoom-label { font-size: 11px; color: var(--text-3); white-space: nowrap; }
+  .usr-crop-zoom-range {
+    flex: 1; accent-color: var(--gold);
+  }
+  .usr-crop-footer {
+    display: flex; justify-content: flex-end; gap: 8px;
+    padding: 12px 18px; border-top: 1px solid var(--border);
+  }
+
+  /* ── Viewer de imagem ── */
+  .usr-viewer-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.9);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 500; gap: 20px;
+  }
+  .usr-viewer-img {
+    width: 200px; height: 200px; border-radius: 50%;
+    object-fit: cover; border: 3px solid rgba(200,165,94,0.5);
+    box-shadow: 0 0 60px rgba(0,0,0,0.8);
+  }
+  .usr-viewer-actions { display: flex; gap: 10px; }
 `;
 
 /* ─────────────────────────────────────────────
@@ -567,8 +669,169 @@ function BadgeCargo({ cargo }) {
 }
 
 /* ─────────────────────────────────────────────
-   MODAL CONVIDAR / EDITAR USUÁRIO
+   COMPONENTE: Crop de imagem circular
 ───────────────────────────────────────────── */
+function CropModal({ imageSrc, onConfirm, onCancel }) {
+  const canvasRef = useRef(null);
+  const [zoom, setZoom]     = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const dragRef             = useRef(null);
+  const imgRef              = useRef(new window.Image());
+
+  useEffect(() => {
+    const img = imgRef.current;
+    img.onload = () => draw();
+    img.src = imageSrc;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageSrc]);
+
+  useEffect(() => { draw(); }, [zoom, offset]);
+
+  function draw() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx    = canvas.getContext("2d");
+    const size   = canvas.width;
+    const img    = imgRef.current;
+    if (!img.complete || !img.naturalWidth) return;
+
+    ctx.clearRect(0, 0, size, size);
+
+    const scale  = Math.min(size / img.naturalWidth, size / img.naturalHeight) * zoom;
+    const iw     = img.naturalWidth  * scale;
+    const ih     = img.naturalHeight * scale;
+    const cx     = size / 2 + offset.x - iw / 2;
+    const cy     = size / 2 + offset.y - ih / 2;
+
+    ctx.drawImage(img, cx, cy, iw, ih);
+  }
+
+  function getCropped() {
+    const canvas = canvasRef.current;
+    const size   = canvas.width;
+    const r      = size * 0.36; // raio do círculo (72% do canvas / 2)
+    const out    = document.createElement("canvas");
+    out.width    = out.height = Math.round(r * 2);
+    const ctx    = out.getContext("2d");
+    ctx.beginPath();
+    ctx.arc(r, r, r, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(canvas, size / 2 - r, size / 2 - r, r * 2, r * 2, 0, 0, r * 2, r * 2);
+    return out.toDataURL("image/jpeg", 0.85);
+  }
+
+  function onMouseDown(e) {
+    e.preventDefault();
+    const start = { x: e.clientX, y: e.clientY, ox: offset.x, oy: offset.y };
+    dragRef.current = start;
+    const onMove = (ev) => {
+      setOffset({ x: start.ox + ev.clientX - start.x, y: start.oy + ev.clientY - start.y });
+    };
+    const onUp = () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+  }
+
+  function onTouchStart(e) {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const start = { x: t.clientX, y: t.clientY, ox: offset.x, oy: offset.y };
+    const onMove = (ev) => {
+      const tt = ev.touches[0];
+      setOffset({ x: start.ox + tt.clientX - start.x, y: start.oy + tt.clientY - start.y });
+    };
+    const onEnd = () => {
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onEnd);
+    };
+    window.addEventListener("touchmove", onMove, { passive: true });
+    window.addEventListener("touchend", onEnd);
+  }
+
+  return (
+    <div className="usr-crop-overlay" onClick={(e) => e.target === e.currentTarget && onCancel()}>
+      <div className="usr-crop-box">
+        <div className="usr-crop-header">
+          <h4>📷 Ajustar foto</h4>
+          <button className="modal-close" onClick={onCancel}>✕</button>
+        </div>
+
+        <div
+          className="usr-crop-canvas-wrap"
+          onMouseDown={onMouseDown}
+          onTouchStart={onTouchStart}
+        >
+          <canvas ref={canvasRef} width={400} height={400} className="usr-crop-canvas" />
+          {/* Máscara circular */}
+          <div style={{
+            position: "absolute", inset: 0, pointerEvents: "none",
+            background: `radial-gradient(circle 36% at 50% 50%, transparent 99%, rgba(0,0,0,0.6) 100%)`,
+          }} />
+          <div style={{
+            position: "absolute",
+            top: "50%", left: "50%",
+            transform: "translate(-50%,-50%)",
+            width: "72%", aspectRatio: "1",
+            borderRadius: "50%",
+            border: "2px solid rgba(200,165,94,0.8)",
+            pointerEvents: "none",
+            boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)",
+          }} />
+        </div>
+
+        <div className="usr-crop-controls">
+          <div className="usr-crop-zoom-row">
+            <span className="usr-crop-zoom-label">🔍 Zoom</span>
+            <input
+              type="range" className="usr-crop-zoom-range"
+              min="0.5" max="3" step="0.05"
+              value={zoom}
+              onChange={(e) => setZoom(Number(e.target.value))}
+            />
+            <span className="usr-crop-zoom-label">{(zoom * 100).toFixed(0)}%</span>
+          </div>
+        </div>
+
+        <div className="usr-crop-footer">
+          <button className="usr-btn-cancelar" onClick={onCancel}>Cancelar</button>
+          <button
+            className="usr-btn-salvar"
+            onClick={() => onConfirm(getCropped())}
+          >
+            Confirmar foto
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   COMPONENTE: Viewer de foto (clique na foto)
+───────────────────────────────────────────── */
+function ImageViewer({ src, nome, onClose, onRemove, onTrocar }) {
+  return (
+    <div className="usr-viewer-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <img src={src} alt={nome} className="usr-viewer-img" />
+      <div className="usr-viewer-actions">
+        <button className="usr-btn-acao editar" onClick={onTrocar}>
+          🔄 Trocar imagem
+        </button>
+        <button className="usr-btn-acao desativar" onClick={onRemove}>
+          🗑 Remover imagem
+        </button>
+        <button className="usr-btn-cancelar" onClick={onClose}>
+          Fechar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+
 function ModalUsuario({ usuario, vendedores, onSalvar, onFechar, salvando }) {
   const isEdicao = Boolean(usuario?.uid);
 
@@ -579,10 +842,27 @@ function ModalUsuario({ usuario, vendedores, onSalvar, onFechar, salvando }) {
   const [vendedorId, setVendedorId] = useState(usuario?.vendedorId || "");
   const [erro,       setErro]       = useState("");
 
+  // Foto
+  const [fotoBase64,   setFotoBase64]   = useState(usuario?.fotoBase64 || null);
+  const [cropSrc,      setCropSrc]      = useState(null);
+  const [showViewer,   setShowViewer]   = useState(false);
+  const fileInputRef = useRef(null);
+
   // Quando muda de cargo e não é mais "vendedor", limpa o vínculo
   useEffect(() => {
     if (cargo !== "vendedor") setVendedorId("");
   }, [cargo]);
+
+  function abrirSeletorFoto() { fileInputRef.current?.click(); }
+
+  function onFileChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setCropSrc(ev.target.result);
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
 
   const cargoInfo = {
     financeiro:  "Acesso completo ao módulo financeiro. Visão estratégica dos números.",
@@ -606,10 +886,39 @@ function ModalUsuario({ usuario, vendedores, onSalvar, onFechar, salvando }) {
       setErro("Selecione o cadastro de vendedor vinculado a este usuário."); return;
     }
 
-    onSalvar({ nome: nome.trim(), email: email.trim(), senha, cargo, vendedorId }, setErro);
+    onSalvar({ nome: nome.trim(), email: email.trim(), senha, cargo, vendedorId, fotoBase64 }, setErro);
   }
 
+  const inicial = inicialNome(nome || "?");
+
   return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={onFileChange}
+      />
+
+      {cropSrc && (
+        <CropModal
+          imageSrc={cropSrc}
+          onConfirm={(b64) => { setFotoBase64(b64); setCropSrc(null); }}
+          onCancel={() => setCropSrc(null)}
+        />
+      )}
+
+      {showViewer && fotoBase64 && (
+        <ImageViewer
+          src={fotoBase64}
+          nome={nome}
+          onClose={() => setShowViewer(false)}
+          onRemove={() => { setFotoBase64(null); setShowViewer(false); }}
+          onTrocar={() => { setShowViewer(false); abrirSeletorFoto(); }}
+        />
+      )}
+
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onFechar()}>
       <div className="modal-box">
         <div className="modal-header">
@@ -617,7 +926,7 @@ function ModalUsuario({ usuario, vendedores, onSalvar, onFechar, salvando }) {
             <h3>{isEdicao ? "Editar usuário" : "Convidar novo usuário"}</h3>
             <p>
               {isEdicao
-                ? "Altere o cargo ou o vínculo de vendedor"
+                ? "Altere cargo, foto ou vínculo de vendedor"
                 : "Cria uma conta e define o cargo de acesso"}
             </p>
           </div>
@@ -626,6 +935,36 @@ function ModalUsuario({ usuario, vendedores, onSalvar, onFechar, salvando }) {
 
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
+
+            {/* ── Foto ── */}
+            <div className="usr-field">
+              <label>Foto do colaborador</label>
+              <div className="usr-foto-wrap">
+                <div
+                  className="usr-foto-preview"
+                  onClick={() => fotoBase64 ? setShowViewer(true) : abrirSeletorFoto()}
+                  title={fotoBase64 ? "Clique para visualizar / alterar" : "Clique para adicionar foto"}
+                >
+                  {fotoBase64
+                    ? <img src={fotoBase64} alt={nome} />
+                    : inicial}
+                  <div className="usr-foto-overlay">
+                    {fotoBase64 ? "🔍" : "📷"}
+                  </div>
+                </div>
+                <div className="usr-foto-actions">
+                  <button type="button" className="usr-foto-btn escolher" onClick={abrirSeletorFoto}>
+                    {fotoBase64 ? "Trocar foto" : "Escolher foto"}
+                  </button>
+                  {fotoBase64 && (
+                    <button type="button" className="usr-foto-btn remover" onClick={() => setFotoBase64(null)}>
+                      Remover foto
+                    </button>
+                  )}
+                </div>
+              </div>
+              <span className="usr-field-hint">A foto aparece no header para este colaborador.</span>
+            </div>
 
             {/* Nome */}
             <div className="usr-field">
@@ -740,9 +1079,9 @@ function ModalUsuario({ usuario, vendedores, onSalvar, onFechar, salvando }) {
         </form>
       </div>
     </div>
+    </>
   );
 }
-
 
 /* ─────────────────────────────────────────────
    MODAL: Detalhes do colaborador
@@ -883,11 +1222,17 @@ export default function Usuarios() {
   const totalAtivos = usuarios.filter((u) => u.ativo !== false).length;
 
   /* ── Criar usuário via Cloud Function (validação no servidor) ── */
-  async function criarUsuario({ nome, email, senha, cargo: novoCargo, vendedorId }, setErro) {
+  async function criarUsuario({ nome, email, senha, cargo: novoCargo, vendedorId, fotoBase64 }, setErro) {
     setSalvando(true);
     try {
       const fn = httpsCallable(getFunctions(), "criarUsuario");
       const { data } = await fn({ nome, email, senha, cargo: novoCargo, vendedorId });
+      // Se tiver foto, salva no documento criado pela CF
+      if (fotoBase64 && data?.uid) {
+        try {
+          await updateDoc(doc(db, "users", raiz, "usuarios", data.uid), { fotoBase64 });
+        } catch (_) { /* não bloqueia se a foto falhar */ }
+      }
       fecharModal();
       mostrarToast(`Usuário "${data.nome}" criado com sucesso.`);
     } catch (err) {
@@ -904,11 +1249,15 @@ export default function Usuarios() {
   }
 
   /* ── Editar usuário via Cloud Function (validação no servidor) ── */
-  async function editarUsuario({ nome, cargo: novoCargo, vendedorId }, setErro) {
+  async function editarUsuario({ nome, cargo: novoCargo, vendedorId, fotoBase64 }, setErro) {
     setSalvando(true);
     try {
       const fn = httpsCallable(getFunctions(), "editarUsuario");
       await fn({ uid: usuarioEditando.uid, nome, cargo: novoCargo, vendedorId });
+      // Salva foto diretamente no documento do usuário (não passa pela CF)
+      await updateDoc(doc(db, "users", raiz, "usuarios", usuarioEditando.uid), {
+        fotoBase64: fotoBase64 || null,
+      });
       fecharModal();
       mostrarToast(`Usuário "${nome}" atualizado.`);
     } catch (err) {
@@ -1126,8 +1475,10 @@ export default function Usuarios() {
                     <tr key={usr.uid}>
                       <td>
                         <div className="usr-user-cell">
-                          <div className={`usr-avatar${isAtivo ? "" : " inativo"}`}>
-                            {inicialNome(usr.nome)}
+                          <div className={`usr-avatar${isAtivo ? "" : " inativo"}`} style={usr.fotoBase64 ? { background: "none", padding: 0, overflow: "hidden" } : {}}>
+                            {usr.fotoBase64
+                              ? <img src={usr.fotoBase64} alt={usr.nome} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: "50%" }} />
+                              : inicialNome(usr.nome)}
                           </div>
                           <div>
                             <div className={`usr-user-name${isAtivo ? "" : " inativo"}`}>
