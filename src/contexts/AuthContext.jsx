@@ -82,9 +82,9 @@ export const podeVerRelatorio = (cargo, subRelatorio) => !!(PERMISSOES_RELATORIO
 // ─────────────────────────────────────────────
 // Rate Limiting — proteção contra brute force
 // ─────────────────────────────────────────────
-const RL_MAX_TENTATIVAS = 5;          // tentativas antes de bloquear
-const RL_JANELA_MS      = 15 * 60 * 1000; // janela de 15 minutos
-const RL_BLOQUEIO_MS    = 15 * 60 * 1000; // tempo de bloqueio após exceder
+const RL_MAX_TENTATIVAS = 5;
+const RL_JANELA_MS      = 15 * 60 * 1000;
+const RL_BLOQUEIO_MS    = 15 * 60 * 1000;
 
 function rl_chave(email) {
   return `assent_rl_${email.toLowerCase().trim()}`;
@@ -98,7 +98,6 @@ function rl_verificar(email) {
     const dados = JSON.parse(raw);
     const agora = Date.now();
 
-    // Janela expirou — limpa automaticamente
     if (agora - dados.inicio > RL_JANELA_MS) {
       localStorage.removeItem(rl_chave(email));
       return { bloqueado: false, tentativas: 0 };
@@ -140,15 +139,15 @@ function rl_resetar(email) {
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser]                   = useState(null);  // Firebase Auth user
-  const [tenantUid, setTenantUid]         = useState(null);  // uid do dono/Admin do tenant
-  const [cargo, setCargo]                 = useState(null);  // string do cargo
-  const [vendedorId, setVendedorId]       = useState(null);  // id em /vendedores
-  const [vendedorNome, setVendedorNome]   = useState(null);  // nome para exibição
-  const [nomeUsuario, setNomeUsuario]     = useState(null);  // nome do Firestore (admin e convidados)
-  const [loadingAuth, setLoadingAuth]     = useState(true);
+  const [user, setUser]                 = useState(null);
+  const [tenantUid, setTenantUid]       = useState(null);
+  const [cargo, setCargo]               = useState(null);
+  const [vendedorId, setVendedorId]     = useState(null);
+  const [vendedorNome, setVendedorNome] = useState(null);
+  const [nomeUsuario, setNomeUsuario]   = useState(null);
+  const [loadingAuth, setLoadingAuth]   = useState(true); // ← nasce true: trava render até Firebase responder
 
-  // ── Limpa todo o estado de sessão ──
+  // ── Limpa todo o estado de sessão ──────────────────────────────────
   const limparSessao = useCallback(() => {
     setUser(null);
     setTenantUid(null);
@@ -158,12 +157,23 @@ export function AuthProvider({ children }) {
     setNomeUsuario(null);
   }, []);
 
-  // ── Carrega o perfil do usuário no Firestore após autenticação ──
+  // ── Helper interno: rejeita acesso e garante estado limpo ──────────
+  // Sempre chama limparSessao() ANTES de firebaseSignOut para que o estado
+  // seja zerado imediatamente, sem esperar o onAuthStateChanged(null) disparar.
+  // Isso elimina a janela de milissegundos onde user/tenantUid ficam com
+  // valores stale após o signOut ser chamado dentro de carregarPerfil.
+  const _rejeitarAcesso = useCallback(async (motivo) => {
+    console.warn(`[AuthContext] Acesso rejeitado: ${motivo}`);
+    limparSessao();
+    await firebaseSignOut(auth);
+  }, [limparSessao]);
+
+  // ── Carrega o perfil do usuário no Firestore após autenticação ──────
   const carregarPerfil = useCallback(async (firebaseUser) => {
     try {
       const uid = firebaseUser.uid;
 
-      // ── Passo 1: verifica se é o Admin/dono do tenant ──
+      // ── Passo 1: verifica se é o Admin/dono do tenant ──────────────
       const adminDoc = await getDoc(doc(db, "users", uid));
       if (adminDoc.exists()) {
         setUser(firebaseUser);
@@ -175,16 +185,15 @@ export function AuthProvider({ children }) {
         return;
       }
 
-      // ── Passo 1.5: users/{uid} não existe — pode ser Admin no primeiro acesso ──
+      // ── Passo 1.5: pode ser Admin no primeiro acesso (bootstrapping) ──
       const licencaDoc = await getDoc(doc(db, "licencas", uid));
 
       if (licencaDoc.exists()) {
         if (licencaDoc.data().ativo !== true) {
-          console.warn("[AuthContext] Licença inativa. Acesso bloqueado.");
-          await firebaseSignOut(auth);
+          await _rejeitarAcesso("Licença inativa.");
           return;
         }
-        // Licença ativa — primeiro acesso do Admin
+        // Licença ativa — primeiro acesso do Admin: cria documento base
         await setDoc(doc(db, "users", uid), {
           email:    firebaseUser.email,
           criadoEm: serverTimestamp(),
@@ -199,22 +208,20 @@ export function AuthProvider({ children }) {
         return;
       }
 
-      // ── Passo 2: usuário convidado — busca o tenant via índice ──
+      // ── Passo 2: usuário convidado — busca o tenant via índice ──────
       const indexDoc = await getDoc(doc(db, "userIndex", uid));
       if (!indexDoc.exists()) {
-        console.error("[AuthContext] userIndex não encontrado");
-        await firebaseSignOut(auth);
+        await _rejeitarAcesso("userIndex não encontrado — usuário sem registro.");
         return;
       }
 
       const data = indexDoc.data();
       const tUid = data.tenantUid ?? data.tenantUID;
 
-      // ── Passo 3: lê o perfil em /users/{tenantUid}/usuarios/{uid} ──
+      // ── Passo 3: lê o perfil em /users/{tenantUid}/usuarios/{uid} ───
       const perfilDoc = await getDoc(doc(db, "users", tUid, "usuarios", uid));
       if (!perfilDoc.exists()) {
-        console.error("[AuthContext] Documento de usuário convidado não encontrado.");
-        await firebaseSignOut(auth);
+        await _rejeitarAcesso("Documento de usuário convidado não encontrado.");
         return;
       }
 
@@ -222,8 +229,7 @@ export function AuthProvider({ children }) {
 
       // Bloqueia usuário desativado
       if (!perfil.ativo) {
-        console.warn("[AuthContext] Usuário desativado. Acesso negado.");
-        await firebaseSignOut(auth);
+        await _rejeitarAcesso("Usuário desativado.");
         return;
       }
 
@@ -247,9 +253,9 @@ export function AuthProvider({ children }) {
       console.error("[AuthContext] Erro ao carregar perfil:", err);
       limparSessao();
     }
-  }, [limparSessao]);
+  }, [limparSessao, _rejeitarAcesso]);
 
-  // ── Listener do Firebase Auth ──
+  // ── Listener do Firebase Auth ───────────────────────────────────────
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -262,9 +268,8 @@ export function AuthProvider({ children }) {
     return () => unsubscribe();
   }, [carregarPerfil, limparSessao]);
 
-  // ── signIn com Rate Limiting ──
+  // ── signIn com Rate Limiting ────────────────────────────────────────
   const signIn = useCallback(async (email, password) => {
-    // ── 1. Checa se o usuário está bloqueado ──
     const { bloqueado, restanteMin } = rl_verificar(email);
     if (bloqueado) {
       throw Object.assign(
@@ -276,13 +281,11 @@ export function AuthProvider({ children }) {
     setLoadingAuth(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      // ── Login bem-sucedido: zera o contador do email ──
       rl_resetar(email);
       // carregarPerfil é disparado pelo onAuthStateChanged
     } catch (err) {
       setLoadingAuth(false);
 
-      // ── Registra falha apenas para erros de credencial (não para erros de rede etc.) ──
       const errosDeCredencial = [
         "auth/invalid-credential",
         "auth/wrong-password",
@@ -294,7 +297,6 @@ export function AuthProvider({ children }) {
       if (errosDeCredencial.includes(err.code)) {
         rl_registrarFalha(email);
 
-        // Verifica quantas tentativas restam e enriquece a mensagem de erro
         const { tentativas } = rl_verificar(email);
         const restam = RL_MAX_TENTATIVAS - tentativas;
 
@@ -313,17 +315,17 @@ export function AuthProvider({ children }) {
         }
       }
 
-      throw err; // repassa para o componente de login exibir o erro original
+      throw err;
     }
   }, []);
 
-  // ── signOut ──
+  // ── signOut ─────────────────────────────────────────────────────────
   const signOut = useCallback(async () => {
     await firebaseSignOut(auth);
-    // o listener limpa o estado automaticamente
+    // o listener limpa o estado automaticamente via limparSessao()
   }, []);
 
-  // ── Helpers de permissão prontos para uso nos componentes ──
+  // ── Helpers de permissão prontos para uso nos componentes ───────────
   const perm = {
     podeVer:          (modulo) => podeVer(cargo, modulo),
     podeCriar:        (modulo) => podeCriar(cargo, modulo),
@@ -346,6 +348,11 @@ export function AuthProvider({ children }) {
     vendedorNome,   // nome para exibição no select travado em Vendas.jsx
     nomeUsuario,    // nome real do Firestore para exibição no header
     loadingAuth,    // true enquanto o perfil ainda está sendo carregado
+
+    // ── Flag de autenticação de aplicação (Firebase Auth + Firestore validado) ──
+    // Use isAuthenticated nos guards, não user !== null.
+    // user pode existir no Firebase mas sem registro no Firestore.
+    isAuthenticated: !!tenantUid,
 
     // ── Ações ──
     signIn,
