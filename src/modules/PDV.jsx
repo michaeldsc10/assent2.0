@@ -312,7 +312,7 @@ function ModalCupom({ venda, troco, empresa, onClose }) {
     win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cupom</title>
 <style>@page{size:80mm auto;margin:3mm 4mm}*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Courier New',monospace;font-size:11px;width:72mm;color:#111}.center{text-align:center}.empresa-nome{font-size:14px;font-weight:bold;margin-bottom:2px}.empresa-sub{font-size:10px;color:#555}.divider{border:none;border-top:1px dashed #999;margin:6px 0}.row{display:flex;gap:4px;padding:3px 0;border-bottom:1px dotted #ddd}.row .nome{flex:1}.row .qtd{color:#555;flex-shrink:0}.row .val{flex-shrink:0;text-align:right;font-weight:600}.total-row{display:flex;justify-content:space-between;padding:2px 0}.total-grande{font-size:14px;font-weight:bold;padding:4px 0}.rodape{font-size:9px;color:#777;text-align:center;margin-top:4px}</style>
 </head><body>
-<div class="center"><div class="empresa-nome">${empresa.nome||"ASSENT"}</div>${empresa.endereco?`<div class="empresa-sub">${empresa.endereco}</div>`:""}</div>
+<div class="center"><div class="empresa-nome">${empresa.nome||"ASSENT"}</div>${empresa.cnpj?`<div class="empresa-sub">CNPJ: ${empresa.cnpj}</div>`:""} ${empresa.endereco?`<div class="empresa-sub">${empresa.endereco}</div>`:""}</div>
 <hr class="divider"><div class="center" style="font-size:10px;color:#777">#${venda.id} · ${dataHora}</div><hr class="divider">
 ${linhaItens}<hr class="divider">
 <div class="total-row"><span>Subtotal</span><span>${Number(venda.total||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>
@@ -339,6 +339,7 @@ ${venda.cliente?`<div class="total-row"><span>Cliente</span><span>${venda.client
         </div>
         <div className="cupom-paper">
           <div className="cupom-empresa">{empresa.nome}</div>
+          {empresa.cnpj && <div className="cupom-sub">CNPJ: {empresa.cnpj}</div>}
           {empresa.endereco && <div className="cupom-sub">{empresa.endereco}</div>}
           <div className="cupom-divider" />
           <div className="cupom-meta">#{venda.id} · {dataHora}</div>
@@ -892,11 +893,19 @@ export default function PDV({ onVoltar }) {
         const ref = collection(db, "users", tenantUid, "clientes");
         const q = query(ref, orderBy("nome"), limit(20));
         const snap = await getDocs(q);
-        const termo = buscaCliente.toLowerCase();
+        const termo = buscaCliente.toLowerCase().replace(/\D/g, "") || buscaCliente.toLowerCase();
+        const termoBruto = buscaCliente.toLowerCase();
         setClientesFiltrados(
           snap.docs
             .map((d) => ({ id: d.id, ...d.data() }))
-            .filter((c) => c.nome?.toLowerCase().includes(termo))
+            .filter((c) => {
+              const cpfLimpo = (c.cpf || c.documento || "").replace(/\D/g, "");
+              return (
+                c.nome?.toLowerCase().includes(termoBruto) ||
+                cpfLimpo.includes(termo) ||
+                (c.cpf || c.documento || "").toLowerCase().includes(termoBruto)
+              );
+            })
             .slice(0, 6)
         );
       } catch {
@@ -1108,7 +1117,7 @@ export default function PDV({ onVoltar }) {
               const t = (vendaFinalizada.pagamentos || []).reduce((s,p)=>s+(p.troco||0),0);
               return t > 0 ? t : null;
             })()}
-            empresa={{ nome: nomeEmpresa, logo: logoEmpresa, endereco: empresa.endereco, telefone: empresa.telefone }}
+            empresa={{ nome: nomeEmpresa, logo: logoEmpresa, endereco: empresa.endereco, telefone: empresa.telefone, cnpj: empresa.cnpj }}
             onClose={() => setShowCupom(false)}
           />
         )}
@@ -1303,7 +1312,9 @@ export default function PDV({ onVoltar }) {
                           }}
                         >
                           {c.nome}
-                          {c.telefone && <span className="pdv-cliente-tel">{c.telefone}</span>}
+                          <span className="pdv-cliente-tel">
+                            {[c.cpf || c.documento, c.telefone].filter(Boolean).join(" · ")}
+                          </span>
                         </button>
                       ))}
                     </div>
