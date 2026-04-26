@@ -1377,32 +1377,59 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   };
 
   /* ── Nome do usuário ──
-     Lê licencas/{uid} → campo name (fonte de verdade do admin) */
+     Admin  → lê licencas/{tenantUid} → campo name
+     Convidado → lê users/{tenantUid}/usuarios/{authUser.uid} → campo nome */
   useEffect(() => {
-    if (!uid) return;
-    return onSnapshot(doc(db, "licencas", uid), (snap) => {
-      const name =
-        snap.data()?.name ||
-        nomeUsuario ||
-        authUser?.displayName ||
-        authUser?.email?.split("@")[0] ||
-        "Usuário";
-      setUserName(name);
-    });
-  }, [uid, authUser, nomeUsuario]);
+    if (!uid || !authUser) return;
 
-  /* ── Avatar — users/{uid}/foto/avatar → campo base64 ── */
+    if (isAdmin) {
+      // Admin: fonte de verdade é licencas/{uid}
+      return onSnapshot(doc(db, "licencas", uid), (snap) => {
+        const name =
+          snap.data()?.name ||
+          nomeUsuario ||
+          authUser?.displayName ||
+          authUser?.email?.split("@")[0] ||
+          "Usuário";
+        setUserName(name);
+      });
+    } else {
+      // Convidado: nome salvo em users/{tenantUid}/usuarios/{authUser.uid}
+      return onSnapshot(doc(db, "users", uid, "usuarios", authUser.uid), (snap) => {
+        const name =
+          snap.data()?.nome ||
+          nomeUsuario ||
+          authUser?.displayName ||
+          authUser?.email?.split("@")[0] ||
+          "Usuário";
+        setUserName(name);
+      });
+    }
+  }, [uid, authUser, nomeUsuario, isAdmin]);
+
+  /* ── Avatar ──
+     Admin     → users/{uid}/foto/avatar → campo base64
+     Convidado → users/{tenantUid}/usuarios/{authUser.uid} → campo fotoBase64 */
   useEffect(() => {
-    if (!uid) return;
-    return onSnapshot(doc(db, "users", uid, "foto", "avatar"), (snap) => {
-      if (snap.exists()) {
-        const d = snap.data();
-        setUserAvatar(d?.base64 || d?.url || d?.photoURL || null);
-      } else {
-        setUserAvatar(null);
-      }
-    }, () => setUserAvatar(null));
-  }, [uid]);
+    if (!uid || !authUser) return;
+
+    if (isAdmin) {
+      return onSnapshot(doc(db, "users", uid, "foto", "avatar"), (snap) => {
+        if (snap.exists()) {
+          const d = snap.data();
+          setUserAvatar(d?.base64 || d?.url || d?.photoURL || null);
+        } else {
+          setUserAvatar(null);
+        }
+      }, () => setUserAvatar(null));
+    } else {
+      // Convidado: foto salva no próprio documento do usuário
+      return onSnapshot(doc(db, "users", uid, "usuarios", authUser.uid), (snap) => {
+        const fotoBase64 = snap.data()?.fotoBase64 || null;
+        setUserAvatar(fotoBase64);
+      }, () => setUserAvatar(null));
+    }
+  }, [uid, authUser, isAdmin]);
 
   /* ── Visibilidade do menu ── */
   useEffect(() => {
