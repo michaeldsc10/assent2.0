@@ -890,7 +890,9 @@ function SecaoEmpresa({ config, onSave }) {
 
     const MAX_BYTES  = 300 * 1024;   // 300 KB — limite final do base64
     const MAX_DIM    = 1200;          // largura/altura máxima em pixels
-    const MIME       = "image/jpeg";  // sempre salva como JPEG para melhor compressão
+    // PNG preserva transparência; JPEG para outros formatos (melhor compressão)
+    const isPng      = file.type === "image/png";
+    const MIME       = isPng ? "image/png" : "image/jpeg";
 
     const comprimirComCanvas = (src) => {
       return new Promise((resolve, reject) => {
@@ -907,9 +909,12 @@ function SecaoEmpresa({ config, onSave }) {
           canvas.width  = width;
           canvas.height = height;
           const ctx = canvas.getContext("2d");
-          // Fundo branco para imagens com transparência (PNG → JPEG)
-          ctx.fillStyle = "#ffffff";
-          ctx.fillRect(0, 0, width, height);
+          // Só preenche fundo branco para JPEG (não suporta transparência).
+          // PNG mantém canal alpha intacto — sem fundo branco.
+          if (!isPng) {
+            ctx.fillStyle = "#ffffff";
+            ctx.fillRect(0, 0, width, height);
+          }
           ctx.drawImage(img, 0, 0, width, height);
 
           // 2. Tentar qualidades decrescentes até caber em 300 KB
