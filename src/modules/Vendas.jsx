@@ -11,7 +11,7 @@ import { useState, useEffect, useContext, useMemo, useRef } from "react";
 import {
   Search, Plus, Edit2, Trash2, X, Printer,
   ShoppingCart, Package, ChevronDown, ChevronUp,
-  Download, Copy, Filter, Calendar, Ban, ChevronsUpDown, Barcode,
+  Download, Copy, Filter, Calendar, Ban, ChevronsUpDown, Barcode, QrCode,
 } from "lucide-react";
 
 import AuthContext from "../contexts/AuthContext";
@@ -1388,9 +1388,156 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
 /* ══════════════════════════════════════════════════
    MODAL: Detalhe de Venda (clique na linha)
    ══════════════════════════════════════════════════ */
-function ModalDetalheVenda({ venda, onClose, onEditar, onCancelar, onExcluirDef, isAdmin }) {
+/* ══════════════════════════════════════════════════
+   MODAL PIX QR — Geração e polling de pagamento
+   ══════════════════════════════════════════════════ */
+const CF_BASE = "https://us-central1-assent-2b945.cloudfunctions.net";
+
+function ModalPixQr({ valor, tenantUid, descricao, onClose, onPago }) {
+  const [fase, setFase]         = useState("gerando"); // gerando | aguardando | pago | erro
+  const [qrBase64, setQrBase64] = useState(null);
+  const [qrCode,   setQrCode]   = useState(null);
+  const [paymentId, setPayId]   = useState(null);
+  const [copiado,  setCopiado]  = useState(false);
+  const [erroMsg,  setErroMsg]  = useState("");
+  const pollingRef = useRef(null);
+
+  /* Gerar QR ao montar */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const res   = await fetch(`${CF_BASE}/gerarPixQr`, {
+          method:  "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body:    JSON.stringify({ tenantUid, valor, descricao }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `Erro ${res.status}`);
+        if (cancelled) return;
+        setQrBase64(data.qrCodeBase64);
+        setQrCode(data.qrCode);
+        setPayId(data.paymentId);
+        setFase("aguardando");
+      } catch (err) {
+        if (!cancelled) { setErroMsg(err.message); setFase("erro"); }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  /* Polling de status a cada 4 s */
+  useEffect(() => {
+    if (fase !== "aguardando" || !paymentId) return;
+    const poll = async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const res   = await fetch(`${CF_BASE}/consultarPagamento`, {
+          method:  "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body:    JSON.stringify({ tenantUid, paymentId }),
+        });
+        const data = await res.json();
+        if (data.status === "approved") {
+          clearInterval(pollingRef.current);
+          setFase("pago");
+          if (onPago) onPago();
+        }
+      } catch { /* ignora falha pontual de rede */ }
+    };
+    pollingRef.current = setInterval(poll, 4000);
+    return () => clearInterval(pollingRef.current);
+  }, [fase, paymentId]);
+
+  const copiar = () => {
+    navigator.clipboard.writeText(qrCode || "");
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2500);
+  };
+
+  return (
+    <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box modal-box-md" style={{ maxWidth: 360 }}>
+
+        <div className="modal-header">
+          <div>
+            <div className="modal-title" style={{ color: "var(--gold)" }}>Pagamento PIX</div>
+            <div className="modal-sub">{fmtR$(valor)}</div>
+          </div>
+          <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)" /></button>
+        </div>
+
+        <div className="modal-body" style={{ textAlign: "center", padding: "24px 22px" }}>
+
+          {fase === "gerando" && (
+            <div style={{ padding: "40px 0", color: "var(--text-2)", fontSize: 13 }}>
+              <div style={{ marginBottom: 10, fontSize: 28 }}>⏳</div>
+              Gerando QR Code...
+            </div>
+          )}
+
+          {fase === "erro" && (
+            <div style={{ padding: "30px 0" }}>
+              <div style={{ fontSize: 32, marginBottom: 10 }}>❌</div>
+              <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 6 }}>Não foi possível gerar o QR Code.</div>
+              <div style={{ color: "var(--text-2)", fontSize: 11 }}>{erroMsg || "Verifique se o PIX está ativo nas Configurações."}</div>
+            </div>
+          )}
+
+          {fase === "pago" && (
+            <div style={{ padding: "30px 0" }}>
+              <div style={{ fontSize: 52, marginBottom: 10 }}>✅</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: "var(--green)", marginBottom: 4 }}>Pagamento Confirmado!</div>
+              <div style={{ fontSize: 12, color: "var(--text-2)" }}>PIX recebido com sucesso.</div>
+            </div>
+          )}
+
+          {fase === "aguardando" && qrBase64 && (
+            <>
+              <img
+                src={`data:image/png;base64,${qrBase64}`}
+                alt="QR Code PIX"
+                style={{ width: 210, height: 210, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 14 }}
+              />
+              <div style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: "var(--green)", animation: "pulse 1.4s infinite" }} />
+                Aguardando pagamento...
+              </div>
+              <button
+                onClick={copiar}
+                style={{
+                  width: "100%", padding: "10px 14px",
+                  background: copiado ? "rgba(74,222,128,.1)" : "var(--s2)",
+                  border: `1px solid ${copiado ? "var(--green)" : "var(--border)"}`,
+                  borderRadius: 8, color: copiado ? "var(--green)" : "var(--text)",
+                  fontSize: 12, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                  transition: "all .2s",
+                }}
+              >
+                <Copy size={12} />
+                {copiado ? "Código copiado!" : "Copiar código PIX (copia e cola)"}
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>
+            {fase === "pago" ? "Fechar" : "Cancelar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+function ModalDetalheVenda({ venda, onClose, onEditar, onCancelar, onExcluirDef, isAdmin, tenantUid }) {
   if (!venda) return null;
   const itens = venda.itens || [];
+  const [pixQrOpen, setPixQrOpen] = useState(false);
 
   const subtotal   = itens.reduce((s, i) => s + (i.preco || 0) * (i.qtd || 1), 0);
   const descontos  = itens.reduce((s, i) => s + (i.desconto || 0), 0);
@@ -1408,6 +1555,17 @@ function ModalDetalheVenda({ venda, onClose, onEditar, onCancelar, onExcluirDef,
             <div className="modal-sub">Detalhes da venda</div>
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {/* Botão PIX QR — visível para vendas ativas com total > 0 */}
+            {venda.status !== "cancelada" && total > 0 && tenantUid && (
+              <button
+                className="btn-icon"
+                onClick={() => setPixQrOpen(true)}
+                title="Gerar QR Code PIX"
+                style={{ color: "var(--green)" }}
+              >
+                <QrCode size={13} />
+              </button>
+            )}
             {onEditar && (
               <button className="btn-icon btn-icon-edit" onClick={() => onEditar(venda)} title="Editar">
                 <Edit2 size={13} />
@@ -1577,13 +1735,18 @@ function ModalDetalheVenda({ venda, onClose, onEditar, onCancelar, onExcluirDef,
 
         </div>
       </div>
+
+      {pixQrOpen && (
+        <ModalPixQr
+          valor={total}
+          tenantUid={tenantUid}
+          descricao={`Venda ${venda.id}${venda.cliente ? ` — ${venda.cliente}` : ""}`}
+          onClose={() => setPixQrOpen(false)}
+        />
+      )}
     </div>
   );
 }
-
-
-/* ══════════════════════════════════════════════════
-   MODAL: Confirmar Cancelamento de Venda
    ══════════════════════════════════════════════════ */
 function ModalCancelarVenda({ venda, onConfirm, onClose }) {
   const [cancelando, setCancelando] = useState(false);
@@ -2760,6 +2923,7 @@ useEffect(() => {
         <ModalDetalheVenda
           venda={detalhe}
           onClose={() => setDetalhe(null)}
+          tenantUid={tenantUid}
           onEditar={
             podeEditar && (detalhe?.status !== "cancelada" || cargo === "admin")
               ? (v) => { setDetalhe(null); setEditando(v); }
