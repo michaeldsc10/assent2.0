@@ -1125,6 +1125,9 @@ function SecaoFinanceiro({ config, onSave }) {
   const [erros, setErros]       = useState({});
   const [salvando, setSalvando] = useState(false);
 
+  /* PIX online ativo? → congela a linha de taxa PIX presencial */
+  const pixOnlineAtivo = !!(config?.pagamentos?.mercadopago?.ativo && config?.pagamentos?.mercadopago?.accessToken);
+
   useEffect(() => {
     if (config?.taxas) setTaxas(prev => ({ ...TAXAS_DEFAULT, ...config.taxas }));
   }, [config]);
@@ -1151,18 +1154,35 @@ function SecaoFinanceiro({ config, onSave }) {
     setSalvando(false);
   };
 
-  const TaxaRow = ({ chave, label, tipo }) => (
-    <tr>
-      <td><span className="taxa-bandeira">{label}</span></td>
-      <td><span className="taxa-tipo-badge">{tipo}</span></td>
-      <td style={{ textAlign: "right" }}>
-        <span style={{ display: "inline-flex", alignItems: "center" }}>
-          <input className={`taxa-input ${erros[chave] ? "err" : ""}`} value={taxas[chave] ?? ""} onChange={e => setTaxa(chave, e.target.value)} inputMode="decimal" />
-          <span className="taxa-pct">%</span>
-        </span>
-      </td>
-    </tr>
-  );
+  const TaxaRow = ({ chave, label, tipo }) => {
+    const freezado = chave === "pix" && pixOnlineAtivo;
+    return (
+      <tr style={freezado ? { opacity: 0.45, pointerEvents: "none" } : {}}>
+        <td>
+          <span className="taxa-bandeira">{label}</span>
+          {freezado && (
+            <span title="Taxa irrelevante — PIX online (QR Code MP) está ativo. A tarifa é gerenciada pelo Mercado Pago."
+              style={{ marginLeft: 6, fontSize: 10, color: "var(--text-3)", cursor: "help", verticalAlign: "middle" }}>
+              🔒 gerenciado pelo MP
+            </span>
+          )}
+        </td>
+        <td><span className="taxa-tipo-badge">{tipo}</span></td>
+        <td style={{ textAlign: "right" }}>
+          <span style={{ display: "inline-flex", alignItems: "center" }}>
+            <input
+              className={`taxa-input ${erros[chave] ? "err" : ""}`}
+              value={taxas[chave] ?? ""}
+              onChange={e => setTaxa(chave, e.target.value)}
+              inputMode="decimal"
+              disabled={freezado}
+            />
+            <span className="taxa-pct">%</span>
+          </span>
+        </td>
+      </tr>
+    );
+  };
 
   return (
     <div className="cfg-card">
@@ -1174,6 +1194,26 @@ function SecaoFinanceiro({ config, onSave }) {
         </div>
       </div>
       <div className="cfg-card-body" style={{ padding: 0 }}>
+        {pixOnlineAtivo && (
+          <div style={{
+            margin: "12px 16px 0",
+            padding: "10px 14px",
+            background: "rgba(200,165,94,.08)",
+            border: "1px solid rgba(200,165,94,.25)",
+            borderRadius: 8,
+            fontSize: 12,
+            color: "var(--text-2)",
+            display: "flex",
+            gap: 8,
+            alignItems: "flex-start",
+          }}>
+            <span style={{ fontSize: 14, lineHeight: 1 }}>ℹ️</span>
+            <span>
+              <strong style={{ color: "var(--gold)" }}>PIX Online ativo.</strong>{" "}
+              A linha de taxa PIX está bloqueada — ao usar o QR Code do Mercado Pago, a tarifa é gerenciada diretamente pelo MP e não pela maquininha.
+            </span>
+          </div>
+        )}
         <table className="taxa-table">
           <thead><tr><th>Modalidade</th><th>Tipo</th><th style={{ textAlign: "right" }}>Taxa (%)</th></tr></thead>
           <tbody>
@@ -1223,12 +1263,7 @@ function ModalTutorialPagamento({ onClose }) {
     },
     {
       titulo: "Registre o Webhook no Mercado Pago",
-      desc: <>Este é o passo mais importante para a confirmação automática. Siga o caminho correto:<br/><br/>
-        1. Acesse o <a className="tut-link" href="https://www.mercadopago.com.br/developers/panel" target="_blank" rel="noreferrer">painel de desenvolvedor <ExternalLink size={10} /></a><br/>
-        2. No menu lateral, clique em <strong>Suas integrações</strong> (ou <strong>Aplicações</strong>)<br/>
-        3. Clique na sua aplicação<br/>
-        4. No menu lateral da aplicação, clique em <strong>Webhooks</strong><br/>
-        5. Clique em <strong>"Adicionar webhook"</strong> e configure:<br/><br/>
+      desc: <>Este é o passo mais importante para a confirmação automática. No painel MP acesse <strong>Seu negócio → Webhooks</strong>, clique em <strong>"Adicionar webhook"</strong> e configure:<br/><br/>
         • <strong>URL:</strong> <code>https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook</code><br/>
         • <strong>Eventos:</strong> marque <strong>"Pagamentos"</strong><br/><br/>
         Isso faz o Mercado Pago notificar o ASSENT automaticamente quando o PIX for pago.</>,
