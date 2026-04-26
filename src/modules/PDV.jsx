@@ -18,7 +18,7 @@ import {
   collection, query, where, getDocs, runTransaction,
   doc, orderBy, limit, getDoc,
 } from "firebase/firestore";
-import BarcodeInput from "../components/BarcodeInput";
+import BarcodeInput from "./BarcodeInput";
 import { useConfiguracoes } from "./Configuracoes";
 
 /* ─── Formata moeda BRL ─── */
@@ -383,7 +383,6 @@ export default function PDV({ onVoltar }) {
   const [showCupom, setShowCupom] = useState(false);
   const [erro, setErro] = useState("");
   const [toast, setToast] = useState(null);
-  const [editandoQty, setEditandoQty] = useState(null);
   const [nomeOperador, setNomeOperador] = useState("");
 
   const buscaRef = useRef(null);
@@ -560,14 +559,13 @@ export default function PDV({ onVoltar }) {
   }, []);
 
   const setQtyManual = useCallback((idx, valor) => {
-    const qty = parseFloat(valor.replace(",", "."));
+    const qty = parseFloat(String(valor).replace(",", "."));
     if (isNaN(qty) || qty <= 0) return;
     setCarrinho((prev) => {
       const novo = [...prev];
-      novo[idx] = { ...novo[idx], qty, subtotal: qty * novo[idx].precoUnit };
+      novo[idx] = { ...novo[idx], qty, subtotal: parseFloat((qty * novo[idx].precoUnit).toFixed(2)) };
       return novo;
     });
-    setEditandoQty(null);
   }, []);
 
   const removerItem = useCallback((idx) => {
@@ -998,23 +996,19 @@ export default function PDV({ onVoltar }) {
                             lineHeight:1, userSelect:"none",
                           }}
                         >−</span>
-                        {editandoQty === idx ? (
-                          <input
-                            className="pdv-qty-input"
-                            defaultValue={fmtNum(item.qty)}
-                            autoFocus
-                            onBlur={(e) => setQtyManual(idx, e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && setQtyManual(idx, e.target.value)}
-                          />
-                        ) : (
-                          <span
-                            className="pdv-qty-valor"
-                            onClick={() => setEditandoQty(idx)}
-                            title="Clique para editar"
-                          >
-                            {fmtNum(item.qty)}
-                          </span>
-                        )}
+                        <input
+                          className="pdv-qty-input"
+                          type="number"
+                          min="0.01"
+                          step="1"
+                          value={item.qty}
+                          onChange={(e) => {
+                            const v = parseFloat(e.target.value);
+                            if (!isNaN(v) && v > 0) setQtyManual(idx, String(v));
+                          }}
+                          onFocus={(e) => e.target.select()}
+                          onKeyDown={(e) => e.key === "Enter" && e.target.blur()}
+                        />
                         <span
                           role="button"
                           tabIndex={0}
@@ -1400,17 +1394,18 @@ const CSS = `
 .pdv-item-qty button:hover { background: var(--pdv-gold-dim); border-color: var(--pdv-gold); }
 .pdv-item-qty button svg { stroke: #b0b2c8; }
 .pdv-item-qty button:hover svg { stroke: var(--pdv-gold); }
-.pdv-qty-valor {
-  font-size: 13px; font-weight: 500; min-width: 34px; text-align: center;
-  cursor: pointer; padding: 2px 4px; border-radius: 4px;
-  transition: background .15s;
-}
-.pdv-qty-valor:hover { background: rgba(255,255,255,0.07); }
 .pdv-qty-input {
-  width: 44px; background: rgba(255,255,255,0.07); border: 1px solid var(--pdv-gold);
-  border-radius: 5px; padding: 2px 4px; font-size: 13px; color: var(--pdv-text);
+  width: 52px; background: rgba(255,255,255,0.06);
+  border: 1.5px solid rgba(255,255,255,0.18);
+  border-radius: 6px; padding: 3px 6px;
+  font-size: 13px; font-weight: 600; color: var(--pdv-text);
   text-align: center; outline: none;
+  -moz-appearance: textfield;
+  transition: border-color .15s;
 }
+.pdv-qty-input::-webkit-outer-spin-button,
+.pdv-qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.pdv-qty-input:focus { border-color: var(--pdv-gold); background: rgba(200,165,94,0.08); }
 .pdv-item-unit { font-size: 12px; color: var(--pdv-text-3); }
 .pdv-item-sub  { font-size: 13px; font-weight: 600; color: var(--pdv-text); }
 .pdv-item-del {
