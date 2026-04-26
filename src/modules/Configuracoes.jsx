@@ -1230,7 +1230,7 @@ function ModalTutorialPagamento({ onClose }) {
         4. No menu lateral da aplicação, clique em <strong>Webhooks</strong><br/>
         5. Clique em <strong>"Adicionar webhook"</strong> e configure:<br/><br/>
         • <strong>URL:</strong> <code>https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook</code><br/>
-        • <strong>Eventos:</strong> marque <strong>"Pagamentos"</strong><br/><br/>
+        • <strong>Eventos:</strong> marque <strong>"Pagamentos Presenciais"</strong><br/><br/>
         Isso faz o Mercado Pago notificar o ASSENT automaticamente quando o PIX for pago.</>,
     },
     {
