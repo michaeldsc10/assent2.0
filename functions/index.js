@@ -66,9 +66,16 @@ async function verificarAuth(req) {
    FUNÇÃO 4: gerarPixQr  (onRequest — CORS manual)
 ───────────────────────────────────────────── */
 exports.gerarPixQr = onRequest(
-  { region: "us-central1" },
+  {
+    region: "us-central1",
+    cors: [
+      "https://ag.assentagencia.com.br",
+      "https://assent2-0.vercel.app",
+      "http://localhost:5173",
+      "http://localhost:3000",
+    ],
+  },
   async (req, res) => {
-    if (!applyCors(req, res)) return;
     if (req.method !== "POST") { res.status(405).send("Method Not Allowed"); return; }
 
     const uid = await verificarAuth(req);
@@ -150,9 +157,16 @@ exports.gerarPixQr = onRequest(
    FUNÇÃO 6: consultarPagamento  (onRequest — CORS manual)
 ───────────────────────────────────────────── */
 exports.consultarPagamento = onRequest(
-  { region: "us-central1" },
+  {
+    region: "us-central1",
+    cors: [
+      "https://ag.assentagencia.com.br",
+      "https://assent2-0.vercel.app",
+      "http://localhost:5173",
+      "http://localhost:3000",
+    ],
+  },
   async (req, res) => {
-    if (!applyCors(req, res)) return;
     if (req.method !== "POST") { res.status(405).send("Method Not Allowed"); return; }
 
     const uid = await verificarAuth(req);
