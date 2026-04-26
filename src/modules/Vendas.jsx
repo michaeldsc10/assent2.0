@@ -11,7 +11,7 @@ import { useState, useEffect, useContext, useMemo, useRef } from "react";
 import {
   Search, Plus, Edit2, Trash2, X, Printer,
   ShoppingCart, Package, ChevronDown, ChevronUp,
-  Download, Copy, Filter, Calendar, Ban, ChevronsUpDown,
+  Download, Copy, Filter, Calendar, Ban, ChevronsUpDown, Barcode,
 } from "lucide-react";
 
 import AuthContext from "../contexts/AuthContext";
@@ -2329,7 +2329,7 @@ useEffect(() => {
 
   /* Filtros — ativas */
   const vendasFiltradas = useMemo(() => {
-    let lista = filtrarPorPeriodo(vendas.filter(v => v.status !== "cancelada"), period, dataInicio, dataFim);
+    let lista = filtrarPorPeriodo(vendas.filter(v => v.status !== "cancelada" && v.origem !== "pdv"), period, dataInicio, dataFim);
     if (search.trim()) {
       const q = search.toLowerCase();
       lista = lista.filter(v =>
@@ -2372,7 +2372,7 @@ useEffect(() => {
 
   /* Filtros — canceladas (mesmo período e busca) */
   const vendasCanceladas = useMemo(() => {
-    let lista = filtrarPorPeriodo(vendas.filter(v => v.status === "cancelada"), period, dataInicio, dataFim);
+    let lista = filtrarPorPeriodo(vendas.filter(v => v.status === "cancelada" && v.origem !== "pdv"), period, dataInicio, dataFim);
     if (search.trim()) {
       const q = search.toLowerCase();
       lista = lista.filter(v =>
@@ -2382,6 +2382,27 @@ useEffect(() => {
       );
     }
     return lista;
+  }, [vendas, period, dataInicio, dataFim, search]);
+
+  /* ── PDV: separado ── */
+  const vendasPDV = useMemo(() => {
+    let lista = filtrarPorPeriodo(
+      vendas.filter(v => v.origem === "pdv" && v.status !== "cancelada"),
+      period, dataInicio, dataFim
+    );
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      lista = lista.filter(v =>
+        (v.idVenda || v.id)?.toLowerCase().includes(q) ||
+        v.cliente?.toLowerCase().includes(q) ||
+        v.vendedorNome?.toLowerCase().includes(q)
+      );
+    }
+    return lista.sort((a, b) => {
+      const da = a.criadoEm?.toDate ? a.criadoEm.toDate() : new Date(a.criadoEm || 0);
+      const db_ = b.criadoEm?.toDate ? b.criadoEm.toDate() : new Date(b.criadoEm || 0);
+      return db_ - da;
+    });
   }, [vendas, period, dataInicio, dataFim, search]);
 
   if (!tenantUid) return <div className="vd-loading">Carregando autenticação...</div>;
@@ -2424,13 +2445,21 @@ useEffect(() => {
           <Ban size={14} /> Canceladas
           <span className="vd-tab-badge">{vendasCanceladas.length}</span>
         </button>
+        <button
+          className={`vd-tab ${tab === "pdv" ? "active" : ""}`}
+          onClick={() => setTab("pdv")}
+          style={tab === "pdv" ? {} : {}}
+        >
+          <Barcode size={14} /> PDV
+          <span className="vd-tab-badge">{vendasPDV.length}</span>
+        </button>
       </div>
 
       {/* Topbar — search compartilhado entre abas */}
       <header className="vd-topbar">
         <div className="vd-topbar-title">
-          <h1>{tab === "ativas" ? "Vendas" : "Vendas Canceladas"}</h1>
-          <p>{tab === "ativas" ? "Gerencie e acompanhe todas as vendas" : "Histórico de vendas canceladas"}</p>
+          <h1>{tab === "ativas" ? "Vendas" : tab === "canceladas" ? "Vendas Canceladas" : "Vendas PDV"}</h1>
+          <p>{tab === "ativas" ? "Gerencie e acompanhe todas as vendas" : tab === "canceladas" ? "Histórico de vendas canceladas" : "Vendas realizadas pelo Ponto de Venda"}</p>
         </div>
 
         <div className="vd-search">
@@ -2539,7 +2568,7 @@ useEffect(() => {
               </div>
             ) : vendasFiltradas.map(v => (
               <div key={v.id} className="vd-row" onClick={() => setDetalhe(v)}>
-                <span className="vd-vid">{v.id}</span>
+                <span className="vd-vid">{v.idVenda || v.id}</span>
                 <span className="vd-cliente">{v.cliente || "—"}</span>
                 <span>{fmtData(v.data)}</span>
                 <span><span className="vd-fp-badge">{v.formaPagamento || "—"}</span></span>
@@ -2607,7 +2636,7 @@ useEffect(() => {
               </div>
             ) : vendasCanceladas.map(v => (
               <div key={v.id} className="vd-row-cancelada" onClick={() => setDetalhe(v)}>
-                <span className="vd-vid">{v.id}</span>
+                <span className="vd-vid">{v.idVenda || v.id}</span>
                 <span className="vd-cliente">{v.cliente || "—"}</span>
                 <span>{fmtData(v.data)}</span>
                 <span className="vd-total" style={{ color: "var(--red)", textDecoration: "line-through", opacity: .7 }}>
@@ -2630,6 +2659,65 @@ useEffect(() => {
                 </span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Tabela: Vendas PDV ── */}
+      {tab === "pdv" && (
+        <div className="ag-content">
+          <div className="vd-table-wrap">
+            <div className="vd-table-header">
+              <div className="vd-table-title">
+                Vendas PDV
+                <span className="vd-count-badge">{vendasPDV.length}</span>
+              </div>
+              <div className="vd-table-actions">
+                <button className="vd-export-btn" onClick={() => exportarCSV(vendasPDV)}>
+                  <Download size={11} /> CSV
+                </button>
+              </div>
+            </div>
+
+            <div className="vd-row vd-row-head">
+              <span>ID</span>
+              <span>CLIENTE</span>
+              <span>DATA</span>
+              <span>PAGAMENTOS</span>
+              <span>OPERADOR</span>
+              <span>ITENS</span>
+              <span>TOTAL</span>
+              <span style={{ textAlign: "right" }}>AÇÕES</span>
+            </div>
+
+            {loading ? (
+              <div className="vd-loading">Carregando...</div>
+            ) : vendasPDV.length === 0 ? (
+              <div className="vd-empty">
+                <Barcode size={28} color="var(--text-3)" style={{ marginBottom: 8 }} />
+                <p>Nenhuma venda pelo PDV no período.</p>
+              </div>
+            ) : vendasPDV.map(v => {
+              const pagLabel = (v.pagamentos || []).map(p => p.label).join(" + ") || v.formaPagamento || "—";
+              return (
+                <div key={v.id} className="vd-row" onClick={() => setDetalhe(v)}>
+                  <span className="vd-vid">{v.idVenda || v.id}</span>
+                  <span className="vd-cliente">{v.cliente || "—"}</span>
+                  <span>{fmtData(v.data)}</span>
+                  <span><span className="vd-fp-badge">{pagLabel}</span></span>
+                  <span>{v.vendedorNome || "—"}</span>
+                  <span>{v.itens?.length || 0} item(s)</span>
+                  <span className="vd-total">{fmtR$(v.total)}</span>
+                  <div className="vd-actions" onClick={e => e.stopPropagation()}>
+                    {podeExcluir && (
+                      <button className="btn-icon btn-icon-del" onClick={() => setExcluindoDef(v)} title="Excluir permanentemente">
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
