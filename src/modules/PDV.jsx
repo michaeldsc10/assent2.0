@@ -18,7 +18,7 @@ import {
   collection, query, where, getDocs, runTransaction,
   doc, orderBy, limit, getDoc,
 } from "firebase/firestore";
-import BarcodeInput from "../components/BarcodeInput";
+import BarcodeInput from "./BarcodeInput";
 import { useConfiguracoes } from "./Configuracoes";
 
 /* ─── Formata moeda BRL ─── */
@@ -663,11 +663,15 @@ export default function PDV({ onVoltar }) {
               <h2>Venda Finalizada!</h2>
               <p className="pdv-success-id">#{vendaFinalizada.id}</p>
               <p className="pdv-success-total">{fmt(vendaFinalizada.total)}</p>
-              {troco > 0 && (
-                <div className="pdv-success-troco">
-                  Troco: <strong>{fmt(troco)}</strong>
-                </div>
-              )}
+              {(() => {
+                const trocoTotal = (vendaFinalizada.pagamentos || [])
+                  .reduce((s, p) => s + (p.troco || 0), 0);
+                return trocoTotal > 0 ? (
+                  <div className="pdv-success-troco">
+                    Troco: <strong>{fmt(trocoTotal)}</strong>
+                  </div>
+                ) : null;
+              })()}
               <div className="pdv-success-actions">
                 <button className="pdv-btn-nova" onClick={limparVenda}>
                   <Plus size={18} /> Nova Venda
@@ -688,7 +692,10 @@ export default function PDV({ onVoltar }) {
         {showCupom && (
           <ModalCupom
             venda={vendaFinalizada}
-            troco={troco > 0 ? troco : null}
+            troco={(() => {
+              const t = (vendaFinalizada.pagamentos || []).reduce((s,p)=>s+(p.troco||0),0);
+              return t > 0 ? t : null;
+            })()}
             empresa={{ nome: nomeEmpresa, logo: logoEmpresa, endereco: empresa.endereco, telefone: empresa.telefone }}
             onClose={() => setShowCupom(false)}
           />
