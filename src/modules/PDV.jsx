@@ -10,6 +10,7 @@ import {
   CheckCircle, X, AlertCircle, Barcode, User,
   CreditCard, Banknote, QrCode, Package, ArrowLeft,
   Receipt, Loader2, ChevronDown, Printer, PlusCircle, Trash2 as TrashIcon,
+  Copy,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
@@ -349,10 +350,366 @@ ${venda.cliente?`<div class="total-row"><span>Cliente</span><span>${venda.client
   );
 }
 
-/* ═══════════════════════════════════════════════════
-   COMPONENTE PRINCIPAL
-   ═══════════════════════════════════════════════════ */
-export default function PDV({ onVoltar }) {
+/* ══════════════════════════════════════════════════════
+   MODAL QR CODE PIX — Mercado Pago
+   Gera cobrança via API, exibe QR e faz polling automático
+   ══════════════════════════════════════════════════════ */
+function ModalQrPix({ valor, descricao, mpToken, onPago, onClose }) {
+  const [fase, setFase]     = useState("gerando"); // gerando | aguardando | confirmado | erro
+  const [qrBase64, setQrBase64] = useState("");
+  const [qrCode,   setQrCode]   = useState(""); // copia-e-cola
+  const [paymentId, setPaymentId] = useState(null);
+  const [errMsg,   setErrMsg]   = useState("");
+  const [copiado,  setCopiado]  = useState(false);
+  const [segundos, setSegundos] = useState(0);
+  const pollingRef  = useRef(null);
+  const countRef    = useRef(null);
+  const mountedRef  = useRef(true);
+
+  const fmt = (v) =>
+    Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  /* ── Gerar QR ── */
+  useEffect(() => {
+    mountedRef.current = true;
+    gerarQr();
+    return () => {
+      mountedRef.current = false;
+      clearInterval(pollingRef.current);
+      clearInterval(countRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const gerarQr = async () => {
+    setFase("gerando");
+    setErrMsg("");
+    try {
+      const res = await fetch("https://api.mercadopago.com/v1/payments", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${mpToken}`,
+          "Content-Type":  "application/json",
+          "X-Idempotency-Key": `assent-pdv-${Date.now()}`,
+        },
+        body: JSON.stringify({
+          transaction_amount: parseFloat(valor.toFixed(2)),
+          description: descricao || "Venda PDV ASSENT",
+          payment_method_id: "pix",
+          payer: { email: "cliente@assent.com.br", first_name: "Cliente" },
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.message || `Erro ${res.status}`);
+      }
+
+      const txData = data?.point_of_interaction?.transaction_data;
+      if (!txData?.qr_code_base64 || !txData?.qr_code) {
+        throw new Error("QR Code não retornado pela API. Verifique se PIX está habilitado na conta Mercado Pago.");
+      }
+
+      if (!mountedRef.current) return;
+      setQrBase64(txData.qr_code_base64);
+      setQrCode(txData.qr_code);
+      setPaymentId(data.id);
+      setFase("aguardando");
+      setSegundos(0);
+
+      // Polling a cada 4s
+      pollingRef.current = setInterval(() => verificarPagamento(data.id), 4000);
+
+      // Contador de segundos aguardando
+      countRef.current = setInterval(() => {
+        if (mountedRef.current) setSegundos(s => s + 1);
+      }, 1000);
+
+    } catch (e) {
+      if (!mountedRef.current) return;
+      setErrMsg(e.message || "Erro ao gerar QR Code. Verifique o Access Token.");
+      setFase("erro");
+    }
+  };
+
+  const verificarPagamento = async (id) => {
+    if (!mountedRef.current) return;
+    try {
+      const res  = await fetch(`https://api.mercadopago.com/v1/payments/${id}`, {
+        headers: { "Authorization": `Bearer ${mpToken}` },
+      });
+      const data = await res.json();
+
+      if (data?.status === "approved") {
+        clearInterval(pollingRef.current);
+        clearInterval(countRef.current);
+        if (mountedRef.current) {
+          setFase("confirmado");
+          setTimeout(() => onPago && onPago(valor), 1200);
+        }
+      }
+    } catch {
+      /* ignora erros de polling silenciosamente */
+    }
+  };
+
+  const copiarCodigo = () => {
+    if (!qrCode) return;
+    navigator.clipboard.writeText(qrCode).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    });
+  };
+
+  const formatarTempo = (s) => {
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return m > 0 ? `${m}m ${r}s` : `${r}s`;
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontFamily: "'DM Sans','Segoe UI',sans-serif",
+        animation: "fadeIn .15s ease",
+      }}
+      onClick={fase === "aguardando" ? undefined : onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: "#13151d",
+          border: "1px solid rgba(255,255,255,0.1)",
+          borderRadius: 20,
+          width: 380,
+          maxWidth: "calc(100vw - 32px)",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(200,165,94,0.12)",
+          overflow: "hidden",
+          animation: "slideUp .2s ease",
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "16px 20px",
+          borderBottom: "1px solid rgba(255,255,255,0.07)",
+          background: "rgba(255,255,255,0.02)",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: 10,
+              background: "rgba(200,165,94,0.12)", border: "1px solid rgba(200,165,94,0.3)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <QrCode size={16} color="#c8a55e" />
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#e8e8f0" }}>Pagar com PIX</div>
+              <div style={{ fontSize: 11, color: "#5c5e72" }}>Mercado Pago · pagamento instantâneo</div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#5c5e72", display: "flex" }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Valor */}
+        <div style={{
+          textAlign: "center", padding: "16px 20px 8px",
+          background: "linear-gradient(180deg, rgba(200,165,94,0.06), transparent)",
+        }}>
+          <div style={{ fontSize: 11, color: "#5c5e72", marginBottom: 4, textTransform: "uppercase", letterSpacing: ".07em" }}>
+            Valor a receber
+          </div>
+          <div style={{ fontSize: 32, fontWeight: 800, color: "#c8a55e", letterSpacing: "-.01em" }}>
+            {fmt(valor)}
+          </div>
+        </div>
+
+        {/* Corpo principal */}
+        <div style={{ padding: "12px 20px 20px" }}>
+
+          {/* GERANDO */}
+          {fase === "gerando" && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "24px 0" }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: "50%",
+                border: "3px solid rgba(200,165,94,0.2)",
+                borderTopColor: "#c8a55e",
+                animation: "spin .8s linear infinite",
+              }} />
+              <div style={{ fontSize: 13, color: "#7a7c96", textAlign: "center" }}>
+                Gerando QR Code via Mercado Pago...
+              </div>
+            </div>
+          )}
+
+          {/* AGUARDANDO PAGAMENTO */}
+          {fase === "aguardando" && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+              {/* QR Image */}
+              <div style={{
+                background: "#fff", borderRadius: 14, padding: 12,
+                boxShadow: "0 4px 24px rgba(0,0,0,0.4)",
+                border: "3px solid rgba(200,165,94,0.4)",
+              }}>
+                <img
+                  src={`data:image/png;base64,${qrBase64}`}
+                  alt="QR Code PIX"
+                  style={{ width: 200, height: 200, display: "block" }}
+                />
+              </div>
+
+              {/* Indicador pulsando */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: "50%",
+                  background: "#c8a55e",
+                  boxShadow: "0 0 0 0 rgba(200,165,94,0.4)",
+                  animation: "pulsar 2s infinite",
+                }} />
+                <span style={{ fontSize: 12, color: "#7a7c96" }}>
+                  Aguardando pagamento · {formatarTempo(segundos)}
+                </span>
+              </div>
+
+              <div style={{ fontSize: 12, color: "#5c5e72", textAlign: "center", lineHeight: 1.6 }}>
+                Escaneie o QR Code com o app do banco ou Mercado Pago.<br/>
+                A venda será finalizada automaticamente.
+              </div>
+
+              {/* Copia e cola */}
+              <div style={{
+                width: "100%", background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, overflow: "hidden",
+              }}>
+                <div style={{ fontSize: 10, color: "#5c5e72", padding: "8px 12px 4px", textTransform: "uppercase", letterSpacing: ".06em" }}>
+                  Pix Copia e Cola
+                </div>
+                <div style={{ padding: "0 12px 4px", fontSize: 10, color: "#7a7c96", wordBreak: "break-all", lineHeight: 1.5 }}>
+                  {qrCode.slice(0, 60)}...
+                </div>
+                <button
+                  onClick={copiarCodigo}
+                  style={{
+                    width: "100%", padding: "9px 12px",
+                    background: copiado ? "rgba(72,187,120,0.12)" : "rgba(255,255,255,0.04)",
+                    border: "none", borderTop: "1px solid rgba(255,255,255,0.07)",
+                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    color: copiado ? "#48bb78" : "#9193a5",
+                    fontSize: 12, fontWeight: 600,
+                    fontFamily: "'DM Sans',sans-serif",
+                    transition: "all .15s",
+                  }}
+                >
+                  <Copy size={12} />
+                  {copiado ? "Código copiado!" : "Copiar código"}
+                </button>
+              </div>
+
+              {/* Cancelar */}
+              <button
+                onClick={() => { clearInterval(pollingRef.current); clearInterval(countRef.current); onClose(); }}
+                style={{
+                  background: "none", border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 8, padding: "7px 16px",
+                  color: "#5c5e72", fontSize: 12, cursor: "pointer",
+                  fontFamily: "'DM Sans',sans-serif", transition: "all .13s",
+                }}
+              >
+                Cancelar pagamento
+              </button>
+            </div>
+          )}
+
+          {/* CONFIRMADO */}
+          {fase === "confirmado" && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "20px 0" }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: "50%",
+                background: "rgba(72,187,120,0.12)", border: "2px solid rgba(72,187,120,0.4)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                animation: "popIn .3s ease",
+              }}>
+                <CheckCircle size={32} color="#48bb78" />
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#48bb78" }}>Pagamento Confirmado!</div>
+              <div style={{ fontSize: 12, color: "#5c5e72", textAlign: "center" }}>
+                {fmt(valor)} recebido via PIX<br/>Finalizando venda automaticamente...
+              </div>
+            </div>
+          )}
+
+          {/* ERRO */}
+          {fase === "erro" && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "16px 0" }}>
+              <div style={{
+                width: 52, height: 52, borderRadius: "50%",
+                background: "rgba(224,82,82,0.12)", border: "2px solid rgba(224,82,82,0.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <AlertCircle size={24} color="#e05252" />
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#e05252" }}>Erro ao gerar QR Code</div>
+              <div style={{
+                background: "rgba(224,82,82,0.07)", border: "1px solid rgba(224,82,82,0.2)",
+                borderRadius: 9, padding: "10px 14px",
+                fontSize: 12, color: "#c07070", lineHeight: 1.6, textAlign: "center", width: "100%",
+              }}>
+                {errMsg}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={gerarQr}
+                  style={{
+                    padding: "9px 18px", borderRadius: 9,
+                    background: "linear-gradient(135deg,#d4b06a,#c8a55e)",
+                    color: "#0a0a0a", border: "none", cursor: "pointer",
+                    fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans',sans-serif",
+                  }}
+                >
+                  Tentar novamente
+                </button>
+                <button
+                  onClick={onClose}
+                  style={{
+                    padding: "9px 18px", borderRadius: 9,
+                    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+                    color: "#9193a5", cursor: "pointer",
+                    fontSize: 13, fontFamily: "'DM Sans',sans-serif",
+                  }}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes pulsar {
+          0%   { box-shadow: 0 0 0 0 rgba(200,165,94,0.5); }
+          70%  { box-shadow: 0 0 0 8px rgba(200,165,94,0); }
+          100% { box-shadow: 0 0 0 0 rgba(200,165,94,0); }
+        }
+        @keyframes popIn {
+          0%   { transform: scale(0.5); opacity: 0; }
+          70%  { transform: scale(1.1); }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+
   const { tenantUid, vendedorNome, vendedorId, cargo, user } = useAuth();
   const { config, loading: cfgLoading } = useConfiguracoes(tenantUid);
 
@@ -376,6 +733,9 @@ export default function PDV({ onVoltar }) {
   /* ── Pagamento dividido ── */
   const [pagamentos, setPagamentos] = useState([]); // [{id, forma, parcelas, valor, label}]
   const [showPagModal, setShowPagModal] = useState(false);
+
+  /* ── Pix QR Code (Mercado Pago) ── */
+  const [showQrPix, setShowQrPix] = useState(false);
 
   /* ── UI states ── */
   const [finalizando, setFinalizando] = useState(false);
@@ -586,7 +946,7 @@ export default function PDV({ onVoltar }) {
   /* ══════════════════════════════════
      FINALIZAR VENDA
      ══════════════════════════════════ */
-  const finalizarVenda = async () => {
+  const finalizarVenda = async (extraPagamento = null) => {
     if (!tenantUid) return;
     if (carrinho.length === 0) {
       setErro("Adicione pelo menos um produto ao carrinho.");
@@ -594,6 +954,11 @@ export default function PDV({ onVoltar }) {
     }
     setFinalizando(true);
     setErro("");
+
+    // Garante que o pagamento QR PIX seja incluído mesmo antes do state atualizar
+    const todosPagamentos = extraPagamento
+      ? [...pagamentos, extraPagamento]
+      : pagamentos;
 
     try {
       const counterRef = doc(db, "users", tenantUid, "config", "contadores");
@@ -618,9 +983,9 @@ export default function PDV({ onVoltar }) {
           idVenda:        vendaId,
           itens,
           total,
-          pagamentos:     pagamentos,
+          pagamentos:     todosPagamentos,
           // compatibilidade com relatórios (1ª forma de pagamento)
-          formaPagamento: pagamentos[0]?.label || "—",
+          formaPagamento: todosPagamentos[0]?.label || "—",
           taxaPct:        0,
           valorTaxa:      0,
           totalLiquido:   total,
@@ -637,7 +1002,7 @@ export default function PDV({ onVoltar }) {
         transaction.set(vendaRef, vendaDoc);
         transaction.set(counterRef, { vendas: nextNum }, { merge: true });
 
-        setVendaFinalizada({ id: vendaId, total, pagamentos, itens: carrinho, cliente: cliente?.nome || null });
+        setVendaFinalizada({ id: vendaId, total, pagamentos: todosPagamentos, itens: carrinho, cliente: cliente?.nome || null });
       });
     } catch (e) {
       console.error(e);
@@ -714,6 +1079,30 @@ export default function PDV({ onVoltar }) {
           taxas={taxas}
           onConfirm={(p) => { setPagamentos(ps => [...ps, p]); setShowPagModal(false); }}
           onClose={() => setShowPagModal(false)}
+        />
+      )}
+
+      {/* Modal QR Code PIX */}
+      {showQrPix && (
+        <ModalQrPix
+          valor={restante}
+          descricao={`Venda PDV — ${carrinho.length} item(ns)`}
+          mpToken={config?.pagamentos?.mercadopago?.accessToken}
+          onPago={(valorPago) => {
+            const pixPagamento = {
+              id:       Date.now(),
+              forma:    "pix",
+              parcelas: 1,
+              valor:    valorPago,
+              label:    "Pix QR Code",
+              valorRecebido: null,
+              troco: null,
+            };
+            setPagamentos(ps => [...ps, pixPagamento]);
+            setShowQrPix(false);
+            finalizarVenda(pixPagamento);
+          }}
+          onClose={() => setShowQrPix(false)}
         />
       )}
       <div className="pdv-root">
@@ -930,20 +1319,40 @@ export default function PDV({ onVoltar }) {
 
               {/* Botão adicionar pagamento */}
               {!vencido && carrinho.length > 0 && (
-                <span
-                  role="button"
-                  onClick={() => setShowPagModal(true)}
-                  style={{
-                    display:"flex", alignItems:"center", justifyContent:"center", gap:7,
-                    padding:"9px 12px", borderRadius:8, cursor:"pointer",
-                    background:"rgba(200,165,94,0.1)", border:"1px solid rgba(200,165,94,0.35)",
-                    color:"var(--pdv-gold)", fontSize:13, fontWeight:600,
-                    userSelect:"none",
-                  }}
-                >
-                  <PlusCircle size={14} color="var(--pdv-gold)" />
-                  {pagamentos.length === 0 ? "Adicionar pagamento" : `Adicionar mais (restam ${fmt(restante)})`}
-                </span>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span
+                    role="button"
+                    onClick={() => setShowPagModal(true)}
+                    style={{
+                      display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+                      padding:"9px 12px", borderRadius:8, cursor:"pointer",
+                      background:"rgba(200,165,94,0.1)", border:"1px solid rgba(200,165,94,0.35)",
+                      color:"var(--pdv-gold)", fontSize:13, fontWeight:600,
+                      userSelect:"none",
+                    }}
+                  >
+                    <PlusCircle size={14} color="var(--pdv-gold)" />
+                    {pagamentos.length === 0 ? "Adicionar pagamento" : `Adicionar mais (restam ${fmt(restante)})`}
+                  </span>
+
+                  {/* Botão QR PIX — visível somente se MP configurado */}
+                  {config?.pagamentos?.mercadopago?.ativo && config?.pagamentos?.mercadopago?.accessToken && (
+                    <span
+                      role="button"
+                      onClick={() => setShowQrPix(true)}
+                      style={{
+                        display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+                        padding:"9px 12px", borderRadius:8, cursor:"pointer",
+                        background:"rgba(0,158,227,0.1)", border:"1px dashed rgba(0,158,227,0.4)",
+                        color:"#5ab4e0", fontSize:13, fontWeight:600,
+                        userSelect:"none",
+                      }}
+                    >
+                      <QrCode size={14} color="#5ab4e0" />
+                      Pagar com Pix QR Code
+                    </span>
+                  )}
+                </div>
               )}
             </div>
           </section>
@@ -1099,7 +1508,7 @@ export default function PDV({ onVoltar }) {
       </div>
     </>
   );
-}
+
 
 /* ═══════════════════════════════════════════════════
    CSS
