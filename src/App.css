@@ -150,7 +150,6 @@
   pointer-events: none;
 }
 
-/* Card — padding vertical aumentado para esticar na vertical */
 .login-form-card {
   position: relative;
   z-index: 1;
@@ -185,7 +184,7 @@
   margin-bottom: 48px;
 }
 
-/* Linha com Assent (branco) + Gestão (dourado) */
+/* ✦ white-space: nowrap impede quebra de linha */
 .logo-text {
   font-family: 'Cinzel', serif;
   font-size: 30px;
@@ -193,6 +192,7 @@
   letter-spacing: 0.1em;
   line-height: 1;
   margin-bottom: 10px;
+  white-space: nowrap;
 }
 
 .logo-assent {
@@ -284,16 +284,18 @@
   opacity: 0.4;
 }
 
-/* ── Botão principal ─────────────────────────────────
-   Estado padrão: branco
-   Hover: dourado com luz passando (shimmer no ::after)
-   ─────────────────────────────────────────────────── */
-.btn-login {
+/* ══════════════════════════════════════════════════
+   BOTÃO LOGIN — especificidade elevada para vencer
+   o seletor global button:hover do index.css
+   ══════════════════════════════════════════════════ */
+
+/* Estado padrão: branco */
+.login-card-wrap .btn-login {
   width: 100%;
   margin-top: 28px;
   padding: 15px;
   background: #ffffff;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 10px;
   font-family: 'Montserrat', sans-serif;
   font-size: 11px;
@@ -304,62 +306,70 @@
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  transition: background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, transform 0.15s ease;
+  transition:
+    background   0.3s ease,
+    color        0.3s ease,
+    box-shadow   0.3s ease,
+    transform    0.15s ease,
+    border-color 0.3s ease;
 }
 
-/* Luz que passa — só ativa no hover via animação com delay 0 */
-.btn-login::after {
+/* Span fica acima do shimmer */
+.login-card-wrap .btn-login span {
+  position: relative;
+  z-index: 1;
+}
+
+/* Faixa de luz — posicionada fora da área visível */
+.login-card-wrap .btn-login::after {
   content: '';
   position: absolute;
   top: 0;
-  left: -100%;
+  left: -120%;
   width: 60%;
   height: 100%;
   background: linear-gradient(
     90deg,
-    transparent,
-    rgba(255, 255, 255, 0.45),
-    transparent
+    transparent 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 100%
   );
   pointer-events: none;
+  z-index: 2;
 }
 
-.btn-login:hover {
+/* Hover: dourado + shimmer disparado uma vez */
+.login-card-wrap .btn-login:hover {
   background: #D4AF37;
   color: #000000;
-  opacity: 1;
+  border-color: #D4AF37;
   transform: translateY(-1px);
-  box-shadow: 0 6px 28px rgba(212, 175, 55, 0.45);
-  border-color: transparent;
+  box-shadow:
+    0 6px 28px rgba(212, 175, 55, 0.45),
+    0 0   16px rgba(212, 175, 55, 0.2);
 }
 
-/* Shimmer dispara apenas no hover */
-.btn-login:hover::after {
-  animation: btnShimmer 0.65s ease-in-out forwards;
+.login-card-wrap .btn-login:hover::after {
+  animation: btnShimmer 0.7s ease-in-out forwards;
 }
 
 @keyframes btnShimmer {
-  0%   { left: -100%; }
-  100% { left: 200%; }
+  0%   { left: -120%; }
+  100% { left:  160%; }
 }
 
-.btn-login:active {
+.login-card-wrap .btn-login:active {
   transform: translateY(0);
   box-shadow: 0 3px 14px rgba(212, 175, 55, 0.3);
 }
 
-.btn-login:disabled {
-  opacity: 0.55;
+.login-card-wrap .btn-login:disabled {
+  background: rgba(255, 255, 255, 0.55);
+  color: rgba(0, 0, 0, 0.5);
+  border-color: transparent;
   cursor: not-allowed;
   transform: none;
-  background: #ffffff;
-  color: #000000;
   box-shadow: none;
-}
-
-.btn-login span {
-  position: relative;
-  z-index: 1;
 }
 
 /* ── Footer / Recuperação ──────────────────────────── */
