@@ -1972,7 +1972,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             ) : (
               dash.ultimasVendas.map((v, i) => (
                 <div key={v.id || i} className="ag-trow" style={{ gridTemplateColumns: "90px 1fr 130px 130px", minWidth: 440 }}>
-                  <span style={{ color: "var(--gold)" }}>{v.id}</span>
+                  <span style={{ color: "var(--gold)" }}>{v.idVenda || v.id}</span>
                   <span>{v.cliente || "—"}</span>
                   <span>{fmtData(v.data)}</span>
                   <span style={{ color: "var(--green)", textAlign: "right" }}>{fmtR$(v.total)}</span>
