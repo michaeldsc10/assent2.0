@@ -1118,22 +1118,22 @@ function CustomTooltip({ active, payload, label }) {
   const value = payload[0]?.value;
   return (
     <div style={{
-      background: "rgba(18, 17, 23, 0.92)",
+      background: "var(--s2)",
       backdropFilter: "blur(12px)",
       WebkitBackdropFilter: "blur(12px)",
       border: "1px solid rgba(200,165,94,0.25)",
       borderRadius: 12,
       padding: "10px 14px",
       fontSize: 12,
-      boxShadow: "0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(200,165,94,0.08) inset",
+      boxShadow: "0 8px 32px rgba(0,0,0,0.2), 0 0 0 1px rgba(200,165,94,0.08) inset",
       minWidth: 130,
       pointerEvents: "none",
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
         <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#c8a55e", boxShadow: "0 0 6px #c8a55e88" }} />
-        <span style={{ color: "rgba(200,165,94,0.8)", fontWeight: 500, fontSize: 11, letterSpacing: "0.04em" }}>{label}</span>
+        <span style={{ color: "var(--gold)", fontWeight: 500, fontSize: 11, letterSpacing: "0.04em" }}>{label}</span>
       </div>
-      <div style={{ color: "#edeae3", fontWeight: 700, fontSize: 14, letterSpacing: "-0.01em" }}>
+      <div style={{ color: "var(--text)", fontWeight: 700, fontSize: 14, letterSpacing: "-0.01em" }}>
         R$ {value?.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
       </div>
     </div>
@@ -1861,8 +1861,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
                   </filter>
                 </defs>
-                <XAxis dataKey="d" tick={{ fill: "#3a3842", fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "#3a3842", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="d" tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
                 <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(200,165,94,0.15)", strokeWidth: 1, strokeDasharray: "4 3" }} />
                 <Area type="monotone" dataKey="v" stroke="#c8a55e" strokeWidth={2} fill="url(#gGold)" dot={false}
                   activeDot={{ r: 5, fill: "#c8a55e", stroke: "rgba(200,165,94,0.3)", strokeWidth: 6, filter: "url(#glowGoldMain)" }} />
@@ -2086,21 +2086,21 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       if (!active || !payload?.length) return null;
       return (
         <div style={{
-          background: "rgba(14,13,20,0.96)",
+          background: "var(--s2)",
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
           border: "1px solid rgba(200,165,94,0.2)",
           borderRadius: 12,
           padding: "12px 16px",
           fontSize: 12,
-          boxShadow: "0 16px 48px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04) inset",
+          boxShadow: "0 16px 48px rgba(0,0,0,0.2), 0 0 0 1px var(--border) inset",
           minWidth: 155,
           pointerEvents: "none",
           animation: "tooltipIn 0.15s ease",
         }}>
           <style>{`@keyframes tooltipIn { from { opacity:0; transform:translateY(4px) scale(.97); } to { opacity:1; transform:none; } }`}</style>
           {label && (
-            <div style={{ color: "rgba(255,255,255,0.4)", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10, borderBottom: "1px solid rgba(255,255,255,0.06)", paddingBottom: 8 }}>
+            <div style={{ color: "var(--text-3)", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10, borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>
               {label}
             </div>
           )}
@@ -2108,9 +2108,9 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, margin: "4px 0" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                 <div style={{ width: 8, height: 8, borderRadius: 2, background: p.color || "#c8a55e", boxShadow: `0 0 6px ${(p.color || "#c8a55e") + "88"}`, flexShrink: 0 }} />
-                <span style={{ color: "rgba(255,255,255,0.5)", fontSize: 11 }}>{p.name}</span>
+                <span style={{ color: "var(--text-2)", fontSize: 11 }}>{p.name}</span>
               </div>
-              <span style={{ color: p.color || "#c8a55e", fontWeight: 700, fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+              <span style={{ color: p.color || "var(--gold)", fontWeight: 700, fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
                 {typeof p.value === "number" && p.value > 1000
                   ? `R$ ${p.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
                   : p.value}
