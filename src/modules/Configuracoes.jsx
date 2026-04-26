@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { db, functions } from "../lib/firebase";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, startAfter } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -844,7 +845,7 @@ function PassInput({ value, onChange, placeholder, className }) {
 /* ══════════════════════════════════════════════════════
    SEÇÕES
    ══════════════════════════════════════════════════════ */
-function SecaoEmpresa({ config, onSave }) {
+function SecaoEmpresa({ config, onSave, uid }) {
   const [form, setForm] = useState({
     nomeEmpresa: config?.empresa?.nomeEmpresa || config?.nomeEmpresa || "",
     cnpj:        config?.empresa?.cnpj        || config?.cnpj        || "",
@@ -888,58 +889,45 @@ function SecaoEmpresa({ config, onSave }) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const MAX_BYTES  = 300 * 1024;   // 300 KB — limite final do base64
-    const MAX_DIM    = 1200;          // largura/altura máxima em pixels
-    // PNG preserva transparência; JPEG para outros formatos (melhor compressão)
-    const isPng      = file.type === "image/png";
-    const MIME       = isPng ? "image/png" : "image/jpeg";
+    const MAX_DIM = 800;
+    const isPng   = file.type === "image/png";
 
-    const comprimirComCanvas = (src) => {
-      return new Promise((resolve, reject) => {
+    // Redimensiona e converte para Blob antes do upload pro Storage
+    const redimensionar = (src) =>
+      new Promise((resolve, reject) => {
         const img = new Image();
         img.onload = () => {
-          // 1. Calcular dimensões mantendo proporção
           let { width, height } = img;
           if (width > MAX_DIM || height > MAX_DIM) {
             if (width >= height) { height = Math.round(height * MAX_DIM / width); width = MAX_DIM; }
             else                 { width  = Math.round(width  * MAX_DIM / height); height = MAX_DIM; }
           }
-
           const canvas = document.createElement("canvas");
-          canvas.width  = width;
-          canvas.height = height;
+          canvas.width = width; canvas.height = height;
           const ctx = canvas.getContext("2d");
-          // Só preenche fundo branco para JPEG (não suporta transparência).
-          // PNG mantém canal alpha intacto — sem fundo branco.
-          if (!isPng) {
-            ctx.fillStyle = "#ffffff";
-            ctx.fillRect(0, 0, width, height);
-          }
+          // PNG preserva transparência; JPEG recebe fundo branco (não suporta alpha)
+          if (!isPng) { ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, width, height); }
           ctx.drawImage(img, 0, 0, width, height);
-
-          // 2. Tentar qualidades decrescentes até caber em 300 KB
-          const tentativas = [0.92, 0.85, 0.78, 0.70, 0.60, 0.50, 0.40];
-          for (const q of tentativas) {
-            const dataUrl = canvas.toDataURL(MIME, q);
-            // base64 overhead: cada 4 chars = 3 bytes
-            const bytes = Math.ceil((dataUrl.length - dataUrl.indexOf(",") - 1) * 3 / 4);
-            if (bytes <= MAX_BYTES) { resolve(dataUrl); return; }
-          }
-          // Se ainda não couber na qualidade mínima, retorna mesmo assim
-          resolve(canvas.toDataURL(MIME, 0.40));
+          canvas.toBlob(resolve, isPng ? "image/png" : "image/jpeg", 0.85);
         };
         img.onerror = reject;
         img.src = src;
       });
-    };
 
     const reader = new FileReader();
     reader.onload = async (ev) => {
       try {
-        const comprimida = await comprimirComCanvas(ev.target.result);
-        set("logo", comprimida);
+        setSalvando(true);
+        const blob = await redimensionar(ev.target.result);
+        // Caminho fixo por tenant — novo upload sobrescreve o anterior automaticamente
+        const sRef = storageRef(getStorage(), `logos/${uid}/logo`);
+        await uploadBytes(sRef, blob);
+        const url  = await getDownloadURL(sRef);
+        set("logo", url);
       } catch {
-        alert("Não foi possível processar a imagem. Tente outro arquivo.");
+        alert("Não foi possível enviar a imagem. Tente novamente.");
+      } finally {
+        setSalvando(false);
       }
     };
     reader.readAsDataURL(file);
@@ -977,7 +965,14 @@ function SecaoEmpresa({ config, onSave }) {
                   <button className="btn-secondary" style={{ fontSize: 11, padding: "4px 10px" }}
                     onClick={e => { e.stopPropagation(); fileRef.current?.click(); }}>Trocar</button>
                   <button className="btn-logo-remove"
-                    onClick={e => { e.stopPropagation(); set("logo", ""); }}>Remover</button>
+                    onClick={async e => {
+                      e.stopPropagation();
+                      try {
+                        const sRef = storageRef(getStorage(), `logos/${uid}/logo`);
+                        await deleteObject(sRef);
+                      } catch {} // ignora se arquivo já não existe no Storage
+                      set("logo", "");
+                    }}>Remover</button>
                 </div>
               </>
             ) : (
@@ -1927,7 +1922,7 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
   const renderSecao = () => {
     if (loading) return <div className="cfg-loading">Carregando configurações...</div>;
     switch (secao) {
-      case "empresa":    return <SecaoEmpresa    config={config} onSave={handleSave} />;
+      case "empresa":    return <SecaoEmpresa    config={config} onSave={handleSave} uid={uid} />;
       case "seguranca":  return <SecaoSeguranca />;
       case "financeiro": return <SecaoFinanceiro config={config} onSave={handleSave} />;
       case "pagamentos": return <SecaoPagamentos config={config} onSave={handleSave} />;
