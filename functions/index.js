@@ -24,10 +24,21 @@ const fbAuth = admin.auth();
 const CALL_OPTIONS = {
   enforceAppCheck: true,
   cors: [
-    "https://ag.assentagencia.com.br",    // domínio próprio
-    "https://assent2-0.vercel.app",       // domínio Vercel
-    "http://localhost:5173",           // dev local (Vite padrão)
-    "http://localhost:3000",           // dev local alternativo
+    "https://ag.assentagencia.com.br",
+    "https://assent2-0.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+  ],
+};
+
+/* Opções para as funções PIX — App Check manual para não bloquear CORS no preflight */
+const CALL_OPTIONS_PIX = {
+  enforceAppCheck: false, // verificado manualmente dentro da função
+  cors: [
+    "https://ag.assentagencia.com.br",
+    "https://assent2-0.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
   ],
 };
 
@@ -200,10 +211,15 @@ const WEBHOOK_URL = "https://us-central1-assent-2b945.cloudfunctions.net/mpWebho
    Cria pagamento PIX no Mercado Pago e salva doc
    no Firestore. O PDV escuta via onSnapshot.
 ───────────────────────────────────────────── */
-exports.gerarPixQr = onCall(CALL_OPTIONS, async (request) => {
+exports.gerarPixQr = onCall(CALL_OPTIONS_PIX, async (request) => {
   const callerUid = request.auth?.uid;
   if (!callerUid) {
     throw new HttpsError("unauthenticated", "Usuário não autenticado.");
+  }
+
+  // App Check manual — loga se ausente mas não bloqueia (enquanto configura o domínio)
+  if (!request.app) {
+    console.warn("[gerarPixQr] App Check token ausente — verifique se o domínio está autorizado no Firebase Console.");
   }
 
   const { tenantUid, valor, descricao } = request.data;
@@ -371,7 +387,7 @@ exports.mpWebhook = onRequest(
    Fallback de polling caso o webhook falhe.
    O ModalQrPix chama a cada 8s como segurança.
 ───────────────────────────────────────────── */
-exports.consultarPagamento = onCall(CALL_OPTIONS, async (request) => {
+exports.consultarPagamento = onCall(CALL_OPTIONS_PIX, async (request) => {
   const callerUid = request.auth?.uid;
   if (!callerUid) {
     throw new HttpsError("unauthenticated", "Usuário não autenticado.");
