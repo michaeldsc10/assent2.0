@@ -20,6 +20,7 @@ import {
 } from "firebase/firestore";
 
 import { getStorage } from "firebase/storage";
+import { getFunctions } from "firebase/functions";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 // ⚠️ Todas as chaves são lidas de variáveis de ambiente (.env)
@@ -47,9 +48,12 @@ initializeAppCheck(app, {
   isTokenAutoRefreshEnabled: true,
 });
 
-export const auth    = getAuth(app);
-export const db      = getFirestore(app);
-export const storage = getStorage(app);
+export const auth      = getAuth(app);
+export const db        = getFirestore(app);
+export const storage   = getStorage(app);
+
+/* ── Cloud Functions (mesma região do functions/index.js) ── */
+export const functions = getFunctions(app, "us-central1");
 
 
 /* ── Funções de Autenticação ── */
