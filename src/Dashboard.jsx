@@ -534,7 +534,7 @@ const CSS = `
     --gold-brand:   #D4AF37;
     --text:         #edeae3;
     --text-2:       #a09caa;
-    --text-3:       #6a6775;
+    --text-3:       #f6f5fa;
     --green:        #3ecf8e;
     --green-d:      rgba(62,207,142,0.1);
     --red:          #e05252;
