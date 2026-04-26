@@ -17,7 +17,7 @@ import { db, functions } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
 import {
   collection, query, where, getDocs, runTransaction,
-  doc, orderBy, limit, getDoc, onSnapshot,
+  doc, orderBy, limit, getDoc, onSnapshot, serverTimestamp,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import BarcodeInput from "../components/BarcodeInput";
@@ -27,7 +27,23 @@ import { useConfiguracoes } from "./Configuracoes";
 const fmt = (v) =>
   Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-/* ─── Formata número decimal BR ─── */
+/* ─── Sanitiza produto vindo do Firestore ───────────────────────────
+   Remove campos Timestamp/Firebase internos — só mantém primitivos.
+   Chamado ao adicionar ao carrinho para garantir que nunca cheguem
+   a um transaction.set().
+──────────────────────────────────────────────────────────────────── */
+function sanitizarProduto(produto) {
+  return {
+    id:           String(produto.id           || ""),
+    nome:         String(produto.nome         || ""),
+    codigoBarras: String(produto.codigoBarras || produto.codigo || ""),
+    precoVenda:   Number(produto.precoVenda   || produto.preco  || 0),
+    preco:        Number(produto.preco        || produto.precoVenda || 0),
+    estoque:      produto.estoque != null ? Number(produto.estoque) : null,
+    categoria:    typeof produto.categoria === "string" ? produto.categoria : "",
+    unidade:      typeof produto.unidade    === "string" ? produto.unidade   : "",
+  };
+}
 const fmtNum = (v) =>
   Number(v || 0).toLocaleString("pt-BR", {
     minimumFractionDigits: 2,
@@ -816,7 +832,7 @@ export default function PDV({ onVoltar }) {
           setErro(`Produto não encontrado: "${codigo}"`);
           return;
         }
-        const prod = { id: snap.docs[0].id, ...snap.docs[0].data() };
+        const prod = sanitizarProduto({ id: snap.docs[0].id, ...snap.docs[0].data() });
         adicionarAoCarrinho(prod);
       } catch (e) {
         setErro("Erro ao buscar produto.");
@@ -843,7 +859,7 @@ export default function PDV({ onVoltar }) {
         const snap = await getDocs(q);
         const termo = buscaProduto.toLowerCase();
         const resultados = snap.docs
-          .map((d) => ({ id: d.id, ...d.data() }))
+          .map((d) => sanitizarProduto({ id: d.id, ...d.data() }))
           .filter(
             (p) =>
               p.nome?.toLowerCase().includes(termo) ||
@@ -967,55 +983,76 @@ export default function PDV({ onVoltar }) {
     setFinalizando(true);
     setErro("");
 
-    // Garante que o pagamento QR PIX seja incluído mesmo antes do state atualizar
     const todosPagamentos = extraPagamento
       ? [...pagamentos, extraPagamento]
       : pagamentos;
 
+    // Sanitiza pagamentos — garante apenas primitivos no Firestore
+    const pagamentosLimpos = todosPagamentos.map((p) => ({
+      id:            Number(p.id)         || 0,
+      forma:         String(p.forma)      || "",
+      parcelas:      Number(p.parcelas)   || 1,
+      valor:         Number(p.valor)      || 0,
+      label:         String(p.label)      || "",
+      valorRecebido: p.valorRecebido != null ? Number(p.valorRecebido) : null,
+      troco:         p.troco         != null ? Number(p.troco)         : null,
+    }));
+
     try {
       const counterRef = doc(db, "users", tenantUid, "config", "contadores");
+
+      // Variáveis capturadas fora da transaction para uso pós-commit
+      let vendaIdFinal;
 
       await runTransaction(db, async (transaction) => {
         const counterSnap = await transaction.get(counterRef);
         const nextNum = (counterSnap.exists() ? counterSnap.data().vendas ?? 0 : 0) + 1;
-        const vendaId = `PDV-${String(nextNum).padStart(5, "0")}`;
+        vendaIdFinal  = `PDV-${String(nextNum).padStart(5, "0")}`;
 
         const vendaRef = doc(collection(db, "users", tenantUid, "vendas"));
 
+        // Apenas campos primitivos — sem objetos Firebase internos
         const itens = carrinho.map((item) => ({
-          produtoId: item.produto.id,
-          nome: item.produto.nome,
-          codigoBarras: item.produto.codigoBarras || "",
-          qty: item.qty,
-          precoUnit: item.precoUnit,
-          subtotal: item.subtotal,
+          produtoId:    String(item.produto.id           || ""),
+          nome:         String(item.produto.nome         || ""),
+          codigoBarras: String(item.produto.codigoBarras || ""),
+          qty:          Number(item.qty)                 || 1,
+          precoUnit:    Number(item.precoUnit)           || 0,
+          subtotal:     Number(item.subtotal)            || 0,
         }));
 
         const vendaDoc = {
-          idVenda:        vendaId,
+          idVenda:        vendaIdFinal,
           itens,
-          total,
-          pagamentos:     todosPagamentos,
-          // compatibilidade com relatórios (1ª forma de pagamento)
-          formaPagamento: todosPagamentos[0]?.label || "—",
+          total:          Number(total)       || 0,
+          pagamentos:     pagamentosLimpos,
+          formaPagamento: pagamentosLimpos[0]?.label || "—",
           taxaPct:        0,
           valorTaxa:      0,
-          totalLiquido:   total,
+          totalLiquido:   Number(total)       || 0,
           data:           new Date().toISOString().slice(0, 10),
-          cliente:        cliente?.nome || null,
-          clienteId:      cliente?.id  || null,
+          cliente:        cliente?.nome  || null,
+          clienteId:      cliente?.id   || null,
           status:         "ativa",
           origem:         "pdv",
-          vendedorId:     vendedorId   || null,
-          vendedorNome:   nomeOperador || null,
-          criadoEm:       new Date(),
+          vendedorId:     vendedorId    || null,
+          vendedorNome:   nomeOperador  || null,
+          criadoEm:       serverTimestamp(), // servidor — fora do client
         };
 
         transaction.set(vendaRef, vendaDoc);
         transaction.set(counterRef, { vendas: nextNum }, { merge: true });
-
-        setVendaFinalizada({ id: vendaId, total, pagamentos: todosPagamentos, itens: carrinho, cliente: cliente?.nome || null });
       });
+
+      // ✅ State update APÓS o commit — fora da transaction
+      setVendaFinalizada({
+        id:       vendaIdFinal,
+        total,
+        pagamentos: pagamentosLimpos,
+        itens:      carrinho,
+        cliente:    cliente?.nome || null,
+      });
+
     } catch (e) {
       console.error(e);
       setErro("Erro ao finalizar venda. Tente novamente.");
