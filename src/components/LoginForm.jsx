@@ -6,19 +6,40 @@
 import { useState } from "react";
 import { useAuth } from "./Auth";
 
+// ── Ícones SVG inline ───────────────────────────────
+const IconEyeOpen = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" strokeWidth="2"
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
+const IconEyeOff = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" strokeWidth="2"
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+    <line x1="1" y1="1" x2="23" y2="23" />
+  </svg>
+);
+
 const LoginForm = ({ onLoginSuccess }) => {
   const { login, resetPassword } = useAuth();
 
   // ── estados de login ────────────────────────────────
-  const [email,    setEmail]    = useState("");
-  const [senha,    setSenha]    = useState("");
-  const [error,    setError]    = useState("");
-  const [loading,  setLoading]  = useState(false);
+  const [email,      setEmail]      = useState("");
+  const [senha,      setSenha]      = useState("");
+  const [showSenha,  setShowSenha]  = useState(false);
+  const [error,      setError]      = useState("");
+  const [loading,    setLoading]    = useState(false);
 
   // ── estados de recuperação ──────────────────────────
   const [showReset,     setShowReset]     = useState(false);
   const [resetEmail,    setResetEmail]    = useState("");
-  const [resetMsg,      setResetMsg]      = useState("");   // sucesso
+  const [resetMsg,      setResetMsg]      = useState("");
   const [resetError,    setResetError]    = useState("");
   const [resetLoading,  setResetLoading]  = useState(false);
 
@@ -86,16 +107,44 @@ const LoginForm = ({ onLoginSuccess }) => {
 
           <div className="input-group" style={{ marginTop: "1rem" }}>
             <label htmlFor="password">Senha</label>
-            <input
-              type="password"
-              id="password"
-              placeholder="Sua senha"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              required
-              autoComplete="current-password"
-              disabled={loading}
-            />
+            {/* ── wrapper para posicionar o botão do olhinho ── */}
+            <div style={{ position: "relative" }}>
+              <input
+                type={showSenha ? "text" : "password"}
+                id="password"
+                placeholder="Sua senha"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                required
+                autoComplete="current-password"
+                disabled={loading}
+                style={{ paddingRight: "2.75rem" }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowSenha((v) => !v)}
+                disabled={loading}
+                aria-label={showSenha ? "Ocultar senha" : "Mostrar senha"}
+                style={{
+                  position: "absolute",
+                  right: "0.75rem",
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  padding: 0,
+                  cursor: loading ? "not-allowed" : "pointer",
+                  color: "#a0a0a0",
+                  display: "flex",
+                  alignItems: "center",
+                  transition: "color 0.2s",
+                }}
+                onMouseEnter={(e) => { if (!loading) e.currentTarget.style.color = "#D4AF37"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = "#a0a0a0"; }}
+              >
+                {showSenha ? <IconEyeOff /> : <IconEyeOpen />}
+              </button>
+            </div>
           </div>
 
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem" }}>
@@ -165,7 +214,6 @@ const LoginForm = ({ onLoginSuccess }) => {
               </p>
             </div>
 
-            {/* Feedback de sucesso */}
             {resetMsg && (
               <div style={{
                 background: "rgba(52,199,89,0.1)",
@@ -177,7 +225,6 @@ const LoginForm = ({ onLoginSuccess }) => {
               </div>
             )}
 
-            {/* Feedback de erro */}
             {resetError && (
               <div style={{
                 background: "rgba(224,82,82,0.1)",
@@ -189,7 +236,6 @@ const LoginForm = ({ onLoginSuccess }) => {
               </div>
             )}
 
-            {/* Formulário — some após sucesso */}
             {!resetMsg && (
               <form onSubmit={handleReset} noValidate style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                 <div className="input-group">
