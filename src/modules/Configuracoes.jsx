@@ -10,6 +10,7 @@ import {
   ChevronRight, Camera, Shield, Keyboard, Activity,
   Filter, RefreshCw, Search, ChevronDown,
   Zap, Copy, ExternalLink, BookOpen, X, CheckCircle2,
+  Wallet, ArrowRight, ServerCog, Wifi, WifiOff,
 } from "lucide-react";
 
 import { db, functions } from "../lib/firebase";
@@ -571,67 +572,144 @@ const CSS = `
   }
 
   /* ── Seção Pagamentos Online ── */
-  .pag-provedor-card {
-    border: 1.5px solid var(--border); border-radius: 12px;
-    overflow: hidden; transition: border-color .15s;
+  .pag-wrap { display: flex; flex-direction: column; gap: 24px; }
+
+  /* Bloco do provedor — fundo escuro com borda esquerda colorida */
+  .pag-mp-block {
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(0,158,227,0.06) 0%, rgba(0,0,0,0) 60%);
+    border: 1px solid rgba(0,158,227,0.18);
+    overflow: hidden;
+    transition: border-color .2s;
   }
-  .pag-provedor-card.ativo { border-color: rgba(200,165,94,0.5); }
-  .pag-provedor-header {
+  .pag-mp-block.ativo {
+    border-color: rgba(0,158,227,0.4);
+    box-shadow: 0 0 0 1px rgba(0,158,227,0.1) inset;
+  }
+
+  /* Cabeçalho do bloco MP */
+  .pag-mp-head {
     display: flex; align-items: center; gap: 14px;
-    padding: 16px 18px; background: var(--s2);
-    border-bottom: 1px solid var(--border);
+    padding: 16px 20px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
   }
-  .pag-provedor-logo {
-    width: 42px; height: 42px; border-radius: 10px;
+  .pag-mp-icon {
+    width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+    background: linear-gradient(135deg, #009ee3, #0077bb);
     display: flex; align-items: center; justify-content: center;
-    font-size: 22px; background: #009ee3; color: #fff; flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(0,158,227,0.35);
   }
-  .pag-provedor-info { flex: 1; }
-  .pag-provedor-nome { font-size: 14px; font-weight: 700; color: var(--text); font-family: 'Sora', sans-serif; }
-  .pag-provedor-sub  { font-size: 11px; color: var(--text-3); margin-top: 2px; }
-  .pag-provedor-badge {
-    font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px;
-    background: rgba(72,187,120,0.12); color: #48bb78; border: 1px solid rgba(72,187,120,0.25);
+  .pag-mp-label { flex: 1; }
+  .pag-mp-nome { font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: -.01em; }
+  .pag-mp-tag  {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 20px; margin-top: 4px;
+    background: rgba(72,187,120,0.1); color: #48bb78; border: 1px solid rgba(72,187,120,0.2);
   }
-  .pag-provedor-badge.inativo {
-    background: var(--s3); color: var(--text-3); border-color: var(--border);
+  .pag-mp-tag.inativo {
+    background: rgba(255,255,255,0.04); color: var(--text-3); border-color: rgba(255,255,255,0.08);
   }
-  .pag-provedor-body { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+
+  /* Toggle row */
+  .pag-toggle-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px; gap: 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .pag-toggle-label { font-size: 13px; font-weight: 600; color: var(--text); }
+  .pag-toggle-sub   { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+
+  /* Corpo do token */
+  .pag-token-area { padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
   .pag-token-wrap { position: relative; }
-  .pag-token-wrap .form-input { padding-right: 42px; font-family: 'DM Mono', 'Courier New', monospace; font-size: 12px; }
+  .pag-token-wrap .form-input {
+    padding-right: 42px; letter-spacing: .04em;
+    font-family: 'DM Mono', 'Courier New', monospace; font-size: 11.5px;
+    background: rgba(0,0,0,0.2);
+  }
   .pag-token-toggle {
     position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
     background: none; border: none; cursor: pointer;
     color: var(--text-3); display: flex; align-items: center; transition: color .13s;
   }
   .pag-token-toggle:hover { color: var(--text-2); }
-  .pag-status-row {
-    display: flex; align-items: center; gap: 10px;
-    background: var(--s3); border: 1px solid var(--border);
-    border-radius: 9px; padding: 12px 14px;
+
+  /* Botões de ação do token */
+  .pag-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* Status pill */
+  .pag-status {
+    display: flex; align-items: center; gap: 9px;
+    padding: 10px 14px; border-radius: 10px;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
+    font-size: 12px; color: var(--text-3); transition: all .2s;
   }
+  .pag-status.ok   { border-color: rgba(72,187,120,0.2);  background: rgba(72,187,120,0.06);  color: #48bb78; }
+  .pag-status.erro { border-color: rgba(224,82,82,0.2);   background: rgba(224,82,82,0.06);   color: var(--red); }
   .pag-status-dot {
-    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-    background: var(--text-3);
+    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: currentColor;
+    transition: box-shadow .2s;
   }
-  .pag-status-dot.ok { background: #48bb78; box-shadow: 0 0 6px rgba(72,187,120,0.5); }
-  .pag-status-dot.erro { background: var(--red); }
-  .pag-status-text { flex: 1; font-size: 12px; color: var(--text-2); }
+  .pag-status.ok .pag-status-dot   { box-shadow: 0 0 7px rgba(72,187,120,0.7); }
+  .pag-status.erro .pag-status-dot { box-shadow: 0 0 7px rgba(224,82,82,0.6); }
+
+  /* Bloco webhook — linha horizontal separada */
+  .pag-webhook {
+    border-radius: 12px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.02);
+  }
+  .pag-webhook-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 12px; font-weight: 600; color: var(--text-2);
+  }
+  .pag-webhook-url {
+    padding: 10px 16px; display: flex; align-items: center; gap: 10px;
+    font-family: 'DM Mono', monospace; font-size: 10.5px; color: var(--gold);
+    background: rgba(200,165,94,0.05); word-break: break-all; line-height: 1.5;
+  }
+  .pag-copy-url {
+    flex-shrink: 0; background: rgba(200,165,94,0.1); border: 1px solid rgba(200,165,94,0.25);
+    border-radius: 7px; padding: 5px 9px; cursor: pointer; color: var(--gold);
+    font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 5px;
+    transition: all .13s; font-family: 'DM Sans', sans-serif; white-space: nowrap;
+  }
+  .pag-copy-url:hover { background: rgba(200,165,94,0.18); }
+
+  /* Fluxo visual */
+  .pag-flow {
+    display: flex; align-items: center; gap: 6px;
+    padding: 12px 16px; flex-wrap: wrap;
+    border-top: 1px solid rgba(255,255,255,0.04);
+  }
+  .pag-flow-step {
+    font-size: 10.5px; color: var(--text-3); font-weight: 500;
+    background: rgba(255,255,255,0.04); border-radius: 6px; padding: 4px 9px;
+    white-space: nowrap;
+  }
+  .pag-flow-arrow { color: var(--text-3); flex-shrink: 0; }
+
+  /* Botão tutorial */
   .pag-btn-tutorial {
     display: inline-flex; align-items: center; gap: 8px;
-    padding: 9px 16px; border-radius: 9px;
-    background: rgba(200,165,94,0.08); border: 1px solid rgba(200,165,94,0.3);
+    padding: 10px 16px; border-radius: 10px;
+    background: rgba(200,165,94,0.07); border: 1px solid rgba(200,165,94,0.25);
     color: var(--gold); font-size: 12px; font-weight: 600;
-    cursor: pointer; transition: all .15s;
-    font-family: 'DM Sans', sans-serif;
+    cursor: pointer; transition: all .15s; font-family: 'DM Sans', sans-serif;
+    align-self: flex-start;
   }
-  .pag-btn-tutorial:hover { background: rgba(200,165,94,0.15); }
+  .pag-btn-tutorial:hover { background: rgba(200,165,94,0.14); transform: translateX(2px); }
+  .pag-btn-tutorial span  { flex: 1; }
+
+  /* Info box — versão mais sutil */
   .pag-info-box {
-    background: rgba(200,165,94,0.06); border: 1px solid rgba(200,165,94,0.2);
-    border-radius: 9px; padding: 12px 14px;
-    font-size: 12px; color: var(--text-2); line-height: 1.7;
+    font-size: 11.5px; color: var(--text-3); line-height: 1.75;
+    padding: 11px 14px; border-radius: 9px;
+    background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06);
   }
-  .pag-info-box strong { color: var(--gold); font-weight: 600; }
+  .pag-info-box strong { color: var(--text-2); font-weight: 600; }
 
   /* ── Modal Tutorial ── */
   .tut-overlay {
@@ -1297,87 +1375,81 @@ function SecaoPagamentos({ config, onSave }) {
           <div className="cfg-card-header-icon"><Zap size={15} /></div>
           <div>
             <div className="cfg-card-title">Pagamentos Online</div>
-            <div className="cfg-card-sub">Configuração de APIs de pagamento para QR Code PIX</div>
+            <div className="cfg-card-sub">Integração com gateways de pagamento para QR Code PIX</div>
           </div>
         </div>
 
-        <div className="cfg-card-body" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        <div className="cfg-card-body">
+          <div className="pag-wrap">
 
-          {/* Aviso segurança */}
-          <div className="pag-info-box">
-            <strong>🔒 Área restrita ao Administrador.</strong> O Access Token é salvo de forma segura no servidor (Firebase) e <strong>nunca é exposto ao navegador</strong> durante as transações. Todas as chamadas ao Mercado Pago passam por Cloud Functions.
-          </div>
+            <button className="pag-btn-tutorial" onClick={() => setShowTutorial(true)}>
+              <BookOpen size={13} />
+              <span>Tutorial — como cadastrar sua API de pagamento</span>
+              <ArrowRight size={13} />
+            </button>
 
-          {/* Botão tutorial */}
-          <button className="pag-btn-tutorial" onClick={() => setShowTutorial(true)}>
-            <BookOpen size={14} />
-            Tutorial para cadastrar API de pagamento
-            <ChevronRight size={13} />
-          </button>
-
-          {/* Card Mercado Pago */}
-          <div className={`pag-provedor-card ${ativo && token ? "ativo" : ""}`}>
-            <div className="pag-provedor-header">
-              <div className="pag-provedor-logo" title="Mercado Pago">
-                <span style={{ fontSize: 18 }}>💳</span>
-              </div>
-              <div className="pag-provedor-info">
-                <div className="pag-provedor-nome">Mercado Pago</div>
-                <div className="pag-provedor-sub">PIX · QR Code · Pagamento instantâneo via Cloud Functions</div>
-              </div>
-              <div className="pag-provedor-badge" style={ativo && token ? {} : { background: "var(--s3)", color: "var(--text-3)", borderColor: "var(--border)" }}>
-                {ativo && token ? "Ativo" : "Inativo"}
-              </div>
+            <div className="pag-info-box">
+              <strong>Token protegido no servidor.</strong> O Access Token nunca trafega pelo navegador durante transações — todas as chamadas ao Mercado Pago passam pelas Cloud Functions do ASSENT.
             </div>
 
-            <div className="pag-provedor-body">
-              {/* Toggle ativar */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div className={`pag-mp-block ${ativo && token ? "ativo" : ""}`}>
+              <div className="pag-mp-head">
+                <div className="pag-mp-icon">
+                  <CreditCard size={18} color="#fff" />
+                </div>
+                <div className="pag-mp-label">
+                  <div className="pag-mp-nome">Mercado Pago</div>
+                  <div className={`pag-mp-tag ${ativo && token ? "" : "inativo"}`}>
+                    {ativo && token
+                      ? <><span style={{ width: 5, height: 5, borderRadius: "50%", background: "#48bb78", display: "inline-block" }} /> Ativo</>
+                      : "Não configurado"
+                    }
+                  </div>
+                </div>
+              </div>
+
+              <div className="pag-toggle-row">
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>Ativar Pagamentos PIX</div>
-                  <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>Exibe o botão "Pagar com Pix QR Code" no PDV</div>
+                  <div className="pag-toggle-label">Aceitar pagamentos PIX</div>
+                  <div className="pag-toggle-sub">Habilita o QR Code PIX no PDV</div>
                 </div>
                 <Toggle checked={ativo} onChange={setAtivo} />
               </div>
 
-              {/* Access Token */}
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">
-                  Access Token de Produção <span className="form-label-req">*</span>
-                </label>
-                <div className="pag-token-wrap">
-                  <input
-                    type={showToken ? "text" : "password"}
-                    className="form-input"
-                    style={{ fontFamily: "'DM Mono','Courier New',monospace", fontSize: 12 }}
-                    value={token}
-                    onChange={e => { setToken(e.target.value); setTesteOk(null); }}
-                    placeholder="APP_USR-xxxxxxxxxxxxxxxxxxxx-xxxxxx-xxxxxxxxxxxxxxxxx-xxxxxxxxxx"
-                  />
-                  <button
-                    className="pag-token-toggle"
-                    onClick={() => setShowToken(s => !s)}
-                    type="button"
-                    title={showToken ? "Ocultar token" : "Exibir token"}
-                  >
-                    {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
+              <div className="pag-token-area">
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">
+                    Access Token de Produção <span className="form-label-req">*</span>
+                  </label>
+                  <div className="pag-token-wrap">
+                    <input
+                      type={showToken ? "text" : "password"}
+                      className="form-input"
+                      value={token}
+                      onChange={e => { setToken(e.target.value); setTesteOk(null); }}
+                      placeholder="APP_USR-••••••••••••••••••••••••••••••••••••••"
+                    />
+                    <button className="pag-token-toggle" onClick={() => setShowToken(s => !s)} type="button">
+                      {showToken ? <EyeOff size={13} /> : <Eye size={13} />}
+                    </button>
+                  </div>
                 </div>
-                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+
+                <div className="pag-actions">
                   <button
                     className="btn-secondary"
                     style={{ fontSize: 11, padding: "5px 12px", display: "flex", alignItems: "center", gap: 6 }}
                     onClick={handleTestar}
                     disabled={!token.trim() || testando}
-                    title="Salve o token primeiro para poder testar"
+                    title="Salve o token antes de testar"
                   >
                     {testando
-                      ? <><span className="cfg-spinner" />Testando via servidor...</>
+                      ? <><span className="cfg-spinner" />Verificando...</>
                       : testeOk === true
-                        ? <><Check size={12} color="#48bb78" />Token válido</>
+                        ? <><Check size={12} color="#48bb78" />Verificado</>
                         : testeOk === false
-                          ? <><AlertCircle size={12} color="var(--red)" />Token inválido</>
-                          : <>Testar conexão</>
+                          ? <><WifiOff size={12} color="var(--red)" />Falhou</>
+                          : <><Wifi size={12} />Testar conexão</>
                     }
                   </button>
                   <button
@@ -1386,46 +1458,57 @@ function SecaoPagamentos({ config, onSave }) {
                     onClick={handleCopiar}
                     disabled={!token}
                   >
-                    <Copy size={11} />
-                    {copiado ? "Copiado!" : "Copiar token"}
+                    <Copy size={11} />{copiado ? "Copiado!" : "Copiar token"}
                   </button>
                 </div>
-              </div>
 
-              {/* Status indicator */}
-              <div className="pag-status-row">
-                <div className={`pag-status-dot ${testeOk === true ? "ok" : testeOk === false ? "erro" : ""}`} />
-                <div className="pag-status-text">
+                <div className={`pag-status ${testeOk === true ? "ok" : testeOk === false ? "erro" : ""}`}>
+                  <span className="pag-status-dot" />
                   {testeOk === true
-                    ? "✅ Cloud Function conectada ao Mercado Pago com sucesso"
+                    ? "Cloud Function conectada ao Mercado Pago com sucesso"
                     : testeOk === false
-                      ? "❌ Falha na conexão — verifique o token e se o webhook está registrado"
+                      ? "Falha — verifique o token e o webhook"
                       : token
-                        ? "Salve o token e clique em 'Testar conexão' para validar"
+                        ? "Salve e clique em Testar conexão para validar"
                         : "Nenhum token configurado"
                   }
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Webhook info */}
-          <div className="pag-info-box">
-            <strong>⚡ Webhook obrigatório.</strong> Para a confirmação automática funcionar, registre a URL abaixo no painel do Mercado Pago em <strong>Webhooks → Pagamentos</strong>:<br/>
-            <code style={{ display: "block", marginTop: 8, padding: "6px 10px", background: "rgba(200,165,94,0.1)", borderRadius: 6, fontSize: 11, wordBreak: "break-all" }}>
-              https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook
-            </code>
-          </div>
+            <div className="pag-webhook">
+              <div className="pag-webhook-head">
+                <ServerCog size={13} />
+                Webhook — registre no painel do Mercado Pago
+              </div>
+              <div className="pag-webhook-url">
+                <span style={{ flex: 1 }}>
+                  https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook
+                </span>
+                <button
+                  className="pag-copy-url"
+                  onClick={() => navigator.clipboard.writeText("https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook")}
+                >
+                  <Copy size={10} /> Copiar
+                </button>
+              </div>
+              <div className="pag-flow">
+                {["Cliente paga o PIX", "MP notifica webhook", "Cloud Function", "Firestore atualiza"].map((s, i, arr) => (
+                  <span key={s} style={{ display: "contents" }}>
+                    <span className="pag-flow-step">{s}</span>
+                    <ArrowRight size={11} className="pag-flow-arrow" />
+                  </span>
+                ))}
+                <span className="pag-flow-step" style={{ color: "#48bb78" }}>Venda finalizada ✓</span>
+              </div>
+            </div>
 
-          {/* Como funciona */}
-          <div className="pag-info-box">
-            <strong>Como funciona:</strong> Quando o cliente escanear o QR Code e pagar, o Mercado Pago notifica o ASSENT via webhook → Cloud Function atualiza o Firestore → PDV detecta e <strong>finaliza a venda automaticamente</strong>. O token nunca é exposto — todas as chamadas ao MP passam pelo servidor.
           </div>
         </div>
 
         <div className="cfg-card-footer">
           <button className="btn-primary" onClick={handleSalvar} disabled={salvando || !token.trim()}>
-            {salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Configuração</>}
+            {salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar</>}
           </button>
         </div>
       </div>
