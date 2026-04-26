@@ -1,1994 +1,2811 @@
-/* ═══════════════════════════════════════════════════
-   ASSENT v2.0 — Configuracoes.jsx
-   Estrutura: users/{uid}/config/geral (doc único, merge)
+              /* ═══════════════════════════════════════════════════
+   ASSENT v2.0 — Dashboard.jsx  (responsivo)
+   ─────────────────────────────────────────────────
+   ✓ Sidebar recolhível (ícones + tooltip no modo colapsado)
+   ✓ Header global com usuário, avatar e dropdown
+   ✓ Logo dinâmica via useEmpresa (Firestore, reativa)
+   ✓ Dashboard data-driven via useDashboardData
+   ✓ Grid responsivo com melhor espaçamento
+   ✓ Bottom Nav para mobile (< 720px)
+   ✓ Overlay sidebar para mobile
+   ✓ CSS responsivo global injetado via useEffect
    ═══════════════════════════════════════════════════ */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
-  Building2, Lock, CreditCard, LayoutDashboard, Package,
-  Eye, EyeOff, Check, AlertCircle, Save,
-  ChevronRight, Camera, Shield, Keyboard, Activity,
-  Filter, RefreshCw, Search, ChevronDown,
-  Zap, Copy, ExternalLink, BookOpen, X, CheckCircle2,
-  Wallet, ArrowRight, ServerCog, Wifi, WifiOff,
+  AreaChart, Area, XAxis, YAxis, Tooltip, Legend,
+  ResponsiveContainer, PieChart, Pie, Cell,
+  BarChart, Bar, LineChart, Line,
+  RadarChart, Radar, PolarGrid, PolarAngleAxis,
+  CartesianGrid,
+} from "recharts";
+import {
+  LayoutDashboard, Users, Package, Wrench, ArrowDownToLine,
+  ShoppingCart, Clock, Wallet, TrendingDown, Truck, BarChart3,
+  Calendar, Settings, Zap, UserCheck, UserPlus, Search, ArrowUpRight,
+  ArrowDownRight, ChevronRight, Bell, LogOut, ChevronDown,
+  PanelLeftClose, PanelLeftOpen, Menu, X, Sun, Moon, LayoutGrid, GraduationCap, TrendingUp, Barcode,
 } from "lucide-react";
 
-import { db, functions } from "../lib/firebase";
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { useAuth } from "../contexts/AuthContext";
-import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, startAfter } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
-import {
-  reauthenticateWithCredential,
-  EmailAuthProvider,
-  updatePassword,
-} from "firebase/auth";
+/* ── Módulos ───────────────────────────────────── */
+import Clientes      from "./modules/Clientes.jsx";
+import Produtos      from "./modules/Produtos.jsx";
+import Servicos      from "./modules/Servicos.jsx";
+import Vendedores    from "./modules/Vendedores.jsx";
+import Vendas        from "./modules/Vendas.jsx";
+import Configuracoes from "./modules/Configuracoes.jsx";
+import Despesas      from "./modules/Despesas.jsx";
+import EntradaEstoque from "./modules/EntradaEstoque.jsx";
+import Agenda        from "./modules/Agenda/Agenda.jsx";
+import Fornecedores  from "./modules/Fornecedores.jsx";
+import AReceber      from "./modules/AReceber.jsx";
+import Relatorios    from "./components/Relatorios.jsx";
+import CaixaDiario   from "./modules/CaixaDiario.jsx";
+import Orcamentos    from "./modules/Orcamentos.jsx";
+import Usuarios      from "./modules/Usuarios.jsx";
+import Compras       from "./modules/Compras.jsx";
+import Mesas         from "./modules/Mesas.jsx";
+import Alunos        from "./modules/Alunos.jsx";
+import PDV          from "./modules/PDV.jsx";
 
-/* ── Validadores CPF / CNPJ ── */
-const validarCPF = (cpf) => {
-  cpf = cpf.replace(/\D/g, "");
-  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
-  let soma = 0;
-  for (let i = 0; i < 9; i++) soma += parseInt(cpf[i]) * (10 - i);
-  let resto = soma % 11;
-  const d1 = resto < 2 ? 0 : 11 - resto;
-  if (d1 !== parseInt(cpf[9])) return false;
-  soma = 0;
-  for (let i = 0; i < 10; i++) soma += parseInt(cpf[i]) * (11 - i);
-  resto = soma % 11;
-  const d2 = resto < 2 ? 0 : 11 - resto;
-  return d2 === parseInt(cpf[10]);
-};
+import RotaProtegida from "./contexts/RotaProtegida";
+import { usePermissao } from "./hooks/usePermissao";
 
-const validarCNPJ = (cnpj) => {
-  cnpj = cnpj.replace(/\D/g, "");
-  if (cnpj.length !== 14 || /^(\d)\1+$/.test(cnpj)) return false;
-  let t = cnpj.length - 2;
-  let n = cnpj.substring(0, t);
-  let d = cnpj.substring(t);
-  let s = 0, p = t - 7;
-  for (let i = t; i >= 1; i--) { s += parseInt(n.charAt(t - i)) * p--; if (p < 2) p = 9; }
-  let r = s % 11 < 2 ? 0 : 11 - (s % 11);
-  if (r !== parseInt(d.charAt(0))) return false;
-  t++; n = cnpj.substring(0, t); s = 0; p = t - 7;
-  for (let i = t; i >= 1; i--) { s += parseInt(n.charAt(t - i)) * p--; if (p < 2) p = 9; }
-  r = s % 11 < 2 ? 0 : 11 - (s % 11);
-  return r === parseInt(d.charAt(1));
-};
+/* ── Firebase ──────────────────────────────────── */
+import { db, logout } from "./lib/firebase";
+import { useAuth } from "./contexts/AuthContext";
+import { doc, onSnapshot, collection, query, orderBy, limit } from "firebase/firestore";
 
-/* ══════════════════════════════════════════════════════
+/* ── Hooks de dados ────────────────────────────── */
+import { useDashboardData, fmtR$, fmtData } from "./hooks/useDashboardData";
+import { useEmpresa }                        from "./hooks/useEmpresa";
+import { useLicenca }                        from "./hooks/useLicenca";
+
+/* ═══════════════════════════════════════════════
    CONSTANTES
-   ══════════════════════════════════════════════════════ */
-const MENU_SECTIONS = [
-  { key: "dashboard",       label: "Dashboard",         sub: "Visão geral e KPIs",       icon: "📊", locked: true  },
-  { key: "clientes",        label: "Clientes",           sub: "Cadastro e histórico",     icon: "👥", locked: false },
-  { key: "produtos",        label: "Produtos",           sub: "Catálogo de produtos",     icon: "📦", locked: false },
-  { key: "servicos",        label: "Serviços",           sub: "Catálogo de serviços",     icon: "🔧", locked: false },
-  { key: "entrada_estoque", label: "Estoque",             sub: "Movimentação de entrada",  icon: "📥", locked: false },
-  { key: "vendas",          label: "Vendas",             sub: "PDV e registro de vendas",       icon: "🛒", locked: false },
-  { key: "pdv",            label: "PDV",                sub: "Ponto de Venda (leitor de código)", icon: "🏪", locked: false },
-  { key: "mesas",           label: "Mesas",              sub: "Gestão de mesas e comandas",     icon: "🪑", locked: false },
-  { key: "matriculas",      label: "Matrículas",         sub: "Alunos e mensalidades",          icon: "🎓", locked: false },
-  { key: "fiado",           label: "A Receber",           sub: "Contas a receber",         icon: "💳", locked: false },
-  { key: "caixa",           label: "Caixa Diário",       sub: "Abertura e fechamento",    icon: "💰", locked: false },
-  { key: "despesas",        label: "Despesas",           sub: "Controle de saídas",       icon: "📉", locked: false },
-  { key: "fornecedores",    label: "Fornecedores",       sub: "Cadastro de fornecedores", icon: "🏭", locked: false },
-  { key: "relatorios",      label: "Relatórios",         sub: "Análises e exportações",   icon: "📈", locked: false },
-  { key: "agenda",          label: "Agenda",             sub: "Compromissos e tarefas",   icon: "📅", locked: false },
-  { key: "orcamentos",         label: "Orçamentos",      sub: "Orçamentos",            icon: "⚡", locked: false },
-  { key: "vendedores",      label: "Vendedores",         sub: "Equipe de vendas",         icon: "👔", locked: false },
-   
-  { key: "config",          label: "Configurações",      sub: "Esta tela",                icon: "⚙️", locked: true  },
+   ═══════════════════════════════════════════════ */
+
+const PERIODS = ["Hoje", "7 dias", "30 dias", "Este mês", "Todos", "Personalizado"];
+
+const KEY_MAP = {
+  "Dashboard":          "dashboard",
+  "Clientes":           "clientes",
+  "Produtos":           "produtos",
+  "Serviços":           "servicos",
+  "Estoque":           "entrada_estoque",
+  "Vendas":             "vendas",
+  "Matriculas":            "matriculas",
+  "Fiado / A Receber":  "fiado",
+  "Caixa Diário":       "caixa",
+  "Despesas":           "despesas",
+  "Fornecedores":       "fornecedores",
+  "Relatórios":         "relatorios",
+  "Agenda":             "agenda",
+  "Orçamentos":         "orcamentos",
+  "Vendedores":         "vendedores",
+  "Usuários":           "usuarios",
+  "Configurações":      "config",
+   "Compras":           "compras",
+   "Mesas":             "mesas",
+  "PDV":              "pdv",
+};
+
+const ATALHOS_TECLADO = [
+  { code: "KeyD", label: "Dashboard",           dbKey: "dashboard"       },
+  { code: "KeyC", label: "Clientes",            dbKey: "clientes"        },
+  { code: "KeyP", label: "Produtos",            dbKey: "produtos"        },
+  { code: "KeyS", label: "Serviços",            dbKey: "servicos"        },
+  { code: "KeyE", label: "Estoque",             dbKey: "entrada_estoque" },
+  { code: "KeyV", label: "Vendas",              dbKey: "vendas"          },
+  { code: "KeyF", label: "A Receber",           dbKey: "fiado"           },
+  { code: "KeyH", label: "Matriculas",          dbKey: "matriculas"      },
+  { code: "KeyX", label: "Caixa Diário",        dbKey: "caixa"           },
+  { code: "KeyZ", label: "Despesas",            dbKey: "despesas"        },
+  { code: "KeyN", label: "Fornecedores",        dbKey: "fornecedores"    },
+  { code: "KeyR", label: "Relatórios",          dbKey: "relatorios"      },
+  { code: "KeyA", label: "Agenda",              dbKey: "agenda"          },
+  { code: "KeyO", label: "Orçamentos",          dbKey: "orcamentos"      },
+  { code: "KeyM", label: "Vendedores",          dbKey: "vendedores"      },
+  { code: "KeyU", label: "Usuários",            dbKey: "usuarios"        },
+  { code: "KeyG", label: "Configurações",       dbKey: "config"          },
+  { code: "KeyT", label: "Mesas",               dbKey: "mesas"           },
+  { code: "KeyB", label: "PDV",                 dbKey: "pdv"             },
 ];
 
-const TAXAS_DEFAULT = {
-  debito:     "1.99",
-  pix:        "0.00",
-  credito_1:  "2.99",
-  credito_2:  "3.19",
-  credito_3:  "3.39",
-  credito_4:  "3.59",
-  credito_5:  "3.79",
-  credito_6:  "3.99",
-  credito_7:  "4.19",
-  credito_8:  "4.39",
-  credito_9:  "4.59",
-  credito_10: "4.79",
-  credito_11: "4.99",
-  credito_12: "5.19",
-};
+const LOCKED_KEYS  = new Set(["dashboard", "config"]);
+const ATALHO_LOOKUP = Object.fromEntries(ATALHOS_TECLADO.map(a => [a.code, a]));
 
 const NAV = [
-  { id: "empresa",    label: "Empresa",             icon: Building2      },
-  { id: "seguranca",  label: "Segurança",            icon: Shield         },
-  { id: "financeiro", label: "Financeiro",           icon: CreditCard     },
-  { id: "pagamentos", label: "Pagamentos Online",    icon: Zap            },
-  { id: "menu",       label: "Menu do Sistema",      icon: LayoutDashboard},
-  { id: "estoque",    label: "Estoque",              icon: Package        },
-  { id: "atalhos",    label: "Atalhos",              icon: Keyboard       },
-  { id: "log",        label: "Log de Atividades",    icon: Activity       },
+  { section: "BÁSICO", items: [
+    { label: "Dashboard",       modulo: "dashboard",       icone: LayoutDashboard,  secao: "PRINCIPAL" },
+    { label: "Clientes",        modulo: "clientes",         icone: Users,            secao: "PRINCIPAL" },
+   { label: "Produtos",        modulo: "produtos",         icone: Package,          secao: "ESTOQUE"   },
+    { label: "Serviços",        modulo: "servicos",         icone: Wrench,           secao: "ESTOQUE"   },
+  ]},
+  { section: "OPERAÇÕES", items: [
+    { label: "Estoque", modulo: "entradaEstoque",   icone: ArrowDownToLine,  secao: "ESTOQUE"   },
+    { label: "Vendas",          modulo: "vendas",           icone: TrendingDown,       secao: "COMERCIAL" },
+    { label: "PDV",            modulo: "pdv",              icone: Barcode,            secao: "COMERCIAL" },
+    { label: "A Receber",       modulo: "aReceber",         icone: Clock,            secao: "FINANCEIRO"},
+    {label: "Matriculas",       modulo: "alunos",       icone: GraduationCap,    secao: "COMERCIAL" }, 
+   { label: "Compras",         modulo: "compras",          icone: ShoppingCart,     secao: "COMERCIAL" },
+    { label: "Mesas",           modulo: "mesas",            icone: LayoutGrid,       secao: "OPERAÇÕES"  },
+    { label: "Caixa Diário",    modulo: "caixaDiario",      icone: Wallet,           secao: "FINANCEIRO"},
+    { label: "Despesas",        modulo: "despesas",         icone: ArrowDownRight,          secao: "FINANCEIRO"},
+   { label: "Fornecedores",    modulo: "fornecedores",     icone: Truck,            secao: "ESTOQUE"   },
+  ]},
+  { section: "ANÁLISE", items: [
+    { label: "Relatórios",      modulo: "relatorios",       icone: BarChart3,        secao: "FINANCEIRO"},
+    { label: "Agenda",          modulo: "agenda",           icone: Calendar,         secao: "PRINCIPAL" },
+  ]},
+  { section: "SISTEMA", items: [
+    { label: "Orçamentos",      modulo: "orcamentos",       icone: Zap,         secao: "COMERCIAL" },
+    { label: "Vendedores",      modulo: "vendedores",       icone: UserCheck,          secao: "COMERCIAL" },
+    { label: "Usuários",        modulo: "usuarios",         icone: UserPlus,         secao: "SISTEMA"   },
+    { icone: Settings, label: "Configurações" },
+  ]},
 ];
 
-/* ══════════════════════════════════════════════════════
-   MAPEAMENTO DE ATALHOS DE TECLADO
-   Combinação: Alt + tecla → navega para o módulo
-   ══════════════════════════════════════════════════════ */
-export const ATALHOS_MAP = [
-  { code: "KeyD", display: "Alt + D", key: "dashboard",       hint: "Dashboard"           },
-  { code: "KeyC", display: "Alt + C", key: "clientes",        hint: "Clientes"             },
-  { code: "KeyP", display: "Alt + P", key: "produtos",        hint: "Produtos"             },
-  { code: "KeyS", display: "Alt + S", key: "servicos",        hint: "Serviços"             },
-  { code: "KeyE", display: "Alt + E", key: "entrada_estoque", hint: "Entrada"              },
-  { code: "KeyV", display: "Alt + V", key: "vendas",          hint: "Vendas"               },
-   { code: "KeyH", display: "Alt + U", key: "matriculas",      hint: "matrícUlas (alunos)" },
-  { code: "KeyF", display: "Alt + F", key: "fiado",           hint: "Fiado (F de Fiado)"   },
-  { code: "KeyX", display: "Alt + X", key: "caixa",           hint: "Caixa (Cx)"           },
-  { code: "KeyZ", display: "Alt + Z", key: "despesas",        hint: "Despesas"             },
-  { code: "KeyN", display: "Alt + N", key: "fornecedores",    hint: "forNecedores"         },
-  { code: "KeyR", display: "Alt + R", key: "relatorios",      hint: "Relatórios"           },
-  { code: "KeyA", display: "Alt + A", key: "agenda",          hint: "Agenda"               },
-  { code: "KeyO", display: "Alt + O", key: "orcamentos",      hint: "Orçamentos"           },
-  { code: "KeyM", display: "Alt + M", key: "vendedores",      hint: "equipe (Membros)"     },
-  { code: "KeyT", display: "Alt + T", key: "mesas",           hint: "Mesas (T de Table)"   },
-  { code: "KeyB", display: "Alt + B", key: "pdv",             hint: "PDV (B de Barcode)"   },
-  { code: "KeyG", display: "Alt + G", key: "config",          hint: "confiGurações"        },
+/* Itens do bottom nav mobile */
+const BOTTOM_NAV = [
+  { icone: LayoutDashboard, label: "Dashboard" },
+  { icone: Users,           label: "Clientes"  },
+  { icone: ShoppingCart,    label: "Vendas"    },
+  { icone: Calendar,        label: "Agenda"    },
 ];
 
-/* Lookup rápido: code → key do módulo */
-const ATALHO_LOOKUP = Object.fromEntries(ATALHOS_MAP.map(a => [a.code, a.key]));
-
-/* ══════════════════════════════════════════════════════
-   HOOK: useAtalhosTeclado
-   Deve ser chamado no App.jsx (raiz), onde setModule e
-   menuVisivel já existem. Zero dependência de Configuracoes.
-   ══════════════════════════════════════════════════════ */
-export function useAtalhosTeclado(setModule, menuVisivel = {}) {
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      /* 1. Apenas combinações Alt + tecla */
-      if (!e.altKey) return;
-
-      /* 2. Ignorar se foco está em campo de texto */
-      const tag = document.activeElement?.tagName;
-      if (
-        tag === "INPUT"    ||
-        tag === "TEXTAREA" ||
-        document.activeElement?.isContentEditable
-      ) return;
-
-      /* 3. Verificar se o código tem atalho mapeado */
-      const moduleKey = ATALHO_LOOKUP[e.code];
-      if (!moduleKey) return;
-
-      /* 4. Verificar visibilidade do módulo */
-      const section = MENU_SECTIONS.find(s => s.key === moduleKey);
-      if (!section) return;
-      /* Módulos locked são sempre visíveis; os outros precisam estar ativos */
-      if (!section.locked && menuVisivel[moduleKey] === false) return;
-
-      /* 5. Navegar — previne ação padrão do navegador (ex: Alt+F abre menu) */
-      e.preventDefault();
-      setModule(moduleKey);
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  /* eslint-disable-next-line react-hooks/exhaustive-deps */
-  }, [setModule, menuVisivel]);
+/* ═══════════════════════════════════════════════
+   CSS RESPONSIVO GLOBAL
+   Injetado via useEffect no final do <head>
+   para garantir precedência sobre os CSS
+   dos módulos (que são injetados dinamicamente).
+   ═══════════════════════════════════════════════ */
+const RESPONSIVE_CSS = `
+/* ── MODAL: bottom sheet no mobile ── */
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: 0 !important;
+    align-items: flex-end !important;
+  }
+  .modal-box,
+  .modal-box-xl,
+  .modal-box-lg,
+  .modal-box-md,
+  .modal-box-sm {
+    max-width: 100% !important;
+    width: 100% !important;
+    border-radius: 16px 16px 0 0 !important;
+    max-height: 88vh !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-bottom: none !important;
+  }
+  .modal-header {
+    padding: 16px 16px 12px !important;
+  }
+  .modal-body {
+    padding: 14px 16px !important;
+  }
+  .modal-footer {
+    padding: 12px 16px !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  /* EventoModal grid de detalhes */
+  div[style*="grid-template-columns: 1fr 1fr"] {
+    grid-template-columns: 1fr !important;
+  }
 }
 
-/* ══════════════════════════════════════════════════════
-   CSS
-   ══════════════════════════════════════════════════════ */
-const CSS = `
-  @keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
-  @keyframes slideUp {
-    from { opacity: 0; transform: translateY(14px) }
-    to   { opacity: 1; transform: translateY(0) }
+/* ── FORM ROWS ── */
+@media (max-width: 480px) {
+  .form-row,
+  .form-row-3 {
+    grid-template-columns: 1fr !important;
   }
-  @keyframes spin { to { transform: rotate(360deg) } }
+}
 
+/* ── TOPBARS DE MÓDULOS ── */
+@media (max-width: 640px) {
+  .cl-topbar,
+  .vd-topbar,
+  .cx-topbar,
+  .ar-topbar,
+  .desp-topbar,
+  .ee-topbar,
+  .fn-topbar,
+  .pd-topbar,
+  .sv-topbar,
+  .orc-topbar,
+  .cfg-topbar {
+    flex-wrap: wrap !important;
+    padding: 10px 14px !important;
+    gap: 8px !important;
+  }
+
+  /* Barras de busca full-width */
+  .cl-search,
+  .vd-search,
+  .cx-search,
+  .ar-search,
+  .desp-search,
+  .ee-search,
+  .fn-search,
+  .pd-search,
+  .sv-search,
+  .orc-search {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 1 1 100% !important;
+    min-width: 0 !important;
+    order: 5;
+  }
+
+  /* Grupos de botões à direita vão para baixo */
+  .vd-topbar-right,
+  .cx-topbar-right,
+  .fn-topbar-right,
+  .sv-topbar-actions,
+  .orc-topbar-right,
+  .cl-topbar-right,
+  .ar-topbar-right,
+  .desp-topbar-right,
+  .ee-topbar-right,
+  .pd-topbar-right {
+    margin-left: 0 !important;
+    flex-wrap: wrap !important;
+    width: 100%;
+    justify-content: flex-end;
+    order: 6;
+  }
+
+  /* Fallback: botão "Novo" direto na topbar (sem wrapper div) */
+  .cl-topbar > button:last-child,
+  .ar-topbar > button:last-child,
+  .desp-topbar > button:last-child,
+  .ee-topbar > button:last-child,
+  .pd-topbar > button:last-child {
+    margin-left: auto !important;
+    order: 6 !important;
+  }
+}
+
+/* ── TABELAS: scroll horizontal ── */
+@media (max-width: 640px) {
+  .cl-table-wrap,
+  .vd-table-wrap,
+  .cx-table-wrap,
+  .ar-table-wrap,
+  .desp-table-wrap,
+  .ee-table-wrap,
+  .fn-table-wrap,
+  .pd-table-wrap,
+  .sv-table-wrap,
+  .orc-table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Larguras mínimas para que as linhas não squish */
+  .cl-row, .cl-row-head     { min-width: 660px; }
+  .vd-row, .vd-row-head     { min-width: 680px; }
+  .cx-row, .cx-row-head     { min-width: 600px; }
+  .ar-row, .ar-row-head     { min-width: 700px; }
+  .desp-row, .desp-row-head { min-width: 680px; }
+  .ee-row,  .ee-row-head    { min-width: 660px; }
+  .fn-row,  .fn-row-head    { min-width: 640px; }
+  .pd-row,  .pd-row-head    { min-width: 580px; }
+  .sv-row,  .sv-row-head    { min-width: 560px; }
+  .orc-row, .orc-row-head   { min-width: 620px; }
+
+  /* Barra de filtros de período (Vendas, CaixaDiário) */
+  .vd-periods,
+  .cx-periods,
+  .desp-filters {
+    padding: 8px 14px !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+  .vd-period-sep { display: none !important; }
+
+  /* AReceber: KPIs em 2 colunas */
+  .ar-kpis { grid-template-columns: 1fr 1fr !important; }
+
+  /* Filtros de status / categoria */
+  .ar-filter-group,
+  .fn-filters,
+  .orc-filters {
+    padding: 8px 14px !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* AReceber: KPIs em 1 coluna */
+  .ar-kpis       { grid-template-columns: 1fr !important; }
+  /* CaixaDiário: cards em 1 coluna */
+  .cx-cards      { grid-template-columns: 1fr !important; }
+}
+
+/* ── AGENDA ── */
+@media (max-width: 640px) {
+  .ag-main { overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
+  .ag-page { overflow: auto !important; }
+
+  /* Topbar da Agenda */
+  .ag-topbar {
+    flex-wrap: wrap !important;
+    padding: 10px 14px !important;
+    gap: 8px !important;
+  }
+  .ag-topbar-right {
+    margin-left: 0 !important;
+    flex: 1 1 100% !important;
+    justify-content: flex-start !important;
+  }
+
+  /* Filtros */
+  .ag-filtros { flex-wrap: wrap !important; }
+
+  /* KPIs resumo: 2 cols */
+  .ag-resumo { grid-template-columns: 1fr 1fr !important; }
+
+  /* Lista horizontal scroll */
+  .ag-lista-wrap { overflow-x: auto !important; }
+  .ag-row, .ag-row-head { min-width: 720px !important; }
+
+  /* Calendário */
+  .ag-cal-wrap { overflow-x: auto !important; }
+  .ag-cal-grid { min-width: 360px !important; }
+  .ag-cal-cell { min-height: 48px !important; }
+  .ag-cal-evento { font-size: 9px !important; }
+}
+@media (max-width: 480px) {
+  .ag-resumo { grid-template-columns: 1fr !important; }
+  .ag-content { padding: 12px !important; }
+}
+
+/* ── RELATÓRIOS ── */
+@media (max-width: 640px) {
+  .rel-root { overflow: visible !important; height: auto !important; }
+  .rel-topbar {
+    flex-wrap: wrap !important;
+    padding: 10px 14px !important;
+    gap: 10px !important;
+  }
+  .rel-topbar-left { flex: 1 1 100% !important; order: 1; }
+  .rel-actions     { order: 2; flex: 1 1 100% !important; justify-content: flex-end !important; }
+
+  .rel-body {
+    flex-direction: column !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+  .rel-nav {
+    width: 100% !important;
+    min-width: 0 !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border) !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 8px 10px !important;
+    gap: 4px !important;
+    flex-shrink: 0 !important;
+    height: auto !important;
+    min-height: unset !important;
+  }
+  .rel-nav-label   { display: none !important; }
+  .rel-nav-btn {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    padding: 7px 12px !important;
+  }
+  .rel-content {
+    padding: 14px !important;
+    overflow-y: visible !important;
+    height: auto !important;
+    flex: none !important;
+  }
+
+  /* CardResumo: 2 colunas */
+  .cr-grid { grid-template-columns: 1fr 1fr !important; }
+
+  /* TabelaRelatorio scroll */
+  .tr-wrap  { overflow-x: auto !important; }
+  .tr-head, .tr-row { min-width: 480px !important; }
+}
+@media (max-width: 480px) {
+  .cr-grid { grid-template-columns: 1fr !important; }
+}
+
+/* ── CONFIGURAÇÕES ── */
+@media (max-width: 640px) {
   .cfg-root {
-    display: flex; flex-direction: column;
-    height: 100vh; width: 100%; overflow: hidden;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 100% !important;
   }
   .cfg-topbar {
-    padding: 14px 22px;
-    background: var(--s1); border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 14px; flex-shrink: 0;
+    flex-wrap: wrap !important;
+    padding: 10px 14px !important;
+    gap: 8px !important;
   }
-  .cfg-topbar-title h1 {
-    font-family: 'Sora', sans-serif; font-size: 17px; font-weight: 600; color: var(--text);
-  }
-  .cfg-topbar-title p { font-size: 11px; color: var(--text-2); margin-top: 2px; }
-
   .cfg-body {
-    display: flex; flex: 1;
-    overflow: hidden; min-height: 0;
+    flex-direction: column !important;
+    overflow: visible !important;
+    height: auto !important;
   }
   .cfg-nav {
-    width: 220px; flex-shrink: 0;
-    background: var(--s1); border-right: 1px solid var(--border);
-    padding: 16px 10px; display: flex; flex-direction: column; gap: 2px;
-    overflow-y: auto;
+    width: 100% !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border) !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding: 8px 10px !important;
+    gap: 4px !important;
+    flex-shrink: 0 !important;
+    height: auto !important;
+  }
+  .cfg-nav-group-label { display: none !important; }
+  .cfg-nav-item {
+    white-space: nowrap !important;
+    flex-shrink: 0 !important;
+    width: auto !important;
+    padding: 7px 12px !important;
+    min-width: unset !important;
+    border-radius: 8px !important;
+    border: 1px solid transparent !important;
   }
   .cfg-panel {
-    flex: 1; overflow-y: auto; padding: 24px;
-    display: flex; flex-direction: column; gap: 20px;
-    animation: fadeIn .18s ease; 
-    height: 100%;
+    padding: 14px !important;
+    overflow: visible !important;
+    height: auto !important;
   }
-  .cfg-panel::-webkit-scrollbar { width: 3px; }
-  .cfg-panel::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
-
-  .cfg-nav-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 12px; border-radius: 9px; cursor: pointer;
-    font-family: 'DM Sans', sans-serif; font-size: 13px;
-    color: var(--text-2); border: 1px solid transparent;
-    transition: all .13s; background: transparent;
-    text-align: left; width: 100%;
-  }
-  .cfg-nav-item:hover { background: var(--s2); color: var(--text); }
-  .cfg-nav-item.active { background: var(--s2); color: var(--text); border-color: var(--border-h); }
-  .cfg-nav-item.active .cfg-nav-icon { color: var(--gold); }
-  .cfg-nav-label { flex: 1; }
-  .cfg-nav-icon  { flex-shrink: 0; }
-  .cfg-nav-group-label {
-    font-size: 10px; font-weight: 600; letter-spacing: .07em;
-    text-transform: uppercase; color: var(--text-3);
-    padding: 0 12px; margin-bottom: 4px; margin-top: 8px;
-  }
-
-  .cfg-card {
-    background: var(--s1); border: 1px solid var(--border);
-    border-radius: 14px; overflow: hidden; animation: slideUp .18s ease;
-    flex-shrink: 0;
-  }
-  .cfg-card-header {
-    padding: 16px 20px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 10px;
-  }
-  .cfg-card-header-icon {
-    width: 32px; height: 32px; border-radius: 8px;
-    background: var(--s3); border: 1px solid var(--border-h);
-    display: flex; align-items: center; justify-content: center; color: var(--gold);
-  }
-  .cfg-card-title {
-    font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; color: var(--text);
-  }
-  .cfg-card-sub { font-size: 11px; color: var(--text-2); margin-top: 1px; }
-  .cfg-card-body { padding: 20px; }
+  .cfg-card-body { padding: 14px !important; }
   .cfg-card-footer {
-    padding: 13px 20px; border-top: 1px solid var(--border);
-    display: flex; justify-content: flex-end; gap: 10px; background: var(--s2);
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    justify-content: flex-end !important;
   }
+}
 
-  .form-group  { margin-bottom: 16px; }
-  .form-group:last-child { margin-bottom: 0; }
-  .form-label {
-    display: block; font-size: 10px; font-weight: 600;
-    letter-spacing: .07em; text-transform: uppercase;
-    color: var(--text-2); margin-bottom: 7px;
+/* ── FILTRO DE PERÍODO ── */
+@media (max-width: 640px) {
+  .fp-wrap  { flex-wrap: wrap !important; gap: 8px !important; }
+  .fp-btns  { flex-wrap: wrap !important; }
+  .fp-custom {
+    width: 100% !important;
+    flex-wrap: wrap !important;
   }
-  .form-label-req { color: var(--gold); margin-left: 2px; }
-  .form-input {
-    width: 100%; background: var(--s2);
-    border: 1px solid var(--border); border-radius: 9px;
-    padding: 10px 13px; color: var(--text); font-size: 13px;
+  .fp-date {
+    flex: 1 !important;
+    min-width: 120px !important;
+  }
+}
+
+/* ── DASHBOARD ESPECÍFICO ── */
+@media (max-width: 720px) {
+  .ag-search  { display: none !important; }
+  .ag-periods { display: none !important; }
+  .ag-custom-range { display: none !important; }
+  .ag-despesa-grid { grid-template-columns: 1fr 1fr !important; }
+  .ag-mini-cards-mobile { display: none !important; }
+  .ag-period-mobile { display: flex !important; }
+}
+@media (min-width: 721px) {
+  .ag-period-mobile { display: none !important; }
+}
+@media (max-width: 480px) {
+  .ag-despesa-grid { grid-template-columns: 1fr !important; }
+}
+
+/* ── MOBILE BOTTOM NAV ── */
+@media (max-width: 720px) {
+  .ag-app { padding-bottom: 0 !important; }
+  .ag-content { padding-bottom: 76px !important; }
+  .ag-mobile-nav { display: flex !important; }
+}
+`;
+
+/* ═══════════════════════════════════════════════
+   CSS DO DASHBOARD (layout base)
+   ═══════════════════════════════════════════════ */
+const CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Sora:wght@300;400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body, #root { height: 100%; width: 100%; margin: 0; padding: 0; }
+
+  :root {
+    --bg:           #09090c;
+    --s1:           #0f0f13;
+    --s2:           #141419;
+    --s3:           #1a1a22;
+    --border:       rgba(255,255,255,0.07);
+    --border-h:     rgba(255,255,255,0.13);
+    --gold:         #c8a55e;
+    --gold-l:       #dfc07c;
+    --gold-d:       rgba(200,165,94,0.12);
+    --gold-brand:   #D4AF37;
+    --text:         #edeae3;
+    --text-2:       #a09caa;
+    --text-3:       #6a6775;
+    --green:        #3ecf8e;
+    --green-d:      rgba(62,207,142,0.1);
+    --red:          #e05252;
+    --red-d:        rgba(224,82,82,0.1);
+    --blue:         #5b8ef0;
+    --blue-d:       rgba(91,142,240,0.1);
+    --purple:       #a78bfa;
+    --purple-d:     rgba(167,139,250,0.1);
+    --amber:        #f59e0b;
+    --amber-d:      rgba(245,158,11,0.1);
+    --sidebar-w:    220px;
+    --sidebar-w-sm: 64px;
+    --header-h:     62px;
+    --sidebar-transition: width 0.22s cubic-bezier(0.4,0,0.2,1);
     font-family: 'DM Sans', sans-serif;
-    outline: none; transition: border-color .15s, box-shadow .15s;
-    box-sizing: border-box;
-  }
-  .form-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(200,165,94,0.1); }
-  .form-input.err   { border-color: var(--red); }
-  .form-input.err:focus { box-shadow: 0 0 0 3px rgba(224,82,82,0.1); }
-  .form-error { font-size: 11px; color: var(--red); margin-top: 5px; }
-  .form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-
-  .input-pass-wrap { position: relative; }
-  .input-pass-wrap .form-input { padding-right: 40px; }
-  .input-pass-toggle {
-    position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
-    background: none; border: none; cursor: pointer;
-    color: var(--text-3); padding: 0; line-height: 1;
-    display: flex; align-items: center; transition: color .13s;
-  }
-  .input-pass-toggle:hover { color: var(--text-2); }
-
-  .btn-primary {
-    padding: 9px 20px; border-radius: 9px;
-    background: var(--gold); color: #0a0808; border: none; cursor: pointer;
-    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
-    display: flex; align-items: center; gap: 6px;
-    transition: opacity .13s, transform .1s;
-  }
-  .btn-primary:hover  { opacity: .88; }
-  .btn-primary:active { transform: scale(.97); }
-  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-
-  .btn-secondary {
-    padding: 9px 20px; border-radius: 9px;
-    background: var(--s3); color: var(--text-2);
-    border: 1px solid var(--border); cursor: pointer;
-    font-family: 'DM Sans', sans-serif; font-size: 13px;
-    transition: background .13s, color .13s;
-  }
-  .btn-secondary:hover { background: var(--s2); color: var(--text); }
-
-  .cfg-toast {
-    position: fixed; bottom: 24px; right: 24px;
-    padding: 11px 16px; border-radius: 10px;
-    display: flex; align-items: center; gap: 8px;
-    font-family: 'DM Sans', sans-serif; font-size: 13px;
-    z-index: 9999; animation: slideUp .18s ease;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-  }
-  .cfg-toast.success {
-    background: rgba(72,187,120,0.12); border: 1px solid rgba(72,187,120,0.3); color: #48bb78;
-  }
-  .cfg-toast.error {
-    background: rgba(224,82,82,0.12); border: 1px solid rgba(224,82,82,0.3); color: var(--red);
+    --font-display: 'Playfair Display', serif;
+    color-scheme: dark;
   }
 
-  .logo-upload-area {
-    border: 1.5px dashed var(--border-h); border-radius: 12px; padding: 24px 16px;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    gap: 10px; cursor: pointer; transition: border-color .15s, background .15s;
-    background: var(--s2);
-  }
-  .logo-upload-area:hover { border-color: var(--gold); background: rgba(200,165,94,0.04); }
-  .logo-upload-area.has-logo { padding: 12px; }
-  .logo-preview { max-height: 80px; max-width: 200px; object-fit: contain; border-radius: 6px; }
-  .logo-upload-hint { font-size: 11px; color: var(--text-3); text-align: center; line-height: 1.5; }
-  .logo-upload-btn-row { display: flex; gap: 8px; margin-top: 6px; }
-  .btn-logo-remove {
-    padding: 5px 12px; border-radius: 7px; background: var(--red-d); color: var(--red);
-    border: 1px solid rgba(224,82,82,.25); cursor: pointer;
-    font-size: 11px; font-family: 'DM Sans', sans-serif; transition: background .13s;
-  }
-  .btn-logo-remove:hover { background: rgba(224,82,82,.18); }
-
-  .taxa-table { width: 100%; border-collapse: collapse; }
-  .taxa-table thead tr { background: var(--s2); }
-  .taxa-table th {
-    font-size: 10px; font-weight: 600; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--text-3);
-    padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border);
-  }
-  .taxa-table td {
-    padding: 8px 14px; border-bottom: 1px solid var(--border);
-    font-size: 13px; color: var(--text-2); vertical-align: middle;
-  }
-  .taxa-table tr:last-child td { border-bottom: none; }
-  .taxa-table tr:hover td { background: rgba(255,255,255,0.01); }
-  .taxa-bandeira {
-    font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 600; color: var(--text);
-  }
-  .taxa-tipo-badge {
-    display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 20px;
-    font-size: 10px; font-weight: 600; background: var(--s3); color: var(--text-3);
-    border: 1px solid var(--border);
-  }
-  .taxa-input {
-    width: 80px; background: var(--s2); border: 1px solid var(--border); border-radius: 7px;
-    padding: 5px 10px; color: var(--text); font-size: 13px;
-    font-family: 'DM Sans', sans-serif; outline: none;
-    transition: border-color .15s, box-shadow .15s; text-align: right;
-  }
-  .taxa-input:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(200,165,94,0.1); }
-  .taxa-pct { font-size: 12px; color: var(--text-3); margin-left: 5px; }
-  .taxa-section-divider td {
-    padding: 5px 14px; font-size: 9px; font-weight: 700; letter-spacing: .08em;
-    text-transform: uppercase; color: var(--text-3);
-    background: var(--s3); border-bottom: 1px solid var(--border);
+  /* ══ LAYOUT RAIZ ══ */
+  .ag-app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh; /* mobile: exclui barra do browser */
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
   }
 
-  .menu-toggle-list { display: flex; flex-direction: column; gap: 6px; }
-  .menu-toggle-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 11px 14px; border-radius: 9px;
-    border: 1px solid var(--border); background: var(--s2); transition: border-color .13s;
+  /* ══ HEADER GLOBAL ══ */
+  .ag-global-header {
+    height: var(--header-h);
+    flex-shrink: 0;
+    background: var(--s1);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px 0 0;
+    gap: 0;
+    z-index: 50;
+    position: relative;
   }
-  .menu-toggle-item:hover { border-color: var(--border-h); }
-  .menu-toggle-icon {
-    width: 28px; height: 28px; border-radius: 7px;
-    background: var(--s3); border: 1px solid var(--border-h);
+
+  .ag-toggle-btn {
+    width: var(--sidebar-w-sm);
+    height: var(--header-h);
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--border);
+    cursor: pointer;
+    color: var(--text-3);
+    transition: color .15s, background .15s;
+  }
+  .ag-toggle-btn:hover { background: rgba(255,255,255,0.03); color: var(--text); }
+
+  .ag-header-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 16px;
+    min-width: 0;
+    flex: 0 0 auto;
+  }
+  .ag-header-logo-img {
+    width: 30px; height: 30px; border-radius: 8px;
+    object-fit: cover; flex-shrink: 0;
+  }
+  .ag-header-logo-icon {
+    width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
+    background: linear-gradient(135deg, #b8952e, #e0c060);
     display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; font-size: 14px;
+    font-family: 'Sora', sans-serif; font-weight: 700; font-size: 13px;
+    color: #0a0808; letter-spacing: -0.5px;
   }
-  .menu-toggle-label { font-size: 13px; color: var(--text); font-family: 'DM Sans', sans-serif; }
-  .menu-toggle-sub   { font-size: 11px; color: var(--text-3); margin-top: 1px; }
-  .menu-toggle-locked {
-    font-size: 10px; color: var(--text-3); background: var(--s3);
-    border: 1px solid var(--border); border-radius: 20px; padding: 2px 8px; white-space: nowrap;
-  }
-
-  .toggle-switch { position: relative; width: 38px; height: 22px; flex-shrink: 0; }
-  .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
-  .toggle-track {
-    position: absolute; inset: 0; border-radius: 22px;
-    background: var(--s3); border: 1px solid var(--border);
-    cursor: pointer; transition: background .2s, border-color .2s;
-  }
-  .toggle-switch input:checked + .toggle-track {
-    background: rgba(200,165,94,0.25); border-color: var(--gold);
-  }
-  .toggle-track::after {
-    content: ''; position: absolute; width: 16px; height: 16px; border-radius: 50%;
-    background: var(--text-3); top: 2px; left: 2px; transition: transform .2s, background .2s;
-  }
-  .toggle-switch input:checked + .toggle-track::after {
-    transform: translateX(16px); background: var(--gold);
+  .ag-header-logo-name {
+    font-size: 13px; font-weight: 600; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 160px;
   }
 
-  .estoque-hint {
-    font-size: 12px; color: var(--text-3); background: var(--s3); border: 1px solid var(--border);
-    border-radius: 8px; padding: 10px 14px; margin-top: 12px; line-height: 1.6;
-  }
-  .cfg-spinner {
-    width: 14px; height: 14px; border-radius: 50%;
-    border: 2px solid rgba(0,0,0,0.15); border-top-color: #0a0808;
-    animation: spin .6s linear infinite; flex-shrink: 0;
-  }
-  .cfg-alert {
-    display: flex; align-items: flex-start; gap: 10px;
-    padding: 12px 14px; border-radius: 9px; font-size: 12px; line-height: 1.6;
-  }
-  .cfg-loading {
-    padding: 56px 20px; text-align: center; color: var(--text-3); font-size: 13px;
-  }
+  .ag-header-spacer { flex: 1; }
 
-  /* ── Seção Atalhos ── */
-  .atalhos-intro {
-    font-size: 12px; color: var(--text-3); line-height: 1.7;
+  .ag-notif {
+    width: 34px; height: 34px; border-radius: 8px;
     background: var(--s2); border: 1px solid var(--border);
-    border-radius: 9px; padding: 12px 14px; margin-bottom: 4px;
-  }
-  .atalhos-intro strong { color: var(--gold); font-weight: 600; }
-  .atalhos-list { display: flex; flex-direction: column; gap: 6px; }
-  .atalho-item {
-    display: flex; align-items: center; gap: 12px;
-    padding: 10px 14px; border-radius: 9px;
-    border: 1px solid var(--border); background: var(--s2);
-    transition: border-color .13s, opacity .13s;
-  }
-  .atalho-item:not(.atalho-disabled):hover { border-color: var(--border-h); }
-  .atalho-disabled { opacity: .38; }
-  .atalho-icon {
-    width: 28px; height: 28px; border-radius: 7px;
-    background: var(--s3); border: 1px solid var(--border-h);
     display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; font-size: 14px;
+    cursor: pointer; transition: border-color .15s;
+    color: var(--text-2); flex-shrink: 0; position: relative;
   }
-  .atalho-info { flex: 1; min-width: 0; }
-  .atalho-label { font-size: 13px; color: var(--text); font-family: 'DM Sans', sans-serif; }
-  .atalho-sub   { font-size: 11px; color: var(--text-3); margin-top: 1px; }
-  .atalho-key {
-    font-family: 'DM Mono', 'Courier New', monospace;
-    font-size: 11px; font-weight: 700; white-space: nowrap;
-    background: var(--s3); border: 1px solid var(--border-h);
-    border-bottom-width: 2px; border-radius: 6px;
-    padding: 3px 10px; color: var(--gold); letter-spacing: .04em;
+  .ag-notif:hover { border-color: var(--border-h); color: var(--text); }
+
+  .ag-notif-badge {
+    position: absolute; top: -5px; right: -5px;
+    background: var(--red); color: #fff;
+    border-radius: 10px; font-size: 9px; font-weight: 700;
+    padding: 1px 5px; font-family: 'IBM Plex Mono', monospace;
+    line-height: 1.6; pointer-events: none;
+    border: 2px solid var(--bg);
+  }
+
+  .ag-notif-panel {
+    position: absolute; top: calc(100% + 10px); right: 0;
+    width: 400px; max-height: 560px;
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,.35);
+    z-index: 200; overflow: hidden; display: flex; flex-direction: column;
+  }
+  .ag-notif-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--text-2);
     flex-shrink: 0;
   }
-  .atalho-hidden-badge {
-    font-size: 10px; color: var(--text-3); background: var(--s3);
-    border: 1px solid var(--border); border-radius: 20px;
-    padding: 2px 8px; white-space: nowrap; flex-shrink: 0;
+  .ag-notif-list {
+    overflow-y: auto; flex: 1;
+    max-height: 500px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .ag-notif-list::-webkit-scrollbar { width: 4px; }
+  .ag-notif-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+  .ag-notif-item {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .ag-notif-item:last-child { border-bottom: none; }
+  .ag-notif-item-title {
+    font-size: 13px; font-weight: 600; color: var(--text);
+  }
+  .ag-notif-item-body {
+    font-size: 12px; color: var(--text-2); line-height: 1.5;
+  }
+  .ag-notif-item-meta {
+    font-size: 10px; color: var(--text-3);
+    font-family: 'IBM Plex Mono', monospace; margin-top: 3px;
+  }
+  .ag-notif-empty {
+    padding: 40px 16px; text-align: center;
+    font-size: 12px; color: var(--text-3);
   }
 
-  /* ── Seção Log de Atividades ── */
-  .log-toolbar {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    margin-bottom: 4px;
+  .ag-user-area { position: relative; display: flex; align-items: center; margin-left: 10px; }
+  .ag-user-trigger {
+    display: flex; align-items: center; gap: 9px;
+    padding: 6px 10px 6px 6px; border-radius: 10px;
+    border: 1px solid transparent; cursor: pointer;
+    transition: background .13s, border-color .13s; user-select: none;
   }
-  .log-search-wrap {
-    flex: 1; min-width: 160px; position: relative;
-    display: flex; align-items: center;
+  .ag-user-trigger:hover { background: var(--s2); border-color: var(--border); }
+  .ag-avatar {
+    width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(135deg, rgba(200,165,94,0.18), rgba(200,165,94,0.06));
+    border: 1.5px solid var(--gold-d);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 600; color: var(--gold);
+    font-family: 'Sora', sans-serif;
+    overflow: hidden;
   }
-  .log-search-wrap svg { position: absolute; left: 11px; pointer-events: none; }
-  .log-search-input {
-    width: 100%; background: var(--s2); border: 1px solid var(--border);
-    border-radius: 9px; padding: 8px 12px 8px 34px;
-    color: var(--text); font-size: 13px;
-    font-family: 'DM Sans', sans-serif; outline: none;
+  .ag-user-name {
+    font-size: 12px; font-weight: 500; color: var(--text);
+    max-width: 130px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ag-user-chevron { color: var(--text-3); transition: transform .18s; flex-shrink: 0; }
+  .ag-user-chevron.open { transform: rotate(180deg); }
+
+  .ag-user-dropdown {
+    position: absolute; top: calc(100% + 8px); right: 0;
+    background: var(--s2); border: 1px solid var(--border-h);
+    border-radius: 12px; min-width: 180px; padding: 6px;
+    box-shadow: 0 16px 48px rgba(0,0,0,0.6);
+    z-index: 200; animation: ag-dropdown-in .14s ease;
+  }
+  @keyframes ag-dropdown-in {
+    from { opacity: 0; transform: translateY(-6px) scale(.97); }
+    to   { opacity: 1; transform: translateY(0)   scale(1); }
+  }
+  .ag-dropdown-divider { height: 1px; background: var(--border); margin: 4px 0; }
+  .ag-dropdown-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 9px 12px; border-radius: 8px; border: none;
+    background: transparent; color: var(--text-2);
+    font-family: 'DM Sans', sans-serif; font-size: 13px;
+    cursor: pointer; width: 100%; text-align: left;
+    transition: background .1s, color .1s;
+  }
+  .ag-dropdown-item:hover { background: var(--s3); color: var(--text); }
+  .ag-dropdown-item.danger { color: var(--red); }
+  .ag-dropdown-item.danger:hover { background: var(--red-d); }
+
+  /* ══ CORPO ══ */
+  .ag-body { flex: 1; display: flex; overflow: hidden; }
+
+  /* ══ SIDEBAR ══ */
+  .ag-sidebar {
+    width: var(--sidebar-w); flex-shrink: 0;
+    background: var(--s1); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    overflow: hidden; transition: var(--sidebar-transition);
+  }
+  .ag-sidebar.collapsed { width: var(--sidebar-w-sm); }
+
+  .ag-nav { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 10px 0 6px; }
+  .ag-nav::-webkit-scrollbar { width: 3px; }
+  .ag-nav::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
+
+  .ag-sec-label {
+    font-size: 9px; font-weight: 600; letter-spacing: .1em;
+    color: var(--text-3); padding: 10px 18px 5px;
+    text-transform: uppercase; white-space: nowrap; overflow: hidden;
+    transition: opacity .15s, padding .22s;
+  }
+  .ag-sidebar.collapsed .ag-sec-label {
+    opacity: 0; pointer-events: none; padding-top: 6px; padding-bottom: 6px;
+  }
+
+  .ag-nav-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 16px 8px 18px; margin: 1px 8px 1px 0;
+    border-left: 2px solid transparent;
+    border-radius: 0 8px 8px 0; cursor: pointer; font-size: 13px;
+    color: var(--text-2);
+    transition: background .12s, color .12s, border-color .12s, padding .22s;
+    white-space: nowrap; overflow: hidden; position: relative;
+  }
+  .ag-nav-item:hover  { background: rgba(255,255,255,0.03); color: var(--text); }
+  .ag-nav-item.active { background: var(--gold-d); color: var(--gold); border-left-color: var(--gold); }
+  .ag-nav-item.active svg { color: var(--gold); }
+
+  .ag-nav-item span {
+    overflow: hidden; white-space: nowrap;
+    transition: opacity .15s, max-width .22s; max-width: 160px;
+  }
+
+  .ag-sidebar.collapsed .ag-nav-item {
+    padding: 9px; justify-content: center; margin: 1px 4px;
+    border-left-width: 0; border-radius: 8px; border: 1px solid transparent;
+  }
+  .ag-sidebar.collapsed .ag-nav-item.active {
+    border-color: rgba(200,165,94,0.2); border-left-width: 0;
+  }
+  .ag-sidebar.collapsed .ag-nav-item span { max-width: 0; opacity: 0; }
+
+  .ag-sidebar.collapsed .ag-nav-item::after {
+    content: attr(data-label);
+    position: absolute; left: calc(100% + 10px); top: 50%;
+    transform: translateY(-50%);
+    background: var(--s3); border: 1px solid var(--border-h);
+    color: var(--text); padding: 5px 11px; border-radius: 8px;
+    font-size: 12px; font-weight: 500; white-space: nowrap;
+    pointer-events: none; opacity: 0; transition: opacity .12s;
+    z-index: 100; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .ag-sidebar.collapsed .ag-nav-item:hover::after { opacity: 1; }
+
+  /* ══ MAIN ══ */
+  .ag-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* ── Acesso Negado (RotaProtegida) ── */
+  .acesso-negado { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; text-align: center; padding: 2rem; color: var(--text-3); }
+  .acesso-negado__icone  { font-size: 3rem; line-height: 1; }
+  .acesso-negado__titulo { font-size: 1.25rem; font-weight: 600; color: var(--text); margin: 0; }
+  .acesso-negado__texto  { margin: 0; font-size: 0.95rem; }
+  .acesso-negado__sub    { margin: 0; font-size: 0.85rem; opacity: 0.7; }
+  .acesso-negado__spinner { width: 2rem; height: 2rem; border: 3px solid var(--border); border-top-color: var(--gold-brand); border-radius: 50%; animation: spin 0.7s linear infinite; }
+
+  .ag-topbar {
+    padding: 14px 24px; background: var(--s1);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px; flex-shrink: 0;
+  }
+  .ag-topbar-title h1 {
+    font-family: var(--font-display); font-size: 26px; font-weight: 600;
+    color: var(--gold-brand); line-height: 1.15; letter-spacing: 0.01em;
+    background: linear-gradient(135deg, #D4AF37 10%, #e8ca60 55%, #c8a55e 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .ag-topbar-title p { font-size: 11px; color: var(--text-3); margin-top: 3px; letter-spacing: 0.02em; }
+
+  .ag-search {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 7px 11px; width: 200px;
     transition: border-color .15s;
   }
-  .log-search-input:focus { border-color: var(--gold); }
+  .ag-search:focus-within { border-color: var(--border-h); }
+  .ag-search input {
+    background: transparent; border: none; outline: none;
+    color: var(--text); font-size: 12px; width: 100%;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .ag-search input::placeholder { color: var(--text-3); }
 
-  .log-select {
-    background: var(--s2); border: 1px solid var(--border);
-    border-radius: 9px; padding: 8px 32px 8px 12px;
-    color: var(--text); font-size: 12px;
-    font-family: 'DM Sans', sans-serif; outline: none;
-    appearance: none; cursor: pointer;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 10px center;
-    min-width: 130px;
+  .ag-periods { display: flex; gap: 3px; flex-wrap: wrap; }
+  .ag-period-btn {
+    padding: 5px 12px; border-radius: 20px; font-size: 11px;
+    cursor: pointer; border: 1px solid transparent;
+    background: transparent; color: var(--text-2);
+    font-family: 'DM Sans', sans-serif; transition: all .13s;
   }
-  .log-select:focus { border-color: var(--gold); }
+  .ag-period-btn:hover  { background: var(--s2); color: var(--text); }
+  .ag-period-btn.active { background: var(--gold-d); border-color: rgba(200,165,94,.3); color: var(--gold); }
 
-  .log-btn-refresh {
-    padding: 8px 14px; border-radius: 9px; background: var(--s2);
-    border: 1px solid var(--border); color: var(--text-2);
-    cursor: pointer; display: flex; align-items: center; gap: 6px;
-    font-size: 12px; font-family: 'DM Sans', sans-serif;
-    transition: background .13s, color .13s; flex-shrink: 0;
-  }
-  .log-btn-refresh:hover { background: var(--s3); color: var(--text); }
-  .log-btn-refresh:disabled { opacity: .5; cursor: not-allowed; }
+  /* ══ CONTENT ══ */
+  .ag-content { flex: 1; overflow-y: auto; padding: 20px 24px 36px; -webkit-overflow-scrolling: touch; }
+  .ag-content::-webkit-scrollbar { width: 4px; }
+  .ag-content::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
 
-  .log-list { display: flex; flex-direction: column; gap: 6px; }
-  .log-item {
-    display: flex; align-items: flex-start; gap: 12px;
-    padding: 12px 14px; border-radius: 10px;
-    border: 1px solid var(--border); background: var(--s2);
-    transition: border-color .13s;
+  /* ══ CARDS ══ */
+  .ag-card {
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 14px; padding: 20px;
+    transition: border-color .2s, box-shadow .2s, transform .2s;
   }
-  .log-item:hover { border-color: var(--border-h); }
+  .ag-card:hover {
+    border-color: var(--border-h);
+    box-shadow: 0 6px 28px rgba(0,0,0,0.3);
+    transform: translateY(-2px);
+  }
+  .ag-card-click { cursor: pointer; }
+  .ag-card-click:hover {
+    border-color: rgba(200,165,94,0.25);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+    transform: translateY(-3px);
+  }
+  .ag-card-click:active { transform: translateY(-1px); }
 
-  .log-acao-badge {
-    flex-shrink: 0; padding: 3px 9px; border-radius: 20px;
-    font-size: 10px; font-weight: 700; letter-spacing: .04em;
-    text-transform: uppercase; white-space: nowrap; margin-top: 1px;
+  .ag-card-bare {
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 14px; overflow: hidden;
+    transition: border-color .2s, box-shadow .2s, transform .2s;
   }
-  .log-acao-criar   { background: rgba(72,187,120,0.12); color: #48bb78; border: 1px solid rgba(72,187,120,0.25); }
-  .log-acao-editar  { background: rgba(200,165,94,0.12); color: var(--gold); border: 1px solid rgba(200,165,94,0.25); }
-  .log-acao-excluir { background: rgba(224,82,82,0.12);  color: var(--red);  border: 1px solid rgba(224,82,82,0.25); }
-
-  .log-info { flex: 1; min-width: 0; }
-  .log-desc {
-    font-size: 13px; color: var(--text); font-family: 'DM Sans', sans-serif;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .log-meta {
-    display: flex; align-items: center; gap: 8px; margin-top: 4px; flex-wrap: wrap;
-  }
-  .log-meta-item { font-size: 11px; color: var(--text-3); }
-  .log-meta-dot { font-size: 11px; color: var(--text-3); }
-  .log-modulo-badge {
-    font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 20px;
-    background: var(--s3); border: 1px solid var(--border); color: var(--text-2);
-  }
-
-  .log-empty {
-    padding: 56px 20px; text-align: center; color: var(--text-3); font-size: 13px;
-  }
-  .log-loading {
-    padding: 48px 20px; text-align: center; color: var(--text-3); font-size: 13px;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-  }
-  .log-load-more {
-    padding: 9px 20px; border-radius: 9px; background: var(--s2);
-    border: 1px solid var(--border); color: var(--text-2);
-    cursor: pointer; font-size: 12px; font-family: 'DM Sans', sans-serif;
-    transition: all .13s; display: flex; align-items: center; justify-content: center; gap: 6px;
-    width: 100%; margin-top: 4px;
-  }
-  .log-load-more:hover { background: var(--s3); color: var(--text); }
-  .log-load-more:disabled { opacity: .5; cursor: not-allowed; }
-  .log-count-bar {
-    font-size: 11px; color: var(--text-3); text-align: right; padding-top: 4px;
-  }
-
-  /* ── Seção Pagamentos Online ── */
-  .pag-wrap { display: flex; flex-direction: column; gap: 24px; }
-
-  /* Bloco do provedor — fundo escuro com borda esquerda colorida */
-  .pag-mp-block {
-    border-radius: 14px;
-    background: linear-gradient(135deg, rgba(0,158,227,0.06) 0%, rgba(0,0,0,0) 60%);
-    border: 1px solid rgba(0,158,227,0.18);
-    overflow: hidden;
-    transition: border-color .2s;
-  }
-  .pag-mp-block.ativo {
-    border-color: rgba(0,158,227,0.4);
-    box-shadow: 0 0 0 1px rgba(0,158,227,0.1) inset;
-  }
-
-  /* Cabeçalho do bloco MP */
-  .pag-mp-head {
-    display: flex; align-items: center; gap: 14px;
-    padding: 16px 20px 14px;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-  }
-  .pag-mp-icon {
-    width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
-    background: linear-gradient(135deg, #009ee3, #0077bb);
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: 0 4px 12px rgba(0,158,227,0.35);
-  }
-  .pag-mp-label { flex: 1; }
-  .pag-mp-nome { font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: -.01em; }
-  .pag-mp-tag  {
-    display: inline-flex; align-items: center; gap: 5px;
-    font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
-    padding: 3px 9px; border-radius: 20px; margin-top: 4px;
-    background: rgba(72,187,120,0.1); color: #48bb78; border: 1px solid rgba(72,187,120,0.2);
-  }
-  .pag-mp-tag.inativo {
-    background: rgba(255,255,255,0.04); color: var(--text-3); border-color: rgba(255,255,255,0.08);
-  }
-
-  /* Toggle row */
-  .pag-toggle-row {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 20px; gap: 16px;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-  }
-  .pag-toggle-label { font-size: 13px; font-weight: 600; color: var(--text); }
-  .pag-toggle-sub   { font-size: 11px; color: var(--text-3); margin-top: 2px; }
-
-  /* Corpo do token */
-  .pag-token-area { padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
-  .pag-token-wrap { position: relative; }
-  .pag-token-wrap .form-input {
-    padding-right: 42px; letter-spacing: .04em;
-    font-family: 'DM Mono', 'Courier New', monospace; font-size: 11.5px;
-    background: rgba(0,0,0,0.2);
-  }
-  .pag-token-toggle {
-    position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
-    background: none; border: none; cursor: pointer;
-    color: var(--text-3); display: flex; align-items: center; transition: color .13s;
-  }
-  .pag-token-toggle:hover { color: var(--text-2); }
-
-  /* Botões de ação do token */
-  .pag-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-
-  /* Status pill */
-  .pag-status {
-    display: flex; align-items: center; gap: 9px;
-    padding: 10px 14px; border-radius: 10px;
-    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07);
-    font-size: 12px; color: var(--text-3); transition: all .2s;
-  }
-  .pag-status.ok   { border-color: rgba(72,187,120,0.2);  background: rgba(72,187,120,0.06);  color: #48bb78; }
-  .pag-status.erro { border-color: rgba(224,82,82,0.2);   background: rgba(224,82,82,0.06);   color: var(--red); }
-  .pag-status-dot {
-    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: currentColor;
-    transition: box-shadow .2s;
-  }
-  .pag-status.ok .pag-status-dot   { box-shadow: 0 0 7px rgba(72,187,120,0.7); }
-  .pag-status.erro .pag-status-dot { box-shadow: 0 0 7px rgba(224,82,82,0.6); }
-
-  /* Bloco webhook — linha horizontal separada */
-  .pag-webhook {
-    border-radius: 12px; overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.08);
-    background: rgba(255,255,255,0.02);
-  }
-  .pag-webhook-head {
-    display: flex; align-items: center; gap: 10px;
-    padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.05);
-    font-size: 12px; font-weight: 600; color: var(--text-2);
-  }
-  .pag-webhook-url {
-    padding: 10px 16px; display: flex; align-items: center; gap: 10px;
-    font-family: 'DM Mono', monospace; font-size: 10.5px; color: var(--gold);
-    background: rgba(200,165,94,0.05); word-break: break-all; line-height: 1.5;
-  }
-  .pag-copy-url {
-    flex-shrink: 0; background: rgba(200,165,94,0.1); border: 1px solid rgba(200,165,94,0.25);
-    border-radius: 7px; padding: 5px 9px; cursor: pointer; color: var(--gold);
-    font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 5px;
-    transition: all .13s; font-family: 'DM Sans', sans-serif; white-space: nowrap;
-  }
-  .pag-copy-url:hover { background: rgba(200,165,94,0.18); }
-
-  /* Fluxo visual */
-  .pag-flow {
-    display: flex; align-items: center; gap: 6px;
-    padding: 12px 16px; flex-wrap: wrap;
-    border-top: 1px solid rgba(255,255,255,0.04);
-  }
-  .pag-flow-step {
-    font-size: 10.5px; color: var(--text-3); font-weight: 500;
-    background: rgba(255,255,255,0.04); border-radius: 6px; padding: 4px 9px;
-    white-space: nowrap;
-  }
-  .pag-flow-arrow { color: var(--text-3); flex-shrink: 0; }
-
-  /* Botão tutorial */
-  .pag-btn-tutorial {
-    display: inline-flex; align-items: center; gap: 10px;
-    padding: 11px 18px; border-radius: 11px;
-    background: rgba(200,165,94,0.1);
-    border: 1px solid rgba(200,165,94,0.4);
-    color: var(--gold); font-size: 12px; font-weight: 600;
-    cursor: pointer; transition: all .18s; font-family: 'DM Sans', sans-serif;
-    align-self: flex-start;
-    box-shadow: 0 0 0 3px rgba(200,165,94,0.06), 0 4px 16px rgba(200,165,94,0.12);
-    text-shadow: 0 0 20px rgba(200,165,94,0.4);
-  }
-  .pag-btn-tutorial:hover {
-    background: rgba(200,165,94,0.16);
-    border-color: rgba(200,165,94,0.65);
-    box-shadow: 0 0 0 4px rgba(200,165,94,0.08), 0 6px 22px rgba(200,165,94,0.2);
+  .ag-card-bare:hover {
+    border-color: var(--border-h);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.25);
     transform: translateY(-1px);
   }
-  .pag-btn-tutorial span { flex: 1; }
 
-  /* Info box — versão mais sutil */
-  .pag-info-box {
-    font-size: 11.5px; color: var(--text-3); line-height: 1.75;
-    padding: 11px 14px; border-radius: 9px;
-    background: rgba(255,255,255,0.025); border: 1px solid rgba(255,255,255,0.06);
-  }
-  .pag-info-box strong { color: var(--text-2); font-weight: 600; }
-
-  /* ── Modal Tutorial ── */
-  .tut-overlay {
-    position: fixed; inset: 0; z-index: 10000;
-    background: rgba(0,0,0,0.72); backdrop-filter: blur(6px);
-    display: flex; align-items: center; justify-content: center;
-    animation: fadeIn .15s ease; padding: 16px;
-  }
-  .tut-modal {
-    background: #13151d; border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 18px; width: 100%; max-width: 560px;
-    max-height: 90vh; display: flex; flex-direction: column;
-    box-shadow: 0 32px 96px rgba(0,0,0,0.8), 0 0 0 1px rgba(200,165,94,0.15);
-    animation: slideUp .2s ease;
-  }
-  .tut-header {
-    display: flex; align-items: center; gap: 12px;
-    padding: 18px 22px; border-bottom: 1px solid rgba(255,255,255,0.08);
-  }
-  .tut-header-icon {
-    width: 38px; height: 38px; border-radius: 10px;
-    background: rgba(200,165,94,0.15); border: 1px solid rgba(200,165,94,0.3);
-    display: flex; align-items: center; justify-content: center; color: var(--gold); flex-shrink: 0;
-  }
-  .tut-header-title { flex: 1; }
-  .tut-header-title h3 { font-size: 15px; font-weight: 700; color: #e8e8f0; margin: 0; font-family: 'Sora', sans-serif; }
-  .tut-header-title p  { font-size: 11px; color: #5c5e72; margin: 3px 0 0; }
-  .tut-close {
-    background: none; border: none; cursor: pointer; color: #5c5e72;
-    display: flex; align-items: center; padding: 4px; border-radius: 7px; transition: color .13s;
-  }
-  .tut-close:hover { color: #e05555; }
-  .tut-body { flex: 1; overflow-y: auto; padding: 22px; display: flex; flex-direction: column; gap: 14px; }
-  .tut-body::-webkit-scrollbar { width: 3px; }
-  .tut-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
-  .tut-step {
-    display: flex; gap: 14px;
-    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 12px; padding: 14px 16px;
-    transition: border-color .15s;
-  }
-  .tut-step:hover { border-color: rgba(200,165,94,0.25); }
-  .tut-step-num {
-    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
-    background: rgba(200,165,94,0.15); border: 1px solid rgba(200,165,94,0.35);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 12px; font-weight: 700; color: var(--gold);
-  }
-  .tut-step-content { flex: 1; min-width: 0; }
-  .tut-step-title { font-size: 13px; font-weight: 600; color: #e8e8f0; margin-bottom: 4px; }
-  .tut-step-desc { font-size: 12px; color: #7a7c96; line-height: 1.65; }
-  .tut-step-desc strong { color: #c0c2d8; font-weight: 600; }
-  .tut-step-desc code {
-    background: rgba(200,165,94,0.1); border: 1px solid rgba(200,165,94,0.2);
-    border-radius: 4px; padding: 1px 7px; font-family: 'DM Mono', monospace;
-    font-size: 11px; color: var(--gold);
-  }
-  .tut-link {
-    display: inline-flex; align-items: center; gap: 5px;
-    color: #5a9fd4; font-size: 12px; text-decoration: none; font-weight: 500;
-    transition: color .13s;
-  }
-  .tut-link:hover { color: #7ab8e8; }
-  .tut-warning {
-    background: rgba(224,82,82,0.08); border: 1px solid rgba(224,82,82,0.25);
-    border-radius: 10px; padding: 12px 14px;
-    display: flex; gap: 10px; align-items: flex-start;
-    font-size: 12px; color: #e05555; line-height: 1.6;
-  }
-  .tut-warning strong { font-weight: 700; display: block; margin-bottom: 3px; }
-  .tut-footer {
-    padding: 16px 22px; border-top: 1px solid rgba(255,255,255,0.08);
+  .ag-card-header {
+    padding: 14px 18px; border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
   }
-  .tut-footer-note { font-size: 11px; color: #5c5e72; }
-  .tut-footer-note span { color: #48bb78; font-weight: 600; }
+  .ag-card-title { font-size: 13px; font-weight: 500; color: var(--text); }
+
+  .ag-view-all {
+    font-size: 11px; color: var(--gold);
+    background: transparent; border: none; cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    display: flex; align-items: center; gap: 3px; transition: opacity .13s;
+  }
+  .ag-view-all:hover { opacity: .75; }
+
+  /* ══ GRIDS ══ */
+  .g4  { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 16px; }
+  .g3  { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 16px; }
+  .g21 { display: grid; grid-template-columns: 2fr 1fr;        gap: 16px; margin-bottom: 16px; }
+  .g11 { display: grid; grid-template-columns: 1fr 1fr;        gap: 16px; margin-bottom: 16px; }
+  .g1  { margin-bottom: 16px; }
+
+  /* ══ MINI STATS ══ */
+  .ag-mini { display: flex; align-items: center; gap: 14px; }
+  .ag-mini-icon {
+    width: 44px; height: 44px; border-radius: 11px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ag-mini-val { font-family: 'Sora', sans-serif; font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
+  .ag-mini-lbl { font-size: 11px; color: var(--text-2); margin-top: 4px; }
+
+  /* ══ KPI CARDS ══ */
+  .ag-kpi-label { font-size: 10px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; color: var(--text-2); margin-bottom: 10px; }
+  .ag-kpi-val   { font-family: 'Sora', sans-serif; font-size: 24px; font-weight: 700; color: var(--text); line-height: 1; }
+  .ag-kpi-meta  { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .ag-trend     { font-size: 11px; font-weight: 500; display: flex; align-items: center; gap: 2px; }
+  .ag-sub       { font-size: 11px; color: var(--text-3); }
+
+  /* ══ TABELAS ══ */
+  .ag-trow {
+    display: grid; padding: 11px 18px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px; color: var(--text-2); transition: background .1s;
+  }
+  .ag-trow:hover   { background: rgba(255,255,255,0.02); }
+  .ag-trow:last-child { border-bottom: none; }
+  .ag-thead { background: var(--s2); }
+  .ag-th { font-size: 10px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .ag-empty-row { padding: 24px 18px; text-align: center; font-size: 12px; color: var(--text-3); }
+
+  /* ══ RESUMO DESPESAS ══ */
+  .ag-despesa-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; padding: 18px; }
+  .ag-despesa-card { border-radius: 10px; padding: 15px; }
+  .ag-despesa-label { font-size: 9px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; margin-bottom: 8px; }
+  .ag-despesa-count { font-family: 'Sora', sans-serif; font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
+  .ag-despesa-val   { font-size: 11px; color: var(--text-2); margin-top: 6px; }
+
+  /* ══ FILTRO PERSONALIZADO ══ */
+  .ag-custom-range {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--s2); border: 1px solid rgba(200,165,94,0.3);
+    border-radius: 10px; padding: 5px 10px;
+    animation: ag-dropdown-in .14s ease;
+  }
+  .ag-custom-range label { font-size: 10px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); white-space: nowrap; }
+  .ag-date-input {
+    background: var(--s3); border: 1px solid var(--border); border-radius: 7px;
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 12px;
+    padding: 5px 8px; outline: none; cursor: pointer; transition: border-color .15s; color-scheme: dark;
+  }
+  .ag-date-input:focus { border-color: var(--gold); }
+  .ag-date-input::-webkit-calendar-picker-indicator {
+    filter: invert(0.6) sepia(1) saturate(2) hue-rotate(5deg); cursor: pointer; opacity: 0.7;
+  }
+  .ag-date-sep { color: var(--text-3); font-size: 12px; user-select: none; }
+
+  /* ══ LOADING SKELETON ══ */
+  @keyframes ag-shimmer {
+    0%   { background-position: -400px 0; }
+    100% { background-position:  400px 0; }
+  }
+  .ag-skeleton {
+    background: linear-gradient(90deg, var(--s2) 25%, var(--s3) 50%, var(--s2) 75%);
+    background-size: 800px 100%; animation: ag-shimmer 1.4s infinite;
+    border-radius: 6px; height: 1em; display: inline-block; width: 100%;
+  }
+
+  /* ══ PLACEHOLDER ══ */
+  .ag-placeholder {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 10px; color: var(--text-3);
+  }
+  .ag-placeholder h2 { font-family: 'Sora',sans-serif; font-size: 18px; font-weight: 600; color: var(--text-2); }
+  .ag-placeholder p  { font-size: 13px; }
+
+  /* ══ MOBILE BOTTOM NAV ══ */
+  .ag-mobile-nav {
+    display: none;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    height: 60px;
+    background: var(--s1);
+    border-top: 1px solid var(--border);
+    z-index: 100;
+    align-items: stretch;
+  }
+  .ag-mobile-nav-btn {
+    flex: 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 3px;
+    background: transparent; border: none; cursor: pointer;
+    color: var(--text-3); font-family: 'DM Sans', sans-serif;
+    font-size: 9px; font-weight: 500; letter-spacing: .03em;
+    transition: color .15s, background .15s;
+    padding: 4px 2px;
+  }
+  .ag-mobile-nav-btn.active { color: var(--gold); background: var(--gold-d); }
+  .ag-mobile-nav-btn:hover  { color: var(--text); }
+
+  /* ══ MOBILE OVERLAY SIDEBAR ══ */
+  .ag-mobile-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.72);
+    z-index: 200;
+    backdrop-filter: blur(4px);
+    animation: fadeIn .18s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+  .ag-sidebar-mobile {
+    position: fixed; top: 0; left: 0; bottom: 0;
+    width: 280px; max-width: 85vw;
+    background: var(--s1); border-right: 1px solid var(--border);
+    z-index: 201; display: flex; flex-direction: column;
+    overflow-y: auto;
+    animation: ag-slide-in .22s cubic-bezier(0.4,0,0.2,1);
+  }
+  @keyframes ag-slide-in {
+    from { transform: translateX(-100%); }
+    to   { transform: translateX(0); }
+  }
+  .ag-sidebar-mobile-header {
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center;
+    justify-content: space-between; flex-shrink: 0;
+  }
+  .ag-sidebar-mobile-close {
+    background: var(--s3); border: 1px solid var(--border);
+    border-radius: 8px; width: 32px; height: 32px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--text-2);
+    transition: background .13s, color .13s;
+    flex-shrink: 0;
+  }
+  .ag-sidebar-mobile-close:hover { background: var(--s2); color: var(--text); }
+
+  /* ══ RESPONSIVO (desktop) ══ */
+  @media (max-width: 1100px) {
+    .g4  { grid-template-columns: repeat(2, 1fr); }
+    .g3  { grid-template-columns: repeat(2, 1fr); }
+    .g21 { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 720px) {
+    .ag-sidebar     { display: none; }
+    .ag-toggle-btn  { display: none; }
+    .g4, .g3, .g11 { grid-template-columns: 1fr; }
+    .ag-content     { padding: 14px 14px 28px; }
+    .ag-periods     { display: none; }
+    .ag-header-logo-name { display: none; }
+    .ag-user-name   { display: none; }
+    .ag-topbar      { padding: 12px 14px; flex-wrap: wrap; }
+  }
+  @media (max-width: 480px) {
+    .ag-header-logo { padding: 0 10px; }
+    .ag-notif       { display: none; }
+  }
+
+  /* ══ BOTÃO DE TEMA ══ */
+  .ag-theme-btn {
+    width: 34px; height: 34px; border-radius: 8px;
+    background: var(--s2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: border-color .15s, color .15s, transform .25s;
+    color: var(--text-2); flex-shrink: 0; margin-left: 8px;
+    user-select: none;
+  }
+  .ag-theme-btn:hover {
+    border-color: var(--gold);
+    color: var(--gold);
+    transform: rotate(20deg);
+  }
+
+  /* ══ TEMA LIGHT ══ */
+  .ag-app.light {
+    --bg:       #f4f3f0;
+    --s1:       #ffffff;
+    --s2:       #f0efe9;
+    --s3:       #e8e7e0;
+    --border:   rgba(0,0,0,0.08);
+    --border-h: rgba(0,0,0,0.15);
+    --gold:         #a07c1a;
+    --gold-l:       #c09a30;
+    --gold-d:       rgba(160,124,26,0.1);
+    --gold-brand:   #a07c1a;
+    --text:     #1a1a1a;
+    --text-2:   #555050;
+    --text-3:   #999490;
+    --green:    #1a9e6a;
+    --green-d:  rgba(26,158,106,0.1);
+    --red:      #c03030;
+    --red-d:    rgba(192,48,48,0.1);
+    --blue:     #2a5ec0;
+    --blue-d:   rgba(42,94,192,0.1);
+    --purple:   #6b4fc8;
+    --purple-d: rgba(107,79,200,0.1);
+    --amber:    #c07800;
+    --amber-d:  rgba(192,120,0,0.1);
+    color-scheme: light;
+  }
+  .ag-app.light .ag-date-input { color-scheme: light; }
+  .ag-app.light .ag-user-dropdown { box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
+  .ag-app.light .ag-avatar {
+    background: linear-gradient(135deg, rgba(160,124,26,0.15), rgba(160,124,26,0.05));
+    border-color: rgba(160,124,26,0.25);
+  }
+  .ag-app.light .ag-header-logo-icon {
+    background: linear-gradient(135deg, #b8952e, #d4af37);
+  }
 `;
 
 /* ══════════════════════════════════════════════════════
-   UTILITÁRIOS
-   ══════════════════════════════════════════════════════ */
-function Toast({ msg, type, onClose }) {
-  useEffect(() => {
-    const t = setTimeout(onClose, 3500);
-    return () => clearTimeout(t);
-  }, [onClose]);
+   SUB-COMPONENTES
+═══════════════════════════════════════════════════════ */
+
+function CustomTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+  const value = payload[0]?.value;
   return (
-    <div className={`cfg-toast ${type}`}>
-      {type === "success" ? <Check size={14} /> : <AlertCircle size={14} />}
-      {msg}
-    </div>
-  );
-}
-
-function Toggle({ checked, onChange, disabled }) {
-  return (
-    <label className="toggle-switch" onClick={e => e.stopPropagation()}>
-      <input
-        type="checkbox" checked={checked}
-        onChange={e => !disabled && onChange(e.target.checked)}
-        disabled={disabled}
-      />
-      <span className="toggle-track" />
-    </label>
-  );
-}
-
-function PassInput({ value, onChange, placeholder, className }) {
-  const [show, setShow] = useState(false);
-  return (
-    <div className="input-pass-wrap">
-      <input
-        type={show ? "text" : "password"}
-        className={`form-input ${className || ""}`}
-        value={value} onChange={onChange} placeholder={placeholder}
-      />
-      <button className="input-pass-toggle" onClick={() => setShow(s => !s)} type="button">
-        {show ? <EyeOff size={14} /> : <Eye size={14} />}
-      </button>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════
-   SEÇÕES
-   ══════════════════════════════════════════════════════ */
-function SecaoEmpresa({ config, onSave, uid }) {
-  const [form, setForm] = useState({
-    nomeEmpresa: config?.empresa?.nomeEmpresa || config?.nomeEmpresa || "",
-    cnpj:        config?.empresa?.cnpj        || config?.cnpj        || "",
-    telefone:    config?.empresa?.telefone    || config?.telefone    || "",
-    endereco:    config?.empresa?.endereco    || config?.endereco    || "",
-    logo:        config?.empresa?.logo        || config?.logo        || "",
-  });
-  const [erros, setErros]       = useState({});
-  const [salvando, setSalvando] = useState(false);
-  const fileRef = useRef();
-
-  useEffect(() => {
-    if (!config) return;
-    setForm({
-      nomeEmpresa: config?.empresa?.nomeEmpresa || "",
-      cnpj:        config?.empresa?.cnpj        || "",
-      telefone:    config?.empresa?.telefone    || "",
-      endereco:    config?.empresa?.endereco    || "",
-      logo:        config?.empresa?.logo        || "",
-    });
-  }, [config]);
-
-  const set = (k, v) => {
-    setForm(f => ({ ...f, [k]: v }));
-    if (erros[k]) setErros(e => ({ ...e, [k]: "" }));
-  };
-
-  const validarEmpresa = () => {
-    const e = {};
-    if (form.cnpj?.trim()) {
-      const clean = form.cnpj.replace(/\D/g, "");
-      if      (clean.length === 11 && !validarCPF(clean))  e.cnpj = "CPF inválido.";
-      else if (clean.length === 14 && !validarCNPJ(clean)) e.cnpj = "CNPJ inválido.";
-      else if (clean.length !== 11 && clean.length !== 14) e.cnpj = "CPF (11) ou CNPJ (14 dígitos).";
-    }
-    setErros(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleLogo = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const MAX_DIM = 800;
-    const isPng   = file.type === "image/png";
-
-    // Redimensiona e converte para Blob antes do upload pro Storage
-    const redimensionar = (src) =>
-      new Promise((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => {
-          let { width, height } = img;
-          if (width > MAX_DIM || height > MAX_DIM) {
-            if (width >= height) { height = Math.round(height * MAX_DIM / width); width = MAX_DIM; }
-            else                 { width  = Math.round(width  * MAX_DIM / height); height = MAX_DIM; }
-          }
-          const canvas = document.createElement("canvas");
-          canvas.width = width; canvas.height = height;
-          const ctx = canvas.getContext("2d");
-          // PNG preserva transparência; JPEG recebe fundo branco (não suporta alpha)
-          if (!isPng) { ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, width, height); }
-          ctx.drawImage(img, 0, 0, width, height);
-          canvas.toBlob(resolve, isPng ? "image/png" : "image/jpeg", 0.85);
-        };
-        img.onerror = reject;
-        img.src = src;
-      });
-
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      try {
-        setSalvando(true);
-        const blob = await redimensionar(ev.target.result);
-        // Caminho fixo por tenant — novo upload sobrescreve o anterior automaticamente
-        const sRef = storageRef(getStorage(), `logos/${uid}/logo`);
-        await uploadBytes(sRef, blob);
-        const url  = await getDownloadURL(sRef);
-        set("logo", url);
-      } catch {
-        alert("Não foi possível enviar a imagem. Tente novamente.");
-      } finally {
-        setSalvando(false);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleSalvar = async () => {
-    if (!validarEmpresa()) return;
-    setSalvando(true);
-    try {
-      await onSave({ empresa: form });
-    } finally {
-      setSalvando(false);
-    }
-  };
-  return (
-    <div className="cfg-card">
-      <div className="cfg-card-header">
-        <div className="cfg-card-header-icon"><Building2 size={15} /></div>
-        <div>
-          <div className="cfg-card-title">Dados da Empresa</div>
-          <div className="cfg-card-sub">Informações exibidas em documentos e recibos</div>
-        </div>
+    <div style={{
+      background: "var(--s2)",
+      backdropFilter: "blur(12px)",
+      WebkitBackdropFilter: "blur(12px)",
+      border: "1px solid rgba(200,165,94,0.25)",
+      borderRadius: 12,
+      padding: "10px 14px",
+      fontSize: 12,
+      boxShadow: "0 8px 32px rgba(0,0,0,0.2), 0 0 0 1px rgba(200,165,94,0.08) inset",
+      minWidth: 130,
+      pointerEvents: "none",
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
+        <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#c8a55e", boxShadow: "0 0 6px #c8a55e88" }} />
+        <span style={{ color: "var(--gold)", fontWeight: 500, fontSize: 11, letterSpacing: "0.04em" }}>{label}</span>
       </div>
-      <div className="cfg-card-body">
-        <div className="form-group">
-          <label className="form-label">Logo da Empresa</label>
-          <div
-            className={`logo-upload-area ${form.logo ? "has-logo" : ""}`}
-            onClick={() => !form.logo && fileRef.current?.click()}
-          >
-            {form.logo ? (
-              <>
-                <img src={form.logo} alt="Logo" className="logo-preview" />
-                <div className="logo-upload-btn-row">
-                  <button className="btn-secondary" style={{ fontSize: 11, padding: "4px 10px" }}
-                    onClick={e => { e.stopPropagation(); fileRef.current?.click(); }}>Trocar</button>
-                  <button className="btn-logo-remove"
-                    onClick={async e => {
-                      e.stopPropagation();
-                      try {
-                        const sRef = storageRef(getStorage(), `logos/${uid}/logo`);
-                        await deleteObject(sRef);
-                      } catch {} // ignora se arquivo já não existe no Storage
-                      set("logo", "");
-                    }}>Remover</button>
-                </div>
-              </>
-            ) : (
-              <>
-                <Camera size={22} color="var(--text-3)" />
-                <span className="logo-upload-hint">Clique para enviar a logo<br />PNG, JPEG ou WebP · Compactado automaticamente</span>
-              </>
-            )}
-          </div>
-          <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp"
-            style={{ display: "none" }} onChange={handleLogo} />
-        </div>
-        <div className="form-row">
-          <div className="form-group">
-            <label className="form-label">Nome da Empresa</label>
-            <input className="form-input" value={form.nomeEmpresa}
-              onChange={e => set("nomeEmpresa", e.target.value)} placeholder="Nome ou razão social" />
-          </div>
-          <div className="form-group">
-            <label className="form-label">CNPJ / CPF</label>
-            <input className={`form-input ${erros.cnpj ? "err" : ""}`} value={form.cnpj}
-              onChange={e => set("cnpj", e.target.value)} placeholder="00.000.000/0001-00" />
-            {erros.cnpj && <div className="form-error">{erros.cnpj}</div>}
-          </div>
-        </div>
-        <div className="form-row">
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Telefone</label>
-            <input className="form-input" value={form.telefone}
-              onChange={e => set("telefone", e.target.value)} placeholder="(62) 99999-9999" />
-          </div>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Endereço</label>
-            <input className="form-input" value={form.endereco}
-              onChange={e => set("endereco", e.target.value)} placeholder="Rua, número, bairro, cidade" />
-          </div>
-        </div>
-      </div>
-      <div className="cfg-card-footer">
-        <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
-          {salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Empresa</>}
-        </button>
+      <div style={{ color: "var(--text)", fontWeight: 700, fontSize: 14, letterSpacing: "-0.01em" }}>
+        R$ {value?.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
       </div>
     </div>
   );
 }
 
-function SecaoSeguranca() {
-  const [form, setForm]         = useState({ senhaAtual: "", novaSenha: "", confirmar: "" });
-  const [erros, setErros]       = useState({});
-  const [salvando, setSalvando] = useState(false);
-  const [sucesso, setSucesso]   = useState(false);
-
-  const set = (k, v) => {
-    setForm(f => ({ ...f, [k]: v }));
-    if (erros[k]) setErros(e => ({ ...e, [k]: "" }));
-  };
-
-  const validar = () => {
-    const e = {};
-    if (!form.senhaAtual)                e.senhaAtual = "Informe a senha atual.";
-    if (form.novaSenha.length < 6)       e.novaSenha  = "Mínimo 6 caracteres.";
-    if (form.novaSenha !== form.confirmar) e.confirmar = "As senhas não conferem.";
-    setErros(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSalvar = async () => {
-    if (!validar()) return;
-    setSalvando(true); setSucesso(false);
-    try {
-      const user = auth.currentUser;
-      const credential = EmailAuthProvider.credential(user.email, form.senhaAtual);
-      await reauthenticateWithCredential(user, credential);
-      await updatePassword(user, form.novaSenha);
-      setForm({ senhaAtual: "", novaSenha: "", confirmar: "" });
-      setSucesso(true);
-      setTimeout(() => setSucesso(false), 4000);
-    } catch (err) {
-      const isWrongPass = err.code === "auth/wrong-password" || err.code === "auth/invalid-credential";
-      setErros({ senhaAtual: isWrongPass ? "Senha atual incorreta." : `Erro: ${err.message}` });
-    } finally {
-      setSalvando(false);
-    }
-  };
-
-  return (
-    <div className="cfg-card">
-      <div className="cfg-card-header">
-        <div className="cfg-card-header-icon"><Lock size={15} /></div>
-        <div>
-          <div className="cfg-card-title">Trocar Senha</div>
-          <div className="cfg-card-sub">Autenticação via Firebase — confirme a senha atual</div>
-        </div>
-      </div>
-      <div className="cfg-card-body">
-        {sucesso && (
-          <div className="cfg-alert" style={{ background: "rgba(72,187,120,0.08)", border: "1px solid rgba(72,187,120,0.3)", color: "#48bb78", marginBottom: 16 }}>
-            <Check size={14} style={{ flexShrink: 0 }} />Senha alterada com sucesso!
-          </div>
-        )}
-        <div className="form-group">
-          <label className="form-label">Senha Atual <span className="form-label-req">*</span></label>
-          <PassInput value={form.senhaAtual} onChange={e => set("senhaAtual", e.target.value)}
-            placeholder="Digite sua senha atual" className={erros.senhaAtual ? "err" : ""} />
-          {erros.senhaAtual && <div className="form-error">{erros.senhaAtual}</div>}
-        </div>
-        <div className="form-row">
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Nova Senha <span className="form-label-req">*</span></label>
-            <PassInput value={form.novaSenha} onChange={e => set("novaSenha", e.target.value)}
-              placeholder="Mínimo 6 caracteres" className={erros.novaSenha ? "err" : ""} />
-            {erros.novaSenha && <div className="form-error">{erros.novaSenha}</div>}
-          </div>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Confirmar Nova Senha <span className="form-label-req">*</span></label>
-            <PassInput value={form.confirmar} onChange={e => set("confirmar", e.target.value)}
-              placeholder="Repita a nova senha" className={erros.confirmar ? "err" : ""} />
-            {erros.confirmar && <div className="form-error">{erros.confirmar}</div>}
-          </div>
-        </div>
-      </div>
-      <div className="cfg-card-footer">
-        <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
-          {salvando ? <><span className="cfg-spinner" />Alterando...</> : <><Lock size={13} />Alterar Senha</>}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-const normalizaTaxa = (raw) => {
-  let v = String(raw).replace(",", ".").replace(/[^0-9.]/g, "");
-  const parts = v.split(".");
-  if (parts.length > 2) v = parts[0] + "." + parts.slice(1).join("");
-  if (v.includes(".")) {
-    const [int, dec] = v.split(".");
-    v = int + "." + dec.slice(0, 2);
-  }
-  return v;
-};
-
-const taxaValida = (v) => {
-  const n = parseFloat(v);
-  return v !== "" && !isNaN(n) && n >= 0;
-};
-
-function SecaoFinanceiro({ config, onSave }) {
-  const [taxas, setTaxas]       = useState(() => ({ ...TAXAS_DEFAULT, ...(config?.taxas || {}) }));
-  const [erros, setErros]       = useState({});
-  const [salvando, setSalvando] = useState(false);
-
-  useEffect(() => {
-    if (config?.taxas) setTaxas(prev => ({ ...TAXAS_DEFAULT, ...config.taxas }));
-  }, [config]);
-
-  const setTaxa = (k, raw) => {
-    const v = normalizaTaxa(raw);
-    setTaxas(t => ({ ...t, [k]: v }));
-    if (erros[k]) setErros(e => ({ ...e, [k]: "" }));
-  };
-
-  const validar = () => {
-    const e = {};
-    Object.keys(taxas).forEach(k => { if (!taxaValida(taxas[k])) e[k] = "Inválido"; });
-    setErros(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSalvar = async () => {
-    if (!validar()) return;
-    const taxasFinais = {};
-    Object.keys(taxas).forEach(k => { taxasFinais[k] = parseFloat(parseFloat(taxas[k]).toFixed(2)); });
-    setSalvando(true);
-    await onSave({ taxas: taxasFinais });
-    setSalvando(false);
-  };
-
-  const TaxaRow = ({ chave, label, tipo }) => (
-    <tr>
-      <td><span className="taxa-bandeira">{label}</span></td>
-      <td><span className="taxa-tipo-badge">{tipo}</span></td>
-      <td style={{ textAlign: "right" }}>
-        <span style={{ display: "inline-flex", alignItems: "center" }}>
-          <input className={`taxa-input ${erros[chave] ? "err" : ""}`} value={taxas[chave] ?? ""} onChange={e => setTaxa(chave, e.target.value)} inputMode="decimal" />
-          <span className="taxa-pct">%</span>
-        </span>
-      </td>
-    </tr>
-  );
-
-  return (
-    <div className="cfg-card">
-      <div className="cfg-card-header">
-        <div className="cfg-card-header-icon"><CreditCard size={15} /></div>
-        <div>
-          <div className="cfg-card-title">Taxa de Máquina de Cartão</div>
-          <div className="cfg-card-sub">Usada para calcular lucro líquido nas vendas</div>
-        </div>
-      </div>
-      <div className="cfg-card-body" style={{ padding: 0 }}>
-        <table className="taxa-table">
-          <thead><tr><th>Modalidade</th><th>Tipo</th><th style={{ textAlign: "right" }}>Taxa (%)</th></tr></thead>
-          <tbody>
-            <tr className="taxa-section-divider"><td colSpan={3}>Outros</td></tr>
-            <TaxaRow chave="debito" label="Débito" tipo="Débito" />
-            <TaxaRow chave="pix"    label="PIX"    tipo="PIX"    />
-            <tr className="taxa-section-divider"><td colSpan={3}>Crédito</td></tr>
-            {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
-              <TaxaRow key={n} chave={`credito_${n}`} label={`Crédito ${n}x`} tipo="Crédito" />
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="cfg-card-footer">
-        <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
-          {salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Taxas</>}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════
-   MODAL TUTORIAL — Como cadastrar API de pagamento
-   ══════════════════════════════════════════════════════ */
-function ModalTutorialPagamento({ onClose }) {
-  const PASSOS = [
-    {
-      titulo: "Crie uma conta no Mercado Pago",
-      desc: <>Acesse <a className="tut-link" href="https://www.mercadopago.com.br" target="_blank" rel="noreferrer">mercadopago.com.br <ExternalLink size={10} /></a> e crie sua conta de <strong>pessoa jurídica (empresa)</strong> ou pessoa física. Uma conta de vendedor é necessária para receber pagamentos PIX automáticos.</>,
-    },
-    {
-      titulo: "Acesse o Painel do Desenvolvedor",
-      desc: <>Após logar, vá em <strong>Meu Perfil → Seu negócio → Configurações → Gestão e Administração → Credenciais</strong>. Ou acesse diretamente: <a className="tut-link" href="https://www.mercadopago.com.br/developers/panel/app" target="_blank" rel="noreferrer">painel de aplicações <ExternalLink size={10} /></a>.</>,
-    },
-    {
-      titulo: "Crie uma Aplicação",
-      desc: <>No painel do desenvolvedor, clique em <strong>"Criar aplicação"</strong>. Dê um nome como <em>"ASSENT Gestão"</em>, selecione <strong>Pagamentos online</strong> como produto e confirme a criação.</>,
-    },
-    {
-      titulo: "Use as Credenciais de Produção",
-      desc: <>Dentro da sua aplicação, acesse a aba <strong>"Credenciais de produção"</strong>. <br/><br/>⚠️ <strong>Não use credenciais de teste</strong> (sandbox) — elas não processam pagamentos reais. Somente credenciais de <strong>produção</strong> funcionam no PDV.</>,
-    },
-    {
-      titulo: "Copie o Access Token",
-      desc: <>Localize o campo <strong>"Access Token"</strong> de produção — começa com <code>APP_USR-</code> seguido de uma longa sequência. Clique em <strong>Copiar</strong> e cole no campo desta tela. O token é salvo criptografado no servidor — <strong>nunca fica exposto no navegador</strong>.</>,
-    },
-    {
-      titulo: "Registre o Webhook no Mercado Pago",
-      desc: <>Este é o passo mais importante para a confirmação automática. No painel MP acesse <strong>Seu negócio → Webhooks</strong>, clique em <strong>"Adicionar webhook"</strong> e configure:<br/><br/>
-        • <strong>URL:</strong> <code>https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook</code><br/>
-        • <strong>Eventos:</strong> marque <strong>"Pagamentos"</strong><br/><br/>
-        Isso faz o Mercado Pago notificar o ASSENT automaticamente quando o PIX for pago.</>,
-    },
-    {
-      titulo: "Ative e Salve no ASSENT",
-      desc: <>Cole o token no campo abaixo, ative o toggle <strong>"Ativar Pagamentos PIX"</strong> e clique em <strong>Salvar</strong>. Use <strong>"Testar conexão"</strong> para confirmar que o token está válido antes de usar no PDV.</>,
-    },
-    {
-      titulo: "Habilite o PIX na sua conta MP",
-      desc: <>Para receber via PIX, configure sua chave PIX dentro do app Mercado Pago: <strong>Configurações → PIX</strong>. Cadastre sua chave (CPF, CNPJ, e-mail ou telefone). Sem isso, o QR é gerado mas o pagamento não é processado.</>,
-    },
-  ];
-
-  return (
-    <div className="tut-overlay" onClick={onClose}>
-      <div className="tut-modal" onClick={e => e.stopPropagation()}>
-        <div className="tut-header">
-          <div className="tut-header-icon"><BookOpen size={16} /></div>
-          <div className="tut-header-title">
-            <h3>Como cadastrar a API de Pagamento</h3>
-            <p>Passo a passo para integrar o Mercado Pago ao PDV</p>
-          </div>
-          <button className="tut-close" onClick={onClose}><X size={16} /></button>
-        </div>
-
-        <div className="tut-body">
-          <div className="tut-warning">
-            <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-            <div>
-              <strong>Somente Administradores têm acesso</strong>
-              Esta configuração é restrita ao cargo de Admin do sistema. O Access Token dá acesso à sua conta de recebimentos — mantenha-o seguro e nunca compartilhe.
-            </div>
-          </div>
-
-          {PASSOS.map((p, i) => (
-            <div key={i} className="tut-step">
-              <div className="tut-step-num">{i + 1}</div>
-              <div className="tut-step-content">
-                <div className="tut-step-title">{p.titulo}</div>
-                <div className="tut-step-desc">{p.desc}</div>
-              </div>
-            </div>
-          ))}
-
-          <div className="tut-warning" style={{ background: "rgba(72,187,120,0.07)", borderColor: "rgba(72,187,120,0.25)", color: "#48bb78" }}>
-            <CheckCircle2 size={15} style={{ flexShrink: 0, marginTop: 1 }} />
-            <div>
-              <strong>Outros provedores</strong>
-              Futuramente serão suportados PagSeguro, Pagar.me e outros. Se você usa outro provedor, entre em contato com o suporte ASSENT.
-            </div>
-          </div>
-        </div>
-
-        <div className="tut-footer">
-          <span className="tut-footer-note">
-            Dúvidas? Documentação oficial: <span>developers.mercadopago.com</span>
-          </span>
-          <button className="btn-primary" onClick={onClose}>
-            <Check size={13} /> Entendi
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════
-   SEÇÃO PAGAMENTOS ONLINE — somente admin
-   Salva em: users/{uid}/config/geral → pagamentos.mercadopago
-   ══════════════════════════════════════════════════════ */
-function SecaoPagamentos({ config, onSave }) {
-  const [token,        setToken]        = useState(config?.pagamentos?.mercadopago?.accessToken || "");
-  const [ativo,        setAtivo]        = useState(config?.pagamentos?.mercadopago?.ativo ?? false);
-  const [showToken,    setShowToken]    = useState(false);
-  const [salvando,     setSalvando]     = useState(false);
-  const [testando,     setTestando]     = useState(false);
-  const [testeOk,      setTesteOk]      = useState(null); // null | true | false
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [copiado,      setCopiado]      = useState(false);
-
-  useEffect(() => {
-    setToken(config?.pagamentos?.mercadopago?.accessToken || "");
-    setAtivo(config?.pagamentos?.mercadopago?.ativo ?? false);
-    setTesteOk(null);
-  }, [config]);
-
-  const handleSalvar = async () => {
-    if (!token.trim()) { alert("Informe o Access Token antes de salvar."); return; }
-    setSalvando(true);
-    setTesteOk(null);
-    try {
-      await onSave({
-        pagamentos: {
-          mercadopago: {
-            accessToken:  token.trim(),
-            ativo,
-            atualizadoEm: new Date().toISOString(),
-          }
-        }
-      });
-    } finally {
-      setSalvando(false);
-    }
-  };
-
-  /* ── Testa o token via Cloud Function ──────────────────────────────
-     O token já está salvo no Firestore; a CF lê de lá e valida no MP.
-     Assim o token nunca sai do servidor para validação.
-  ─────────────────────────────────────────────────────────────────── */
-  const handleTestar = async () => {
-    if (!token.trim()) return;
-
-    // Se há alterações não salvas, salva primeiro
-    const tokenSalvo = config?.pagamentos?.mercadopago?.accessToken || "";
-    if (token.trim() !== tokenSalvo) {
-      alert("Salve o token antes de testar a conexão.");
-      return;
-    }
-
-    setTestando(true);
-    setTesteOk(null);
-    try {
-      const consultarFn = httpsCallable(functions, "consultarPagamento");
-      // Chama com paymentId inválido — se o erro for 404 (not found) o token é válido;
-      // se for 401 (unauthorized) o token é inválido. Qualquer resposta da CF = token ok.
-      await consultarFn({ tenantUid: config?._tenantUid || "", paymentId: 0 });
-      setTesteOk(true);
-    } catch (e) {
-      // Erro "not-found" ou "invalid-argument" = token válido (CF respondeu)
-      // Erro "failed-precondition" = token não configurado/inativo
-      const code = e?.code || "";
-      if (code === "functions/not-found" || code === "functions/invalid-argument") {
-        setTesteOk(true);
-      } else {
-        setTesteOk(false);
-      }
-    } finally {
-      setTestando(false);
-    }
-  };
-
-  const handleCopiar = () => {
-    if (!token) return;
-    navigator.clipboard.writeText(token).then(() => {
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 2000);
-    });
-  };
-
-  return (
-    <>
-      {showTutorial && <ModalTutorialPagamento onClose={() => setShowTutorial(false)} />}
-
-      <div className="cfg-card">
-        <div className="cfg-card-header">
-          <div className="cfg-card-header-icon"><Zap size={15} /></div>
-          <div>
-            <div className="cfg-card-title">Pagamentos Online</div>
-            <div className="cfg-card-sub">Integração com gateways de pagamento para QR Code PIX</div>
-          </div>
-        </div>
-
-        <div className="cfg-card-body">
-          <div className="pag-wrap">
-
-            <button className="pag-btn-tutorial" onClick={() => setShowTutorial(true)}>
-              <BookOpen size={13} />
-              <span>Tutorial — como cadastrar sua API de pagamento</span>
-              <ArrowRight size={13} />
-            </button>
-
-            <div className="pag-info-box">
-              <strong>Token protegido no servidor.</strong> O Access Token nunca trafega pelo navegador durante transações — todas as chamadas ao Mercado Pago passam pelas Cloud Functions do ASSENT.
-            </div>
-
-            <div className={`pag-mp-block ${ativo && token ? "ativo" : ""}`}>
-              <div className="pag-mp-head">
-                <div className="pag-mp-icon">
-                  <CreditCard size={18} color="#fff" />
-                </div>
-                <div className="pag-mp-label">
-                  <div className="pag-mp-nome">Mercado Pago</div>
-                  <div className={`pag-mp-tag ${ativo && token ? "" : "inativo"}`}>
-                    {ativo && token
-                      ? <><span style={{ width: 5, height: 5, borderRadius: "50%", background: "#48bb78", display: "inline-block" }} /> Ativo</>
-                      : "Não configurado"
-                    }
-                  </div>
-                </div>
-              </div>
-
-              <div className="pag-toggle-row">
-                <div>
-                  <div className="pag-toggle-label">Aceitar pagamentos PIX</div>
-                  <div className="pag-toggle-sub">Habilita o QR Code PIX no PDV</div>
-                </div>
-                <Toggle checked={ativo} onChange={setAtivo} />
-              </div>
-
-              <div className="pag-token-area">
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">
-                    Access Token de Produção <span className="form-label-req">*</span>
-                  </label>
-                  <div className="pag-token-wrap">
-                    <input
-                      type={showToken ? "text" : "password"}
-                      className="form-input"
-                      value={token}
-                      onChange={e => { setToken(e.target.value); setTesteOk(null); }}
-                      placeholder="APP_USR-••••••••••••••••••••••••••••••••••••••"
-                    />
-                    <button className="pag-token-toggle" onClick={() => setShowToken(s => !s)} type="button">
-                      {showToken ? <EyeOff size={13} /> : <Eye size={13} />}
-                    </button>
-                  </div>
-                </div>
-
-                <div className="pag-actions">
-                  <button
-                    className="btn-secondary"
-                    style={{ fontSize: 11, padding: "5px 12px", display: "flex", alignItems: "center", gap: 6 }}
-                    onClick={handleTestar}
-                    disabled={!token.trim() || testando}
-                    title="Salve o token antes de testar"
-                  >
-                    {testando
-                      ? <><span className="cfg-spinner" />Verificando...</>
-                      : testeOk === true
-                        ? <><Check size={12} color="#48bb78" />Verificado</>
-                        : testeOk === false
-                          ? <><WifiOff size={12} color="var(--red)" />Falhou</>
-                          : <><Wifi size={12} />Testar conexão</>
-                    }
-                  </button>
-                  <button
-                    className="btn-secondary"
-                    style={{ fontSize: 11, padding: "5px 12px", display: "flex", alignItems: "center", gap: 6 }}
-                    onClick={handleCopiar}
-                    disabled={!token}
-                  >
-                    <Copy size={11} />{copiado ? "Copiado!" : "Copiar token"}
-                  </button>
-                </div>
-
-                <div className={`pag-status ${testeOk === true ? "ok" : testeOk === false ? "erro" : ""}`}>
-                  <span className="pag-status-dot" />
-                  {testeOk === true
-                    ? "Cloud Function conectada ao Mercado Pago com sucesso"
-                    : testeOk === false
-                      ? "Falha — verifique o token e o webhook"
-                      : token
-                        ? "Salve e clique em Testar conexão para validar"
-                        : "Nenhum token configurado"
-                  }
-                </div>
-              </div>
-            </div>
-
-            <div className="pag-webhook">
-              <div className="pag-webhook-head">
-                <ServerCog size={13} />
-                Webhook — registre no painel do Mercado Pago
-              </div>
-              <div className="pag-webhook-url">
-                <span style={{ flex: 1 }}>
-                  https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook
-                </span>
-                <button
-                  className="pag-copy-url"
-                  onClick={() => navigator.clipboard.writeText("https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook")}
-                >
-                  <Copy size={10} /> Copiar
-                </button>
-              </div>
-              <div className="pag-flow">
-                {["Cliente paga o PIX", "MP notifica webhook", "Cloud Function", "Firestore atualiza"].map((s, i, arr) => (
-                  <span key={s} style={{ display: "contents" }}>
-                    <span className="pag-flow-step">{s}</span>
-                    <ArrowRight size={11} className="pag-flow-arrow" />
-                  </span>
-                ))}
-                <span className="pag-flow-step" style={{ color: "#48bb78" }}>Venda finalizada ✓</span>
-              </div>
-            </div>
-
-          </div>
-        </div>
-
-        <div className="cfg-card-footer">
-          <button className="btn-primary" onClick={handleSalvar} disabled={salvando || !token.trim()}>
-            {salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar</>}
-          </button>
-        </div>
-      </div>
-    </>
-  );
-}
-
-
-const buildVisivel = (cfg) => {
-  const base = {};
-  MENU_SECTIONS.forEach(s => {
-    base[s.key] = s.locked ? true : (cfg?.menuVisivel?.[s.key] !== undefined ? cfg.menuVisivel[s.key] : true);
-  });
-  return base;
-};
-
-function SecaoMenu({ config, onSave }) {
-  const [visivel, setVisivel]   = useState(() => buildVisivel(config));
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro]         = useState("");
-
-  useEffect(() => { if (config !== null) setVisivel(buildVisivel(config)); }, [config]);
-
-  const toggle = useCallback((key, val) => {
-    setVisivel(prev => ({ ...prev, [key]: val }));
-    setErro("");
-  }, []);
-
-  const handleSalvar = async () => {
-    setSalvando(true); setErro("");
-    try {
-      const menuVisivel = {};
-      MENU_SECTIONS.forEach(s => { if (!s.locked) menuVisivel[s.key] = visivel[s.key]; });
-      await onSave({ menuVisivel });
-    } catch { setErro("Falha ao salvar. Verifique sua conexão."); }
-    finally { setSalvando(false); }
-  };
-
-  return (
-    <div className="cfg-card">
-      <div className="cfg-card-header">
-        <div className="cfg-card-header-icon"><LayoutDashboard size={15} /></div>
-        <div><div className="cfg-card-title">Visibilidade do Menu</div><div className="cfg-card-sub">Oculte seções que não utiliza</div></div>
-      </div>
-      <div className="cfg-card-body">
-        <div className="menu-toggle-list">
-          {MENU_SECTIONS.map(s => (
-            <div key={s.key} className="menu-toggle-item">
-              <div className="menu-toggle-icon">{s.icon}</div>
-              <div style={{ flex: 1 }}><div className="menu-toggle-label">{s.label}</div><div className="menu-toggle-sub">{s.sub}</div></div>
-              {s.locked ? <span className="menu-toggle-locked">Sempre visível</span> : <Toggle checked={!!visivel[s.key]} onChange={val => toggle(s.key, val)} />}
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="cfg-card-footer"><button className="btn-primary" onClick={handleSalvar} disabled={salvando}>{salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Menu</>}</button></div>
-    </div>
-  );
-}
-
-function SecaoEstoque({ config, onSave }) {
-  const [minimo, setMinimo]     = useState(config?.estoqueMinimo ?? 5);
-  const [salvando, setSalvando] = useState(false);
-  useEffect(() => { if (config?.estoqueMinimo !== undefined) setMinimo(config.estoqueMinimo); }, [config]);
-  const handleSalvar = async () => { setSalvando(true); await onSave({ estoqueMinimo: Number(minimo) }); setSalvando(false); };
-  return (
-    <div className="cfg-card">
-      <div className="cfg-card-header">
-        <div className="cfg-card-header-icon"><Package size={15} /></div>
-        <div><div className="cfg-card-title">Estoque Mínimo Padrão</div><div className="cfg-card-sub">Alertas quando o limite for atingido</div></div>
-      </div>
-      <div className="cfg-card-body">
-        <div className="form-group"><label className="form-label">Quantidade mínima padrão</label><div style={{ display: "flex", alignItems: "center", gap: 10 }}><input type="number" min="0" className="form-input" style={{ maxWidth: 160 }} value={minimo} onChange={e => setMinimo(e.target.value)} /><span style={{ fontSize: 12, color: "var(--text-3)" }}>unidades</span></div></div>
-      </div>
-      <div className="cfg-card-footer"><button className="btn-primary" onClick={handleSalvar} disabled={salvando}>{salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Estoque</>}</button></div>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════
-   SEÇÃO ATALHOS — informativa, preparada para expansão
-   ══════════════════════════════════════════════════════ */
-function SecaoAtalhos({ menuVisivel = {} }) {
-  return (
-    <div className="cfg-card">
-      <div className="cfg-card-header">
-        <div className="cfg-card-header-icon"><Keyboard size={15} /></div>
-        <div>
-          <div className="cfg-card-title">Atalhos de Teclado</div>
-          <div className="cfg-card-sub">Navegue rapidamente usando o teclado</div>
-        </div>
-      </div>
-      <div className="cfg-card-body">
-        <div className="atalhos-intro">
-          Use <strong>Alt + tecla</strong> para saltar diretamente para qualquer módulo.{" "}
-          Atalhos são desativados automaticamente quando você está digitando em um campo.
-          Módulos ocultos no menu não respondem ao atalho.
-        </div>
-        <div className="atalhos-list">
-          {ATALHOS_MAP.map(({ code, display, key, hint }) => {
-            const section = MENU_SECTIONS.find(s => s.key === key);
-            if (!section) return null;
-            const ativo = section.locked || menuVisivel[key] !== false;
-            return (
-              <div key={code} className={`atalho-item${ativo ? "" : " atalho-disabled"}`}>
-                <div className="atalho-icon">{section.icon}</div>
-                <div className="atalho-info">
-                  <div className="atalho-label">{section.label}</div>
-                  <div className="atalho-sub">{hint}</div>
-                </div>
-                <kbd className="atalho-key">{display}</kbd>
-                {!ativo && <span className="atalho-hidden-badge">Oculto no menu</span>}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════
-   SEÇÃO LOG DE ATIVIDADES — somente admin
-   Firestore: users/{tenantUid}/logs (orderBy criadoEm desc)
-   ══════════════════════════════════════════════════════ */
-const PAGE_SIZE = 30;
-
-const MODULOS_LOG = [
-  "Todos", "Agenda", "A Receber", "Caixa Diário", "Clientes",
-  "Compras", "Configurações", "Despesas", "Entrada de Estoque",
-  "Fornecedores", "Matrículas", "Mesas", "Orçamentos", "PDV", "Produtos",
-  "Serviços", "Usuários", "Vendas", "Vendedores",
-];
-
-const ACOES_LOG = ["Todas", "criar", "editar", "excluir"];
-
-function fmtDataLog(iso) {
-  if (!iso) return "—";
-  try {
-    const d = new Date(iso);
-    return d.toLocaleString("pt-BR", {
-      day: "2-digit", month: "2-digit", year: "numeric",
-      hour: "2-digit", minute: "2-digit",
-    });
-  } catch { return iso; }
-}
-
-function SecaoLog({ tenantUid }) {
-  // Todos os logs brutos do Firestore — sem where, sem índice composto
-  const [todosLogs, setTodosLogs]     = useState([]);
-  const [carregando, setCarregando]   = useState(true);
-  const [carregandoMais, setCarregandoMais] = useState(false);
-  const [ultimoDoc, setUltimoDoc]     = useState(null);
-  const [temMais, setTemMais]         = useState(false);
-
-  // Filtros e busca — todos aplicados no cliente
-  const [busca, setBusca]             = useState("");
-  const [filtroAcao, setFiltroAcao]   = useState("Todas");
-  const [filtroModulo, setFiltroModulo] = useState("Todos");
-
-  // Busca apenas por criadoEm desc — sem where, sem índice composto
-  const carregarLogs = useCallback(async (resetar = true) => {
-    if (!tenantUid) return;
-    resetar ? setCarregando(true) : setCarregandoMais(true);
-
-    try {
-      let q = query(
-        collection(db, "users", tenantUid, "logs"),
-        orderBy("criadoEm", "desc"),
-        limit(PAGE_SIZE + 1)
-      );
-
-      if (!resetar && ultimoDoc) {
-        q = query(
-          collection(db, "users", tenantUid, "logs"),
-          orderBy("criadoEm", "desc"),
-          limit(PAGE_SIZE + 1),
-          startAfter(ultimoDoc)
-        );
-      }
-
-      const snap = await getDocs(q);
-      const docs = snap.docs;
-      const temProximo = docs.length > PAGE_SIZE;
-      const fatia = temProximo ? docs.slice(0, PAGE_SIZE) : docs;
-      const dados = fatia.map(d => ({ id: d.id, ...d.data() }));
-
-      setTodosLogs(prev => resetar ? dados : [...prev, ...dados]);
-      setUltimoDoc(fatia[fatia.length - 1] ?? null);
-      setTemMais(temProximo);
-    } catch (err) {
-      console.error("[SecaoLog] Erro ao carregar logs:", err);
-    } finally {
-      setCarregando(false);
-      setCarregandoMais(false);
-    }
-  }, [tenantUid, ultimoDoc]);
-
-  useEffect(() => {
-    setUltimoDoc(null);
-    carregarLogs(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantUid]);
-
-  // Todos os filtros aplicados no cliente — sem índice necessário
-  const logsFiltrados = useMemo(() => {
-    let lista = todosLogs;
-
-    if (filtroAcao !== "Todas") {
-      lista = lista.filter(l => l.acao === filtroAcao);
-    }
-
-    if (filtroModulo !== "Todos") {
-      lista = lista.filter(l => l.modulo === filtroModulo);
-    }
-
-    if (busca.trim()) {
-      const q = busca.toLowerCase();
-      lista = lista.filter(l =>
-        l.descricao?.toLowerCase().includes(q) ||
-        l.nomeUsuario?.toLowerCase().includes(q) ||
-        l.modulo?.toLowerCase().includes(q) ||
-        l.cargo?.toLowerCase().includes(q)
-      );
-    }
-
-    return lista;
-  }, [todosLogs, filtroAcao, filtroModulo, busca]);
-
-  const badgeClass = (acao) => {
-    if (acao === "criar")   return "log-acao-badge log-acao-criar";
-    if (acao === "editar")  return "log-acao-badge log-acao-editar";
-    if (acao === "excluir") return "log-acao-badge log-acao-excluir";
-    return "log-acao-badge log-acao-editar";
-  };
-
-  return (
-    <div className="cfg-card">
-      <div className="cfg-card-header">
-        <div className="cfg-card-header-icon"><Activity size={15} /></div>
-        <div>
-          <div className="cfg-card-title">Log de Atividades</div>
-          <div className="cfg-card-sub">Histórico de ações realizadas no sistema</div>
-        </div>
-      </div>
-
-      <div className="cfg-card-body" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        {/* Toolbar */}
-        <div className="log-toolbar">
-          <div className="log-search-wrap">
-            <Search size={13} color="var(--text-3)" />
-            <input
-              className="log-search-input"
-              placeholder="Buscar por ação, usuário ou módulo..."
-              value={busca}
-              onChange={e => setBusca(e.target.value)}
-            />
-          </div>
-
-          <select
-            className="log-select"
-            value={filtroAcao}
-            onChange={e => { setFiltroAcao(e.target.value); setUltimoDoc(null); }}
-          >
-            {ACOES_LOG.map(a => (
-              <option key={a} value={a}>
-                {a === "Todas" ? "Todas as ações" : a.charAt(0).toUpperCase() + a.slice(1)}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className="log-select"
-            value={filtroModulo}
-            onChange={e => { setFiltroModulo(e.target.value); setUltimoDoc(null); }}
-          >
-            {MODULOS_LOG.map(m => (
-              <option key={m} value={m}>
-                {m === "Todos" ? "Todos os módulos" : m}
-              </option>
-            ))}
-          </select>
-
-          <button
-            className="log-btn-refresh"
-            onClick={() => { setUltimoDoc(null); carregarLogs(true); }}
-            disabled={carregando}
-          >
-            <RefreshCw size={13} style={carregando ? { animation: "spin .8s linear infinite" } : {}} />
-            Atualizar
-          </button>
-        </div>
-
-        {/* Lista */}
-        {carregando ? (
-          <div className="log-loading">
-            <span className="cfg-spinner" style={{ border: "2px solid rgba(200,165,94,0.2)", borderTopColor: "var(--gold)" }} />
-            Carregando logs...
-          </div>
-        ) : logsFiltrados.length === 0 ? (
-          <div className="log-empty">
-            {busca.trim() ? "Nenhum resultado para esta busca." : "Nenhuma atividade registrada ainda."}
-          </div>
-        ) : (
-          <>
-            <div className="log-list">
-              {logsFiltrados.map(log => (
-                <div key={log.id} className="log-item">
-                  <span className={badgeClass(log.acao)}>
-                    {log.acao || "—"}
-                  </span>
-                  <div className="log-info">
-                    <div className="log-desc">{log.descricao || "—"}</div>
-                    <div className="log-meta">
-                      <span className="log-modulo-badge">{log.modulo || "—"}</span>
-                      <span className="log-meta-dot">·</span>
-                      <span className="log-meta-item">{log.nomeUsuario || "—"}</span>
-                      {log.cargo && (
-                        <>
-                          <span className="log-meta-dot">·</span>
-                          <span className="log-meta-item" style={{ textTransform: "capitalize" }}>{log.cargo}</span>
-                        </>
-                      )}
-                      <span className="log-meta-dot">·</span>
-                      <span className="log-meta-item">{fmtDataLog(log.timestamp)}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {temMais && !busca.trim() && (
-              <button
-                className="log-load-more"
-                onClick={() => carregarLogs(false)}
-                disabled={carregandoMais}
-              >
-                {carregandoMais
-                  ? <><span className="cfg-spinner" style={{ border: "2px solid rgba(200,165,94,0.2)", borderTopColor: "var(--gold)" }} />Carregando...</>
-                  : <>Carregar mais</>
-                }
-              </button>
-            )}
-
-            <div className="log-count-bar">
-              {logsFiltrados.length} {logsFiltrados.length === 1 ? "registro" : "registros"} exibidos
-              {(filtroAcao !== "Todas" || filtroModulo !== "Todos" || busca.trim()) && todosLogs.length > 0 &&
-                ` (de ${todosLogs.length} carregados)`
-              }
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
+function Val({ v, loading, prefix = "", suffix = "" }) {
+  if (loading) return <span className="ag-skeleton" style={{ width: 80 }} />;
+  return <>{prefix}{v}{suffix}</>;
 }
 
 /* ══════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
-   ══════════════════════════════════════════════════════ */
-/* ─────────────────────────────────────────────
-   Seções visíveis por cargo
-───────────────────────────────────────────── */
-const SECOES_POR_CARGO = {
-  admin:       ["empresa", "seguranca", "financeiro", "pagamentos", "menu", "estoque", "atalhos", "log"],
-  financeiro:  ["seguranca", "financeiro", "atalhos"],
-  comercial:   ["seguranca", "atalhos"],
-  compras:     ["seguranca", "estoque", "atalhos"],
-  operacional: ["seguranca", "estoque", "atalhos"],
-  vendedor:    ["seguranca", "atalhos"],
-  suporte:     ["seguranca", "atalhos"],
-};
+═══════════════════════════════════════════════════════ */
+export default function Dashboard() {
+  const [period,        setPeriod]       = useState("Este mês");
+  const [customRange,   setCustomRange]  = useState({ from: "", to: "" });
+  const [module,        setModule]       = useState("Dashboard");
+  const [userName,      setUserName]     = useState("Usuário");
+  const [userAvatar,    setUserAvatar]   = useState(null);
+  const [menuVisivel,   setMenuVisivel]  = useState({});
+  const [collapsed,     setCollapsed]    = useState(
+    () => localStorage.getItem("ag_sidebar_collapsed") === "true"
+  );
+  const [dropdownOpen,  setDropdownOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [notifOpen,     setNotifOpen]    = useState(false);
+  const [notificacoes,  setNotificacoes] = useState([]);
+  const [notifLidas,    setNotifLidas]   = useState(
+    () => { try { return JSON.parse(localStorage.getItem("ag_notif_lidas") || "[]"); } catch { return []; } }
+  );
+  const [notifDespesas, setNotifDespesas] = useState([]);
+  const [notifInsights, setNotifInsights] = useState([]);
+  const notifRef = useRef(null);
+  const [theme, setTheme] = useState(
+    () => localStorage.getItem("ag_theme") || "dark"
+  );
+  const [dashView, setDashView] = useState("overview"); // "overview" | "charts"
+  const [clientesCadastro, setClientesCadastro] = useState([]);
+   
+const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin } = usePermissao();
+  const { user: authUser, tenantUid, nomeUsuario } = useAuth();
 
-export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
-  // ── Multi-tenant ──
-  const { tenantUid, cargo, isAdmin } = useAuth();
-  const uid = tenantUid;
-
-  const [config, setConfig]   = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [secao, setSecao]     = useState(isAdmin ? "empresa" : "seguranca");
-  const [toast, setToast]     = useState(null);
-
-  // Seções que este cargo pode ver
-  const secoesVisiveis = SECOES_POR_CARGO[cargo] ?? ["seguranca", "atalhos"];
-  const navFiltrado    = NAV.filter(n => secoesVisiveis.includes(n.id));
-
+  // uid como estado local derivado de tenantUid.
+  // Necessário para que os data hooks (useEmpresa, useLicenca, useDashboardData)
+  // disparem seus useEffect([uid]) corretamente quando o auth resolve.
+  // Usa tenantUid (não user.uid) para que colaboradores vejam dados do tenant certo.
+  const [uid, setUid] = useState(tenantUid ?? null);
   useEffect(() => {
-    if (!uid) { setLoading(false); return; }
-    const ref = doc(db, "users", uid, "config", "geral");
-    getDoc(ref).then(snap => setConfig(snap.exists() ? snap.data() : {})).catch(() => setConfig({})).finally(() => setLoading(false));
-  }, [uid]);
+    if (tenantUid) setUid(tenantUid);
+  }, [tenantUid]);
+   
+  const toggleTheme = () => {
+    setTheme(prev => {
+      const next = prev === "dark" ? "light" : "dark";
+      localStorage.setItem("ag_theme", next);
+      return next;
+    });
+  };
+  const dropdownRef = useRef(null);
 
-  const handleSave = useCallback(async (partial) => {
+  /* ── Hooks de dados — declarados aqui para isPro estar disponível nos useEffects abaixo ── */
+  const empresa = useEmpresa(uid);
+  const { isPro } = useLicenca(tenantUid);
+  const dash    = useDashboardData(
+    uid, period,
+    period === "Personalizado" && customRange.from && customRange.to ? customRange : null
+  );
+
+  /* ── Notificações AG — listener em tempo real ── */
+  useEffect(() => {
+    if (!tenantUid) return;
+    const q = collection(db, "notificacoesAG");
+    const qOrdered = query(q, orderBy("criadoEm", "desc"), limit(50));
+    const seteDiasAtras = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const unsub = onSnapshot(qOrdered, (snap) => {
+      const todas = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const filtradas = todas.filter((n) => {
+        // Filtro de plano
+        const planOk =
+          n.destinatario === "todos" ||
+          (n.destinatario === "pro"  && isPro) ||
+          (n.destinatario === "free" && !isPro);
+        if (!planOk) return false;
+        // Filtro de 7 dias — ignora notificações antigas para o usuário
+        const data = n.criadoEm?.toDate ? n.criadoEm.toDate() : null;
+        if (data && data < seteDiasAtras) return false;
+        return true;
+      });
+      setNotificacoes(filtradas);
+    }, () => {/* silencia erros de permissão */});
+    return unsub;
+  }, [tenantUid, isPro]);
+
+  /* ── Notificações automáticas de despesas próximas do vencimento ── */
+  useEffect(() => {
     if (!uid) return;
-    try {
-      await setDoc(doc(db, "users", uid, "config", "geral"), partial, { merge: true });
-      setConfig(prev => ({ ...prev, ...partial }));
-      setToast({ msg: "Configurações salvas!", type: "success" });
-    } catch (err) { setToast({ msg: "Erro ao salvar.", type: "error" }); throw err; }
+    const q = query(
+      collection(db, "users", uid, "despesas"),
+      orderBy("vencimento", "asc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+
+      const alertas = [];
+      snap.docs.forEach((docSnap) => {
+        const d = { id: docSnap.id, ...docSnap.data() };
+
+        // Ignora despesas já pagas ou canceladas
+        if (d.status === "pago" || d.status === "cancelado") return;
+        if (!d.vencimento) return;
+
+        // Parse da data de vencimento (YYYY-MM-DD ou Timestamp)
+        let venc;
+        if (d.vencimento?.toDate) {
+          venc = d.vencimento.toDate();
+        } else if (typeof d.vencimento === "string") {
+          const [y, m, dia] = d.vencimento.split("-").map(Number);
+          venc = new Date(y, m - 1, dia);
+        } else {
+          return;
+        }
+        venc.setHours(0, 0, 0, 0);
+
+        const diffMs   = venc - hoje;
+        const diffDias = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+        if (diffDias < 0 || diffDias > 3) return; // só 0, 1, 2, 3 dias
+
+        const idShow = d.idShow || d.id.slice(0, 6).toUpperCase();
+        const nome   = d.descricao || "Sem descrição";
+
+        let titulo, urgencia;
+        if (diffDias === 0) {
+          titulo   = `⚠️ Vence hoje — #${idShow}`;
+          urgencia = "hoje";
+        } else if (diffDias === 1) {
+          titulo   = `🔔 Vence amanhã — #${idShow}`;
+          urgencia = "1dia";
+        } else if (diffDias === 2) {
+          titulo   = `📅 Vence em 2 dias — #${idShow}`;
+          urgencia = "2dias";
+        } else {
+          titulo   = `📅 Vence em 3 dias — #${idShow}`;
+          urgencia = "3dias";
+        }
+
+        alertas.push({
+          id:        `desp-${d.id}-${urgencia}`,
+          titulo,
+          mensagem:  nome,
+          despesaId: d.id,
+          diffDias,
+          urgencia,
+          tipo:      "despesa",
+        });
+      });
+
+      // Ordena: vence hoje → 1 dia → 2 dias → 3 dias
+      alertas.sort((a, b) => a.diffDias - b.diffDias);
+      setNotifDespesas(alertas);
+    }, () => {});
+    return unsub;
   }, [uid]);
 
-  const renderSecao = () => {
-    if (loading) return <div className="cfg-loading">Carregando configurações...</div>;
-    switch (secao) {
-      case "empresa":    return <SecaoEmpresa    config={config} onSave={handleSave} uid={uid} />;
-      case "seguranca":  return <SecaoSeguranca />;
-      case "financeiro": return <SecaoFinanceiro config={config} onSave={handleSave} />;
-      case "pagamentos": return <SecaoPagamentos config={config} onSave={handleSave} />;
-      case "menu":       return <SecaoMenu       config={config} onSave={handleSave} />;
-      case "estoque":    return <SecaoEstoque    config={config} onSave={handleSave} />;
-      case "atalhos":    return <SecaoAtalhos    menuVisivel={menuVisivelProp ?? config?.menuVisivel ?? {}} />;
-      case "log":        return <SecaoLog        tenantUid={uid} />;
-      default:           return null;
+  /* ── Insights automáticos de negócio — gerados pela Cloud Function diária ── */
+  useEffect(() => {
+    if (!uid) return;
+    const q = query(
+      collection(db, "users", uid, "insights"),
+      orderBy("criadoEm", "desc"),
+      limit(20)
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setNotifInsights(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    }, () => {});
+    return unsub;
+  }, [uid]);
+
+  /* ── Fecha painel de notificações ao clicar fora ── */
+  useEffect(() => {
+    if (!notifOpen) return;
+    const handler = (e) => {
+      if (!notifRef.current?.contains(e.target)) setNotifOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [notifOpen]);
+
+  /* Normaliza despesas: quanto mais urgente (diffDias menor), mais no topo */
+  const notifDespesasNorm = notifDespesas.map((n) => ({
+    ...n,
+    _ts: Date.now() - n.diffDias * 86400000,
+  }));
+
+  /* Notificações AG do sistema têm criadoEm (Firestore Timestamp) */
+  const notifSistemaNorm = notificacoes.map((n) => ({
+    ...n,
+    _ts: n.criadoEm?.toDate ? n.criadoEm.toDate().getTime() : 0,
+  }));
+
+  /* Insights de negócio por tenant */
+  const notifInsightsNorm = notifInsights.map((n) => ({
+    ...n,
+    tipo: "insight",
+    _ts: n.criadoEm?.toDate ? n.criadoEm.toDate().getTime() : 0,
+  }));
+
+  /* Merge cronológico: mais recente/urgente primeiro */
+  const todasNotif = [...notifDespesasNorm, ...notifSistemaNorm, ...notifInsightsNorm]
+    .sort((a, b) => b._ts - a._ts);
+
+  const notifNaoLidas = todasNotif.filter((n) => !notifLidas.includes(n.id)).length;
+
+  const marcarTodasLidas = () => {
+    const ids = todasNotif.map((n) => n.id);
+    setNotifLidas(ids);
+    localStorage.setItem("ag_notif_lidas", JSON.stringify(ids));
+  };
+
+  const abrirNotif = () => {
+    setNotifOpen((v) => !v);
+    if (!notifOpen) marcarTodasLidas();
+  };
+
+  /* ── Injeta CSS responsivo global após todos os estilos ── */
+  useEffect(() => {
+    let el = document.getElementById("ag-responsive-css");
+    if (!el) {
+      el = document.createElement("style");
+      el.id = "ag-responsive-css";
+      document.head.appendChild(el);
+    }
+    el.textContent = RESPONSIVE_CSS;
+  }, []);
+
+  /* ── Fecha mobile menu ao navegar ── */
+  const navigateTo = (label) => {
+    setModule(label);
+    setMobileMenuOpen(false);
+  };
+
+  /* ── Nome do usuário ──
+     Admin  → lê licencas/{tenantUid} → campo name
+     Convidado → lê users/{tenantUid}/usuarios/{authUser.uid} → campo nome */
+  useEffect(() => {
+    if (!uid || !authUser) return;
+
+    if (isAdmin) {
+      // Admin: fonte de verdade é licencas/{uid}
+      return onSnapshot(doc(db, "licencas", uid), (snap) => {
+        const name =
+          snap.data()?.name ||
+          nomeUsuario ||
+          authUser?.displayName ||
+          authUser?.email?.split("@")[0] ||
+          "Usuário";
+        setUserName(name);
+      });
+    } else {
+      // Convidado: nome salvo em users/{tenantUid}/usuarios/{authUser.uid}
+      return onSnapshot(doc(db, "users", uid, "usuarios", authUser.uid), (snap) => {
+        const name =
+          snap.data()?.nome ||
+          nomeUsuario ||
+          authUser?.displayName ||
+          authUser?.email?.split("@")[0] ||
+          "Usuário";
+        setUserName(name);
+      });
+    }
+  }, [uid, authUser, nomeUsuario, isAdmin]);
+
+  /* ── Avatar ──
+     Admin     → users/{uid}/foto/avatar → campo base64
+     Convidado → users/{tenantUid}/usuarios/{authUser.uid} → campo fotoBase64 */
+  useEffect(() => {
+    if (!uid || !authUser) return;
+
+    if (isAdmin) {
+      return onSnapshot(doc(db, "users", uid, "foto", "avatar"), (snap) => {
+        if (snap.exists()) {
+          const d = snap.data();
+          setUserAvatar(d?.base64 || d?.url || d?.photoURL || null);
+        } else {
+          setUserAvatar(null);
+        }
+      }, () => setUserAvatar(null));
+    } else {
+      // Convidado: foto salva no próprio documento do usuário
+      return onSnapshot(doc(db, "users", uid, "usuarios", authUser.uid), (snap) => {
+        const fotoBase64 = snap.data()?.fotoBase64 || null;
+        setUserAvatar(fotoBase64);
+      }, () => setUserAvatar(null));
+    }
+  }, [uid, authUser, isAdmin]);
+
+  /* ── Visibilidade do menu ── */
+  useEffect(() => {
+    if (!uid) return;
+    return onSnapshot(doc(db, "users", uid, "config", "geral"), (snap) => {
+      if (snap.exists()) setMenuVisivel(snap.data().menuVisivel || {});
+    });
+  }, [uid]);
+
+  /* ── Datas de cadastro dos clientes (gráfico de crescimento) ── */
+  useEffect(() => {
+    if (!uid) return;
+    return onSnapshot(collection(db, "users", uid, "clientes"), (snap) => {
+      setClientesCadastro(snap.docs.map(d => ({ criadoEm: d.data().criadoEm || null })));
+    });
+  }, [uid]);
+
+  /* ── Atalhos de teclado ── */
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (!e.altKey) return;
+      const tag = document.activeElement?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement?.isContentEditable) return;
+      const atalho = ATALHO_LOOKUP[e.code];
+      if (!atalho) return;
+      if (!LOCKED_KEYS.has(atalho.dbKey) && menuVisivel[atalho.dbKey] === false) return;
+      e.preventDefault();
+      setModule(atalho.label);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [menuVisivel]);
+
+  /* ── Fecha dropdown ao clicar fora ── */
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handler = (e) => {
+      if (!dropdownRef.current?.contains(e.target)) setDropdownOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [dropdownOpen]);
+
+  /* ── Fecha mobile menu com Escape ── */
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const handler = (e) => { if (e.key === "Escape") setMobileMenuOpen(false); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [mobileMenuOpen]);
+
+  /* ── Toggle sidebar ── */
+  const toggleSidebar = () =>
+    setCollapsed((v) => {
+      const next = !v;
+      localStorage.setItem("ag_sidebar_collapsed", String(next));
+      return next;
+    });
+
+  /* ── Logo e nome da empresa ── */
+  const logoUrl      = empresa?.logo || null;
+  const nomeEmpresa  = empresa?.nomeEmpresa || "Assent Gestão";
+  const logoInitials = nomeEmpresa
+    .split(" ").filter(Boolean).slice(0, 2)
+    .map((w) => w[0]).join("").toUpperCase();
+
+  const userInitial = userName.charAt(0).toUpperCase();
+
+  /* ── KPI Main ── */
+  const kpiMain = [
+    {
+      label: "Receita Bruta", value: fmtR$(dash.receitaBruta),
+      trend: `${dash.numVendas} venda${dash.numVendas !== 1 ? "s" : ""}`,
+      up: dash.receitaBruta > 0, accent: "var(--green)", sub: "no período selecionado",
+    },
+    {
+      label: "Custo Total", value: fmtR$(dash.custoTotal),
+      trend: dash.custoTotal === 0 ? "—" : `-${fmtR$(dash.custoTotal)}`,
+      up: false, accent: "var(--red)", sub: "mercadorias e serviços",
+    },
+    {
+      label: "Lucro Líquido", value: fmtR$(dash.lucroLiquido),
+      trend: `Margem: ${dash.margem.toFixed(1)}%`,
+      up: dash.lucroLiquido >= 0, accent: "var(--gold)", sub: "receita − custo",
+    },
+  ];
+
+  /* ── KPI Secundário ── */
+  const kpiSec = [
+    { label: "Ticket Médio",    value: fmtR$(dash.ticketMedio),    accent: "var(--blue)",   sub: "por venda no período" },
+    { label: "A Receber",       value: fmtR$(dash.totalAReceber),  accent: "var(--amber)",  sub: "saldo pendente" },
+    { label: "Projeção 30 dias",value: fmtR$(dash.projecao),       accent: "var(--purple)", sub: "baseada na tendência" },
+  ];
+
+  /* ── Mini Stats ── */
+  const miniStats = [
+    { label: "Clientes",          value: dash.numClientes, icon: Users,        color: "var(--blue)",   dim: "var(--blue-d)",   nav: "Clientes" },
+    { label: "Produtos",          value: dash.numProdutos, icon: Package,      color: "var(--gold)",   dim: "var(--gold-d)",   nav: "Produtos" },
+    { label: "Serviços",          value: dash.numServicos, icon: Wrench,       color: "var(--green)",  dim: "var(--green-d)",  nav: "Serviços" },
+    { label: "Vendas no período", value: dash.numVendas,   icon: ShoppingCart, color: "var(--purple)", dim: "var(--purple-d)", nav: "Vendas" },
+  ];
+
+  /* ── Resumo Despesas ── */
+  const despesasCards = [
+    { label: "Vencidas",       count: dash.despesasVencidas,  value: "Em atraso",         color: "var(--red)",    dim: "var(--red-d)" },
+    { label: "A vencer (30d)", count: dash.despesasAVencer,   value: "Próximos 30 dias",  color: "var(--amber)",  dim: "var(--amber-d)" },
+    { label: "Pendentes",      count: dash.despesasPendentes, value: "Total em aberto",   color: "var(--text-2)", dim: "rgba(255,255,255,0.04)" },
+    { label: "Pagas",          count: dash.despesasPagasMes,  value: fmtR$(dash.valorDespesasPagas), color: "var(--green)", dim: "var(--green-d)" },
+  ];
+
+  /* ══ RENDER MÓDULOS ══ */
+  const renderModulo = () => {
+    switch (module) {
+      case "Agenda":
+        return (
+          <RotaProtegida modulo="agenda" label="Agenda">
+            <Agenda isPro={isPro} />
+          </RotaProtegida>
+        );
+      case "Clientes":
+        return (
+          <RotaProtegida modulo="clientes" label="Clientes">
+            <Clientes isPro={isPro} />
+          </RotaProtegida>
+        );
+      case "Produtos":
+        return (
+          <RotaProtegida modulo="produtos" label="Produtos">
+            <Produtos isPro={isPro} />
+          </RotaProtegida>
+        );
+      case "Serviços":
+        return (
+          <RotaProtegida modulo="servicos" label="Serviços">
+            <Servicos isPro={isPro} />
+          </RotaProtegida>
+        );
+      case "Fornecedores":
+        return (
+          <RotaProtegida modulo="fornecedores" label="Fornecedores">
+            <Fornecedores />
+          </RotaProtegida>
+        );
+      case "Vendedores":
+        return (
+          <RotaProtegida modulo="vendedores" label="Vendedores">
+            <Vendedores />
+          </RotaProtegida>
+        );
+      case "Estoque":
+        return (
+          <RotaProtegida modulo="entradaEstoque" label="Entrada de Estoque">
+            <EntradaEstoque />
+          </RotaProtegida>
+        );
+      case "Compras":
+        return (
+          <RotaProtegida modulo="compras" label="Compras">
+            <Compras />
+          </RotaProtegida>
+        );
+      case "Mesas":
+        return (
+          <RotaProtegida modulo="mesas" label="Mesas">
+            <Mesas />
+          </RotaProtegida>
+        );
+      case "Orçamentos":
+        return (
+          <RotaProtegida modulo="orcamentos" label="Orçamentos">
+            <Orcamentos isPro={isPro} />
+          </RotaProtegida>
+        );
+      case "Vendas":
+        return (
+          <RotaProtegida modulo="vendas" label="Vendas">
+            <Vendas isPro={isPro} />
+          </RotaProtegida>
+        );
+      case "A Receber":
+        return (
+          <RotaProtegida modulo="aReceber" label="A Receber">
+            <AReceber />
+          </RotaProtegida>
+        );
+      case "Caixa Diário":
+        return (
+          <RotaProtegida modulo="caixaDiario" label="Caixa Diário">
+            <CaixaDiario />
+          </RotaProtegida>
+        );
+      case "Despesas":
+        return (
+          <RotaProtegida modulo="despesas" label="Despesas">
+            <Despesas isPro={isPro} />
+          </RotaProtegida>
+        );
+      case "Relatórios":
+        // Todos veem o menu; bloqueio por sub-relatório é feito dentro do componente
+        return <Relatorios />;
+      case "Usuários":
+        return (
+          <RotaProtegida modulo="usuarios" label="Usuários">
+            <Usuarios />
+          </RotaProtegida>
+        );
+        case "Matriculas":
+        return (
+          <RotaProtegida modulo="alunos" label="Matriculas">
+            <Alunos />
+          </RotaProtegida>
+            );
+      case "PDV":
+        return (
+          <RotaProtegida modulo="vendas" label="PDV">
+            <PDV onVoltar={() => setModule("Vendas")} />
+          </RotaProtegida>
+        );
+      case "Configurações":
+        // Configurações não precisa de RotaProtegida (acesso controlado pelo cargo admin)
+        return <Configuracoes menuVisivel={menuVisivel} />;       
+      default:
+        return renderDashboard();
     }
   };
 
+  /* ══ RENDER DASHBOARD ══ */
+  const renderDashboard = () => (
+    <>
+      <header className="ag-topbar">
+        <div className="ag-topbar-title">
+          <h1>Dashboard</h1>
+          <p>Visão geral do negócio</p>
+        </div>
+
+        {/* Toggle Visão */}
+        <div style={{ display: "flex", background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 10, padding: 3, gap: 2, flexShrink: 0 }}>
+          <button
+            onClick={() => setDashView("overview")}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+              fontSize: 12, fontWeight: 500, fontFamily: "'DM Sans', sans-serif",
+              background: dashView === "overview" ? "var(--s3)" : "transparent",
+              color: dashView === "overview" ? "var(--text)" : "var(--text-3)",
+              borderColor: dashView === "overview" ? "var(--border-h)" : "transparent",
+              transition: "all .15s",
+            }}
+          >
+            <LayoutDashboard size={13} /> Visão Geral
+          </button>
+          <button
+            onClick={() => setDashView("charts")}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+              fontSize: 12, fontWeight: 500, fontFamily: "'DM Sans', sans-serif",
+              background: dashView === "charts" ? "var(--gold-d)" : "transparent",
+              color: dashView === "charts" ? "var(--gold)" : "var(--text-3)",
+              transition: "all .15s",
+            }}
+          >
+            <BarChart3 size={13} /> Gráficos
+          </button>
+        </div>
+
+        <div style={{ flex: 1 }} />
+        <div className="ag-search">
+          <Search size={13} color="var(--text-3)" />
+          <input placeholder="Buscar módulos, clientes..." />
+        </div>
+        <div className="ag-periods">
+          {PERIODS.map((p) => (
+            <button
+              key={p}
+              className={`ag-period-btn ${period === p ? "active" : ""}`}
+              onClick={() => setPeriod(p)}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+        {period === "Personalizado" && (
+          <div className="ag-custom-range">
+            <label>De</label>
+            <input
+              type="date" className="ag-date-input"
+              value={customRange.from} max={customRange.to || undefined}
+              onChange={(e) => setCustomRange((r) => ({ ...r, from: e.target.value }))}
+            />
+            <span className="ag-date-sep">→</span>
+            <label>Até</label>
+            <input
+              type="date" className="ag-date-input"
+              value={customRange.to} min={customRange.from || undefined}
+              onChange={(e) => setCustomRange((r) => ({ ...r, to: e.target.value }))}
+            />
+          </div>
+        )}
+      </header>
+
+      {/* Filtro de período — apenas mobile */}
+      <div className="ag-period-mobile" style={{
+        alignItems: "center", gap: 8,
+        padding: "10px 16px",
+        borderBottom: "1px solid var(--border)",
+        background: "var(--s1)",
+        flexShrink: 0,
+      }}>
+        <select
+          value={period}
+          onChange={(e) => setPeriod(e.target.value)}
+          style={{
+            flex: 1,
+            background: "var(--s2)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            color: "var(--text)",
+            fontSize: 13,
+            padding: "7px 10px",
+            fontFamily: "'DM Sans', sans-serif",
+            outline: "none",
+          }}
+        >
+          {PERIODS.map((p) => (
+            <option key={p} value={p}>{p}</option>
+          ))}
+        </select>
+        {period === "Personalizado" && (
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1, marginTop: 8 }}>
+            <input
+              type="date" className="ag-date-input"
+              value={customRange.from} max={customRange.to || undefined}
+              onChange={(e) => setCustomRange((r) => ({ ...r, from: e.target.value }))}
+              style={{ flex: 1, fontSize: 12 }}
+            />
+            <span style={{ color: "var(--text-3)", fontSize: 12 }}>→</span>
+            <input
+              type="date" className="ag-date-input"
+              value={customRange.to} min={customRange.from || undefined}
+              onChange={(e) => setCustomRange((r) => ({ ...r, to: e.target.value }))}
+              style={{ flex: 1, fontSize: 12 }}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="ag-content">
+        {dashView === "charts" ? renderChartsView() : null}
+        {dashView !== "charts" && (<>
+        {/* Mini Stats */}
+        <div className="g4 ag-mini-cards-mobile">
+          {miniStats.map((s) => (
+            <div
+              key={s.label}
+              className="ag-card ag-card-click"
+              onClick={() => setModule(s.nav)}
+              title={`Ir para ${s.nav}`}
+            >
+              <div className="ag-mini">
+                <div className="ag-mini-icon" style={{ background: s.dim }}>
+                  <s.icon size={19} color={s.color} />
+                </div>
+                <div>
+                  <div className="ag-mini-val"><Val v={s.value} loading={dash.loading} /></div>
+                  <div className="ag-mini-lbl">{s.label}</div>
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+                <ChevronRight size={13} color={s.color} style={{ opacity: 0.5 }} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* KPI Principal */}
+        <div className="g3">
+          {kpiMain.map((k) => (
+            <div key={k.label} className="ag-card" style={{ borderTop: `2px solid ${k.accent}` }}>
+              <div className="ag-kpi-label">{k.label}</div>
+              <div className="ag-kpi-val"><Val v={k.value} loading={dash.loading} /></div>
+              <div className="ag-kpi-meta">
+                <span className="ag-trend" style={{ color: k.up ? "var(--green)" : "var(--red)" }}>
+                  {k.up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
+                  {k.trend}
+                </span>
+                <span className="ag-sub">{k.sub}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* KPI Secundário */}
+        <div className="g3">
+          {kpiSec.map((k) => (
+            <div key={k.label} className="ag-card" style={{ borderTop: `2px solid ${k.accent}` }}>
+              <div className="ag-kpi-label">{k.label}</div>
+              <div className="ag-kpi-val"><Val v={k.value} loading={dash.loading} /></div>
+              <div className="ag-kpi-meta"><span className="ag-sub">{k.sub}</span></div>
+            </div>
+          ))}
+        </div>
+
+        {/* Gráficos */}
+        <div className="g21">
+          <div className="ag-card">
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div className="ag-card-title">Faturamento por período</div>
+              <span style={{
+                fontSize: 10, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase",
+                color: "var(--gold)", background: "var(--gold-d)", padding: "3px 9px",
+                borderRadius: 20, border: "1px solid rgba(200,165,94,0.2)",
+              }}>
+                {period === "Personalizado" && customRange.from && customRange.to
+                  ? `${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")}`
+                  : period === "Personalizado" ? "Selecione o intervalo" : period}
+              </span>
+            </div>
+            <ResponsiveContainer width="100%" height={180}>
+              <AreaChart data={dash.loading ? [] : dash.faturamentoPorDia} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                <defs>
+                  <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor="#c8a55e" stopOpacity={0.22} />
+                    <stop offset="95%" stopColor="#c8a55e" stopOpacity={0}    />
+                  </linearGradient>
+                  <filter id="glowGoldMain">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  </filter>
+                </defs>
+                <XAxis dataKey="d" tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(200,165,94,0.15)", strokeWidth: 1, strokeDasharray: "4 3" }} />
+                <Area type="monotone" dataKey="v" stroke="#c8a55e" strokeWidth={2} fill="url(#gGold)" dot={false}
+                  activeDot={{ r: 5, fill: "#c8a55e", stroke: "rgba(200,165,94,0.3)", strokeWidth: 6, filter: "url(#glowGoldMain)" }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          <div className="ag-card" style={{ display: "flex", flexDirection: "column" }}>
+            <div className="ag-card-title" style={{ marginBottom: 12 }}>Mix de receita</div>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+              <PieChart width={130} height={130}>
+                <Pie
+                  data={dash.loading ? [{ name: "", value: 1 }] : dash.mixData}
+                  cx={60} cy={60} innerRadius={42} outerRadius={60} dataKey="value" strokeWidth={0}
+                >
+                  {(dash.mixData || []).map((_, i) => (
+                    <Cell key={i} fill={i === 0 ? "#c8a55e" : "#3ecf8e"} opacity={dash.loading ? 0.2 : (i === 0 ? 0.9 : 0.85)} />
+                  ))}
+                </Pie>
+              </PieChart>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
+                {(dash.mixData || []).map((item, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 2, background: i === 0 ? "#c8a55e" : "#3ecf8e" }} />
+                    <span style={{ color: "var(--text-2)", flex: 1 }}>{item.name}</span>
+                    <span style={{ color: "var(--text)", fontWeight: 500 }}>
+                      {dash.loading ? "—" : `${item.value}%`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabelas Produtos / Clientes */}
+        <div className="g11">
+          <div className="ag-card-bare">
+            <div className="ag-card-header">
+              <span className="ag-card-title">Produtos mais vendidos</span>
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 60px 110px", minWidth: 280 }}>
+                <span className="ag-th">Produto</span>
+                <span className="ag-th" style={{ textAlign: "center" }}>Qtd</span>
+                <span className="ag-th" style={{ textAlign: "right" }}>Total</span>
+              </div>
+              {dash.loading ? (
+                <div className="ag-trow" style={{ gridTemplateColumns: "1fr", minWidth: 280 }}><span className="ag-skeleton" /></div>
+              ) : dash.topProdutos.length === 0 ? (
+                <div className="ag-empty-row">Nenhuma venda no período</div>
+              ) : (
+                dash.topProdutos.map((p, i) => (
+                  <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 60px 110px", minWidth: 280 }}>
+                    <span>{p.nome}</span>
+                    <span style={{ textAlign: "center" }}>{p.qtd}</span>
+                    <span style={{ color: "var(--green)", textAlign: "right" }}>{fmtR$(p.total)}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="ag-card-bare">
+            <div className="ag-card-header">
+              <span className="ag-card-title">Clientes que mais compram</span>
+            </div>
+            <div style={{ overflowX: "auto" }}>
+              <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 120px", minWidth: 240 }}>
+                <span className="ag-th">Cliente</span>
+                <span className="ag-th" style={{ textAlign: "right" }}>Total gasto</span>
+              </div>
+              {dash.loading ? (
+                <div className="ag-trow" style={{ gridTemplateColumns: "1fr", minWidth: 240 }}><span className="ag-skeleton" /></div>
+              ) : dash.topClientes.length === 0 ? (
+                <div className="ag-empty-row">Nenhuma venda no período</div>
+              ) : (
+                dash.topClientes.map((c, i) => (
+                  <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 120px", minWidth: 240 }}>
+                    <span>{c.nome}</span>
+                    <span style={{ color: "var(--gold)", textAlign: "right" }}>{fmtR$(c.total)}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Últimas Vendas */}
+        <div className="g1 ag-card-bare">
+          <div className="ag-card-header">
+            <span className="ag-card-title">Últimas vendas</span>
+            <button className="ag-view-all" onClick={() => setModule("Vendas")}>
+              Ver todas <ChevronRight size={12} />
+            </button>
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "90px 1fr 130px 130px", minWidth: 440 }}>
+              {["ID", "Cliente", "Data", "Total"].map((h) => (
+                <span key={h} className="ag-th" style={{ textAlign: h === "Total" ? "right" : "left" }}>{h}</span>
+              ))}
+            </div>
+            {dash.loading ? (
+              <div className="ag-trow" style={{ gridTemplateColumns: "1fr", minWidth: 440 }}><span className="ag-skeleton" /></div>
+            ) : dash.ultimasVendas.length === 0 ? (
+              <div className="ag-empty-row">Nenhuma venda no período</div>
+            ) : (
+              dash.ultimasVendas.map((v, i) => (
+                <div key={v.id || i} className="ag-trow" style={{ gridTemplateColumns: "90px 1fr 130px 130px", minWidth: 440 }}>
+                  <span style={{ color: "var(--gold)" }}>{v.id}</span>
+                  <span>{v.cliente || "—"}</span>
+                  <span>{fmtData(v.data)}</span>
+                  <span style={{ color: "var(--green)", textAlign: "right" }}>{fmtR$(v.total)}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Resumo Despesas */}
+        <div className="g1 ag-card-bare">
+          <div className="ag-card-header">
+            <span className="ag-card-title">Resumo de despesas</span>
+            <button className="ag-view-all" onClick={() => setModule("Despesas")}>
+              Ver todas <ChevronRight size={12} />
+            </button>
+          </div>
+          <div className="ag-despesa-grid">
+            {despesasCards.map((d) => (
+              <div key={d.label} className="ag-despesa-card" style={{ background: d.dim, border: `1px solid ${d.color}28` }}>
+                <div className="ag-despesa-label" style={{ color: d.color }}>{d.label}</div>
+                <div className="ag-despesa-count">
+                  {dash.loading ? <span className="ag-skeleton" style={{ width: 40 }} /> : d.count}
+                </div>
+                <div className="ag-despesa-val">{d.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </>)}
+      </div>
+    </>
+  );
+
+  /* ══ RENDER GRÁFICOS ══ */
+  const renderChartsView = () => {
+    // ── Gráfico 1 e 2: Faturamento vs Custo e Lucro por período ──
+    // Usa os mesmos dados reais de faturamentoPorDia do hook,
+    // agrupando cada ponto como { mes/d, receita, custo, lucro }
+    const faturDia = dash.loading ? [] : (dash.faturamentoPorDia || []);
+
+    // Monta dados combinados: receita vem do hook, custo proporcional por dia
+    // O hook já filtra pelo período selecionado — usamos diretamente
+    const receitaData = faturDia.map((pt) => {
+      // Proporção custo/receita total para estimar custo por ponto
+      const propCusto = dash.receitaBruta > 0 ? dash.custoTotal / dash.receitaBruta : 0;
+      const receita = pt.v || 0;
+      const custo   = Math.round(receita * propCusto);
+      return { mes: pt.d, receita, custo };
+    });
+
+    const lucroData = receitaData.map(d => ({
+      mes: d.mes,
+      lucro: d.receita - d.custo,
+    }));
+
+    // ── Radar: métricas reais normalizadas 0–100 ──
+    // Vendas: % de cumprimento vs meta (1 venda/dia útil = 100%)
+    const diasPeriodo = Math.max(1, faturDia.length);
+    const metaVendas  = diasPeriodo; // 1 venda/dia como referência
+    const scoreVendas = Math.min(100, Math.round((dash.numVendas / metaVendas) * 100));
+
+    // Clientes: proporção cadastrada (base 100 = referência de negócio saudável)
+    const scoreClientes = Math.min(100, Math.round((dash.numClientes / Math.max(1, dash.numClientes)) * 75 + (dash.numClientes > 0 ? 25 : 0)));
+
+    // Produtos: se há produtos cadastrados, score alto; zero produtos = baixo
+    const scoreProdutos = dash.numProdutos >= 10 ? 90 : dash.numProdutos >= 5 ? 72 : dash.numProdutos >= 1 ? 55 : 20;
+
+    // Serviços
+    const scoreServicos = dash.numServicos >= 5 ? 85 : dash.numServicos >= 2 ? 68 : dash.numServicos >= 1 ? 50 : 20;
+
+    // Financeiro: margem de lucro mapeada 0–100
+    const scoreFinanceiro = Math.min(100, Math.max(0, Math.round(dash.margem * 1.1)));
+
+    // Estoque: se tem produtos e tem entradas, bom; sem produtos = baixo
+    const scoreEstoque = dash.numProdutos >= 5 ? 78 : dash.numProdutos >= 1 ? 55 : 25;
+
+    const radarData = [
+      { subject: "Vendas",     A: scoreVendas     },
+      { subject: "Clientes",   A: scoreClientes   },
+      { subject: "Produtos",   A: scoreProdutos   },
+      { subject: "Serviços",   A: scoreServicos   },
+      { subject: "Financeiro", A: scoreFinanceiro },
+      { subject: "Estoque",    A: scoreEstoque    },
+    ];
+
+    const pieColors = ["#c8a55e", "#3ecf8e", "#5b8ef0", "#f59e0b", "#e052a0"];
+    const produtosPie = (dash.topProdutos || []).slice(0, 5).map((p) => ({
+      name: p.nome, value: p.total || p.qtd || 1,
+    }));
+    // Sem dados reais: mostra aviso em vez de dados fictícios
+    const semDados = !dash.loading && faturDia.every(pt => pt.v === 0);
+    const semProdutos = !dash.loading && produtosPie.length === 0;
+
+    const Card = ({ children, title, subtitle, style = {} }) => (
+      <div style={{
+        background: "var(--s1)", border: "1px solid var(--border)",
+        borderRadius: 14, padding: "20px 20px 16px", ...style,
+      }}>
+        {(title || subtitle) && (
+          <div style={{ marginBottom: 16 }}>
+            {title && <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", letterSpacing: "0.01em" }}>{title}</div>}
+            {subtitle && <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3 }}>{subtitle}</div>}
+          </div>
+        )}
+        {children}
+      </div>
+    );
+
+    const GoldTooltip = ({ active, payload, label }) => {
+      if (!active || !payload?.length) return null;
+      return (
+        <div style={{
+          background: "var(--s2)",
+          backdropFilter: "blur(16px)",
+          WebkitBackdropFilter: "blur(16px)",
+          border: "1px solid rgba(200,165,94,0.2)",
+          borderRadius: 12,
+          padding: "12px 16px",
+          fontSize: 12,
+          boxShadow: "0 16px 48px rgba(0,0,0,0.2), 0 0 0 1px var(--border) inset",
+          minWidth: 155,
+          pointerEvents: "none",
+          animation: "tooltipIn 0.15s ease",
+        }}>
+          <style>{`@keyframes tooltipIn { from { opacity:0; transform:translateY(4px) scale(.97); } to { opacity:1; transform:none; } }`}</style>
+          {label && (
+            <div style={{ color: "var(--text-3)", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10, borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>
+              {label}
+            </div>
+          )}
+          {payload.map((p, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, margin: "4px 0" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: p.color || "#c8a55e", boxShadow: `0 0 6px ${(p.color || "#c8a55e") + "88"}`, flexShrink: 0 }} />
+                <span style={{ color: "var(--text-2)", fontSize: 11 }}>{p.name}</span>
+              </div>
+              <span style={{ color: p.color || "var(--gold)", fontWeight: 700, fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
+                {typeof p.value === "number" && p.value > 1000
+                  ? `R$ ${p.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                  : p.value}
+              </span>
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    const EmptyState = ({ msg = "Nenhuma venda no período selecionado" }) => (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "32px 0", color: "var(--text-3)" }}>
+        <div style={{ fontSize: 28, opacity: 0.3 }}>📊</div>
+        <div style={{ fontSize: 12, textAlign: "center", maxWidth: 200, lineHeight: 1.5 }}>{msg}</div>
+      </div>
+    );
+
+    return (
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, padding: 4 }}>
+
+        {/* 1. Faturamento vs Custo — BarChart */}
+        <Card
+          title="Faturamento vs Custo"
+          subtitle={`Período: ${period}${period === "Personalizado" && customRange.from && customRange.to ? ` (${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")})` : ""}`}
+          style={{ gridColumn: "1 / 2" }}
+        >
+          {semDados ? <EmptyState /> : (
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={dash.loading ? [] : receitaData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barSize={14} barGap={3}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="mes" tick={{ fill: "var(--text-2)", fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fill: "var(--text-2)", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<GoldTooltip />} cursor={{ fill: "rgba(200,165,94,0.04)", rx: 6, stroke: "rgba(200,165,94,0.1)", strokeWidth: 1 }} />
+              <Legend wrapperStyle={{ fontSize: 11, color: "var(--text-2)", paddingTop: 12 }} />
+              <Bar dataKey="receita" name="Receita" fill="#c8a55e" radius={[5, 5, 0, 0]} opacity={0.9} activeBar={{ fill: "#e8ca60", opacity: 1, filter: "drop-shadow(0 0 6px rgba(200,165,94,0.6))" }} />
+              <Bar dataKey="custo"   name="Custo"   fill="#e05252" radius={[5, 5, 0, 0]} opacity={0.75} activeBar={{ fill: "#f07070", opacity: 1, filter: "drop-shadow(0 0 6px rgba(224,82,82,0.5))" }} />
+            </BarChart>
+          </ResponsiveContainer>
+          )}
+        </Card>
+
+        {/* 2. Lucro Líquido — AreaChart */}
+        <Card
+          title="Evolução do Lucro Líquido"
+          subtitle={`Período: ${period}`}
+          style={{ gridColumn: "2 / 3" }}
+        >
+          {semDados ? <EmptyState /> : (
+          <ResponsiveContainer width="100%" height={220}>
+            <AreaChart data={dash.loading ? [] : lucroData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gLucro" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#3ecf8e" stopOpacity={0.28} />
+                  <stop offset="95%" stopColor="#3ecf8e" stopOpacity={0}    />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="mes" tick={{ fill: "var(--text-2)", fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fill: "var(--text-2)", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<GoldTooltip />} cursor={{ stroke: "rgba(62,207,142,0.2)", strokeWidth: 1, strokeDasharray: "4 3" }} />
+              <Area type="monotone" dataKey="lucro" name="Lucro" stroke="#3ecf8e" strokeWidth={2.5} fill="url(#gLucro)"
+                dot={{ fill: "#3ecf8e", r: 3, strokeWidth: 0, opacity: 0.7 }}
+                activeDot={{ r: 6, fill: "#3ecf8e", stroke: "rgba(62,207,142,0.3)", strokeWidth: 6 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+          )}
+        </Card>
+
+        {/* 3. Faturamento por dia (período selecionado) — LineChart */}
+        <Card
+          title="Faturamento Diário"
+          subtitle={`Período: ${period}`}
+          style={{ gridColumn: "1 / 3" }}
+        >
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={dash.loading ? [] : dash.faturamentoPorDia} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gLine" x1="0" y1="1" x2="1" y2="0">
+                  <stop offset="0%"   stopColor="#c8a55e" />
+                  <stop offset="100%" stopColor="#e8ca60" />
+                </linearGradient>
+                <filter id="glowGold" x="-50%" y="-50%" width="200%" height="200%">
+                  <feGaussianBlur stdDeviation="3" result="blur" />
+                  <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                </filter>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="d" tick={{ fill: "var(--text-2)", fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fill: "var(--text-2)", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<GoldTooltip />} cursor={{ stroke: "rgba(200,165,94,0.18)", strokeWidth: 1, strokeDasharray: "4 3" }} />
+              <Line type="monotone" dataKey="v" name="Receita" stroke="url(#gLine)" strokeWidth={2.5} dot={false}
+                activeDot={{ r: 6, fill: "#c8a55e", stroke: "rgba(200,165,94,0.35)", strokeWidth: 7, filter: "url(#glowGold)" }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
+
+        {/* 4. Mix de Receita — PieChart melhorado */}
+        <Card title="Mix de Receita" subtitle="Distribuição por categoria">
+          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            <PieChart width={160} height={160}>
+              <Pie
+                data={dash.loading ? [{ name: "", value: 1 }] : dash.mixData}
+                cx={75} cy={75} innerRadius={48} outerRadius={72} dataKey="value" strokeWidth={0}
+                paddingAngle={3}
+              >
+                {(dash.mixData || []).map((_, i) => (
+                  <Cell key={i} fill={pieColors[i % pieColors.length]} opacity={dash.loading ? 0.2 : 0.9} />
+                ))}
+              </Pie>
+              <Tooltip content={<GoldTooltip />} />
+            </PieChart>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
+              {(dash.mixData || [{ name: "Produtos", value: 60 }, { name: "Serviços", value: 40 }]).map((item, i) => (
+                <div key={i}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5 }}>
+                    <span style={{ color: "var(--text-2)", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: 2, background: pieColors[i % pieColors.length], display: "inline-block" }} />
+                      {item.name}
+                    </span>
+                    <span style={{ color: "var(--text)", fontWeight: 600 }}>{dash.loading ? "—" : `${item.value}%`}</span>
+                  </div>
+                  <div style={{ background: "var(--s2)", borderRadius: 4, height: 5, overflow: "hidden" }}>
+                    <div style={{ width: `${dash.loading ? 0 : item.value}%`, height: "100%", background: pieColors[i % pieColors.length], borderRadius: 4, transition: "width 0.6s ease" }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        {/* 5. Top Produtos — Horizontal Bars */}
+        <Card title="Top Produtos Vendidos" subtitle={`Por receita — ${period}`}>
+          {semProdutos ? (
+            <EmptyState msg="Nenhum produto vendido no período selecionado" />
+          ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 4 }}>
+            {produtosPie.map((p, i) => {
+              const max = produtosPie[0]?.value || 1;
+              const pct = Math.round((p.value / max) * 100);
+              return (
+                <div key={i}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5 }}>
+                    <span style={{ color: "var(--text-2)", display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{
+                        width: 18, height: 18, borderRadius: 5,
+                        background: pieColors[i % pieColors.length] + "22",
+                        border: `1px solid ${pieColors[i % pieColors.length]}44`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 9, fontWeight: 700, color: pieColors[i % pieColors.length],
+                      }}>{i + 1}</span>
+                      {p.name}
+                    </span>
+                    <span style={{ color: pieColors[i % pieColors.length], fontWeight: 600, fontSize: 11 }}>
+                      {typeof p.value === "number" && p.value > 100 ? fmtR$(p.value) : `${p.value} un.`}
+                    </span>
+                  </div>
+                  <div style={{ background: "var(--s2)", borderRadius: 4, height: 6, overflow: "hidden" }}>
+                    <div style={{
+                      width: `${pct}%`, height: "100%",
+                      background: `linear-gradient(90deg, ${pieColors[i % pieColors.length]}, ${pieColors[i % pieColors.length]}88)`,
+                      borderRadius: 4, transition: "width 0.7s ease",
+                    }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          )}
+        </Card>
+
+        {/* 6. Desempenho Geral — RadarChart */}
+        <Card title="Radar de Desempenho" subtitle={`Saúde geral — baseado nos dados do período (${period})`} style={{ gridColumn: "1 / 3" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
+            <RadarChart outerRadius={110} width={300} height={260} data={radarData}>
+              <PolarGrid stroke="var(--border)" />
+              <PolarAngleAxis dataKey="subject" tick={{ fill: "var(--text-2)", fontSize: 11 }} />
+              <Radar name="Desempenho" dataKey="A" stroke="#c8a55e" fill="#c8a55e" fillOpacity={0.18} strokeWidth={2} />
+              <Tooltip content={<GoldTooltip />} />
+            </RadarChart>
+            <div style={{ flex: 1 }}>
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 6 }}>Score Geral</div>
+                <div style={{ fontSize: 42, fontWeight: 700, color: "var(--gold)", lineHeight: 1, fontFamily: "'Sora', sans-serif" }}>
+                  {Math.round(radarData.reduce((s, d) => s + d.A, 0) / radarData.length)}%
+                </div>
+                <div style={{ fontSize: 12, color: "var(--text-2)", marginTop: 6 }}>Meta: 85%</div>
+              </div>
+              {radarData.map((r) => (
+                <div key={r.subject} style={{ marginBottom: 8 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-2)", marginBottom: 4 }}>
+                    <span>{r.subject}</span><span style={{ color: r.A >= 80 ? "var(--green)" : r.A >= 65 ? "var(--gold)" : "var(--red)" }}>{r.A}%</span>
+                  </div>
+                  <div style={{ background: "var(--s3)", borderRadius: 3, height: 4 }}>
+                    <div style={{
+                      width: `${r.A}%`, height: "100%", borderRadius: 3,
+                      background: r.A >= 80 ? "var(--green)" : r.A >= 65 ? "var(--gold)" : "var(--red)",
+                      transition: "width 0.6s ease",
+                    }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
+
+        {/* 7. Crescimento de Cadastros de Clientes — AreaChart */}
+        {(() => {
+          const now = new Date();
+          const meses = [];
+          for (let i = 11; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const key = `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(-2)}`;
+            meses.push({ mes: key, novos: 0 });
+          }
+          clientesCadastro.forEach(({ criadoEm }) => {
+            if (!criadoEm) return;
+            try {
+              const d = new Date(criadoEm);
+              const key = `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(-2)}`;
+              const entry = meses.find(m => m.mes === key);
+              if (entry) entry.novos++;
+            } catch {}
+          });
+          let acumulado = 0;
+          const dadosCadastro = meses.map(m => {
+            acumulado += m.novos;
+            return { mes: m.mes, novos: m.novos, total: acumulado };
+          });
+          const totalNovos12m = dadosCadastro.reduce((s, d) => s + d.novos, 0);
+          const mesComMaisNovos = dadosCadastro.reduce((best, d) => d.novos > best.novos ? d : best, dadosCadastro[0] || { mes: "—", novos: 0 });
+          return (
+            <Card
+              title="Crescimento de Cadastros"
+              subtitle="Novos clientes e base total — últimos 12 meses"
+              style={{ gridColumn: "1 / 3" }}
+            >
+              <div style={{ display: "flex", gap: 24, marginBottom: 18, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--text-2)" }}>Novos (12 meses)</span>
+                  <span style={{ fontSize: 28, fontWeight: 700, color: "var(--blue)", fontFamily: "'Sora', sans-serif", lineHeight: 1 }}>{totalNovos12m}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--text-2)" }}>Base total</span>
+                  <span style={{ fontSize: 28, fontWeight: 700, color: "var(--gold)", fontFamily: "'Sora', sans-serif", lineHeight: 1 }}>{dash.numClientes}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--text-2)" }}>Melhor mês</span>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: "var(--green)", fontFamily: "'Sora', sans-serif", lineHeight: 1 }}>{mesComMaisNovos.mes} <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-2)" }}>({mesComMaisNovos.novos} cadastros)</span></span>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={210}>
+                <AreaChart data={dadosCadastro} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gCadastroNovos" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#5b8ef0" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#5b8ef0" stopOpacity={0}   />
+                    </linearGradient>
+                    <linearGradient id="gCadastroTotal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#c8a55e" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#c8a55e" stopOpacity={0}   />
+                    </linearGradient>
+                    <filter id="glowBlue" x="-50%" y="-50%" width="200%" height="200%">
+                      <feGaussianBlur stdDeviation="3" result="blur" />
+                      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                    </filter>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="mes" tick={{ fill: "var(--text-2)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: "var(--text-2)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<GoldTooltip />} cursor={{ stroke: "rgba(91,142,240,0.2)", strokeWidth: 1, strokeDasharray: "4 3" }} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: "var(--text-2)", paddingTop: 12 }} />
+                  <Area type="monotone" dataKey="total" name="Base Total" stroke="#c8a55e" strokeWidth={1.5} fill="url(#gCadastroTotal)"
+                    dot={false} activeDot={{ r: 5, fill: "#c8a55e", stroke: "rgba(200,165,94,0.3)", strokeWidth: 5 }} />
+                  <Area type="monotone" dataKey="novos" name="Novos Clientes" stroke="#5b8ef0" strokeWidth={2.5} fill="url(#gCadastroNovos)"
+                    dot={{ fill: "#5b8ef0", r: 3, strokeWidth: 0 }}
+                    activeDot={{ r: 6, fill: "#5b8ef0", stroke: "rgba(91,142,240,0.35)", strokeWidth: 6, filter: "url(#glowBlue)" }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </Card>
+          );
+        })()}
+
+      </div>
+    );
+  };
   return (
     <>
       <style>{CSS}</style>
-      <div className="cfg-root">
-        <header className="cfg-topbar">
-          <div className="cfg-topbar-title">
-            <h1>Configurações</h1>
-            <p>Personalize o comportamento e os dados do sistema</p>
+
+      <div className={`ag-app${theme === "light" ? " light" : ""}`}>
+
+        {/* ── HEADER GLOBAL ── */}
+        <header className="ag-global-header">
+          <button
+            className="ag-toggle-btn"
+            onClick={toggleSidebar}
+            title={collapsed ? "Expandir menu" : "Recolher menu"}
+            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+          >
+            {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+          </button>
+
+          <div className="ag-header-logo">
+            {logoUrl ? (
+              <img src={logoUrl} alt={nomeEmpresa} className="ag-header-logo-img" />
+            ) : (
+              <div className="ag-header-logo-icon">{logoInitials}</div>
+            )}
+            <span className="ag-header-logo-name">{nomeEmpresa}</span>
+            {isPro && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                background: "linear-gradient(135deg,#D4AF37,#e8ca60)",
+                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                border: "1px solid rgba(200,165,94,0.4)",
+                borderRadius: 20, padding: "2px 7px", flexShrink: 0,
+              }}>PRO</span>
+            )}
+          </div>
+
+          <div className="ag-header-spacer" />
+
+          <div style={{ position: "relative" }} ref={notifRef}>
+            <div
+              className="ag-notif"
+              title="Notificações"
+              onClick={abrirNotif}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && abrirNotif()}
+            >
+              <Bell size={15} />
+              {notifNaoLidas > 0 && (
+                <span className="ag-notif-badge">{notifNaoLidas > 9 ? "9+" : notifNaoLidas}</span>
+              )}
+            </div>
+
+            {notifOpen && (
+              <div className="ag-notif-panel">
+                <div className="ag-notif-header">
+                  <span>Notificações</span>
+                  <span style={{ color: "var(--text-3)", fontWeight: 400, letterSpacing: 0, textTransform: "none", fontSize: 11 }}>
+                    {todasNotif.length} mensage{todasNotif.length !== 1 ? "ns" : "m"}
+                  </span>
+                </div>
+                <div className="ag-notif-list">
+                  {todasNotif.length === 0 ? (
+                    <div className="ag-notif-empty">Nenhuma notificação no momento</div>
+                  ) : (
+                    todasNotif.map((n) => {
+                      /* ── Insight de negócio ── */
+                      if (n.tipo === "insight") {
+                        const INSIGHT_PALETTE = {
+                          faturamento_alta:     { cor: "var(--green)",  bg: "rgba(62,207,142,0.07)",  badge: "#2daa70" },
+                          produto_destaque:     { cor: "var(--green)",  bg: "rgba(62,207,142,0.07)",  badge: "#2daa70" },
+                          ticket_alta:          { cor: "var(--green)",  bg: "rgba(62,207,142,0.07)",  badge: "#2daa70" },
+                          matriculas_alta:      { cor: "var(--blue)",   bg: "rgba(91,142,240,0.07)",  badge: "#4a7de0" },
+                          faturamento_queda:    { cor: "var(--red)",    bg: "rgba(224,82,82,0.07)",   badge: "#c04040" },
+                          ticket_queda:         { cor: "var(--amber)",  bg: "rgba(245,158,11,0.07)",  badge: "#c07800" },
+                          cancelamentos_alerta: { cor: "var(--red)",    bg: "rgba(224,82,82,0.08)",   badge: "#c04040" },
+                          matriculas_queda:     { cor: "var(--amber)",  bg: "rgba(245,158,11,0.07)",  badge: "#c07800" },
+                          matriculas_zero:      { cor: "var(--amber)",  bg: "rgba(245,158,11,0.07)",  badge: "#c07800" },
+                        };
+                        const paleta = INSIGHT_PALETTE[n.tipo] || {
+                          cor: "var(--purple)", bg: "rgba(167,139,250,0.07)", badge: "#8b6ef0",
+                        };
+                        const dataInsight = n.criadoEm?.toDate ? n.criadoEm.toDate() : null;
+                        const tempoRelativo = (() => {
+                          if (!dataInsight) return "—";
+                          const diff = Date.now() - dataInsight.getTime();
+                          const d = Math.floor(diff / 86400000);
+                          const h = Math.floor(diff / 3600000);
+                          if (d >= 1) return `há ${d} dia${d > 1 ? "s" : ""}`;
+                          if (h >= 1) return `há ${h}h`;
+                          return "agora";
+                        })();
+                        return (
+                          <div
+                            key={n.id}
+                            className="ag-notif-item"
+                            style={{
+                              background: paleta.bg,
+                              borderLeft: `2px solid ${paleta.cor}`,
+                              paddingLeft: 14,
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                              <span style={{
+                                fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
+                                textTransform: "uppercase", color: "#fff",
+                                background: paleta.badge,
+                                borderRadius: 20, padding: "2px 8px", flexShrink: 0,
+                              }}>
+                                Insight
+                              </span>
+                              <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'IBM Plex Mono', monospace" }}>
+                                {tempoRelativo}
+                              </span>
+                              {n.prioridade === "high" && (
+                                <span style={{
+                                  fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
+                                  textTransform: "uppercase", color: paleta.cor,
+                                  background: paleta.bg, border: `1px solid ${paleta.cor}40`,
+                                  borderRadius: 20, padding: "2px 7px", marginLeft: "auto", flexShrink: 0,
+                                }}>
+                                  atenção
+                                </span>
+                              )}
+                            </div>
+                            <div className="ag-notif-item-title" style={{ fontSize: 13, lineHeight: 1.4 }}>
+                              {n.titulo}
+                            </div>
+                            <div className="ag-notif-item-body" style={{ marginTop: 5, fontSize: 12, lineHeight: 1.55 }}>
+                              {n.mensagem}
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      /* ── Alerta de despesa próxima do vencimento ── */
+                      if (n.tipo === "despesa") {
+                        const corUrgencia =
+                          n.diffDias === 0 ? "var(--red)"   :
+                          n.diffDias === 1 ? "var(--amber)" :
+                                            "var(--blue)";
+                        const bgUrgencia =
+                          n.diffDias === 0 ? "rgba(224,82,82,0.07)"   :
+                          n.diffDias === 1 ? "rgba(245,158,11,0.07)"  :
+                                            "rgba(91,142,240,0.05)";
+                        const labelUrgencia =
+                          n.diffDias === 0 ? "Vence hoje"   :
+                          n.diffDias === 1 ? "Amanhã"       :
+                          `${n.diffDias} dias`;
+                        return (
+                          <div
+                            key={n.id}
+                            className="ag-notif-item"
+                            style={{
+                              cursor: "pointer",
+                              background: bgUrgencia,
+                              borderLeft: `2px solid ${corUrgencia}`,
+                              paddingLeft: 14,
+                            }}
+                            onClick={() => { setModule("Despesas"); setNotifOpen(false); }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 2 }}>
+                              <div className="ag-notif-item-title" style={{ fontSize: 12 }}>{n.mensagem}</div>
+                              <span style={{
+                                fontSize: 9, fontWeight: 700, letterSpacing: "0.06em",
+                                textTransform: "uppercase", color: corUrgencia,
+                                background: bgUrgencia, border: `1px solid ${corUrgencia}40`,
+                                borderRadius: 20, padding: "2px 7px", flexShrink: 0,
+                              }}>{labelUrgencia}</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'IBM Plex Mono', monospace" }}>
+                              Despesa {n.titulo.split("—")[1]?.trim() || ""} · Ir para Despesas →
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      /* ── Anúncio do sistema ── */
+                      return (
+                        <div key={n.id} className="ag-notif-item">
+                          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
+                            <span style={{
+                              fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
+                              textTransform: "uppercase", color: "var(--gold)",
+                              background: "var(--gold-d)", border: "1px solid rgba(200,165,94,0.2)",
+                              borderRadius: 20, padding: "2px 8px", flexShrink: 0,
+                            }}>Sistema</span>
+                            <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'IBM Plex Mono', monospace" }}>
+                              {n.criadoEm?.toDate
+                                ? n.criadoEm.toDate().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+                                : "—"}
+                            </span>
+                          </div>
+                          <div className="ag-notif-item-title">{n.titulo}</div>
+                          <div className="ag-notif-item-body" style={{ marginTop: 4 }}>{n.mensagem}</div>
+                          {n.btnUrl && (
+                            <a
+                              href={n.btnUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                display: "inline-block", marginTop: 8,
+                                padding: "5px 12px", borderRadius: 6,
+                                background: "linear-gradient(135deg,#B8860B,#D4AF37)",
+                                color: "#050505", fontSize: 11, fontWeight: 700,
+                                letterSpacing: "0.8px", textDecoration: "none",
+                                fontFamily: "'IBM Plex Mono', monospace",
+                              }}
+                            >
+                              {n.btnTexto || "Ver mais"} ↗
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div
+            className="ag-theme-btn"
+            onClick={toggleTheme}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && toggleTheme()}
+            title={theme === "dark" ? "Mudar para tema claro" : "Mudar para tema escuro"}
+            aria-label="Alternar tema"
+          >
+            {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
+          </div>
+
+          <div className="ag-user-area" ref={dropdownRef}>
+            <div
+              className="ag-user-trigger"
+              onClick={() => setDropdownOpen((v) => !v)}
+              role="button" aria-haspopup="true" aria-expanded={dropdownOpen}
+            >
+              <div className="ag-avatar">
+                {userAvatar
+                  ? <img src={userAvatar} alt={userName} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  : userInitial}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.3 }}>
+                <span className="ag-user-name">{userName}</span>
+                {cargo && cargo !== "admin" && (
+                  <span style={{
+                    fontSize: 10,
+                    color: "var(--text-3)",
+                    textTransform: "capitalize",
+                    letterSpacing: "0.02em",
+                  }}>
+                    {cargo}
+                  </span>
+                )}
+              </div>
+              <ChevronDown size={13} className={`ag-user-chevron ${dropdownOpen ? "open" : ""}`} />
+            </div>
+
+            {dropdownOpen && (
+              <div className="ag-user-dropdown" role="menu">
+                <button
+                  className="ag-dropdown-item"
+                  onClick={() => { setModule("Configurações"); setDropdownOpen(false); }}
+                >
+                  <Settings size={13} /> Configurações
+                </button>
+                <div className="ag-dropdown-divider" />
+                <button
+                  className="ag-dropdown-item danger"
+                  onClick={() => { logout(); window.location.reload(); }}
+                >
+                  <LogOut size={13} /> Sair da conta
+                </button>
+              </div>
+            )}
           </div>
         </header>
 
-        <div className="cfg-body">
-          <nav className="cfg-nav">
-            <span className="cfg-nav-group-label">Configurações</span>
-            {navFiltrado.filter(n => n.id !== "log").map(({ id, label, icon: Icon }) => (
-              <button key={id} className={`cfg-nav-item ${secao === id ? "active" : ""}`} onClick={() => setSecao(id)}>
-                <Icon size={15} className="cfg-nav-icon" />
-                <span className="cfg-nav-label">{label}</span>
-                {secao === id && <ChevronRight size={13} color="var(--text-3)" />}
-              </button>
-            ))}
-            {navFiltrado.some(n => n.id === "log") && (
-              <>
-                <span className="cfg-nav-group-label" style={{ marginTop: 14 }}>Auditoria</span>
-                <button className={`cfg-nav-item ${secao === "log" ? "active" : ""}`} onClick={() => setSecao("log")}>
-                  <Activity size={15} className="cfg-nav-icon" />
-                  <span className="cfg-nav-label">Log de Atividades</span>
-                  {secao === "log" && <ChevronRight size={13} color="var(--text-3)" />}
-                </button>
-              </>
-            )}
-          </nav>
+        {/* ── CORPO: sidebar + main ── */}
+        <div className="ag-body">
 
-          <main className="cfg-panel" key={secao}>
-            {renderSecao()}
-          </main>
+          {/* Sidebar desktop recolhível */}
+          <aside className={`ag-sidebar ${collapsed ? "collapsed" : ""}`}>
+            <nav className="ag-nav">
+              {NAV.map((sec) => (
+                <div key={sec.section}>
+                  <div className="ag-sec-label">{sec.section}</div>
+                  {sec.items.map((item) => {
+                    const dbKey = KEY_MAP[item.label];
+                    if (dbKey && menuVisivel[dbKey] === false) return null;
+                    if (item.modulo && !podeVer(item.modulo)) return null;
+                    return (
+                      <div
+                        key={item.label}
+                        className={`ag-nav-item ${module === item.label ? "active" : ""}`}
+                        onClick={() => setModule(item.label)}
+                        data-label={item.label}
+                        title={collapsed ? item.label : undefined}
+                      >
+                        <item.icone size={15} />
+                        <span>{item.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </nav>
+          </aside>
+
+          {/* Conteúdo principal */}
+         <main className="ag-main">
+  {renderModulo()}
+</main>
+
         </div>
+
+         
+        {/* ── BOTTOM NAV MOBILE ── */}
+        <nav className="ag-mobile-nav" aria-label="Navegação mobile">
+          {BOTTOM_NAV.map((item) => (
+            <button
+              key={item.label}
+              className={`ag-mobile-nav-btn ${module === item.label ? "active" : ""}`}
+              onClick={() => navigateTo(item.label)}
+            >
+              <item.icone size={20} />
+              <span>{item.label}</span>
+            </button>
+          ))}
+          <button
+            className={`ag-mobile-nav-btn ${mobileMenuOpen ? "active" : ""}`}
+            onClick={() => setMobileMenuOpen(true)}
+            aria-label="Abrir menu"
+          >
+            <Menu size={20} />
+            <span>Menu</span>
+          </button>
+        </nav>
+
+        {/* ── OVERLAY + SIDEBAR MOBILE ── */}
+        {mobileMenuOpen && (
+          <>
+            {/* Fundo escuro clicável */}
+            <div
+              className="ag-mobile-overlay"
+              style={{ display: "block" }}
+              onClick={() => setMobileMenuOpen(false)}
+              aria-hidden="true"
+            />
+
+            {/* Sidebar deslizante */}
+            <aside className="ag-sidebar-mobile" aria-label="Menu de navegação">
+              <div className="ag-sidebar-mobile-header">
+                <div className="ag-header-logo">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt={nomeEmpresa} className="ag-header-logo-img" />
+                  ) : (
+                    <div className="ag-header-logo-icon">{logoInitials}</div>
+                  )}
+                  <span className="ag-header-logo-name">{nomeEmpresa}</span>
+                  {isPro && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
+                      textTransform: "uppercase",
+                      background: "linear-gradient(135deg,#D4AF37,#e8ca60)",
+                      WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+                      border: "1px solid rgba(200,165,94,0.4)",
+                      borderRadius: 20, padding: "2px 7px", flexShrink: 0,
+                    }}>PRO</span>
+                  )}
+                </div>
+                <button
+                  className="ag-sidebar-mobile-close"
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-label="Fechar menu"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <nav className="ag-nav" style={{ padding: "10px 0" }}>
+                {NAV.map((sec) => (
+                  <div key={sec.section}>
+                    <div className="ag-sec-label">{sec.section}</div>
+                    {sec.items.map((item) => {
+                      const dbKey = KEY_MAP[item.label];
+                      if (dbKey && menuVisivel[dbKey] === false) return null;
+                      if (item.modulo && !podeVer(item.modulo)) return null;
+                      return (
+                        <div
+                          key={item.label}
+                          className={`ag-nav-item ${module === item.label ? "active" : ""}`}
+                          onClick={() => navigateTo(item.label)}
+                          data-label={item.label}
+                        >
+                          <item.icone size={15} />
+                          <span>{item.label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </nav>
+            </aside>
+          </>
+        )}
+
       </div>
-      {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
     </>
   );
-}
-
-export function useConfiguracoes(uid) {
-  const [config, setConfig]   = useState(null);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    if (!uid) { setLoading(false); return; }
-    getDoc(doc(db, "users", uid, "config", "geral")).then(snap => setConfig(snap.exists() ? snap.data() : {})).catch(() => setConfig({})).finally(() => setLoading(false));
-  }, [uid]);
-  return {
-    config, loading,
-    taxas: { ...TAXAS_DEFAULT, ...(config?.taxas || {}) },
-    estoqueMinimo: config?.estoqueMinimo ?? 5,
-    menuVisivel: config?.menuVisivel || {},
-    empresa: config?.empresa || { nomeEmpresa: config?.nomeEmpresa || "", cnpj: config?.cnpj || "", telefone: config?.telefone || "", endereco: config?.endereco || "", logo: config?.logo || "" },
-  };
 }
