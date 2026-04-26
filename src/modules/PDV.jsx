@@ -13,12 +13,13 @@ import {
   Copy,
 } from "lucide-react";
 
-import { db } from "../lib/firebase";
+import { db, functions } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
 import {
   collection, query, where, getDocs, runTransaction,
-  doc, orderBy, limit, getDoc,
+  doc, orderBy, limit, getDoc, onSnapshot,
 } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import BarcodeInput from "../components/BarcodeInput";
 import { useConfiguracoes } from "./Configuracoes";
 
@@ -351,105 +352,106 @@ ${venda.cliente?`<div class="total-row"><span>Cliente</span><span>${venda.client
 }
 
 /* ══════════════════════════════════════════════════════
-   MODAL QR CODE PIX — Mercado Pago
-   Gera cobrança via API, exibe QR e faz polling automático
+   MODAL QR CODE PIX — via Cloud Functions + onSnapshot
+   - gerarPixQr      → Cloud Function cria pagamento MP
+   - onSnapshot      → Firestore notifica quando pago (webhook MP)
+   - consultarPagamento → fallback polling se webhook falhar
    ══════════════════════════════════════════════════════ */
-function ModalQrPix({ valor, descricao, mpToken, onPago, onClose }) {
-  const [fase, setFase]     = useState("gerando"); // gerando | aguardando | confirmado | erro
+function ModalQrPix({ valor, descricao, tenantUid, onPago, onClose }) {
+  const [fase,     setFase]     = useState("gerando"); // gerando | aguardando | confirmado | erro
   const [qrBase64, setQrBase64] = useState("");
-  const [qrCode,   setQrCode]   = useState(""); // copia-e-cola
-  const [paymentId, setPaymentId] = useState(null);
+  const [qrCode,   setQrCode]   = useState("");
   const [errMsg,   setErrMsg]   = useState("");
   const [copiado,  setCopiado]  = useState(false);
   const [segundos, setSegundos] = useState(0);
-  const pollingRef  = useRef(null);
-  const countRef    = useRef(null);
+
+  const unsubRef    = useRef(null); // onSnapshot unsubscribe
+  const pollingRef  = useRef(null); // fallback polling interval
+  const countRef    = useRef(null); // contador de segundos
   const mountedRef  = useRef(true);
+  const confirmadoRef = useRef(false); // evita dupla confirmação
 
   const fmt = (v) =>
     Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-  /* ── Gerar QR ── */
+  /* ── Limpa todos os listeners ao desmontar ── */
   useEffect(() => {
-    mountedRef.current = true;
+    mountedRef.current  = true;
+    confirmadoRef.current = false;
     gerarQr();
     return () => {
       mountedRef.current = false;
+      unsubRef.current?.();
       clearInterval(pollingRef.current);
       clearInterval(countRef.current);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /* ── Confirma pagamento (chamado pelo onSnapshot ou polling) ── */
+  const confirmarPagamento = () => {
+    if (confirmadoRef.current) return; // garante execução única
+    confirmadoRef.current = true;
+    unsubRef.current?.();
+    clearInterval(pollingRef.current);
+    clearInterval(countRef.current);
+    if (mountedRef.current) {
+      setFase("confirmado");
+      setTimeout(() => onPago && onPago(valor), 1200);
+    }
+  };
+
+  /* ── Gera QR via Cloud Function ── */
   const gerarQr = async () => {
     setFase("gerando");
     setErrMsg("");
     try {
-      const res = await fetch("https://api.mercadopago.com/v1/payments", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${mpToken}`,
-          "Content-Type":  "application/json",
-          "X-Idempotency-Key": `assent-pdv-${Date.now()}`,
-        },
-        body: JSON.stringify({
-          transaction_amount: parseFloat(valor.toFixed(2)),
-          description: descricao || "Venda PDV ASSENT",
-          payment_method_id: "pix",
-          payer: { email: "cliente@assent.com.br", first_name: "Cliente" },
-        }),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data?.message || `Erro ${res.status}`);
-      }
-
-      const txData = data?.point_of_interaction?.transaction_data;
-      if (!txData?.qr_code_base64 || !txData?.qr_code) {
-        throw new Error("QR Code não retornado pela API. Verifique se PIX está habilitado na conta Mercado Pago.");
-      }
+      const gerarFn = httpsCallable(functions, "gerarPixQr");
+      const result  = await gerarFn({ tenantUid, valor, descricao });
+      const { paymentId, qrCodeBase64, qrCode: qrText } = result.data;
 
       if (!mountedRef.current) return;
-      setQrBase64(txData.qr_code_base64);
-      setQrCode(txData.qr_code);
-      setPaymentId(data.id);
+      setQrBase64(qrCodeBase64);
+      setQrCode(qrText);
       setFase("aguardando");
       setSegundos(0);
 
-      // Polling a cada 4s
-      pollingRef.current = setInterval(() => verificarPagamento(data.id), 4000);
+      /* ── onSnapshot: escuta o documento no Firestore ──
+         Atualizado pelo webhook do MP em tempo real       */
+      const payRef  = doc(db, "users", tenantUid, "pagamentosQr", String(paymentId));
+      unsubRef.current = onSnapshot(payRef, (snap) => {
+        if (!snap.exists()) return;
+        const status = snap.data()?.status;
+        if (status === "approved") confirmarPagamento();
+        if (status === "rejected" || status === "cancelled") {
+          unsubRef.current?.();
+          if (mountedRef.current) {
+            setErrMsg("Pagamento recusado ou cancelado pelo Mercado Pago.");
+            setFase("erro");
+          }
+        }
+      });
 
-      // Contador de segundos aguardando
+      /* ── Fallback polling a cada 8s ──
+         Garante confirmação mesmo se o webhook falhar */
+      const consultarFn = httpsCallable(functions, "consultarPagamento");
+      pollingRef.current = setInterval(async () => {
+        if (!mountedRef.current || confirmadoRef.current) return;
+        try {
+          const res = await consultarFn({ tenantUid, paymentId });
+          if (res.data?.status === "approved") confirmarPagamento();
+        } catch { /* polling silencioso */ }
+      }, 8000);
+
+      /* ── Contador de segundos ── */
       countRef.current = setInterval(() => {
         if (mountedRef.current) setSegundos(s => s + 1);
       }, 1000);
 
     } catch (e) {
       if (!mountedRef.current) return;
-      setErrMsg(e.message || "Erro ao gerar QR Code. Verifique o Access Token.");
+      setErrMsg(e?.message || "Erro ao gerar QR Code. Verifique as configurações.");
       setFase("erro");
-    }
-  };
-
-  const verificarPagamento = async (id) => {
-    if (!mountedRef.current) return;
-    try {
-      const res  = await fetch(`https://api.mercadopago.com/v1/payments/${id}`, {
-        headers: { "Authorization": `Bearer ${mpToken}` },
-      });
-      const data = await res.json();
-
-      if (data?.status === "approved") {
-        clearInterval(pollingRef.current);
-        clearInterval(countRef.current);
-        if (mountedRef.current) {
-          setFase("confirmado");
-          setTimeout(() => onPago && onPago(valor), 1200);
-        }
-      }
-    } catch {
-      /* ignora erros de polling silenciosamente */
     }
   };
 
@@ -465,6 +467,13 @@ function ModalQrPix({ valor, descricao, mpToken, onPago, onClose }) {
     const m = Math.floor(s / 60);
     const r = s % 60;
     return m > 0 ? `${m}m ${r}s` : `${r}s`;
+  };
+
+  const handleCancelar = () => {
+    unsubRef.current?.();
+    clearInterval(pollingRef.current);
+    clearInterval(countRef.current);
+    onClose();
   };
 
   return (
@@ -615,7 +624,7 @@ function ModalQrPix({ valor, descricao, mpToken, onPago, onClose }) {
 
               {/* Cancelar */}
               <button
-                onClick={() => { clearInterval(pollingRef.current); clearInterval(countRef.current); onClose(); }}
+                onClick={handleCancelar}
                 style={{
                   background: "none", border: "1px solid rgba(255,255,255,0.1)",
                   borderRadius: 8, padding: "7px 16px",
@@ -1090,16 +1099,16 @@ export default function PDV({ onVoltar }) {
         <ModalQrPix
           valor={restante}
           descricao={`Venda PDV — ${carrinho.length} item(ns)`}
-          mpToken={config?.pagamentos?.mercadopago?.accessToken}
+          tenantUid={tenantUid}
           onPago={(valorPago) => {
             const pixPagamento = {
-              id:       Date.now(),
-              forma:    "pix",
-              parcelas: 1,
-              valor:    valorPago,
-              label:    "Pix QR Code",
+              id:            Date.now(),
+              forma:         "pix",
+              parcelas:      1,
+              valor:         valorPago,
+              label:         "Pix QR Code",
               valorRecebido: null,
-              troco: null,
+              troco:         null,
             };
             setPagamentos(ps => [...ps, pixPagamento]);
             setShowQrPix(false);
@@ -1338,8 +1347,8 @@ export default function PDV({ onVoltar }) {
                     {pagamentos.length === 0 ? "Adicionar pagamento" : `Adicionar mais (restam ${fmt(restante)})`}
                   </span>
 
-                  {/* Botão QR PIX — visível somente se MP configurado */}
-                  {config?.pagamentos?.mercadopago?.ativo && config?.pagamentos?.mercadopago?.accessToken && (
+                  {/* Botão QR PIX — visível somente se MP configurado e ativo */}
+                  {config?.pagamentos?.mercadopago?.ativo && (
                     <span
                       role="button"
                       onClick={() => setShowQrPix(true)}
