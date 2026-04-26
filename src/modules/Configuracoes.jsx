@@ -1400,12 +1400,13 @@ function SecaoPagamentos({ config, onSave }) {
 }
 
 
+const buildVisivel = (cfg) => {
   const base = {};
   MENU_SECTIONS.forEach(s => {
     base[s.key] = s.locked ? true : (cfg?.menuVisivel?.[s.key] !== undefined ? cfg.menuVisivel[s.key] : true);
   });
   return base;
-
+};
 
 function SecaoMenu({ config, onSave }) {
   const [visivel, setVisivel]   = useState(() => buildVisivel(config));
