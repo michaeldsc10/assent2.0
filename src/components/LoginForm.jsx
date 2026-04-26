@@ -84,18 +84,19 @@ const LoginForm = ({ onLoginSuccess }) => {
   // ── render ───────────────────────────────────────
   return (
     <>
-      {/* Card com borda gradiente */}
       <div className="login-card-wrap">
         <div className="login-card-border" />
 
         <div className="login-form-card">
-          {/* Linha de luz no topo */}
           <div className="card-light" />
 
           {/* Logo */}
           <div className="logo-area">
-            <div className="logo-text">ASSENT</div>
-            <div className="logo-sub">Gestão Empresarial</div>
+            <div className="logo-text">
+              <span className="logo-assent">Assent</span>{" "}
+              <span className="logo-gestao">Gestão</span>
+            </div>
+            <div className="logo-sub">Quem organiza, cresce!</div>
             <div className="logo-divider" />
           </div>
 
@@ -157,7 +158,6 @@ const LoginForm = ({ onLoginSuccess }) => {
             </button>
           </form>
 
-          {/* Recuperação */}
           <div className="footer-link">
             Esqueceu a senha?{" "}
             <button
@@ -215,7 +215,6 @@ const LoginForm = ({ onLoginSuccess }) => {
               </p>
             </div>
 
-            {/* Sucesso */}
             {resetMsg && (
               <div style={{
                 background: "rgba(52,199,89,0.08)",
@@ -228,7 +227,6 @@ const LoginForm = ({ onLoginSuccess }) => {
               </div>
             )}
 
-            {/* Erro */}
             {resetError && (
               <div style={{
                 background: "rgba(224,82,82,0.08)",
@@ -241,7 +239,6 @@ const LoginForm = ({ onLoginSuccess }) => {
               </div>
             )}
 
-            {/* Formulário — some após sucesso */}
             {!resetMsg && (
               <form onSubmit={handleReset} noValidate style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                 <div className="input-group">
