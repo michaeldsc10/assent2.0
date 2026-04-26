@@ -693,15 +693,23 @@ const CSS = `
 
   /* Botão tutorial */
   .pag-btn-tutorial {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 10px 16px; border-radius: 10px;
-    background: rgba(200,165,94,0.07); border: 1px solid rgba(200,165,94,0.25);
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 11px 18px; border-radius: 11px;
+    background: rgba(200,165,94,0.1);
+    border: 1px solid rgba(200,165,94,0.4);
     color: var(--gold); font-size: 12px; font-weight: 600;
-    cursor: pointer; transition: all .15s; font-family: 'DM Sans', sans-serif;
+    cursor: pointer; transition: all .18s; font-family: 'DM Sans', sans-serif;
     align-self: flex-start;
+    box-shadow: 0 0 0 3px rgba(200,165,94,0.06), 0 4px 16px rgba(200,165,94,0.12);
+    text-shadow: 0 0 20px rgba(200,165,94,0.4);
   }
-  .pag-btn-tutorial:hover { background: rgba(200,165,94,0.14); transform: translateX(2px); }
-  .pag-btn-tutorial span  { flex: 1; }
+  .pag-btn-tutorial:hover {
+    background: rgba(200,165,94,0.16);
+    border-color: rgba(200,165,94,0.65);
+    box-shadow: 0 0 0 4px rgba(200,165,94,0.08), 0 6px 22px rgba(200,165,94,0.2);
+    transform: translateY(-1px);
+  }
+  .pag-btn-tutorial span { flex: 1; }
 
   /* Info box — versão mais sutil */
   .pag-info-box {
