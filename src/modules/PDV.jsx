@@ -755,50 +755,6 @@ function ModalQrPix({ valor, descricao, tenantUid, onPago, onClose }) {
    ═══════════════════════════════════════════════════ */
 export default function PDV({ onVoltar }) {
   const { tenantUid, vendedorNome, vendedorId, cargo, user } = useAuth();
-
-  /* ── Bloqueio de acesso para o financeiro ── */
-  if (cargo === "financeiro") {
-    return (
-      <div style={{
-        display: "flex", flexDirection: "column", alignItems: "center",
-        justifyContent: "center", height: "100vh",
-        background: "var(--pdv-bg, #0f1117)",
-        fontFamily: "'DM Sans','Segoe UI',sans-serif",
-        gap: 16,
-      }}>
-        <div style={{
-          background: "rgba(224,85,85,0.1)", border: "1px solid rgba(224,85,85,0.3)",
-          borderRadius: 14, padding: "40px 48px", textAlign: "center",
-          maxWidth: 400, display: "flex", flexDirection: "column",
-          alignItems: "center", gap: 12,
-        }}>
-          <AlertCircle size={40} color="#e05555" />
-          <div style={{ fontSize: 18, fontWeight: 700, color: "#e8e8f0" }}>
-            Acesso não autorizado
-          </div>
-          <div style={{ fontSize: 14, color: "#9193a5", lineHeight: 1.6 }}>
-            Seu perfil <strong style={{ color: "#e8e8f0" }}>Financeiro</strong> não tem
-            permissão para acessar o módulo de PDV.
-          </div>
-          {onVoltar && (
-            <button
-              onClick={onVoltar}
-              style={{
-                marginTop: 8, display: "flex", alignItems: "center", gap: 8,
-                background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.15)",
-                color: "#c8a55e", borderRadius: 8, padding: "10px 20px",
-                fontSize: 13, fontWeight: 600, cursor: "pointer",
-                fontFamily: "'DM Sans',sans-serif",
-              }}
-            >
-              <ArrowLeft size={15} /> Voltar
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   const { config, loading: cfgLoading } = useConfiguracoes(tenantUid);
 
   /* ── Dados da empresa (logo + nome) ── */
@@ -832,6 +788,9 @@ export default function PDV({ onVoltar }) {
   const [erro, setErro] = useState("");
   const [toast, setToast] = useState(null);
   const [nomeOperador, setNomeOperador] = useState("");
+
+  /* ── Mobile: aba ativa ── */
+  const [mobileTab, setMobileTab] = useState("produtos"); // "produtos" | "carrinho"
 
   const buscaRef = useRef(null);
 
@@ -1271,10 +1230,31 @@ export default function PDV({ onVoltar }) {
           </div>
         </header>
 
+        {/* ── MOBILE TAB NAV ── */}
+        <div className="pdv-mobile-tabs">
+          <button
+            className={"pdv-mobile-tab" + (mobileTab === "produtos" ? " active" : "")}
+            onClick={() => setMobileTab("produtos")}
+          >
+            <Search size={16} />
+            <span>Produtos</span>
+          </button>
+          <button
+            className={"pdv-mobile-tab" + (mobileTab === "carrinho" ? " active" : "")}
+            onClick={() => setMobileTab("carrinho")}
+          >
+            <ShoppingCart size={16} />
+            <span>Carrinho</span>
+            {carrinho.length > 0 && (
+              <span className="pdv-mobile-tab-badge">{carrinho.length}</span>
+            )}
+          </button>
+        </div>
+
         {/* ── BODY ── */}
         <div className="pdv-body">
           {/* ─── COLUNA ESQUERDA: busca + produto ─── */}
-          <section className="pdv-col-left">
+          <section className={"pdv-col-left" + (mobileTab === "carrinho" ? " pdv-hidden-mobile" : "")}>
             {/* Busca textual */}
             <div className="pdv-search-box">
               <Search size={15} className="pdv-search-icon" />
@@ -1467,7 +1447,7 @@ export default function PDV({ onVoltar }) {
           </section>
 
           {/* ─── COLUNA DIREITA: carrinho ─── */}
-          <section className="pdv-col-right">
+          <section className={"pdv-col-right" + (mobileTab === "produtos" ? " pdv-hidden-mobile" : "")}>
             <div className="pdv-carrinho-header">
               <ShoppingCart size={16} />
               <span>Cupom Fiscal</span>
@@ -2084,6 +2064,203 @@ const CSS = `
 .cupom-btn-fechar:hover { background: rgba(255,255,255,0.05); color: #e8e8f0; }
 @keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+
+/* ═══════════════════════════════════
+   MOBILE TAB NAV (sempre renderizado, visível só em mobile)
+   ═══════════════════════════════════ */
+.pdv-mobile-tabs {
+  display: none;
+}
+
+/* ═══════════════════════════════════
+   RESPONSIVIDADE MOBILE (≤ 700px)
+   ═══════════════════════════════════ */
+@media (max-width: 700px) {
+
+  /* ── Header compacto ── */
+  .pdv-root {
+    --pdv-header-h: 112px;
+  }
+  .pdv-header {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 10px 14px;
+    gap: 8px;
+    row-gap: 8px;
+  }
+  .pdv-header-brand {
+    min-width: unset;
+    flex: 1;
+  }
+  .pdv-header-right {
+    min-width: unset;
+    gap: 8px;
+  }
+  .pdv-operador-label { display: none; }
+  .pdv-operador-nome  { font-size: 12px; }
+  .pdv-header-center {
+    order: 3;
+    flex: 0 0 100%;
+  }
+  .pdv-barcode-wrapper {
+    max-width: 100%;
+    margin: 0;
+  }
+
+  /* ── Tab nav ── */
+  .pdv-mobile-tabs {
+    display: flex;
+    background: var(--pdv-surface);
+    border-bottom: 1px solid var(--pdv-border);
+    position: sticky;
+    top: var(--pdv-header-h);
+    z-index: 9;
+    flex-shrink: 0;
+  }
+  .pdv-mobile-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 11px 8px;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--pdv-text-3);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    transition: color .15s, border-color .15s;
+    position: relative;
+  }
+  .pdv-mobile-tab.active {
+    color: var(--pdv-gold);
+    border-bottom-color: var(--pdv-gold);
+  }
+  .pdv-mobile-tab-badge {
+    background: var(--pdv-gold);
+    color: #0a0a0a;
+    font-size: 10px;
+    font-weight: 800;
+    border-radius: 50px;
+    padding: 1px 6px;
+    min-width: 18px;
+    text-align: center;
+    line-height: 16px;
+  }
+
+  /* ── Body: empilhado, scroll vertical ── */
+  .pdv-body {
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: unset;
+    flex: 1;
+  }
+
+  /* ── Colunas: full width, sem border lateral ── */
+  .pdv-col-left {
+    width: 100%;
+    border-right: none;
+    border-bottom: none;
+    flex-shrink: unset;
+    overflow-y: unset;
+  }
+  .pdv-col-right {
+    flex: unset;
+    overflow: unset;
+    width: 100%;
+  }
+
+  /* ── Ocultar coluna inativa no mobile ── */
+  .pdv-hidden-mobile {
+    display: none !important;
+  }
+
+  /* ── Carrinho: linha simplificada sem colunas fixas ── */
+  .pdv-carrinho-thead {
+    display: none;
+  }
+  .pdv-carrinho-row {
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 6px 0;
+    padding: 10px 14px;
+  }
+  .pdv-item-nome {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .pdv-item-sub {
+    grid-column: 2;
+    grid-row: 1;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--pdv-gold);
+    text-align: right;
+    align-self: center;
+  }
+  .pdv-item-qty {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .pdv-item-unit {
+    grid-column: 2;
+    grid-row: 2;
+    font-size: 11px;
+    color: var(--pdv-text-3);
+    text-align: right;
+    align-self: center;
+  }
+  .pdv-item-del {
+    position: absolute;
+    right: 14px;
+    top: 10px;
+  }
+  .pdv-carrinho-row { position: relative; }
+
+  /* ── Botões de qty maiores para touch ── */
+  .pdv-item-qty span[role="button"] {
+    width: 30px !important;
+    height: 30px !important;
+    font-size: 18px !important;
+  }
+  .pdv-qty-input {
+    width: 44px !important;
+    font-size: 15px !important;
+  }
+
+  /* ── Total section compacta ── */
+  .pdv-total-section {
+    padding: 12px 14px;
+  }
+  .pdv-total-grande {
+    font-size: 20px;
+  }
+
+  /* ── Botão finalizar full-width e mais alto ── */
+  .pdv-btn-finalizar,
+  span.pdv-btn-finalizar-inline {
+    margin: 10px 14px 4px !important;
+    width: calc(100% - 28px) !important;
+    padding: 16px 14px !important;
+    font-size: 14px !important;
+  }
+  .pdv-btn-cancelar {
+    margin: 0 14px 14px !important;
+  }
+
+  /* ── Success card ── */
+  .pdv-success-card {
+    padding: 32px 24px;
+    margin: 16px;
+  }
+  .pdv-success-total {
+    font-size: 32px;
+  }
+}
 
 /* ── LISTA PAGAMENTOS DIVIDIDOS ── */
 .pdv-pag-lista {
