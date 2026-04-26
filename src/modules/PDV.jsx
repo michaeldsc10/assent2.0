@@ -13,13 +13,13 @@ import {
   Copy,
 } from "lucide-react";
 
-import { db, functions } from "../lib/firebase";
+import { auth, db, functions } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
 import {
   collection, query, where, getDocs, runTransaction,
   doc, orderBy, limit, getDoc, onSnapshot, serverTimestamp,
 } from "firebase/firestore";
-import { httpsCallable } from "firebase/functions";
+import { getIdToken } from "firebase/auth";
 import BarcodeInput from "../components/BarcodeInput";
 import { useConfiguracoes } from "./Configuracoes";
 
@@ -312,7 +312,7 @@ function ModalCupom({ venda, troco, empresa, onClose }) {
     win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cupom</title>
 <style>@page{size:80mm auto;margin:3mm 4mm}*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Courier New',monospace;font-size:11px;width:72mm;color:#111}.center{text-align:center}.empresa-nome{font-size:14px;font-weight:bold;margin-bottom:2px}.empresa-sub{font-size:10px;color:#555}.divider{border:none;border-top:1px dashed #999;margin:6px 0}.row{display:flex;gap:4px;padding:3px 0;border-bottom:1px dotted #ddd}.row .nome{flex:1}.row .qtd{color:#555;flex-shrink:0}.row .val{flex-shrink:0;text-align:right;font-weight:600}.total-row{display:flex;justify-content:space-between;padding:2px 0}.total-grande{font-size:14px;font-weight:bold;padding:4px 0}.rodape{font-size:9px;color:#777;text-align:center;margin-top:4px}</style>
 </head><body>
-<div class="center"><div class="empresa-nome">${empresa.nome||"ASSENT"}</div>${empresa.cnpj?`<div class="empresa-sub">CNPJ: ${empresa.cnpj}</div>`:""} ${empresa.endereco?`<div class="empresa-sub">${empresa.endereco}</div>`:""}</div>
+<div class="center"><div class="empresa-nome">${empresa.nome||"ASSENT"}</div>${empresa.endereco?`<div class="empresa-sub">${empresa.endereco}</div>`:""}</div>
 <hr class="divider"><div class="center" style="font-size:10px;color:#777">#${venda.id} · ${dataHora}</div><hr class="divider">
 ${linhaItens}<hr class="divider">
 <div class="total-row"><span>Subtotal</span><span>${Number(venda.total||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>
@@ -339,7 +339,6 @@ ${venda.cliente?`<div class="total-row"><span>Cliente</span><span>${venda.client
         </div>
         <div className="cupom-paper">
           <div className="cupom-empresa">{empresa.nome}</div>
-          {empresa.cnpj && <div className="cupom-sub">CNPJ: {empresa.cnpj}</div>}
           {empresa.endereco && <div className="cupom-sub">{empresa.endereco}</div>}
           <div className="cupom-divider" />
           <div className="cupom-meta">#{venda.id} · {dataHora}</div>
@@ -418,14 +417,31 @@ function ModalQrPix({ valor, descricao, tenantUid, onPago, onClose }) {
     }
   };
 
+  const CF_BASE = "https://us-central1-assent-2b945.cloudfunctions.net";
+
+  /* Helper — chama Cloud Function via fetch com token Firebase Auth */
+  const callCF = async (nome, body) => {
+    const token = await getIdToken(auth.currentUser);
+    const res   = await fetch(`${CF_BASE}/${nome}`, {
+      method:  "POST",
+      headers: {
+        "Content-Type":  "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || `Erro ${res.status}`);
+    return data;
+  };
+
   /* ── Gera QR via Cloud Function ── */
   const gerarQr = async () => {
     setFase("gerando");
     setErrMsg("");
     try {
-      const gerarFn = httpsCallable(functions, "gerarPixQr");
-      const result  = await gerarFn({ tenantUid, valor, descricao });
-      const { paymentId, qrCodeBase64, qrCode: qrText } = result.data;
+      const result = await callCF("gerarPixQr", { tenantUid, valor, descricao });
+      const { paymentId, qrCodeBase64, qrCode: qrText } = result;
 
       if (!mountedRef.current) return;
       setQrBase64(qrCodeBase64);
@@ -451,12 +467,11 @@ function ModalQrPix({ valor, descricao, tenantUid, onPago, onClose }) {
 
       /* ── Fallback polling a cada 8s ──
          Garante confirmação mesmo se o webhook falhar */
-      const consultarFn = httpsCallable(functions, "consultarPagamento");
       pollingRef.current = setInterval(async () => {
         if (!mountedRef.current || confirmadoRef.current) return;
         try {
-          const res = await consultarFn({ tenantUid, paymentId });
-          if (res.data?.status === "approved") confirmarPagamento();
+          const res = await callCF("consultarPagamento", { tenantUid, paymentId });
+          if (res?.status === "approved") confirmarPagamento();
         } catch { /* polling silencioso */ }
       }, 8000);
 
@@ -893,19 +908,11 @@ export default function PDV({ onVoltar }) {
         const ref = collection(db, "users", tenantUid, "clientes");
         const q = query(ref, orderBy("nome"), limit(20));
         const snap = await getDocs(q);
-        const termo = buscaCliente.toLowerCase().replace(/\D/g, "") || buscaCliente.toLowerCase();
-        const termoBruto = buscaCliente.toLowerCase();
+        const termo = buscaCliente.toLowerCase();
         setClientesFiltrados(
           snap.docs
             .map((d) => ({ id: d.id, ...d.data() }))
-            .filter((c) => {
-              const cpfLimpo = (c.cpf || c.documento || "").replace(/\D/g, "");
-              return (
-                c.nome?.toLowerCase().includes(termoBruto) ||
-                cpfLimpo.includes(termo) ||
-                (c.cpf || c.documento || "").toLowerCase().includes(termoBruto)
-              );
-            })
+            .filter((c) => c.nome?.toLowerCase().includes(termo))
             .slice(0, 6)
         );
       } catch {
@@ -1117,7 +1124,7 @@ export default function PDV({ onVoltar }) {
               const t = (vendaFinalizada.pagamentos || []).reduce((s,p)=>s+(p.troco||0),0);
               return t > 0 ? t : null;
             })()}
-            empresa={{ nome: nomeEmpresa, logo: logoEmpresa, endereco: empresa.endereco, telefone: empresa.telefone, cnpj: empresa.cnpj }}
+            empresa={{ nome: nomeEmpresa, logo: logoEmpresa, endereco: empresa.endereco, telefone: empresa.telefone }}
             onClose={() => setShowCupom(false)}
           />
         )}
@@ -1312,9 +1319,7 @@ export default function PDV({ onVoltar }) {
                           }}
                         >
                           {c.nome}
-                          <span className="pdv-cliente-tel">
-                            {[c.cpf || c.documento, c.telefone].filter(Boolean).join(" · ")}
-                          </span>
+                          {c.telefone && <span className="pdv-cliente-tel">{c.telefone}</span>}
                         </button>
                       ))}
                     </div>
