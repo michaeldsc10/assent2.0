@@ -9,6 +9,7 @@ import {
   Eye, EyeOff, Check, AlertCircle, Save,
   ChevronRight, Camera, Shield, Keyboard, Activity,
   Filter, RefreshCw, Search, ChevronDown,
+  Zap, Copy, ExternalLink, BookOpen, X, CheckCircle2,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
@@ -98,6 +99,7 @@ const NAV = [
   { id: "empresa",    label: "Empresa",             icon: Building2      },
   { id: "seguranca",  label: "Segurança",            icon: Shield         },
   { id: "financeiro", label: "Financeiro",           icon: CreditCard     },
+  { id: "pagamentos", label: "Pagamentos Online",    icon: Zap            },
   { id: "menu",       label: "Menu do Sistema",      icon: LayoutDashboard},
   { id: "estoque",    label: "Estoque",              icon: Package        },
   { id: "atalhos",    label: "Atalhos",              icon: Keyboard       },
@@ -566,6 +568,145 @@ const CSS = `
   .log-count-bar {
     font-size: 11px; color: var(--text-3); text-align: right; padding-top: 4px;
   }
+
+  /* ── Seção Pagamentos Online ── */
+  .pag-provedor-card {
+    border: 1.5px solid var(--border); border-radius: 12px;
+    overflow: hidden; transition: border-color .15s;
+  }
+  .pag-provedor-card.ativo { border-color: rgba(200,165,94,0.5); }
+  .pag-provedor-header {
+    display: flex; align-items: center; gap: 14px;
+    padding: 16px 18px; background: var(--s2);
+    border-bottom: 1px solid var(--border);
+  }
+  .pag-provedor-logo {
+    width: 42px; height: 42px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; background: #009ee3; color: #fff; flex-shrink: 0;
+  }
+  .pag-provedor-info { flex: 1; }
+  .pag-provedor-nome { font-size: 14px; font-weight: 700; color: var(--text); font-family: 'Sora', sans-serif; }
+  .pag-provedor-sub  { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+  .pag-provedor-badge {
+    font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px;
+    background: rgba(72,187,120,0.12); color: #48bb78; border: 1px solid rgba(72,187,120,0.25);
+  }
+  .pag-provedor-badge.inativo {
+    background: var(--s3); color: var(--text-3); border-color: var(--border);
+  }
+  .pag-provedor-body { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .pag-token-wrap { position: relative; }
+  .pag-token-wrap .form-input { padding-right: 42px; font-family: 'DM Mono', 'Courier New', monospace; font-size: 12px; }
+  .pag-token-toggle {
+    position: absolute; right: 11px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer;
+    color: var(--text-3); display: flex; align-items: center; transition: color .13s;
+  }
+  .pag-token-toggle:hover { color: var(--text-2); }
+  .pag-status-row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--s3); border: 1px solid var(--border);
+    border-radius: 9px; padding: 12px 14px;
+  }
+  .pag-status-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    background: var(--text-3);
+  }
+  .pag-status-dot.ok { background: #48bb78; box-shadow: 0 0 6px rgba(72,187,120,0.5); }
+  .pag-status-dot.erro { background: var(--red); }
+  .pag-status-text { flex: 1; font-size: 12px; color: var(--text-2); }
+  .pag-btn-tutorial {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 16px; border-radius: 9px;
+    background: rgba(200,165,94,0.08); border: 1px solid rgba(200,165,94,0.3);
+    color: var(--gold); font-size: 12px; font-weight: 600;
+    cursor: pointer; transition: all .15s;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .pag-btn-tutorial:hover { background: rgba(200,165,94,0.15); }
+  .pag-info-box {
+    background: rgba(200,165,94,0.06); border: 1px solid rgba(200,165,94,0.2);
+    border-radius: 9px; padding: 12px 14px;
+    font-size: 12px; color: var(--text-2); line-height: 1.7;
+  }
+  .pag-info-box strong { color: var(--gold); font-weight: 600; }
+
+  /* ── Modal Tutorial ── */
+  .tut-overlay {
+    position: fixed; inset: 0; z-index: 10000;
+    background: rgba(0,0,0,0.72); backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+    animation: fadeIn .15s ease; padding: 16px;
+  }
+  .tut-modal {
+    background: #13151d; border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 18px; width: 100%; max-width: 560px;
+    max-height: 90vh; display: flex; flex-direction: column;
+    box-shadow: 0 32px 96px rgba(0,0,0,0.8), 0 0 0 1px rgba(200,165,94,0.15);
+    animation: slideUp .2s ease;
+  }
+  .tut-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 18px 22px; border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .tut-header-icon {
+    width: 38px; height: 38px; border-radius: 10px;
+    background: rgba(200,165,94,0.15); border: 1px solid rgba(200,165,94,0.3);
+    display: flex; align-items: center; justify-content: center; color: var(--gold); flex-shrink: 0;
+  }
+  .tut-header-title { flex: 1; }
+  .tut-header-title h3 { font-size: 15px; font-weight: 700; color: #e8e8f0; margin: 0; font-family: 'Sora', sans-serif; }
+  .tut-header-title p  { font-size: 11px; color: #5c5e72; margin: 3px 0 0; }
+  .tut-close {
+    background: none; border: none; cursor: pointer; color: #5c5e72;
+    display: flex; align-items: center; padding: 4px; border-radius: 7px; transition: color .13s;
+  }
+  .tut-close:hover { color: #e05555; }
+  .tut-body { flex: 1; overflow-y: auto; padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+  .tut-body::-webkit-scrollbar { width: 3px; }
+  .tut-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+  .tut-step {
+    display: flex; gap: 14px;
+    background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; padding: 14px 16px;
+    transition: border-color .15s;
+  }
+  .tut-step:hover { border-color: rgba(200,165,94,0.25); }
+  .tut-step-num {
+    width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+    background: rgba(200,165,94,0.15); border: 1px solid rgba(200,165,94,0.35);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700; color: var(--gold);
+  }
+  .tut-step-content { flex: 1; min-width: 0; }
+  .tut-step-title { font-size: 13px; font-weight: 600; color: #e8e8f0; margin-bottom: 4px; }
+  .tut-step-desc { font-size: 12px; color: #7a7c96; line-height: 1.65; }
+  .tut-step-desc strong { color: #c0c2d8; font-weight: 600; }
+  .tut-step-desc code {
+    background: rgba(200,165,94,0.1); border: 1px solid rgba(200,165,94,0.2);
+    border-radius: 4px; padding: 1px 7px; font-family: 'DM Mono', monospace;
+    font-size: 11px; color: var(--gold);
+  }
+  .tut-link {
+    display: inline-flex; align-items: center; gap: 5px;
+    color: #5a9fd4; font-size: 12px; text-decoration: none; font-weight: 500;
+    transition: color .13s;
+  }
+  .tut-link:hover { color: #7ab8e8; }
+  .tut-warning {
+    background: rgba(224,82,82,0.08); border: 1px solid rgba(224,82,82,0.25);
+    border-radius: 10px; padding: 12px 14px;
+    display: flex; gap: 10px; align-items: flex-start;
+    font-size: 12px; color: #e05555; line-height: 1.6;
+  }
+  .tut-warning strong { font-weight: 700; display: block; margin-bottom: 3px; }
+  .tut-footer {
+    padding: 16px 22px; border-top: 1px solid rgba(255,255,255,0.08);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .tut-footer-note { font-size: 11px; color: #5c5e72; }
+  .tut-footer-note span { color: #48bb78; font-weight: 600; }
 `;
 
 /* ══════════════════════════════════════════════════════
@@ -968,13 +1109,303 @@ function SecaoFinanceiro({ config, onSave }) {
   );
 }
 
-const buildVisivel = (cfg) => {
+/* ══════════════════════════════════════════════════════
+   MODAL TUTORIAL — Como cadastrar API de pagamento
+   ══════════════════════════════════════════════════════ */
+function ModalTutorialPagamento({ onClose }) {
+  const PASSOS = [
+    {
+      titulo: "Crie uma conta no Mercado Pago",
+      desc: <>Acesse <a className="tut-link" href="https://www.mercadopago.com.br" target="_blank" rel="noreferrer">mercadopago.com.br <ExternalLink size={10} /></a> e crie sua conta de <strong>pessoa jurídica (empresa)</strong> ou pessoa física. Uma conta de vendedor é necessária para receber pagamentos PIX automáticos.</>,
+    },
+    {
+      titulo: "Acesse o Painel do Desenvolvedor",
+      desc: <>Após logar, vá em <strong>Meu Perfil</strong> → <strong>Seu negócio</strong> → <strong>Configurações</strong> → <strong>Gestão e Administração</strong> → clique em <strong>"Credenciais"</strong>. Ou acesse diretamente: <a className="tut-link" href="https://www.mercadopago.com.br/developers/panel/app" target="_blank" rel="noreferrer">painel de aplicações <ExternalLink size={10} /></a>.</>,
+    },
+    {
+      titulo: "Crie uma Aplicação",
+      desc: <>No painel de desenvolvedor, clique em <strong>"Criar aplicação"</strong>. Dê um nome como <em>"ASSENT Gestão"</em>, selecione <strong>Pagamentos online</strong> como produto e confirme a criação.</>,
+    },
+    {
+      titulo: "Acesse as Credenciais de Produção",
+      desc: <>Dentro da sua aplicação, vá na aba <strong>"Credenciais de produção"</strong>. <br/><br/>⚠️ <strong>Não use as credenciais de teste</strong> (sandbox) — elas não processam pagamentos reais. Use sempre as credenciais de <strong>produção</strong>.</>,
+    },
+    {
+      titulo: "Copie o Access Token",
+      desc: <>Localize o campo <strong>"Access Token"</strong> de produção — começa com <code>APP_USR-</code> seguido de uma longa sequência de caracteres. Clique em <strong>Copiar</strong> e cole no campo da tela anterior.</>,
+    },
+    {
+      titulo: "Ative e Salve no ASSENT",
+      desc: <>Cole o token no campo <strong>"Access Token de Produção"</strong>, ative o toggle <strong>"Ativar Pagamentos PIX"</strong> e clique em <strong>Salvar</strong>. A partir daí, o PDV terá o botão <strong>"Pagar com Pix QR Code"</strong> disponível.</>,
+    },
+    {
+      titulo: "Habilite o PIX na sua conta MP",
+      desc: <>Para receber via PIX, sua conta Mercado Pago precisa ter a chave PIX configurada. Acesse <strong>Configurações</strong> → <strong>PIX</strong> dentro do app Mercado Pago e cadastre sua chave (CPF, CNPJ, e-mail ou telefone).</>,
+    },
+  ];
+
+  return (
+    <div className="tut-overlay" onClick={onClose}>
+      <div className="tut-modal" onClick={e => e.stopPropagation()}>
+        <div className="tut-header">
+          <div className="tut-header-icon"><BookOpen size={16} /></div>
+          <div className="tut-header-title">
+            <h3>Como cadastrar a API de Pagamento</h3>
+            <p>Passo a passo para integrar o Mercado Pago ao PDV</p>
+          </div>
+          <button className="tut-close" onClick={onClose}><X size={16} /></button>
+        </div>
+
+        <div className="tut-body">
+          <div className="tut-warning">
+            <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div>
+              <strong>Somente Administradores têm acesso</strong>
+              Esta configuração é restrita ao cargo de Admin do sistema. O Access Token dá acesso à sua conta de recebimentos — mantenha-o seguro e nunca compartilhe.
+            </div>
+          </div>
+
+          {PASSOS.map((p, i) => (
+            <div key={i} className="tut-step">
+              <div className="tut-step-num">{i + 1}</div>
+              <div className="tut-step-content">
+                <div className="tut-step-title">{p.titulo}</div>
+                <div className="tut-step-desc">{p.desc}</div>
+              </div>
+            </div>
+          ))}
+
+          <div className="tut-warning" style={{ background: "rgba(72,187,120,0.07)", borderColor: "rgba(72,187,120,0.25)", color: "#48bb78" }}>
+            <CheckCircle2 size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div>
+              <strong>Outros provedores</strong>
+              Futuramente serão suportados PagSeguro, Pagar.me e outros. Se você usa outro provedor, entre em contato com o suporte ASSENT.
+            </div>
+          </div>
+        </div>
+
+        <div className="tut-footer">
+          <span className="tut-footer-note">
+            Dúvidas? Documentação oficial: <span>developers.mercadopago.com</span>
+          </span>
+          <button className="btn-primary" onClick={onClose}>
+            <Check size={13} /> Entendi
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   SEÇÃO PAGAMENTOS ONLINE — somente admin
+   Salva em: users/{uid}/config/geral → pagamentos.mercadopago
+   ══════════════════════════════════════════════════════ */
+function SecaoPagamentos({ config, onSave }) {
+  const [token,     setToken]     = useState(config?.pagamentos?.mercadopago?.accessToken || "");
+  const [ativo,     setAtivo]     = useState(config?.pagamentos?.mercadopago?.ativo ?? false);
+  const [showToken, setShowToken] = useState(false);
+  const [salvando,  setSalvando]  = useState(false);
+  const [testando,  setTestando]  = useState(false);
+  const [testeOk,   setTesteOk]   = useState(null); // null | true | false
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [copiado,   setCopiado]   = useState(false);
+
+  useEffect(() => {
+    setToken(config?.pagamentos?.mercadopago?.accessToken || "");
+    setAtivo(config?.pagamentos?.mercadopago?.ativo ?? false);
+  }, [config]);
+
+  const handleSalvar = async () => {
+    if (!token.trim()) { alert("Informe o Access Token antes de salvar."); return; }
+    setSalvando(true);
+    setTesteOk(null);
+    try {
+      await onSave({
+        pagamentos: {
+          mercadopago: {
+            accessToken: token.trim(),
+            ativo,
+            atualizadoEm: new Date().toISOString(),
+          }
+        }
+      });
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  const handleTestar = async () => {
+    if (!token.trim()) return;
+    setTestando(true);
+    setTesteOk(null);
+    try {
+      // Chama endpoint simples para validar o token
+      const res = await fetch("https://api.mercadopago.com/v1/payment_methods?marketplace=NONE&site_id=MLB", {
+        headers: { "Authorization": `Bearer ${token.trim()}` }
+      });
+      setTesteOk(res.ok);
+    } catch {
+      setTesteOk(false);
+    } finally {
+      setTestando(false);
+    }
+  };
+
+  const handleCopiar = () => {
+    if (!token) return;
+    navigator.clipboard.writeText(token).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    });
+  };
+
+  const tokenMascarado = token
+    ? token.slice(0, 12) + "••••••••••••••••••••••" + token.slice(-6)
+    : "";
+
+  return (
+    <>
+      {showTutorial && <ModalTutorialPagamento onClose={() => setShowTutorial(false)} />}
+
+      <div className="cfg-card">
+        <div className="cfg-card-header">
+          <div className="cfg-card-header-icon"><Zap size={15} /></div>
+          <div>
+            <div className="cfg-card-title">Pagamentos Online</div>
+            <div className="cfg-card-sub">Configuração de APIs de pagamento para QR Code PIX</div>
+          </div>
+        </div>
+
+        <div className="cfg-card-body" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* Aviso admin-only */}
+          <div className="pag-info-box">
+            <strong>🔒 Área restrita ao Administrador.</strong> O Access Token dá acesso direto à sua conta de recebimentos do Mercado Pago. Nunca compartilhe este token com terceiros. Mantenha-o confidencial como uma senha bancária.
+          </div>
+
+          {/* Botão tutorial */}
+          <button className="pag-btn-tutorial" onClick={() => setShowTutorial(true)}>
+            <BookOpen size={14} />
+            Tutorial para cadastrar API de pagamento
+            <ChevronRight size={13} />
+          </button>
+
+          {/* Card Mercado Pago */}
+          <div className={`pag-provedor-card ${ativo && token ? "ativo" : ""}`}>
+            <div className="pag-provedor-header">
+              <div className="pag-provedor-logo" title="Mercado Pago">
+                <span style={{ fontSize: 18 }}>💳</span>
+              </div>
+              <div className="pag-provedor-info">
+                <div className="pag-provedor-nome">Mercado Pago</div>
+                <div className="pag-provedor-sub">PIX · QR Code · Pagamento instantâneo</div>
+              </div>
+              <div className="pag-provedor-badge" style={ativo && token ? {} : { background: "var(--s3)", color: "var(--text-3)", borderColor: "var(--border)" }}>
+                {ativo && token ? "Ativo" : "Inativo"}
+              </div>
+            </div>
+
+            <div className="pag-provedor-body">
+              {/* Toggle ativar */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>Ativar Pagamentos PIX</div>
+                  <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>Exibe o botão "Pagar com Pix QR Code" no PDV</div>
+                </div>
+                <Toggle checked={ativo} onChange={setAtivo} />
+              </div>
+
+              {/* Access Token */}
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">
+                  Access Token de Produção <span className="form-label-req">*</span>
+                </label>
+                <div className="pag-token-wrap">
+                  <input
+                    type={showToken ? "text" : "password"}
+                    className="form-input"
+                    style={{ fontFamily: "'DM Mono','Courier New',monospace", fontSize: 12 }}
+                    value={token}
+                    onChange={e => { setToken(e.target.value); setTesteOk(null); }}
+                    placeholder="APP_USR-xxxxxxxxxxxxxxxxxxxx-xxxxxx-xxxxxxxxxxxxxxxxx-xxxxxxxxxx"
+                  />
+                  <button
+                    className="pag-token-toggle"
+                    onClick={() => setShowToken(s => !s)}
+                    type="button"
+                    title={showToken ? "Ocultar token" : "Exibir token"}
+                  >
+                    {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                  <button
+                    className="btn-secondary"
+                    style={{ fontSize: 11, padding: "5px 12px", display: "flex", alignItems: "center", gap: 6 }}
+                    onClick={handleTestar}
+                    disabled={!token.trim() || testando}
+                  >
+                    {testando
+                      ? <><span className="cfg-spinner" />Testando...</>
+                      : testeOk === true
+                        ? <><Check size={12} color="#48bb78" />Token válido</>
+                        : testeOk === false
+                          ? <><AlertCircle size={12} color="var(--red)" />Token inválido</>
+                          : <>Testar conexão</>
+                    }
+                  </button>
+                  <button
+                    className="btn-secondary"
+                    style={{ fontSize: 11, padding: "5px 12px", display: "flex", alignItems: "center", gap: 6 }}
+                    onClick={handleCopiar}
+                    disabled={!token}
+                  >
+                    <Copy size={11} />
+                    {copiado ? "Copiado!" : "Copiar token"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Status indicator */}
+              <div className="pag-status-row">
+                <div className={`pag-status-dot ${testeOk === true ? "ok" : testeOk === false ? "erro" : ""}`} />
+                <div className="pag-status-text">
+                  {testeOk === true
+                    ? "✅ Conexão bem-sucedida com o Mercado Pago"
+                    : testeOk === false
+                      ? "❌ Token inválido ou sem permissão de acesso"
+                      : token
+                        ? "Clique em 'Testar conexão' para validar o token"
+                        : "Nenhum token configurado"
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Info sobre como funciona */}
+          <div className="pag-info-box">
+            <strong>Como funciona:</strong> Ao ativar, o PDV exibirá o botão <strong>"Pagar com Pix QR Code"</strong>. O sistema gera um QR Code via API do Mercado Pago com o valor exato da venda. Quando o cliente escanear e pagar, a venda é <strong>finalizada automaticamente</strong> sem intervenção manual.
+          </div>
+        </div>
+
+        <div className="cfg-card-footer">
+          <button className="btn-primary" onClick={handleSalvar} disabled={salvando || !token.trim()}>
+            {salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Configuração</>}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+
   const base = {};
   MENU_SECTIONS.forEach(s => {
     base[s.key] = s.locked ? true : (cfg?.menuVisivel?.[s.key] !== undefined ? cfg.menuVisivel[s.key] : true);
   });
   return base;
-};
+
 
 function SecaoMenu({ config, onSave }) {
   const [visivel, setVisivel]   = useState(() => buildVisivel(config));
@@ -1324,7 +1755,7 @@ function SecaoLog({ tenantUid }) {
    Seções visíveis por cargo
 ───────────────────────────────────────────── */
 const SECOES_POR_CARGO = {
-  admin:       ["empresa", "seguranca", "financeiro", "menu", "estoque", "atalhos", "log"],
+  admin:       ["empresa", "seguranca", "financeiro", "pagamentos", "menu", "estoque", "atalhos", "log"],
   financeiro:  ["seguranca", "financeiro", "atalhos"],
   comercial:   ["seguranca", "atalhos"],
   compras:     ["seguranca", "estoque", "atalhos"],
@@ -1368,6 +1799,7 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
       case "empresa":    return <SecaoEmpresa    config={config} onSave={handleSave} />;
       case "seguranca":  return <SecaoSeguranca />;
       case "financeiro": return <SecaoFinanceiro config={config} onSave={handleSave} />;
+      case "pagamentos": return <SecaoPagamentos config={config} onSave={handleSave} />;
       case "menu":       return <SecaoMenu       config={config} onSave={handleSave} />;
       case "estoque":    return <SecaoEstoque    config={config} onSave={handleSave} />;
       case "atalhos":    return <SecaoAtalhos    menuVisivel={menuVisivelProp ?? config?.menuVisivel ?? {}} />;
