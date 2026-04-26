@@ -1172,6 +1172,7 @@ export default function Dashboard() {
     () => localStorage.getItem("ag_theme") || "dark"
   );
   const [dashView, setDashView] = useState("overview"); // "overview" | "charts"
+  const [clientesCadastro, setClientesCadastro] = useState([]);
    
 const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin } = usePermissao();
   const { user: authUser, tenantUid, nomeUsuario } = useAuth();
@@ -1436,6 +1437,14 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     if (!uid) return;
     return onSnapshot(doc(db, "users", uid, "config", "geral"), (snap) => {
       if (snap.exists()) setMenuVisivel(snap.data().menuVisivel || {});
+    });
+  }, [uid]);
+
+  /* ── Datas de cadastro dos clientes (gráfico de crescimento) ── */
+  useEffect(() => {
+    if (!uid) return;
+    return onSnapshot(collection(db, "users", uid, "clientes"), (snap) => {
+      setClientesCadastro(snap.docs.map(d => ({ criadoEm: d.data().criadoEm || null })));
     });
   }, [uid]);
 
@@ -2131,11 +2140,11 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           {semDados ? <EmptyState /> : (
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={dash.loading ? [] : receitaData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barSize={14} barGap={3}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-              <XAxis dataKey="mes" tick={{ fill: "var(--text-3)", fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="mes" tick={{ fill: "var(--text-2)", fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fill: "var(--text-2)", fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip content={<GoldTooltip />} cursor={{ fill: "rgba(200,165,94,0.04)", rx: 6, stroke: "rgba(200,165,94,0.1)", strokeWidth: 1 }} />
-              <Legend wrapperStyle={{ fontSize: 11, color: "var(--text-3)", paddingTop: 12 }} />
+              <Legend wrapperStyle={{ fontSize: 11, color: "var(--text-2)", paddingTop: 12 }} />
               <Bar dataKey="receita" name="Receita" fill="#c8a55e" radius={[5, 5, 0, 0]} opacity={0.9} activeBar={{ fill: "#e8ca60", opacity: 1, filter: "drop-shadow(0 0 6px rgba(200,165,94,0.6))" }} />
               <Bar dataKey="custo"   name="Custo"   fill="#e05252" radius={[5, 5, 0, 0]} opacity={0.75} activeBar={{ fill: "#f07070", opacity: 1, filter: "drop-shadow(0 0 6px rgba(224,82,82,0.5))" }} />
             </BarChart>
@@ -2158,9 +2167,9 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   <stop offset="95%" stopColor="#3ecf8e" stopOpacity={0}    />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-              <XAxis dataKey="mes" tick={{ fill: "var(--text-3)", fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="mes" tick={{ fill: "var(--text-2)", fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fill: "var(--text-2)", fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip content={<GoldTooltip />} cursor={{ stroke: "rgba(62,207,142,0.2)", strokeWidth: 1, strokeDasharray: "4 3" }} />
               <Area type="monotone" dataKey="lucro" name="Lucro" stroke="#3ecf8e" strokeWidth={2.5} fill="url(#gLucro)"
                 dot={{ fill: "#3ecf8e", r: 3, strokeWidth: 0, opacity: 0.7 }}
@@ -2188,9 +2197,9 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
                 </filter>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" vertical={false} />
-              <XAxis dataKey="d" tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+              <XAxis dataKey="d" tick={{ fill: "var(--text-2)", fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fill: "var(--text-2)", fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip content={<GoldTooltip />} cursor={{ stroke: "rgba(200,165,94,0.18)", strokeWidth: 1, strokeDasharray: "4 3" }} />
               <Line type="monotone" dataKey="v" name="Receita" stroke="url(#gLine)" strokeWidth={2.5} dot={false}
                 activeDot={{ r: 6, fill: "#c8a55e", stroke: "rgba(200,165,94,0.35)", strokeWidth: 7, filter: "url(#glowGold)" }} />
@@ -2276,25 +2285,25 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         <Card title="Radar de Desempenho" subtitle={`Saúde geral — baseado nos dados do período (${period})`} style={{ gridColumn: "1 / 3" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
             <RadarChart outerRadius={110} width={300} height={260} data={radarData}>
-              <PolarGrid stroke="rgba(255,255,255,0.08)" />
-              <PolarAngleAxis dataKey="subject" tick={{ fill: "var(--text-3)", fontSize: 11 }} />
+              <PolarGrid stroke="var(--border)" />
+              <PolarAngleAxis dataKey="subject" tick={{ fill: "var(--text-2)", fontSize: 11 }} />
               <Radar name="Desempenho" dataKey="A" stroke="#c8a55e" fill="#c8a55e" fillOpacity={0.18} strokeWidth={2} />
               <Tooltip content={<GoldTooltip />} />
             </RadarChart>
             <div style={{ flex: 1 }}>
               <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 13, color: "var(--text-3)", marginBottom: 6 }}>Score Geral</div>
+                <div style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 6 }}>Score Geral</div>
                 <div style={{ fontSize: 42, fontWeight: 700, color: "var(--gold)", lineHeight: 1, fontFamily: "'Sora', sans-serif" }}>
                   {Math.round(radarData.reduce((s, d) => s + d.A, 0) / radarData.length)}%
                 </div>
-                <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 6 }}>Meta: 85%</div>
+                <div style={{ fontSize: 12, color: "var(--text-2)", marginTop: 6 }}>Meta: 85%</div>
               </div>
               {radarData.map((r) => (
                 <div key={r.subject} style={{ marginBottom: 8 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-3)", marginBottom: 4 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "var(--text-2)", marginBottom: 4 }}>
                     <span>{r.subject}</span><span style={{ color: r.A >= 80 ? "var(--green)" : r.A >= 65 ? "var(--gold)" : "var(--red)" }}>{r.A}%</span>
                   </div>
-                  <div style={{ background: "var(--s2)", borderRadius: 3, height: 4 }}>
+                  <div style={{ background: "var(--s3)", borderRadius: 3, height: 4 }}>
                     <div style={{
                       width: `${r.A}%`, height: "100%", borderRadius: 3,
                       background: r.A >= 80 ? "var(--green)" : r.A >= 65 ? "var(--gold)" : "var(--red)",
@@ -2306,6 +2315,83 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             </div>
           </div>
         </Card>
+
+        {/* 7. Crescimento de Cadastros de Clientes — AreaChart */}
+        {(() => {
+          const now = new Date();
+          const meses = [];
+          for (let i = 11; i >= 0; i--) {
+            const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+            const key = `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(-2)}`;
+            meses.push({ mes: key, novos: 0 });
+          }
+          clientesCadastro.forEach(({ criadoEm }) => {
+            if (!criadoEm) return;
+            try {
+              const d = new Date(criadoEm);
+              const key = `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getFullYear()).slice(-2)}`;
+              const entry = meses.find(m => m.mes === key);
+              if (entry) entry.novos++;
+            } catch {}
+          });
+          let acumulado = 0;
+          const dadosCadastro = meses.map(m => {
+            acumulado += m.novos;
+            return { mes: m.mes, novos: m.novos, total: acumulado };
+          });
+          const totalNovos12m = dadosCadastro.reduce((s, d) => s + d.novos, 0);
+          const mesComMaisNovos = dadosCadastro.reduce((best, d) => d.novos > best.novos ? d : best, dadosCadastro[0] || { mes: "—", novos: 0 });
+          return (
+            <Card
+              title="Crescimento de Cadastros"
+              subtitle="Novos clientes e base total — últimos 12 meses"
+              style={{ gridColumn: "1 / 3" }}
+            >
+              <div style={{ display: "flex", gap: 24, marginBottom: 18, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--text-2)" }}>Novos (12 meses)</span>
+                  <span style={{ fontSize: 28, fontWeight: 700, color: "var(--blue)", fontFamily: "'Sora', sans-serif", lineHeight: 1 }}>{totalNovos12m}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--text-2)" }}>Base total</span>
+                  <span style={{ fontSize: 28, fontWeight: 700, color: "var(--gold)", fontFamily: "'Sora', sans-serif", lineHeight: 1 }}>{dash.numClientes}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--text-2)" }}>Melhor mês</span>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: "var(--green)", fontFamily: "'Sora', sans-serif", lineHeight: 1 }}>{mesComMaisNovos.mes} <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-2)" }}>({mesComMaisNovos.novos} cadastros)</span></span>
+                </div>
+              </div>
+              <ResponsiveContainer width="100%" height={210}>
+                <AreaChart data={dadosCadastro} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gCadastroNovos" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#5b8ef0" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#5b8ef0" stopOpacity={0}   />
+                    </linearGradient>
+                    <linearGradient id="gCadastroTotal" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%"  stopColor="#c8a55e" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#c8a55e" stopOpacity={0}   />
+                    </linearGradient>
+                    <filter id="glowBlue" x="-50%" y="-50%" width="200%" height="200%">
+                      <feGaussianBlur stdDeviation="3" result="blur" />
+                      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                    </filter>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                  <XAxis dataKey="mes" tick={{ fill: "var(--text-2)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: "var(--text-2)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<GoldTooltip />} cursor={{ stroke: "rgba(91,142,240,0.2)", strokeWidth: 1, strokeDasharray: "4 3" }} />
+                  <Legend wrapperStyle={{ fontSize: 11, color: "var(--text-2)", paddingTop: 12 }} />
+                  <Area type="monotone" dataKey="total" name="Base Total" stroke="#c8a55e" strokeWidth={1.5} fill="url(#gCadastroTotal)"
+                    dot={false} activeDot={{ r: 5, fill: "#c8a55e", stroke: "rgba(200,165,94,0.3)", strokeWidth: 5 }} />
+                  <Area type="monotone" dataKey="novos" name="Novos Clientes" stroke="#5b8ef0" strokeWidth={2.5} fill="url(#gCadastroNovos)"
+                    dot={{ fill: "#5b8ef0", r: 3, strokeWidth: 0 }}
+                    activeDot={{ r: 6, fill: "#5b8ef0", stroke: "rgba(91,142,240,0.35)", strokeWidth: 6, filter: "url(#glowBlue)" }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </Card>
+          );
+        })()}
 
       </div>
     );
