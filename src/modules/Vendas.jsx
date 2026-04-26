@@ -7,16 +7,18 @@
      users/{uid}                    → vendaIdCnt (contador)
    ═══════════════════════════════════════════════════ */
 
-import { useState, useEffect, useContext, useMemo, useRef } from "react";
+import { useState, useEffect, useContext, useMemo, useRef, useCallback } from "react";
 import {
   Search, Plus, Edit2, Trash2, X, Printer,
   ShoppingCart, Package, ChevronDown, ChevronUp,
-  Download, Copy, Filter, Calendar, Ban, ChevronsUpDown, Barcode, QrCode,
+  Download, Copy, Filter, Calendar, Ban, ChevronsUpDown, Barcode,
+  QrCode, CheckCircle, AlertCircle,
 } from "lucide-react";
 
 import AuthContext from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO } from "../lib/logAction";
 import { db, auth } from "../lib/firebase";
+import { getIdToken } from "firebase/auth";
 
 import {
   collection, doc, setDoc, deleteDoc, updateDoc,
@@ -561,6 +563,33 @@ const CSS = `
     font-size: 11px; color: var(--text-3); margin-top: 6px;
   }
   .nv-taxa-info strong { color: var(--text-2); }
+
+  /* ── Botão Gerar QrCode Pix ── */
+  .btn-pix-qr {
+    padding: 9px 20px; border-radius: 9px;
+    background: rgba(200,165,94,0.12); color: var(--gold);
+    border: 1px solid rgba(200,165,94,0.35); cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    transition: background .13s, transform .1s;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .btn-pix-qr:hover { background: rgba(200,165,94,0.2); }
+  .btn-pix-qr:active { transform: scale(.97); }
+  .btn-pix-qr:disabled { opacity: .5; cursor: not-allowed; }
+
+  @keyframes vd-pulsar {
+    0%   { box-shadow: 0 0 0 0 rgba(200,165,94,0.5); }
+    70%  { box-shadow: 0 0 0 8px rgba(200,165,94,0); }
+    100% { box-shadow: 0 0 0 0 rgba(200,165,94,0); }
+  }
+  @keyframes vd-popIn {
+    0%   { transform: scale(0.5); opacity: 0; }
+    70%  { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes vd-spin {
+    to { transform: rotate(360deg); }
+  }
 `;
 
 /* ── Helpers ── */
@@ -692,6 +721,360 @@ function exportarCSV(vendas) {
 
 
 /* ══════════════════════════════════════════════════
+   MODAL QR CODE PIX — mesma lógica do PDV
+   via Cloud Functions + onSnapshot Firestore
+   ══════════════════════════════════════════════════ */
+function ModalQrPixVendas({ valor, descricao, tenantUid, onPago, onClose }) {
+  const [fase,     setFase]     = useState("gerando");
+  const [qrBase64, setQrBase64] = useState("");
+  const [qrCode,   setQrCode]   = useState("");
+  const [errMsg,   setErrMsg]   = useState("");
+  const [copiado,  setCopiado]  = useState(false);
+  const [segundos, setSegundos] = useState(0);
+
+  const unsubRef      = useRef(null);
+  const pollingRef    = useRef(null);
+  const countRef      = useRef(null);
+  const mountedRef    = useRef(true);
+  const confirmadoRef = useRef(false);
+
+  const fmtV = (v) =>
+    Number(v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  useEffect(() => {
+    mountedRef.current    = true;
+    confirmadoRef.current = false;
+    gerarQr();
+    return () => {
+      mountedRef.current = false;
+      unsubRef.current?.();
+      clearInterval(pollingRef.current);
+      clearInterval(countRef.current);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const confirmarPagamento = useCallback(() => {
+    if (confirmadoRef.current) return;
+    confirmadoRef.current = true;
+    unsubRef.current?.();
+    clearInterval(pollingRef.current);
+    clearInterval(countRef.current);
+    if (mountedRef.current) {
+      setFase("confirmado");
+      setTimeout(() => onPago && onPago(valor), 1200);
+    }
+  }, [onPago, valor]);
+
+  const CF_BASE = "https://us-central1-assent-2b945.cloudfunctions.net";
+
+  const callCF = async (nome, body) => {
+    const token = await getIdToken(auth.currentUser);
+    const res   = await fetch(`${CF_BASE}/${nome}`, {
+      method: "POST",
+      headers: {
+        "Content-Type":  "application/json",
+        "Authorization": `Bearer ${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error || `Erro ${res.status}`);
+    return data;
+  };
+
+  const gerarQr = async () => {
+    setFase("gerando");
+    setErrMsg("");
+    try {
+      const result = await callCF("gerarPixQr", { tenantUid, valor, descricao });
+      const { paymentId, qrCodeBase64, qrCode: qrText } = result;
+
+      if (!mountedRef.current) return;
+      setQrBase64(qrCodeBase64);
+      setQrCode(qrText);
+      setFase("aguardando");
+      setSegundos(0);
+
+      const payRef = doc(db, "users", tenantUid, "pagamentosQr", String(paymentId));
+      unsubRef.current = onSnapshot(payRef, (snap) => {
+        if (!snap.exists()) return;
+        const status = snap.data()?.status;
+        if (status === "approved") confirmarPagamento();
+        if (status === "rejected" || status === "cancelled") {
+          unsubRef.current?.();
+          if (mountedRef.current) {
+            setErrMsg("Pagamento recusado ou cancelado pelo Mercado Pago.");
+            setFase("erro");
+          }
+        }
+      });
+
+      pollingRef.current = setInterval(async () => {
+        if (!mountedRef.current || confirmadoRef.current) return;
+        try {
+          const res = await callCF("consultarPagamento", { tenantUid, paymentId });
+          if (res?.status === "approved") confirmarPagamento();
+        } catch { /* polling silencioso */ }
+      }, 8000);
+
+      countRef.current = setInterval(() => {
+        if (mountedRef.current) setSegundos(s => s + 1);
+      }, 1000);
+
+    } catch (e) {
+      if (!mountedRef.current) return;
+      setErrMsg(e?.message || "Erro ao gerar QR Code. Verifique as configurações.");
+      setFase("erro");
+    }
+  };
+
+  const copiarCodigo = () => {
+    if (!qrCode) return;
+    navigator.clipboard.writeText(qrCode).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    });
+  };
+
+  const formatarTempo = (s) => {
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return m > 0 ? `${m}m ${r}s` : `${r}s`;
+  };
+
+  const handleCancelar = () => {
+    unsubRef.current?.();
+    clearInterval(pollingRef.current);
+    clearInterval(countRef.current);
+    onClose();
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 10000,
+        background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontFamily: "'DM Sans','Segoe UI',sans-serif",
+        animation: "fadeIn .15s ease",
+      }}
+      onClick={fase === "aguardando" ? undefined : onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: "#13151d",
+          border: "1px solid rgba(255,255,255,0.1)",
+          borderRadius: 20,
+          width: 380,
+          maxWidth: "calc(100vw - 32px)",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(200,165,94,0.12)",
+          overflow: "hidden",
+          animation: "slideUp .2s ease",
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "16px 20px",
+          borderBottom: "1px solid rgba(255,255,255,0.07)",
+          background: "rgba(255,255,255,0.02)",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: 10,
+              background: "rgba(200,165,94,0.12)", border: "1px solid rgba(200,165,94,0.3)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <QrCode size={16} color="#c8a55e" />
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#e8e8f0" }}>Pagar com PIX</div>
+              <div style={{ fontSize: 11, color: "#5c5e72" }}>Mercado Pago · pagamento instantâneo</div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#5c5e72", display: "flex" }}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Valor */}
+        <div style={{
+          textAlign: "center", padding: "16px 20px 8px",
+          background: "linear-gradient(180deg, rgba(200,165,94,0.06), transparent)",
+        }}>
+          <div style={{ fontSize: 11, color: "#5c5e72", marginBottom: 4, textTransform: "uppercase", letterSpacing: ".07em" }}>
+            Valor a receber
+          </div>
+          <div style={{ fontSize: 32, fontWeight: 800, color: "#c8a55e", letterSpacing: "-.01em" }}>
+            {fmtV(valor)}
+          </div>
+        </div>
+
+        {/* Corpo */}
+        <div style={{ padding: "12px 20px 20px" }}>
+
+          {/* GERANDO */}
+          {fase === "gerando" && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "24px 0" }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: "50%",
+                border: "3px solid rgba(200,165,94,0.2)",
+                borderTopColor: "#c8a55e",
+                animation: "vd-spin .8s linear infinite",
+              }} />
+              <div style={{ fontSize: 13, color: "#7a7c96", textAlign: "center" }}>
+                Gerando QR Code via Mercado Pago...
+              </div>
+            </div>
+          )}
+
+          {/* AGUARDANDO */}
+          {fase === "aguardando" && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+              <div style={{
+                background: "#fff", borderRadius: 14, padding: 12,
+                boxShadow: "0 4px 24px rgba(0,0,0,0.4)",
+                border: "3px solid rgba(200,165,94,0.4)",
+              }}>
+                <img
+                  src={`data:image/png;base64,${qrBase64}`}
+                  alt="QR Code PIX"
+                  style={{ width: 200, height: 200, display: "block" }}
+                />
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: "50%",
+                  background: "#c8a55e",
+                  animation: "vd-pulsar 2s infinite",
+                }} />
+                <span style={{ fontSize: 12, color: "#7a7c96" }}>
+                  Aguardando pagamento · {formatarTempo(segundos)}
+                </span>
+              </div>
+
+              <div style={{ fontSize: 12, color: "#5c5e72", textAlign: "center", lineHeight: 1.6 }}>
+                Escaneie o QR Code com o app do banco ou Mercado Pago.<br/>
+                A venda será finalizada automaticamente.
+              </div>
+
+              <div style={{
+                width: "100%", background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, overflow: "hidden",
+              }}>
+                <div style={{ fontSize: 10, color: "#5c5e72", padding: "8px 12px 4px", textTransform: "uppercase", letterSpacing: ".06em" }}>
+                  Pix Copia e Cola
+                </div>
+                <div style={{ padding: "0 12px 4px", fontSize: 10, color: "#7a7c96", wordBreak: "break-all", lineHeight: 1.5 }}>
+                  {qrCode.slice(0, 60)}...
+                </div>
+                <button
+                  onClick={copiarCodigo}
+                  style={{
+                    width: "100%", padding: "9px 12px",
+                    background: copiado ? "rgba(72,187,120,0.12)" : "rgba(255,255,255,0.04)",
+                    border: "none", borderTop: "1px solid rgba(255,255,255,0.07)",
+                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    color: copiado ? "#48bb78" : "#9193a5",
+                    fontSize: 12, fontWeight: 600,
+                    fontFamily: "'DM Sans',sans-serif",
+                    transition: "all .15s",
+                  }}
+                >
+                  <Copy size={12} />
+                  {copiado ? "Código copiado!" : "Copiar código"}
+                </button>
+              </div>
+
+              <button
+                onClick={handleCancelar}
+                style={{
+                  background: "none", border: "1px solid rgba(255,255,255,0.1)",
+                  borderRadius: 8, padding: "7px 16px",
+                  color: "#5c5e72", fontSize: 12, cursor: "pointer",
+                  fontFamily: "'DM Sans',sans-serif", transition: "all .13s",
+                }}
+              >
+                Cancelar pagamento
+              </button>
+            </div>
+          )}
+
+          {/* CONFIRMADO */}
+          {fase === "confirmado" && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "20px 0" }}>
+              <div style={{
+                width: 64, height: 64, borderRadius: "50%",
+                background: "rgba(72,187,120,0.12)", border: "2px solid rgba(72,187,120,0.4)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                animation: "vd-popIn .3s ease",
+              }}>
+                <CheckCircle size={32} color="#48bb78" />
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: "#48bb78" }}>Pagamento Confirmado!</div>
+              <div style={{ fontSize: 12, color: "#5c5e72", textAlign: "center" }}>
+                {fmtV(valor)} recebido via PIX<br/>Finalizando venda automaticamente...
+              </div>
+            </div>
+          )}
+
+          {/* ERRO */}
+          {fase === "erro" && (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "16px 0" }}>
+              <div style={{
+                width: 52, height: 52, borderRadius: "50%",
+                background: "rgba(224,82,82,0.12)", border: "2px solid rgba(224,82,82,0.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <AlertCircle size={24} color="#e05252" />
+              </div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#e05252" }}>Erro ao gerar QR Code</div>
+              <div style={{
+                background: "rgba(224,82,82,0.07)", border: "1px solid rgba(224,82,82,0.2)",
+                borderRadius: 9, padding: "10px 14px",
+                fontSize: 12, color: "#c07070", lineHeight: 1.6, textAlign: "center", width: "100%",
+              }}>
+                {errMsg}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={gerarQr}
+                  style={{
+                    padding: "9px 18px", borderRadius: 9,
+                    background: "linear-gradient(135deg,#d4b06a,#c8a55e)",
+                    color: "#0a0a0a", border: "none", cursor: "pointer",
+                    fontSize: 13, fontWeight: 700, fontFamily: "'DM Sans',sans-serif",
+                  }}
+                >
+                  Tentar novamente
+                </button>
+                <button
+                  onClick={onClose}
+                  style={{
+                    padding: "9px 18px", borderRadius: 9,
+                    background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)",
+                    color: "#9193a5", cursor: "pointer",
+                    fontSize: 13, fontFamily: "'DM Sans',sans-serif",
+                  }}
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════
    MODAL: Nova / Editar Venda  ← VERSÃO CORRIGIDA
    ══════════════════════════════════════════════════ */
 function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vendedorNome: vendedorNomeLogado, clientes, produtos, servicos, vendedores, taxas, onSave, onClose }) {
@@ -755,6 +1138,9 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
   const [salvando, setSalvando] = useState(false);
   const [erros, setErros] = useState({});
   const [estoqueInsuficienteInfo, setEstoqueInsuficienteInfo] = useState(null); // [{nome, qtdPedida, estoqueAtual}]
+
+  /* ── QR Pix ── */
+  const [showQrPix, setShowQrPix] = useState(false);
 
   function itemVazio(tipoAtual = "produto") {
     return {
@@ -1367,6 +1753,22 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
 
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+
+          {/* Botão "Gerar QrCode" — só aparece se Pix e não for edição */}
+          {formaPgto === "Pix" && !isEdit && (
+            <button
+              className="btn-pix-qr"
+              onClick={() => {
+                if (!validar()) return;
+                setShowQrPix(true);
+              }}
+              disabled={salvando}
+            >
+              <QrCode size={15} />
+              Gerar QrCode
+            </button>
+          )}
+
           <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
             {salvando ? "Salvando..." : isEdit ? "Salvar Alterações" : "✓ Finalizar Venda"}
           </button>
@@ -1381,6 +1783,21 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
         onClose={() => setEstoqueInsuficienteInfo(null)}
       />
     )}
+
+    {/* Modal QR Pix — aparece por cima de tudo */}
+    {showQrPix && (
+      <ModalQrPixVendas
+        valor={calculos.total}
+        descricao={`Venda — ${itens.length} item(ns) — ${clienteSearch || "Cliente"}`}
+        tenantUid={uid}
+        onPago={async () => {
+          setShowQrPix(false);
+          /* Dispara o salvamento normal da venda ao confirmar pagamento Pix */
+          await handleSalvar();
+        }}
+        onClose={() => setShowQrPix(false)}
+      />
+    )}
   </>
   );
 }
@@ -1388,156 +1805,9 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
 /* ══════════════════════════════════════════════════
    MODAL: Detalhe de Venda (clique na linha)
    ══════════════════════════════════════════════════ */
-/* ══════════════════════════════════════════════════
-   MODAL PIX QR — Geração e polling de pagamento
-   ══════════════════════════════════════════════════ */
-const CF_BASE = "https://us-central1-assent-2b945.cloudfunctions.net";
-
-function ModalPixQr({ valor, tenantUid, descricao, onClose, onPago }) {
-  const [fase, setFase]         = useState("gerando"); // gerando | aguardando | pago | erro
-  const [qrBase64, setQrBase64] = useState(null);
-  const [qrCode,   setQrCode]   = useState(null);
-  const [paymentId, setPayId]   = useState(null);
-  const [copiado,  setCopiado]  = useState(false);
-  const [erroMsg,  setErroMsg]  = useState("");
-  const pollingRef = useRef(null);
-
-  /* Gerar QR ao montar */
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const token = await auth.currentUser?.getIdToken();
-        const res   = await fetch(`${CF_BASE}/gerarPixQr`, {
-          method:  "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body:    JSON.stringify({ tenantUid, valor, descricao }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || `Erro ${res.status}`);
-        if (cancelled) return;
-        setQrBase64(data.qrCodeBase64);
-        setQrCode(data.qrCode);
-        setPayId(data.paymentId);
-        setFase("aguardando");
-      } catch (err) {
-        if (!cancelled) { setErroMsg(err.message); setFase("erro"); }
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  /* Polling de status a cada 4 s */
-  useEffect(() => {
-    if (fase !== "aguardando" || !paymentId) return;
-    const poll = async () => {
-      try {
-        const token = await auth.currentUser?.getIdToken();
-        const res   = await fetch(`${CF_BASE}/consultarPagamento`, {
-          method:  "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body:    JSON.stringify({ tenantUid, paymentId }),
-        });
-        const data = await res.json();
-        if (data.status === "approved") {
-          clearInterval(pollingRef.current);
-          setFase("pago");
-          if (onPago) onPago();
-        }
-      } catch { /* ignora falha pontual de rede */ }
-    };
-    pollingRef.current = setInterval(poll, 4000);
-    return () => clearInterval(pollingRef.current);
-  }, [fase, paymentId]);
-
-  const copiar = () => {
-    navigator.clipboard.writeText(qrCode || "");
-    setCopiado(true);
-    setTimeout(() => setCopiado(false), 2500);
-  };
-
-  return (
-    <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box modal-box-md" style={{ maxWidth: 360 }}>
-
-        <div className="modal-header">
-          <div>
-            <div className="modal-title" style={{ color: "var(--gold)" }}>Pagamento PIX</div>
-            <div className="modal-sub">{fmtR$(valor)}</div>
-          </div>
-          <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)" /></button>
-        </div>
-
-        <div className="modal-body" style={{ textAlign: "center", padding: "24px 22px" }}>
-
-          {fase === "gerando" && (
-            <div style={{ padding: "40px 0", color: "var(--text-2)", fontSize: 13 }}>
-              <div style={{ marginBottom: 10, fontSize: 28 }}>⏳</div>
-              Gerando QR Code...
-            </div>
-          )}
-
-          {fase === "erro" && (
-            <div style={{ padding: "30px 0" }}>
-              <div style={{ fontSize: 32, marginBottom: 10 }}>❌</div>
-              <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 6 }}>Não foi possível gerar o QR Code.</div>
-              <div style={{ color: "var(--text-2)", fontSize: 11 }}>{erroMsg || "Verifique se o PIX está ativo nas Configurações."}</div>
-            </div>
-          )}
-
-          {fase === "pago" && (
-            <div style={{ padding: "30px 0" }}>
-              <div style={{ fontSize: 52, marginBottom: 10 }}>✅</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: "var(--green)", marginBottom: 4 }}>Pagamento Confirmado!</div>
-              <div style={{ fontSize: 12, color: "var(--text-2)" }}>PIX recebido com sucesso.</div>
-            </div>
-          )}
-
-          {fase === "aguardando" && qrBase64 && (
-            <>
-              <img
-                src={`data:image/png;base64,${qrBase64}`}
-                alt="QR Code PIX"
-                style={{ width: 210, height: 210, borderRadius: 12, border: "1px solid var(--border)", marginBottom: 14 }}
-              />
-              <div style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", background: "var(--green)", animation: "pulse 1.4s infinite" }} />
-                Aguardando pagamento...
-              </div>
-              <button
-                onClick={copiar}
-                style={{
-                  width: "100%", padding: "10px 14px",
-                  background: copiado ? "rgba(74,222,128,.1)" : "var(--s2)",
-                  border: `1px solid ${copiado ? "var(--green)" : "var(--border)"}`,
-                  borderRadius: 8, color: copiado ? "var(--green)" : "var(--text)",
-                  fontSize: 12, cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                  transition: "all .2s",
-                }}
-              >
-                <Copy size={12} />
-                {copiado ? "Código copiado!" : "Copiar código PIX (copia e cola)"}
-              </button>
-            </>
-          )}
-        </div>
-
-        <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>
-            {fase === "pago" ? "Fechar" : "Cancelar"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
-function ModalDetalheVenda({ venda, onClose, onEditar, onCancelar, onExcluirDef, isAdmin, tenantUid }) {
+function ModalDetalheVenda({ venda, onClose, onEditar, onCancelar, onExcluirDef, isAdmin }) {
   if (!venda) return null;
   const itens = venda.itens || [];
-  const [pixQrOpen, setPixQrOpen] = useState(false);
 
   const subtotal   = itens.reduce((s, i) => s + (i.preco || 0) * (i.qtd || 1), 0);
   const descontos  = itens.reduce((s, i) => s + (i.desconto || 0), 0);
@@ -1555,17 +1825,6 @@ function ModalDetalheVenda({ venda, onClose, onEditar, onCancelar, onExcluirDef,
             <div className="modal-sub">Detalhes da venda</div>
           </div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            {/* Botão PIX QR — visível para vendas ativas com total > 0 */}
-            {venda.status !== "cancelada" && total > 0 && tenantUid && (
-              <button
-                className="btn-icon"
-                onClick={() => setPixQrOpen(true)}
-                title="Gerar QR Code PIX"
-                style={{ color: "var(--green)" }}
-              >
-                <QrCode size={13} />
-              </button>
-            )}
             {onEditar && (
               <button className="btn-icon btn-icon-edit" onClick={() => onEditar(venda)} title="Editar">
                 <Edit2 size={13} />
@@ -1735,19 +1994,14 @@ function ModalDetalheVenda({ venda, onClose, onEditar, onCancelar, onExcluirDef,
 
         </div>
       </div>
-
-      {pixQrOpen && (
-        <ModalPixQr
-          valor={total}
-          tenantUid={tenantUid}
-          descricao={`Venda ${venda.id}${venda.cliente ? ` — ${venda.cliente}` : ""}`}
-          onClose={() => setPixQrOpen(false)}
-        />
-      )}
     </div>
   );
 }
-   //══════════════════════════════════════════════════ */
+
+
+/* ══════════════════════════════════════════════════
+   MODAL: Confirmar Cancelamento de Venda
+   ══════════════════════════════════════════════════ */
 function ModalCancelarVenda({ venda, onConfirm, onClose }) {
   const [cancelando, setCancelando] = useState(false);
 
@@ -2923,7 +3177,6 @@ useEffect(() => {
         <ModalDetalheVenda
           venda={detalhe}
           onClose={() => setDetalhe(null)}
-          tenantUid={tenantUid}
           onEditar={
             podeEditar && (detalhe?.status !== "cancelada" || cargo === "admin")
               ? (v) => { setDetalhe(null); setEditando(v); }
