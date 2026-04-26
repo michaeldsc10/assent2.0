@@ -16,6 +16,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO } from "../lib/logAction";
 import {
   collection, doc, onSnapshot, writeBatch, updateDoc, deleteDoc, getDoc,
+  getDocs, query, where,
 } from "firebase/firestore";
 
 import  { useLicenca  }         from "../hooks/useLicenca";
@@ -1200,11 +1201,45 @@ function ModalCancelarCompra({ compra, uid, nomeFornecedor, onClose }) {
   const handleCancelar = async () => {
     setCancelando(true);
     try {
-      const now = new Date().toISOString();
-      await updateDoc(doc(collection(db, "users", uid, "compras"), compra.id), {
-        status:       "cancelado",
-        atualizadoEm: now,
+      const now   = new Date().toISOString();
+      const batch = writeBatch(db);
+
+      /* 1 — Marca a compra como cancelada */
+      batch.update(
+        doc(collection(db, "users", uid, "compras"), compra.id),
+        { status: "cancelado", atualizadoEm: now }
+      );
+
+      /* 2 — Cancela todas as despesas vinculadas (parcelas inclusive).
+             Despesas já pagas NÃO são revertidas — o dinheiro já saiu
+             e o DRE deve continuar refletindo o custo realizado. */
+      const despesasSnap = await getDocs(
+        query(
+          collection(db, "users", uid, "despesas"),
+          where("origem",       "==", "compra"),
+          where("referenciaId", "==", compra.id)
+        )
+      );
+
+      let canceladas = 0;
+      despesasSnap.forEach(d => {
+        if (d.data().status !== "pago") {
+          batch.update(d.ref, { status: "cancelado", atualizadoEm: now });
+          canceladas++;
+        }
       });
+
+      await batch.commit();
+
+      await logAction({
+        tenantUid:   uid,
+        nomeUsuario: "",
+        cargo:       "",
+        acao:        LOG_ACAO.CANCELAR ?? "cancelar",
+        modulo:      LOG_MODULO.COMPRAS,
+        descricao:   `Cancelou compra ${compra.id} — ${canceladas} despesa(s) pendente(s) cancelada(s)`,
+      });
+
       onClose();
     } catch (err) {
       console.error("[Compras] Erro ao cancelar compra:", err);
