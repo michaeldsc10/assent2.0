@@ -709,7 +709,10 @@ function ModalQrPix({ valor, descricao, mpToken, onPago, onClose }) {
   );
 }
 
-
+/* ═══════════════════════════════════════════════════
+   COMPONENTE PRINCIPAL
+   ═══════════════════════════════════════════════════ */
+export default function PDV({ onVoltar }) {
   const { tenantUid, vendedorNome, vendedorId, cargo, user } = useAuth();
   const { config, loading: cfgLoading } = useConfiguracoes(tenantUid);
 
@@ -1508,7 +1511,7 @@ function ModalQrPix({ valor, descricao, mpToken, onPago, onClose }) {
       </div>
     </>
   );
-
+}
 
 /* ═══════════════════════════════════════════════════
    CSS
