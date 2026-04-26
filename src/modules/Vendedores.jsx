@@ -833,7 +833,11 @@ export default function Vendedores() {
           ) : (
             vendedoresFiltrados.map((v) => {
               const qtdVendas        = vendasPorVendedor[v.id] || 0;
-              const usuarioVinculado = usuariosSistema.find(u => u.id === v.usuarioId);
+              // Lookup bidirecional: tenta pelo usuarioId do vendedor (editado via Vendedores)
+              // ou pelo vendedorId do usuário (editado via Usuarios) — garante consistência
+              const usuarioVinculado =
+                usuariosSistema.find(u => v.usuarioId && u.id === v.usuarioId) ||
+                usuariosSistema.find(u => u.vendedorId === v.id);
               return (
                 <div key={v.id} className="vd-row">
                   <span className="vd-id">{v.id}</span>
