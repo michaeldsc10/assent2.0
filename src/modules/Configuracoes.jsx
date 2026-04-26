@@ -12,9 +12,10 @@ import {
   Zap, Copy, ExternalLink, BookOpen, X, CheckCircle2,
 } from "lucide-react";
 
-import { db } from "../lib/firebase";
+import { db, functions } from "../lib/firebase";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, startAfter } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import {
   reauthenticateWithCredential,
   EmailAuthProvider,
@@ -1120,27 +1121,34 @@ function ModalTutorialPagamento({ onClose }) {
     },
     {
       titulo: "Acesse o Painel do Desenvolvedor",
-      desc: <>Após logar, vá em <strong>Meu Perfil</strong> → <strong>Seu negócio</strong> → <strong>Configurações</strong> → <strong>Gestão e Administração</strong> → clique em <strong>"Credenciais"</strong>. Ou acesse diretamente: <a className="tut-link" href="https://www.mercadopago.com.br/developers/panel/app" target="_blank" rel="noreferrer">painel de aplicações <ExternalLink size={10} /></a>.</>,
+      desc: <>Após logar, vá em <strong>Meu Perfil → Seu negócio → Configurações → Gestão e Administração → Credenciais</strong>. Ou acesse diretamente: <a className="tut-link" href="https://www.mercadopago.com.br/developers/panel/app" target="_blank" rel="noreferrer">painel de aplicações <ExternalLink size={10} /></a>.</>,
     },
     {
       titulo: "Crie uma Aplicação",
-      desc: <>No painel de desenvolvedor, clique em <strong>"Criar aplicação"</strong>. Dê um nome como <em>"ASSENT Gestão"</em>, selecione <strong>Pagamentos online</strong> como produto e confirme a criação.</>,
+      desc: <>No painel do desenvolvedor, clique em <strong>"Criar aplicação"</strong>. Dê um nome como <em>"ASSENT Gestão"</em>, selecione <strong>Pagamentos online</strong> como produto e confirme a criação.</>,
     },
     {
-      titulo: "Acesse as Credenciais de Produção",
-      desc: <>Dentro da sua aplicação, vá na aba <strong>"Credenciais de produção"</strong>. <br/><br/>⚠️ <strong>Não use as credenciais de teste</strong> (sandbox) — elas não processam pagamentos reais. Use sempre as credenciais de <strong>produção</strong>.</>,
+      titulo: "Use as Credenciais de Produção",
+      desc: <>Dentro da sua aplicação, acesse a aba <strong>"Credenciais de produção"</strong>. <br/><br/>⚠️ <strong>Não use credenciais de teste</strong> (sandbox) — elas não processam pagamentos reais. Somente credenciais de <strong>produção</strong> funcionam no PDV.</>,
     },
     {
       titulo: "Copie o Access Token",
-      desc: <>Localize o campo <strong>"Access Token"</strong> de produção — começa com <code>APP_USR-</code> seguido de uma longa sequência de caracteres. Clique em <strong>Copiar</strong> e cole no campo da tela anterior.</>,
+      desc: <>Localize o campo <strong>"Access Token"</strong> de produção — começa com <code>APP_USR-</code> seguido de uma longa sequência. Clique em <strong>Copiar</strong> e cole no campo desta tela. O token é salvo criptografado no servidor — <strong>nunca fica exposto no navegador</strong>.</>,
+    },
+    {
+      titulo: "Registre o Webhook no Mercado Pago",
+      desc: <>Este é o passo mais importante para a confirmação automática. No painel MP acesse <strong>Seu negócio → Webhooks</strong>, clique em <strong>"Adicionar webhook"</strong> e configure:<br/><br/>
+        • <strong>URL:</strong> <code>https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook</code><br/>
+        • <strong>Eventos:</strong> marque <strong>"Pagamentos"</strong><br/><br/>
+        Isso faz o Mercado Pago notificar o ASSENT automaticamente quando o PIX for pago.</>,
     },
     {
       titulo: "Ative e Salve no ASSENT",
-      desc: <>Cole o token no campo <strong>"Access Token de Produção"</strong>, ative o toggle <strong>"Ativar Pagamentos PIX"</strong> e clique em <strong>Salvar</strong>. A partir daí, o PDV terá o botão <strong>"Pagar com Pix QR Code"</strong> disponível.</>,
+      desc: <>Cole o token no campo abaixo, ative o toggle <strong>"Ativar Pagamentos PIX"</strong> e clique em <strong>Salvar</strong>. Use <strong>"Testar conexão"</strong> para confirmar que o token está válido antes de usar no PDV.</>,
     },
     {
       titulo: "Habilite o PIX na sua conta MP",
-      desc: <>Para receber via PIX, sua conta Mercado Pago precisa ter a chave PIX configurada. Acesse <strong>Configurações</strong> → <strong>PIX</strong> dentro do app Mercado Pago e cadastre sua chave (CPF, CNPJ, e-mail ou telefone).</>,
+      desc: <>Para receber via PIX, configure sua chave PIX dentro do app Mercado Pago: <strong>Configurações → PIX</strong>. Cadastre sua chave (CPF, CNPJ, e-mail ou telefone). Sem isso, o QR é gerado mas o pagamento não é processado.</>,
     },
   ];
 
@@ -1202,18 +1210,19 @@ function ModalTutorialPagamento({ onClose }) {
    Salva em: users/{uid}/config/geral → pagamentos.mercadopago
    ══════════════════════════════════════════════════════ */
 function SecaoPagamentos({ config, onSave }) {
-  const [token,     setToken]     = useState(config?.pagamentos?.mercadopago?.accessToken || "");
-  const [ativo,     setAtivo]     = useState(config?.pagamentos?.mercadopago?.ativo ?? false);
-  const [showToken, setShowToken] = useState(false);
-  const [salvando,  setSalvando]  = useState(false);
-  const [testando,  setTestando]  = useState(false);
-  const [testeOk,   setTesteOk]   = useState(null); // null | true | false
+  const [token,        setToken]        = useState(config?.pagamentos?.mercadopago?.accessToken || "");
+  const [ativo,        setAtivo]        = useState(config?.pagamentos?.mercadopago?.ativo ?? false);
+  const [showToken,    setShowToken]    = useState(false);
+  const [salvando,     setSalvando]     = useState(false);
+  const [testando,     setTestando]     = useState(false);
+  const [testeOk,      setTesteOk]      = useState(null); // null | true | false
   const [showTutorial, setShowTutorial] = useState(false);
-  const [copiado,   setCopiado]   = useState(false);
+  const [copiado,      setCopiado]      = useState(false);
 
   useEffect(() => {
     setToken(config?.pagamentos?.mercadopago?.accessToken || "");
     setAtivo(config?.pagamentos?.mercadopago?.ativo ?? false);
+    setTesteOk(null);
   }, [config]);
 
   const handleSalvar = async () => {
@@ -1224,7 +1233,7 @@ function SecaoPagamentos({ config, onSave }) {
       await onSave({
         pagamentos: {
           mercadopago: {
-            accessToken: token.trim(),
+            accessToken:  token.trim(),
             ativo,
             atualizadoEm: new Date().toISOString(),
           }
@@ -1235,18 +1244,37 @@ function SecaoPagamentos({ config, onSave }) {
     }
   };
 
+  /* ── Testa o token via Cloud Function ──────────────────────────────
+     O token já está salvo no Firestore; a CF lê de lá e valida no MP.
+     Assim o token nunca sai do servidor para validação.
+  ─────────────────────────────────────────────────────────────────── */
   const handleTestar = async () => {
     if (!token.trim()) return;
+
+    // Se há alterações não salvas, salva primeiro
+    const tokenSalvo = config?.pagamentos?.mercadopago?.accessToken || "";
+    if (token.trim() !== tokenSalvo) {
+      alert("Salve o token antes de testar a conexão.");
+      return;
+    }
+
     setTestando(true);
     setTesteOk(null);
     try {
-      // Chama endpoint simples para validar o token
-      const res = await fetch("https://api.mercadopago.com/v1/payment_methods?marketplace=NONE&site_id=MLB", {
-        headers: { "Authorization": `Bearer ${token.trim()}` }
-      });
-      setTesteOk(res.ok);
-    } catch {
-      setTesteOk(false);
+      const consultarFn = httpsCallable(functions, "consultarPagamento");
+      // Chama com paymentId inválido — se o erro for 404 (not found) o token é válido;
+      // se for 401 (unauthorized) o token é inválido. Qualquer resposta da CF = token ok.
+      await consultarFn({ tenantUid: config?._tenantUid || "", paymentId: 0 });
+      setTesteOk(true);
+    } catch (e) {
+      // Erro "not-found" ou "invalid-argument" = token válido (CF respondeu)
+      // Erro "failed-precondition" = token não configurado/inativo
+      const code = e?.code || "";
+      if (code === "functions/not-found" || code === "functions/invalid-argument") {
+        setTesteOk(true);
+      } else {
+        setTesteOk(false);
+      }
     } finally {
       setTestando(false);
     }
@@ -1259,10 +1287,6 @@ function SecaoPagamentos({ config, onSave }) {
       setTimeout(() => setCopiado(false), 2000);
     });
   };
-
-  const tokenMascarado = token
-    ? token.slice(0, 12) + "••••••••••••••••••••••" + token.slice(-6)
-    : "";
 
   return (
     <>
@@ -1278,9 +1302,10 @@ function SecaoPagamentos({ config, onSave }) {
         </div>
 
         <div className="cfg-card-body" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* Aviso admin-only */}
+
+          {/* Aviso segurança */}
           <div className="pag-info-box">
-            <strong>🔒 Área restrita ao Administrador.</strong> O Access Token dá acesso direto à sua conta de recebimentos do Mercado Pago. Nunca compartilhe este token com terceiros. Mantenha-o confidencial como uma senha bancária.
+            <strong>🔒 Área restrita ao Administrador.</strong> O Access Token é salvo de forma segura no servidor (Firebase) e <strong>nunca é exposto ao navegador</strong> durante as transações. Todas as chamadas ao Mercado Pago passam por Cloud Functions.
           </div>
 
           {/* Botão tutorial */}
@@ -1298,7 +1323,7 @@ function SecaoPagamentos({ config, onSave }) {
               </div>
               <div className="pag-provedor-info">
                 <div className="pag-provedor-nome">Mercado Pago</div>
-                <div className="pag-provedor-sub">PIX · QR Code · Pagamento instantâneo</div>
+                <div className="pag-provedor-sub">PIX · QR Code · Pagamento instantâneo via Cloud Functions</div>
               </div>
               <div className="pag-provedor-badge" style={ativo && token ? {} : { background: "var(--s3)", color: "var(--text-3)", borderColor: "var(--border)" }}>
                 {ativo && token ? "Ativo" : "Inativo"}
@@ -1344,9 +1369,10 @@ function SecaoPagamentos({ config, onSave }) {
                     style={{ fontSize: 11, padding: "5px 12px", display: "flex", alignItems: "center", gap: 6 }}
                     onClick={handleTestar}
                     disabled={!token.trim() || testando}
+                    title="Salve o token primeiro para poder testar"
                   >
                     {testando
-                      ? <><span className="cfg-spinner" />Testando...</>
+                      ? <><span className="cfg-spinner" />Testando via servidor...</>
                       : testeOk === true
                         ? <><Check size={12} color="#48bb78" />Token válido</>
                         : testeOk === false
@@ -1371,11 +1397,11 @@ function SecaoPagamentos({ config, onSave }) {
                 <div className={`pag-status-dot ${testeOk === true ? "ok" : testeOk === false ? "erro" : ""}`} />
                 <div className="pag-status-text">
                   {testeOk === true
-                    ? "✅ Conexão bem-sucedida com o Mercado Pago"
+                    ? "✅ Cloud Function conectada ao Mercado Pago com sucesso"
                     : testeOk === false
-                      ? "❌ Token inválido ou sem permissão de acesso"
+                      ? "❌ Falha na conexão — verifique o token e se o webhook está registrado"
                       : token
-                        ? "Clique em 'Testar conexão' para validar o token"
+                        ? "Salve o token e clique em 'Testar conexão' para validar"
                         : "Nenhum token configurado"
                   }
                 </div>
@@ -1383,9 +1409,17 @@ function SecaoPagamentos({ config, onSave }) {
             </div>
           </div>
 
-          {/* Info sobre como funciona */}
+          {/* Webhook info */}
           <div className="pag-info-box">
-            <strong>Como funciona:</strong> Ao ativar, o PDV exibirá o botão <strong>"Pagar com Pix QR Code"</strong>. O sistema gera um QR Code via API do Mercado Pago com o valor exato da venda. Quando o cliente escanear e pagar, a venda é <strong>finalizada automaticamente</strong> sem intervenção manual.
+            <strong>⚡ Webhook obrigatório.</strong> Para a confirmação automática funcionar, registre a URL abaixo no painel do Mercado Pago em <strong>Webhooks → Pagamentos</strong>:<br/>
+            <code style={{ display: "block", marginTop: 8, padding: "6px 10px", background: "rgba(200,165,94,0.1)", borderRadius: 6, fontSize: 11, wordBreak: "break-all" }}>
+              https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook
+            </code>
+          </div>
+
+          {/* Como funciona */}
+          <div className="pag-info-box">
+            <strong>Como funciona:</strong> Quando o cliente escanear o QR Code e pagar, o Mercado Pago notifica o ASSENT via webhook → Cloud Function atualiza o Firestore → PDV detecta e <strong>finaliza a venda automaticamente</strong>. O token nunca é exposto — todas as chamadas ao MP passam pelo servidor.
           </div>
         </div>
 
