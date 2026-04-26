@@ -9,7 +9,7 @@ import {
   Search, ShoppingCart, Trash2, Plus, Minus,
   CheckCircle, X, AlertCircle, Barcode, User,
   CreditCard, Banknote, QrCode, Package, ArrowLeft,
-  Receipt, Loader2, ChevronDown, Printer,
+  Receipt, Loader2, ChevronDown, Printer, PlusCircle, Trash2 as TrashIcon,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
@@ -18,7 +18,7 @@ import {
   collection, query, where, getDocs, runTransaction,
   doc, orderBy, limit, getDoc,
 } from "firebase/firestore";
-import BarcodeInput from "../components/BarcodeInput";
+import BarcodeInput from "./BarcodeInput";
 import { useConfiguracoes } from "./Configuracoes";
 
 /* ─── Formata moeda BRL ─── */
@@ -31,6 +31,243 @@ const fmtNum = (v) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+/* ══════════════════════════════════════════════════════
+   MODAL PAGAMENTO PARCIAL
+   ══════════════════════════════════════════════════════ */
+function ModalPagamento({ restante, taxas, onConfirm, onClose }) {
+  const [forma, setForma]               = useState("dinheiro");
+  const [parcelas, setParcelas]         = useState(1);
+  const [valorStr, setValorStr]         = useState(
+    restante > 0 ? restante.toFixed(2).replace(".", ",") : ""
+  );
+  const [valorRecebido, setValorRecebido] = useState("");
+
+  const fmt = (v) =>
+    Number(v || 0).toLocaleString("pt-BR", { style:"currency", currency:"BRL" });
+
+  const FORMAS = [
+    { key:"dinheiro", label:"Dinheiro",  icone:"💵" },
+    { key:"cartao",   label:"Débito",    icone:"💳" },
+    { key:"pix",      label:"Pix",       icone:"📱" },
+    { key:"credito",  label:"Crédito",   icone:"💳" },
+  ];
+
+  const valor = parseFloat((valorStr || "0").replace(",", ".")) || 0;
+  const taxa  = (() => {
+    switch(forma) {
+      case "cartao":  return parseFloat(taxas?.debito || "0");
+      case "pix":     return parseFloat(taxas?.pix    || "0");
+      case "credito": return parseFloat(taxas?.[`credito_${parcelas}`] || "0");
+      default: return 0;
+    }
+  })();
+  const vTaxa   = parseFloat((valor * (taxa / 100)).toFixed(2));
+  const liquido = parseFloat((valor - vTaxa).toFixed(2));
+  const troco   = forma === "dinheiro" && valorRecebido
+    ? parseFloat(valorRecebido.replace(",", ".")) - valor
+    : null;
+
+  const labelForma = () => {
+    const f = FORMAS.find(x => x.key === forma);
+    return forma === "credito" ? `Crédito ${parcelas}x` : (f?.label || forma);
+  };
+
+  const handleConfirm = () => {
+    if (valor <= 0) return;
+    onConfirm({
+      id:            Date.now(),
+      forma,
+      parcelas:      forma === "credito" ? parcelas : 1,
+      valor,
+      label:         labelForma(),
+      valorRecebido: forma === "dinheiro" && valorRecebido
+                       ? parseFloat(valorRecebido.replace(",",".")) : null,
+      troco:         troco != null && troco >= 0 ? troco : null,
+    });
+  };
+
+  return (
+    <div
+      style={{
+        position:"fixed", inset:0, zIndex:9998,
+        background:"rgba(0,0,0,0.65)", backdropFilter:"blur(4px)",
+        display:"flex", alignItems:"center", justifyContent:"center",
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background:"#16181f", border:"1px solid rgba(255,255,255,0.1)",
+          borderRadius:14, width:340, padding:"24px 20px",
+          boxShadow:"0 24px 64px rgba(0,0,0,0.7)",
+          display:"flex", flexDirection:"column", gap:16,
+          fontFamily:"'DM Sans','Segoe UI',sans-serif",
+          animation:"slideUp .18s ease",
+        }}
+      >
+        {/* Header */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+          <span style={{ fontSize:15, fontWeight:700, color:"#e8e8f0" }}>
+            Adicionar pagamento
+          </span>
+          <span role="button" onClick={onClose}
+            style={{ color:"#5c5e72", cursor:"pointer", display:"flex", alignItems:"center" }}>
+            <X size={16} />
+          </span>
+        </div>
+
+        {/* Valor */}
+        <div>
+          <div style={{ fontSize:11, color:"#5c5e72", marginBottom:6, textTransform:"uppercase", letterSpacing:".05em" }}>
+            Valor
+          </div>
+          <div style={{ position:"relative" }}>
+            <span style={{
+              position:"absolute", left:12, top:"50%", transform:"translateY(-50%)",
+              fontSize:13, color:"#9193a5",
+            }}>R$</span>
+            <input
+              autoFocus
+              type="text"
+              value={valorStr}
+              onChange={e => setValorStr(e.target.value)}
+              onFocus={e => e.target.select()}
+              style={{
+                width:"100%", background:"rgba(255,255,255,0.06)",
+                border:"1px solid rgba(255,255,255,0.15)", borderRadius:8,
+                padding:"10px 12px 10px 32px", color:"#e8e8f0", fontSize:16,
+                fontWeight:700, outline:"none",
+              }}
+            />
+          </div>
+          {restante > 0 && Math.abs(valor - restante) > 0.009 && (
+            <span
+              role="button"
+              onClick={() => setValorStr(restante.toFixed(2).replace(".",","))}
+              style={{ fontSize:11, color:"var(--pdv-gold,#c8a55e)", cursor:"pointer",
+                       marginTop:4, display:"inline-block" }}
+            >
+              ↩ Usar valor restante ({fmt(restante)})
+            </span>
+          )}
+        </div>
+
+        {/* Forma de pagamento */}
+        <div>
+          <div style={{ fontSize:11, color:"#5c5e72", marginBottom:8, textTransform:"uppercase", letterSpacing:".05em" }}>
+            Forma de pagamento
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:6 }}>
+            {FORMAS.map(f => (
+              <span
+                key={f.key}
+                role="button"
+                onClick={() => setForma(f.key)}
+                style={{
+                  display:"flex", alignItems:"center", justifyContent:"center", gap:6,
+                  padding:"9px 8px", borderRadius:8, cursor:"pointer",
+                  fontSize:13, fontWeight: forma === f.key ? 600 : 400,
+                  border: forma === f.key
+                    ? "1px solid rgba(200,165,94,0.8)"
+                    : "1px solid rgba(255,255,255,0.1)",
+                  background: forma === f.key
+                    ? "rgba(200,165,94,0.15)"
+                    : "rgba(255,255,255,0.04)",
+                  color: forma === f.key ? "#c8a55e" : "#9193a5",
+                  userSelect:"none",
+                }}
+              >
+                {f.icone} {f.label}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Parcelas (crédito) */}
+        {forma === "credito" && (
+          <div>
+            <div style={{ fontSize:11, color:"#5c5e72", marginBottom:8, textTransform:"uppercase", letterSpacing:".05em" }}>
+              Parcelas
+            </div>
+            <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+              {[1,2,3,4,6,12].map(p => (
+                <span
+                  key={p}
+                  role="button"
+                  onClick={() => setParcelas(p)}
+                  style={{
+                    padding:"5px 12px", borderRadius:6, cursor:"pointer",
+                    fontSize:12, userSelect:"none",
+                    border: parcelas === p ? "1px solid #c8a55e" : "1px solid rgba(255,255,255,0.1)",
+                    background: parcelas === p ? "rgba(200,165,94,0.15)" : "rgba(255,255,255,0.04)",
+                    color: parcelas === p ? "#c8a55e" : "#9193a5",
+                  }}
+                >{p}x</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Dinheiro: valor recebido */}
+        {forma === "dinheiro" && (
+          <div>
+            <div style={{ fontSize:11, color:"#5c5e72", marginBottom:6, textTransform:"uppercase", letterSpacing:".05em" }}>
+              Valor recebido (opcional)
+            </div>
+            <input
+              type="text"
+              value={valorRecebido}
+              onChange={e => setValorRecebido(e.target.value)}
+              placeholder="0,00"
+              style={{
+                width:"100%", background:"rgba(255,255,255,0.06)",
+                border:"1px solid rgba(255,255,255,0.12)", borderRadius:8,
+                padding:"9px 12px", color:"#e8e8f0", fontSize:14, outline:"none",
+              }}
+            />
+            {troco !== null && troco >= 0 && (
+              <div style={{ marginTop:6, fontSize:13, color:"#4caf6a", fontWeight:600 }}>
+                Troco: {fmt(troco)}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Taxa info */}
+        {taxa > 0 && (
+          <div style={{
+            background:"rgba(224,85,85,0.08)", border:"1px solid rgba(224,85,85,0.2)",
+            borderRadius:7, padding:"8px 12px", fontSize:12, color:"#e05555",
+          }}>
+            Taxa {taxa.toFixed(2)}% · você recebe {fmt(liquido)} de {fmt(valor)}
+          </div>
+        )}
+
+        {/* Botão confirmar */}
+        <span
+          role="button"
+          onClick={handleConfirm}
+          style={{
+            display:"flex", alignItems:"center", justifyContent:"center", gap:8,
+            background: valor > 0
+              ? "linear-gradient(135deg,#d4b06a,#c8a55e,#b8943e)"
+              : "rgba(255,255,255,0.07)",
+            color: valor > 0 ? "#0a0a0a" : "#5c5e72",
+            borderRadius:"50px", padding:"13px 20px",
+            fontSize:14, fontWeight:800, cursor: valor > 0 ? "pointer" : "not-allowed",
+            letterSpacing:".04em", textTransform:"uppercase",
+            userSelect:"none",
+            transition:"all .15s",
+          }}
+        >
+          Confirmar {fmt(valor)}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 /* ══════════════════════════════════════════════════════
    MODAL CUPOM TÉRMICO
@@ -136,10 +373,9 @@ export default function PDV({ onVoltar }) {
   const [produtosFiltrados, setProdutosFiltrados] = useState([]);
   const [buscando, setBuscando] = useState(false);
 
-  /* ── Pagamento ── */
-  const [formaPag, setFormaPag] = useState("dinheiro");
-  const [parcelas, setParcelas] = useState(1);
-  const [valorRecebido, setValorRecebido] = useState("");
+  /* ── Pagamento dividido ── */
+  const [pagamentos, setPagamentos] = useState([]); // [{id, forma, parcelas, valor, label}]
+  const [showPagModal, setShowPagModal] = useState(false);
 
   /* ── UI states ── */
   const [finalizando, setFinalizando] = useState(false);
@@ -177,24 +413,21 @@ export default function PDV({ onVoltar }) {
   };
 
   /* ─── Total do carrinho ─── */
-  const total = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
-  const troco =
-    formaPag === "dinheiro" && valorRecebido
-      ? parseFloat(valorRecebido.replace(",", ".")) - total
-      : null;
+  const total    = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
+  const pago     = pagamentos.reduce((acc, p) => acc + p.valor, 0);
+  const restante = parseFloat((total - pago).toFixed(2));
+  const vencido  = restante <= 0.009; // considera quitado
 
-  /* ─── Taxas de cartão (puxadas de config.taxas) ─── */
+  /* ─── Taxas ─── */
   const taxas = config?.taxas || {};
-  const taxaPct = (() => {
-    switch (formaPag) {
+  const calcTaxa = (forma, parcelas) => {
+    switch (forma) {
       case "cartao":  return parseFloat(taxas.debito || "0");
       case "pix":     return parseFloat(taxas.pix    || "0");
       case "credito": return parseFloat(taxas[`credito_${parcelas}`] || "0");
       default:        return 0;
     }
-  })();
-  const valorTaxa    = parseFloat((total * (taxaPct / 100)).toFixed(2));
-  const totalLiquido = parseFloat((total - valorTaxa).toFixed(2));
+  };
 
   /* ══════════════════════════════════
      BUSCA POR CÓDIGO DE BARRAS
@@ -383,40 +616,30 @@ export default function PDV({ onVoltar }) {
           subtotal: item.subtotal,
         }));
 
-        const pagamento = {
-          forma: formaPag,
-          ...(formaPag === "credito" ? { parcelas } : {}),
-          ...(formaPag === "dinheiro" && valorRecebido
-            ? {
-                valorRecebido: parseFloat(valorRecebido.replace(",", ".")),
-                troco: parseFloat(valorRecebido.replace(",", ".")) - total,
-              }
-            : {}),
-        };
-
         const vendaDoc = {
-          idVenda: vendaId,
+          idVenda:        vendaId,
           itens,
           total,
-          pagamento,
-          formaPagamento: FORMA_LABEL[formaPag] || formaPag,
-          taxaPct:        taxaPct || 0,
-          valorTaxa:      valorTaxa || 0,
-          totalLiquido:   totalLiquido || total,
+          pagamentos:     pagamentos,
+          // compatibilidade com relatórios (1ª forma de pagamento)
+          formaPagamento: pagamentos[0]?.label || "—",
+          taxaPct:        0,
+          valorTaxa:      0,
+          totalLiquido:   total,
           data:           new Date().toISOString().slice(0, 10),
           cliente:        cliente?.nome || null,
           clienteId:      cliente?.id  || null,
           status:         "ativa",
           origem:         "pdv",
-          vendedorId:     vendedorId      || null,
-          vendedorNome:   nomeOperador    || null,
+          vendedorId:     vendedorId   || null,
+          vendedorNome:   nomeOperador || null,
           criadoEm:       new Date(),
         };
 
         transaction.set(vendaRef, vendaDoc);
         transaction.set(counterRef, { vendas: nextNum }, { merge: true });
 
-        setVendaFinalizada({ id: vendaId, total, itens: carrinho, formaPag, parcelas, cliente: cliente?.nome || null });
+        setVendaFinalizada({ id: vendaId, total, pagamentos, itens: carrinho, cliente: cliente?.nome || null });
       });
     } catch (e) {
       console.error(e);
@@ -480,6 +703,14 @@ export default function PDV({ onVoltar }) {
   return (
     <>
       <style>{CSS}</style>
+      {showPagModal && (
+        <ModalPagamento
+          restante={restante}
+          taxas={taxas}
+          onConfirm={(p) => { setPagamentos(ps => [...ps, p]); setShowPagModal(false); }}
+          onClose={() => setShowPagModal(false)}
+        />
+      )}
       <div className="pdv-root">
         {/* ── HEADER ── */}
         <header className="pdv-header">
@@ -638,69 +869,76 @@ export default function PDV({ onVoltar }) {
               )}
             </div>
 
-            {/* ─── Pagamento ─── */}
+            {/* ─── Pagamento Dividido ─── */}
             <div className="pdv-pagamento-section">
               <label className="pdv-section-label">
                 <CreditCard size={14} /> Pagamento
               </label>
-              <div className="pdv-pag-opcoes">
-                {[
-                  { key: "dinheiro", label: "Dinheiro",  Icon: Banknote   },
-                  { key: "cartao",   label: "Cartão",    Icon: CreditCard },
-                  { key: "pix",      label: "Pix",       Icon: QrCode     },
-                  { key: "credito",  label: "Crédito",   Icon: CreditCard },
-                ].map(({ key, label, Icon }) => (
-                  <button
-                    key={key}
-                    className={`pdv-pag-btn ${formaPag === key ? "active" : ""}`}
-                    onClick={() => setFormaPag(key)}
-                  >
-                    <Icon size={14} /> {label}
-                  </button>
-                ))}
-              </div>
 
-              {formaPag === "dinheiro" && (
-                <div className="pdv-pag-detalhe">
-                  <label>Valor recebido</label>
-                  <input
-                    type="text"
-                    className="pdv-pag-input"
-                    placeholder="0,00"
-                    value={valorRecebido}
-                    onChange={(e) => setValorRecebido(e.target.value)}
-                  />
-                  {troco !== null && troco >= 0 && (
-                    <div className="pdv-troco">Troco: <strong>{fmt(troco)}</strong></div>
-                  )}
+              {/* Lista de pagamentos já adicionados */}
+              {pagamentos.length > 0 && (
+                <div className="pdv-pag-lista">
+                  {pagamentos.map((p) => {
+                    const taxa = calcTaxa(p.forma, p.parcelas);
+                    const vTaxa = parseFloat((p.valor * (taxa / 100)).toFixed(2));
+                    return (
+                      <div key={p.id} className="pdv-pag-item">
+                        <div className="pdv-pag-item-info">
+                          <span className="pdv-pag-item-label">{p.label}</span>
+                          {taxa > 0 && (
+                            <span className="pdv-pag-item-taxa">
+                              taxa {taxa.toFixed(2)}% · líq. {fmt(p.valor - vTaxa)}
+                            </span>
+                          )}
+                          {p.forma === "dinheiro" && p.valorRecebido && (
+                            <span className="pdv-pag-item-taxa">
+                              recebido {fmt(p.valorRecebido)} · troco {fmt(p.troco)}
+                            </span>
+                          )}
+                        </div>
+                        <span className="pdv-pag-item-valor">{fmt(p.valor)}</span>
+                        <span
+                          role="button"
+                          onClick={() => setPagamentos(ps => ps.filter(x => x.id !== p.id))}
+                          style={{ cursor:"pointer", color:"var(--pdv-error)", display:"flex",
+                                   alignItems:"center", padding:"0 4px", flexShrink:0 }}
+                        >
+                          <X size={13} />
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
-              {formaPag === "credito" && (
-                <div className="pdv-pag-detalhe">
-                  <label>Parcelas</label>
-                  <div className="pdv-parcelas-grid">
-                    {[1,2,3,4,6,12].map((p) => (
-                      <button
-                        key={p}
-                        className={`pdv-parcela-btn ${parcelas === p ? "active" : ""}`}
-                        onClick={() => setParcelas(p)}
-                      >
-                        {p}x
-                      </button>
-                    ))}
-                  </div>
-                  {taxaPct > 0 && (
-                    <div className="pdv-taxa-badge">
-                      Taxa {taxaPct.toFixed(2)}% · desc. {fmt(valorTaxa)}
-                    </div>
-                  )}
+              {/* Restante a pagar */}
+              {carrinho.length > 0 && (
+                <div className="pdv-pag-restante" style={{
+                  color: vencido ? "var(--pdv-success)" : "var(--pdv-gold)",
+                  fontWeight: 700, fontSize: 13, marginBottom: 6,
+                  display: "flex", justifyContent: "space-between",
+                }}>
+                  <span>{vencido ? "✓ Quitado" : "Restante"}</span>
+                  <span>{vencido ? fmt(0) : fmt(restante)}</span>
                 </div>
               )}
-              {(formaPag === "cartao" || formaPag === "pix") && taxaPct > 0 && (
-                <div className="pdv-taxa-badge" style={{ marginTop: 8 }}>
-                  Taxa {taxaPct.toFixed(2)}% · desc. {fmt(valorTaxa)}
-                </div>
+
+              {/* Botão adicionar pagamento */}
+              {!vencido && carrinho.length > 0 && (
+                <span
+                  role="button"
+                  onClick={() => setShowPagModal(true)}
+                  style={{
+                    display:"flex", alignItems:"center", justifyContent:"center", gap:7,
+                    padding:"9px 12px", borderRadius:8, cursor:"pointer",
+                    background:"rgba(200,165,94,0.1)", border:"1px solid rgba(200,165,94,0.35)",
+                    color:"var(--pdv-gold)", fontSize:13, fontWeight:600,
+                    userSelect:"none",
+                  }}
+                >
+                  <PlusCircle size={14} color="var(--pdv-gold)" />
+                  {pagamentos.length === 0 ? "Adicionar pagamento" : `Adicionar mais (restam ${fmt(restante)})`}
+                </span>
               )}
             </div>
           </section>
@@ -802,36 +1040,26 @@ export default function PDV({ onVoltar }) {
                 <span>Subtotal</span>
                 <span>{fmt(total)}</span>
               </div>
-              {taxaPct > 0 && (
-                <div className="pdv-total-row" style={{ color: "var(--pdv-error)", fontSize: 12 }}>
-                  <span>Taxa ({taxaPct.toFixed(2)}%)</span>
-                  <span>- {fmt(valorTaxa)}</span>
+              {pago > 0 && (
+                <div className="pdv-total-row" style={{ color:"var(--pdv-success)", fontSize:12 }}>
+                  <span>Pago</span>
+                  <span>{fmt(pago)}</span>
                 </div>
               )}
               <div className="pdv-total-row pdv-total-grande">
-                <span>Total a Pagar</span>
-                <span>{fmt(total)}</span>
+                <span>{vencido ? "✓ Quitado" : "Total a Pagar"}</span>
+                <span style={{ color: vencido ? "var(--pdv-success)" : "var(--pdv-gold)" }}>
+                  {fmt(vencido ? total : restante)}
+                </span>
               </div>
-              {taxaPct > 0 && (
-                <div className="pdv-total-row" style={{ fontSize: 12 }}>
-                  <span style={{ color: "var(--pdv-text-3)" }}>Você recebe</span>
-                  <span style={{ color: "var(--pdv-success)", fontWeight: 600 }}>{fmt(totalLiquido)}</span>
-                </div>
-              )}
-              {troco !== null && troco >= 0 && (
-                <div className="pdv-total-row pdv-troco-row">
-                  <span>Troco</span>
-                  <span>{fmt(troco)}</span>
-                </div>
-              )}
             </div>
 
             {/* Botão finalizar */}
             <span
               role="button"
-              tabIndex={carrinho.length === 0 ? -1 : 0}
-              onClick={!finalizando && carrinho.length > 0 ? finalizarVenda : undefined}
-              onKeyDown={e => e.key === "Enter" && !finalizando && carrinho.length > 0 && finalizarVenda()}
+              tabIndex={!vencido ? -1 : 0}
+              onClick={!finalizando && vencido ? finalizarVenda : undefined}
+              onKeyDown={e => e.key === "Enter" && !finalizando && vencido && finalizarVenda()}
               style={{
                 margin: "12px 16px 4px",
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
@@ -842,10 +1070,10 @@ export default function PDV({ onVoltar }) {
                 padding: "15px 20px",
                 fontSize: 15,
                 fontWeight: 900,
-                cursor: finalizando || carrinho.length === 0 ? "not-allowed" : "pointer",
+                cursor: finalizando || !vencido ? "not-allowed" : "pointer",
                 letterSpacing: ".05em",
                 textTransform: "uppercase",
-                opacity: finalizando || carrinho.length === 0 ? 0.38 : 1,
+                opacity: finalizando || !vencido ? 0.38 : 1,
                 boxShadow: "0 4px 24px rgba(200,165,94,0.4), 0 1px 0 rgba(255,255,255,0.15) inset",
                 width: "calc(100% - 32px)",
                 fontFamily: "'DM Sans','Segoe UI',sans-serif",
@@ -856,7 +1084,7 @@ export default function PDV({ onVoltar }) {
               {finalizando ? (
                 <><Loader2 size={18} color="#0a0a0a" /> Finalizando...</>
               ) : (
-                <><Receipt size={18} color="#0a0a0a" /> Finalizar Venda — {fmt(total)}</>
+                <><Receipt size={18} color="#0a0a0a" /> {vencido ? `Finalizar Venda — ${fmt(total)}` : `Adicione pagamento — falta ${fmt(restante)}`}</>
               )}
             </span>
 
@@ -1336,4 +1564,18 @@ const CSS = `
 .cupom-btn-fechar:hover { background: rgba(255,255,255,0.05); color: #e8e8f0; }
 @keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: none } }
+
+/* ── LISTA PAGAMENTOS DIVIDIDOS ── */
+.pdv-pag-lista {
+  display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px;
+}
+.pdv-pag-item {
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px; padding: 8px 10px;
+}
+.pdv-pag-item-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.pdv-pag-item-label { font-size: 12px; font-weight: 600; color: var(--pdv-text); }
+.pdv-pag-item-taxa  { font-size: 10px; color: var(--pdv-text-3); }
+.pdv-pag-item-valor { font-size: 13px; font-weight: 700; color: var(--pdv-gold); flex-shrink: 0; }
 `;
