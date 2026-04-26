@@ -1827,12 +1827,12 @@ async function loadAllMembers() {
       const lic = docSnap.data();
       const uid = docSnap.id;
       try {
-        const [userDoc, configDoc, fotoDoc] = await Promise.all([
-          db.collection('users').doc(uid).get(),
+        // name, email e telefone lidos direto de licencas/{uid}
+        // config e foto ainda buscados de users/{uid}
+        const [configDoc, fotoDoc] = await Promise.all([
           db.collection('users').doc(uid).collection('config').doc('geral').get(),
           db.collection('users').doc(uid).collection('foto').doc('avatar').get()
         ]);
-        const u = userDoc.exists   ? userDoc.data()   : {};
         const c = configDoc.exists ? configDoc.data() : {};
         const f = fotoDoc.exists   ? fotoDoc.data()   : {};
         return {
@@ -1843,17 +1843,18 @@ async function loadAllMembers() {
           criadoEm:       toDate(lic.criadoEm),
           proExpiradoEm:  toDate(lic.proExpiradoEm),
           // proAtivadoEm: toDate(lic.proAtivadoEm),  // disponível quando estrutura estiver pronta
-          email:          u.email        || '',
-          name:           lic.name       || u.name || u.nome || u.email?.split('@')[0] || 'Sem nome',
+          email:          lic.email      || '',
+          name:           lic.name       || 'Sem nome',
+          telefone:       lic.telefone   || '',
           foto:           f.base64       || '',
           endereco:       c.empresa?.endereco || c.endereço || '',
-          telefone:       c.empresa?.telefone    || '',
           cnpj:           c.empresa?.cnpj        || '',
           nomeEmpresa:    c.empresa?.nomeEmpresa || '',
         };
       } catch {
         return { uid, ativo:true, pro:lic.pro||false, admin:false, criadoEm:null, proExpiradoEm:null,
-                 email:'', name: lic.name||'—', foto:'', telefone:'', endereco:'', cnpj:'', nomeEmpresa:'' };
+                 email: lic.email||'', name: lic.name||'—', telefone: lic.telefone||'',
+                 foto:'', endereco:'', cnpj:'', nomeEmpresa:'' };
       }
     }));
 
@@ -2753,6 +2754,21 @@ document.getElementById('btnSaveAnuncio').addEventListener('click', async () => 
   btn.textContent = 'Publicando...'; btn.disabled = true;
 
   try {
+    // ── Upload de imagem para o Storage (Opção B: pasta plana por tipo)
+    let imageUrl   = '';
+    let imagemPath = '';
+    if (anuncioImgBase64) {
+      btn.textContent = 'Enviando imagem...';
+      const res  = await fetch(anuncioImgBase64);
+      const blob = await res.blob();
+      const uuid = (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+      imagemPath = `anuncios/imagens/${uuid}.jpg`;
+      const ref  = storage.ref(imagemPath);
+      await ref.put(blob, { contentType: 'image/jpeg' });
+      imageUrl = await ref.getDownloadURL();
+      btn.textContent = 'Publicando...';
+    }
+
     const payload = {
       titulo, mensagem,
       destinatario: anuncioDest,
@@ -2760,7 +2776,8 @@ document.getElementById('btnSaveAnuncio').addEventListener('click', async () => 
       btnUrl:   btnUrl   || '',
       btnPos:   anuncioBtnPos,
       mediaType: anuncioMediaType,
-      imagem:    anuncioImgBase64 || '',
+      imageUrl,
+      imagemPath,
       videoUrl:  anuncioVideoUrl  || '',
       imgPosX:   anuncioImgBase64 ? framePosX  : 50,
       imgPosY:   anuncioImgBase64 ? framePosY  : 50,
@@ -2819,7 +2836,7 @@ async function loadAnuncios() {
       return `
         <div class="anuncio-item" id="anuncio-${id}">
           <div class="anuncio-item-thumb">
-            ${d.imagem ? `<img src="${d.imagem}" alt="">` : '📢'}
+            ${d.imageUrl ? `<img src="${d.imageUrl}" alt="">` : '📢'}
           </div>
           <div class="anuncio-item-info">
             <div class="anuncio-item-title">${esc(d.titulo)}</div>
@@ -2860,6 +2877,11 @@ function deleteAnuncio(id) {
     okLabel: 'Excluir',
     onOk: async () => {
       try {
+        // Apaga o arquivo do Storage se existir
+        const docSnap = await db.collection('anunciosAG').doc(id).get();
+        if (docSnap.exists && docSnap.data().imagemPath) {
+          try { await storage.ref(docSnap.data().imagemPath).delete(); } catch(_) {}
+        }
         await db.collection('anunciosAG').doc(id).delete();
         loadAnuncios();
       } catch(e) { alert('Erro ao excluir.'); }
