@@ -755,6 +755,50 @@ function ModalQrPix({ valor, descricao, tenantUid, onPago, onClose }) {
    ═══════════════════════════════════════════════════ */
 export default function PDV({ onVoltar }) {
   const { tenantUid, vendedorNome, vendedorId, cargo, user } = useAuth();
+
+  /* ── Bloqueio de acesso para o financeiro ── */
+  if (cargo === "financeiro") {
+    return (
+      <div style={{
+        display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", height: "100vh",
+        background: "var(--pdv-bg, #0f1117)",
+        fontFamily: "'DM Sans','Segoe UI',sans-serif",
+        gap: 16,
+      }}>
+        <div style={{
+          background: "rgba(224,85,85,0.1)", border: "1px solid rgba(224,85,85,0.3)",
+          borderRadius: 14, padding: "40px 48px", textAlign: "center",
+          maxWidth: 400, display: "flex", flexDirection: "column",
+          alignItems: "center", gap: 12,
+        }}>
+          <AlertCircle size={40} color="#e05555" />
+          <div style={{ fontSize: 18, fontWeight: 700, color: "#e8e8f0" }}>
+            Acesso não autorizado
+          </div>
+          <div style={{ fontSize: 14, color: "#9193a5", lineHeight: 1.6 }}>
+            Seu perfil <strong style={{ color: "#e8e8f0" }}>Financeiro</strong> não tem
+            permissão para acessar o módulo de PDV.
+          </div>
+          {onVoltar && (
+            <button
+              onClick={onVoltar}
+              style={{
+                marginTop: 8, display: "flex", alignItems: "center", gap: 8,
+                background: "rgba(255,255,255,0.07)", border: "1px solid rgba(255,255,255,0.15)",
+                color: "#c8a55e", borderRadius: 8, padding: "10px 20px",
+                fontSize: 13, fontWeight: 600, cursor: "pointer",
+                fontFamily: "'DM Sans',sans-serif",
+              }}
+            >
+              <ArrowLeft size={15} /> Voltar
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   const { config, loading: cfgLoading } = useConfiguracoes(tenantUid);
 
   /* ── Dados da empresa (logo + nome) ── */
