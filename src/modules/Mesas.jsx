@@ -1115,7 +1115,7 @@ function ModalPixQr({ valor, tenantUid, descricao, onClose, onPago }) {
 /* ═══════════════════════════════════════════════════
    MODAL: COMANDA DA MESA
    ═══════════════════════════════════════════════════ */
-function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeUsuario, onClose, onVendaSalva }) {
+function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeUsuario, user, onClose, onVendaSalva }) {
   const isOcupada = !!comanda;
 
   /* Itens da comanda */
@@ -1349,7 +1349,8 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
       const payload = {
         cliente: clienteNome.trim() || `Mesa ${mesa.numero}`,
         data: new Date(),
-        vendedor: cargo ? `${nomeUsuario} (${cargo})` : nomeUsuario,
+        vendedor: nomeUsuario || user?.displayName || user?.email || "—",
+        vendedorCargo: cargo,
         formaPagamento: formaPgto === "Em aberto" ? "Dinheiro" : formaPgto,
         observacao: `Mesa ${mesa.numero}`,
         tipo: "produto",
@@ -1463,7 +1464,8 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
       const payload = {
         cliente: clienteNome.trim() || `Mesa ${mesa.numero}`,
         data: new Date(),
-        vendedor: cargo ? `${nomeUsuario} (${cargo})` : nomeUsuario,
+        vendedor: nomeUsuario || user?.displayName || user?.email || "—",
+        vendedorCargo: cargo,
         formaPagamento: "Cancelado",
         observacao: `Mesa ${mesa.numero} — Cancelado: ${motivoCancelamento.trim()}`,
         tipo: "produto",
@@ -1484,7 +1486,7 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
         mesaNumero: mesa.numero,
         motivoCancelamento: motivoCancelamento.trim(),
         canceladaEm: new Date().toISOString(),
-        canceladaPor: cargo ? `${nomeUsuario} (${cargo})` : nomeUsuario,
+        canceladaPor: { uid: user?.uid, nome: nomeUsuario || user?.displayName || user?.email || "—", cargo },
         canceladoEm: new Date().toISOString(),
         itens: itens.map(i => ({
           produtoId: i.produtoId || null,
@@ -2121,6 +2123,22 @@ export default function Mesas() {
   const { user, cargo, tenantUid, nomeUsuario } = useContext(AuthContext);
   const uid = tenantUid;
 
+  /* ── Nome real do admin (licencas/{tenantUid}/name) ──
+     Mesma lógica de Vendas.jsx: o AuthContext expõe o email do Firebase Auth
+     como displayName para admins — buscamos o nome correto no Firestore. */
+  const [adminNome, setAdminNome] = useState("");
+  useEffect(() => {
+    if (cargo !== "admin" || !tenantUid) return;
+    getDoc(doc(db, "licencas", tenantUid))
+      .then(snap => { if (snap.exists() && snap.data().name) setAdminNome(snap.data().name); })
+      .catch(() => {});
+  }, [cargo, tenantUid]);
+
+  /* Nome efetivo do operador logado — admin usa adminNome, demais usam nomeUsuario */
+  const nomeEfetivo = cargo === "admin"
+    ? (adminNome || nomeUsuario || "")
+    : (nomeUsuario || "");
+
   const [mesas, setMesas] = useState([]);
   const [comandas, setComandas] = useState({});  // { mesaId: comanda }
   const [produtos, setProdutos] = useState([]);
@@ -2388,7 +2406,8 @@ export default function Mesas() {
           taxas={taxas}
           uid={uid}
           cargo={cargo}
-          nomeUsuario={nomeUsuario}
+          nomeUsuario={nomeEfetivo}
+          user={user}
           onClose={() => setMesaModal(null)}
           onVendaSalva={handleVendaSalva}
         />
