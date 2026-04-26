@@ -6,9 +6,9 @@
 import { useState } from "react";
 import { useAuth } from "./Auth";
 
-// ── Ícones SVG inline ───────────────────────────────
+// ── Ícones SVG inline ────────────────────────────────
 const IconEyeOpen = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
     fill="none" stroke="currentColor" strokeWidth="2"
     strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -17,7 +17,7 @@ const IconEyeOpen = () => (
 );
 
 const IconEyeOff = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
     fill="none" stroke="currentColor" strokeWidth="2"
     strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
@@ -29,21 +29,21 @@ const IconEyeOff = () => (
 const LoginForm = ({ onLoginSuccess }) => {
   const { login, resetPassword } = useAuth();
 
-  // ── estados de login ────────────────────────────────
-  const [email,      setEmail]      = useState("");
-  const [senha,      setSenha]      = useState("");
-  const [showSenha,  setShowSenha]  = useState(false);
-  const [error,      setError]      = useState("");
-  const [loading,    setLoading]    = useState(false);
+  // ── estados de login ─────────────────────────────
+  const [email,     setEmail]     = useState("");
+  const [senha,     setSenha]     = useState("");
+  const [showSenha, setShowSenha] = useState(false);
+  const [error,     setError]     = useState("");
+  const [loading,   setLoading]   = useState(false);
 
-  // ── estados de recuperação ──────────────────────────
-  const [showReset,     setShowReset]     = useState(false);
-  const [resetEmail,    setResetEmail]    = useState("");
-  const [resetMsg,      setResetMsg]      = useState("");
-  const [resetError,    setResetError]    = useState("");
-  const [resetLoading,  setResetLoading]  = useState(false);
+  // ── estados de recuperação ───────────────────────
+  const [showReset,    setShowReset]    = useState(false);
+  const [resetEmail,   setResetEmail]   = useState("");
+  const [resetMsg,     setResetMsg]     = useState("");
+  const [resetError,   setResetError]   = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
 
-  // ── submit login ────────────────────────────────────
+  // ── submit login ─────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -58,7 +58,7 @@ const LoginForm = ({ onLoginSuccess }) => {
     }
   };
 
-  // ── submit recuperação ──────────────────────────────
+  // ── submit recuperação ───────────────────────────
   const handleReset = async (e) => {
     e.preventDefault();
     setResetError("");
@@ -81,115 +81,111 @@ const LoginForm = ({ onLoginSuccess }) => {
     setResetError("");
   };
 
-  // ── render ──────────────────────────────────────────
+  // ── render ───────────────────────────────────────
   return (
     <>
-      <div className="login-form-card">
-        <div className="login-header brand-header">
-          <h2 className="brand-title">Assent <span>Gestão</span></h2>
-          <p className="brand-subtitle">Quem organiza, cresce.</p>
-        </div>
+      {/* Card com borda gradiente */}
+      <div className="login-card-wrap">
+        <div className="login-card-border" />
 
-        <form onSubmit={handleSubmit} className="login-form" noValidate>
-          <div className="input-group">
-            <label htmlFor="email">E-mail</label>
-            <input
-              type="email"
-              id="email"
-              placeholder="Seu e-mail profissional"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              disabled={loading}
-            />
+        <div className="login-form-card">
+          {/* Linha de luz no topo */}
+          <div className="card-light" />
+
+          {/* Logo */}
+          <div className="logo-area">
+            <div className="logo-text">ASSENT</div>
+            <div className="logo-sub">Gestão Empresarial</div>
+            <div className="logo-divider" />
           </div>
 
-          <div className="input-group" style={{ marginTop: "1rem" }}>
-            <label htmlFor="password">Senha</label>
-            {/* ── wrapper para posicionar o botão do olhinho ── */}
-            <div style={{ position: "relative" }}>
+          {/* Formulário */}
+          <form onSubmit={handleSubmit} className="login-form" noValidate>
+
+            <div className="field">
+              <label htmlFor="email">E-mail</label>
               <input
-                type={showSenha ? "text" : "password"}
-                id="password"
-                placeholder="Sua senha"
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
+                type="email"
+                id="email"
+                placeholder="seu@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
-                autoComplete="current-password"
+                autoComplete="email"
                 disabled={loading}
-                style={{ paddingRight: "2.75rem" }}
               />
-              <button
-                type="button"
-                onClick={() => setShowSenha((v) => !v)}
-                disabled={loading}
-                aria-label={showSenha ? "Ocultar senha" : "Mostrar senha"}
-                style={{
-                  position: "absolute",
-                  right: "0.75rem",
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                  background: "none",
-                  border: "none",
-                  padding: 0,
-                  cursor: loading ? "not-allowed" : "pointer",
-                  color: "#a0a0a0",
-                  display: "flex",
-                  alignItems: "center",
-                  transition: "color 0.2s",
-                }}
-                onMouseEnter={(e) => { if (!loading) e.currentTarget.style.color = "#D4AF37"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.color = "#a0a0a0"; }}
-              >
-                {showSenha ? <IconEyeOff /> : <IconEyeOpen />}
-              </button>
             </div>
-          </div>
 
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "0.5rem" }}>
+            <div className="field">
+              <label htmlFor="password">Senha</label>
+              <div style={{ position: "relative" }}>
+                <input
+                  type={showSenha ? "text" : "password"}
+                  id="password"
+                  placeholder="••••••••"
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  disabled={loading}
+                  style={{ paddingRight: "2.75rem" }}
+                />
+                <button
+                  type="button"
+                  className="eye-toggle"
+                  onClick={() => setShowSenha((v) => !v)}
+                  disabled={loading}
+                  aria-label={showSenha ? "Ocultar senha" : "Mostrar senha"}
+                >
+                  {showSenha ? <IconEyeOff /> : <IconEyeOpen />}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="login-error" role="alert" aria-live="polite">
+                <span className="login-error-icon">⚠</span> {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="btn-login"
+              disabled={loading}
+            >
+              <span>{loading ? "Entrando..." : "Entrar no sistema"}</span>
+            </button>
+          </form>
+
+          {/* Recuperação */}
+          <div className="footer-link">
+            Esqueceu a senha?{" "}
             <button
               type="button"
-              className="forgot-password"
+              className="forgot-link"
               onClick={() => { setShowReset(true); setResetEmail(email); }}
-              style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
             >
-              Esqueceu a senha?
+              Recuperar acesso
             </button>
           </div>
-
-          {error && (
-            <div className="login-error" role="alert" aria-live="polite">
-              <span className="login-error-icon">⚠</span> {error}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            className="btn-submit"
-            disabled={loading}
-            style={{ opacity: loading ? 0.7 : 1, cursor: loading ? "not-allowed" : "pointer" }}
-          >
-            <span>{loading ? "Entrando..." : "Entrar"}</span>
-          </button>
-        </form>
+        </div>
       </div>
 
-      {/* ── Modal recuperação de senha ─────────────────── */}
+      {/* ── Modal recuperação de senha ──────────────── */}
       {showReset && (
         <div
           onClick={fecharReset}
           style={{
             position: "fixed", inset: 0, zIndex: 50,
-            background: "rgba(0,0,0,0.75)", backdropFilter: "blur(4px)",
+            background: "rgba(0,0,0,0.8)", backdropFilter: "blur(6px)",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}
         >
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: "#111",
-              border: "1px solid rgba(212,175,55,0.25)",
+              background: "rgba(6,6,6,0.96)",
+              border: "1px solid rgba(255,255,255,0.08)",
               borderRadius: 16,
               padding: "2.5rem 2rem",
               width: "100%",
@@ -197,45 +193,55 @@ const LoginForm = ({ onLoginSuccess }) => {
               display: "flex",
               flexDirection: "column",
               gap: "1.25rem",
+              boxShadow: "0 40px 80px rgba(0,0,0,0.85)",
             }}
           >
             <div>
               <h3 style={{
-                fontFamily: "'Cormorant Garamond', serif",
-                fontSize: 26,
+                fontFamily: "'Cinzel', serif",
+                fontSize: 22,
                 color: "#F0EDE6",
                 fontWeight: 400,
-                marginBottom: 6,
+                letterSpacing: "0.1em",
+                marginBottom: 8,
               }}>
                 Recuperar senha
               </h3>
-              <p style={{ color: "#a0a0a0", fontSize: 14 }}>
+              <p style={{
+                color: "rgba(255,255,255,0.3)", fontSize: 13,
+                fontFamily: "'Montserrat', sans-serif", fontWeight: 300,
+              }}>
                 Digite seu e-mail e enviaremos um link para redefinir sua senha.
               </p>
             </div>
 
+            {/* Sucesso */}
             {resetMsg && (
               <div style={{
-                background: "rgba(52,199,89,0.1)",
-                border: "1px solid rgba(52,199,89,0.3)",
+                background: "rgba(52,199,89,0.08)",
+                border: "1px solid rgba(52,199,89,0.25)",
                 borderRadius: 8, padding: "0.75rem 1rem",
-                color: "#4ade80", fontSize: 14,
+                color: "#4ade80", fontSize: 13,
+                fontFamily: "'Montserrat', sans-serif",
               }}>
                 ✓ {resetMsg}
               </div>
             )}
 
+            {/* Erro */}
             {resetError && (
               <div style={{
-                background: "rgba(224,82,82,0.1)",
-                border: "1px solid rgba(224,82,82,0.3)",
+                background: "rgba(224,82,82,0.08)",
+                border: "1px solid rgba(224,82,82,0.25)",
                 borderRadius: 8, padding: "0.75rem 1rem",
-                color: "#e05252", fontSize: 14,
+                color: "#e05252", fontSize: 13,
+                fontFamily: "'Montserrat', sans-serif",
               }}>
                 ⚠ {resetError}
               </div>
             )}
 
+            {/* Formulário — some após sucesso */}
             {!resetMsg && (
               <form onSubmit={handleReset} noValidate style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
                 <div className="input-group">
@@ -256,7 +262,7 @@ const LoginForm = ({ onLoginSuccess }) => {
                   type="submit"
                   className="btn-submit"
                   disabled={resetLoading}
-                  style={{ opacity: resetLoading ? 0.7 : 1, cursor: resetLoading ? "not-allowed" : "pointer" }}
+                  style={{ opacity: resetLoading ? 0.6 : 1, cursor: resetLoading ? "not-allowed" : "pointer" }}
                 >
                   <span>{resetLoading ? "Enviando..." : "Enviar link de recuperação"}</span>
                 </button>
@@ -268,8 +274,9 @@ const LoginForm = ({ onLoginSuccess }) => {
               onClick={fecharReset}
               style={{
                 background: "none", border: "none",
-                color: "#a0a0a0", fontSize: 13,
+                color: "rgba(255,255,255,0.25)", fontSize: 12,
                 cursor: "pointer", textAlign: "center",
+                fontFamily: "'Montserrat', sans-serif",
               }}
             >
               {resetMsg ? "Fechar" : "Cancelar"}
