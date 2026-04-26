@@ -1223,7 +1223,12 @@ function ModalTutorialPagamento({ onClose }) {
     },
     {
       titulo: "Registre o Webhook no Mercado Pago",
-      desc: <>Este é o passo mais importante para a confirmação automática. No painel MP acesse <strong>Seu negócio → Webhooks</strong>, clique em <strong>"Adicionar webhook"</strong> e configure:<br/><br/>
+      desc: <>Este é o passo mais importante para a confirmação automática. Siga o caminho correto:<br/><br/>
+        1. Acesse o <a className="tut-link" href="https://www.mercadopago.com.br/developers/panel" target="_blank" rel="noreferrer">painel de desenvolvedor <ExternalLink size={10} /></a><br/>
+        2. No menu lateral, clique em <strong>Suas integrações</strong> (ou <strong>Aplicações</strong>)<br/>
+        3. Clique na sua aplicação<br/>
+        4. No menu lateral da aplicação, clique em <strong>Webhooks</strong><br/>
+        5. Clique em <strong>"Adicionar webhook"</strong> e configure:<br/><br/>
         • <strong>URL:</strong> <code>https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook</code><br/>
         • <strong>Eventos:</strong> marque <strong>"Pagamentos"</strong><br/><br/>
         Isso faz o Mercado Pago notificar o ASSENT automaticamente quando o PIX for pago.</>,
