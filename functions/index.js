@@ -4,10 +4,12 @@
    + App Check obrigatório (enforceAppCheck)
    + CORS restrito ao domínio da Vercel
    ═══════════════════════════════════════════════════ */
-const { onSchedule } = require("firebase-functions/v2/scheduler");
-const { getFirestore, Timestamp } = require("firebase-admin/firestore");
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
-const admin = require("firebase-admin");
+const { onSchedule }              = require("firebase-functions/v2/scheduler");
+const { onCall, onRequest,
+        HttpsError }              = require("firebase-functions/v2/https");
+const { getFirestore,
+        Timestamp, FieldValue }   = require("firebase-admin/firestore");
+const admin                       = require("firebase-admin");
 
 admin.initializeApp();
 
@@ -176,7 +178,236 @@ exports.excluirUsuario = onCall(CALL_OPTIONS, async (request) => {
 });
 
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════
+   PAGAMENTOS PIX — Mercado Pago via Cloud Functions
+   O token MP fica SOMENTE no Firestore (server-side).
+   O front nunca toca nas credenciais.
+
+   Webhook a registrar no painel MP > Webhooks > Pagamentos:
+   https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook
+
+   Regra Firestore necessária (firestore.rules):
+   match /users/{tenantUid}/pagamentosQr/{paymentId} {
+     allow read: if request.auth != null && request.auth.uid == tenantUid;
+     allow write: if false; // só o Admin SDK escreve
+   }
+═══════════════════════════════════════════════════════════════ */
+
+const WEBHOOK_URL = "https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook";
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO 4: gerarPixQr
+   Cria pagamento PIX no Mercado Pago e salva doc
+   no Firestore. O PDV escuta via onSnapshot.
+───────────────────────────────────────────── */
+exports.gerarPixQr = onCall(CALL_OPTIONS, async (request) => {
+  const callerUid = request.auth?.uid;
+  if (!callerUid) {
+    throw new HttpsError("unauthenticated", "Usuário não autenticado.");
+  }
+
+  const { tenantUid, valor, descricao } = request.data;
+
+  if (!tenantUid || valor == null) {
+    throw new HttpsError("invalid-argument", "tenantUid e valor são obrigatórios.");
+  }
+
+  /* Lê o token do Firestore — nunca exposto ao client */
+  const configSnap = await db.doc(`users/${tenantUid}/config/geral`).get();
+
+  if (!configSnap.exists) {
+    throw new HttpsError("not-found", "Configuração não encontrada.");
+  }
+
+  const mpConfig = configSnap.data()?.pagamentos?.mercadopago;
+
+  if (!mpConfig?.ativo) {
+    throw new HttpsError("failed-precondition", "Pagamentos PIX não estão ativados nesta conta.");
+  }
+  if (!mpConfig?.accessToken) {
+    throw new HttpsError("failed-precondition", "Access Token não configurado. Vá em Configurações → Pagamentos Online.");
+  }
+
+  const token          = mpConfig.accessToken;
+  const idempotencyKey = `assent-${tenantUid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  /* Cria o pagamento no Mercado Pago */
+  let mpData;
+  try {
+    const mpRes = await fetch("https://api.mercadopago.com/v1/payments", {
+      method:  "POST",
+      headers: {
+        "Authorization":     `Bearer ${token}`,
+        "Content-Type":      "application/json",
+        "X-Idempotency-Key": idempotencyKey,
+      },
+      body: JSON.stringify({
+        transaction_amount: parseFloat(Number(valor).toFixed(2)),
+        description:        descricao || "Venda PDV ASSENT",
+        payment_method_id:  "pix",
+        payer: { email: "pagador@assent.com.br", first_name: "Cliente", last_name: "ASSENT" },
+        notification_url:   WEBHOOK_URL,
+      }),
+    });
+
+    mpData = await mpRes.json();
+
+    if (!mpRes.ok) {
+      console.error("[gerarPixQr] Erro Mercado Pago:", mpData);
+      throw new HttpsError("internal", mpData?.message || `Erro Mercado Pago ${mpRes.status}`);
+    }
+  } catch (err) {
+    if (err instanceof HttpsError) throw err;
+    console.error("[gerarPixQr] Fetch error:", err);
+    throw new HttpsError("internal", "Falha ao conectar com o Mercado Pago.");
+  }
+
+  const txData = mpData?.point_of_interaction?.transaction_data;
+  if (!txData?.qr_code_base64 || !txData?.qr_code) {
+    console.error("[gerarPixQr] QR não retornado:", mpData);
+    throw new HttpsError("internal", "QR Code não retornado. Verifique se PIX está habilitado na conta MP.");
+  }
+
+  /* Salva referência no Firestore — PDV escuta via onSnapshot */
+  await db.doc(`users/${tenantUid}/pagamentosQr/${mpData.id}`).set({
+    paymentId:    mpData.id,
+    tenantUid,
+    valor:        parseFloat(Number(valor).toFixed(2)),
+    status:       "pending",
+    statusDetail: null,
+    descricao:    descricao || "",
+    criadoEm:     FieldValue.serverTimestamp(),
+    atualizadoEm: FieldValue.serverTimestamp(),
+  });
+
+  console.log(`[gerarPixQr] Criado: ${mpData.id} — tenant: ${tenantUid} — R$${valor}`);
+
+  return {
+    paymentId:    mpData.id,
+    qrCodeBase64: txData.qr_code_base64,
+    qrCode:       txData.qr_code,
+  };
+});
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO 5: mpWebhook
+   Recebida pelo Mercado Pago quando o pagamento
+   muda de status. Atualiza Firestore → PDV reage
+   via onSnapshot sem polling no cliente.
+
+   ⚠️ Pública intencionalmente — o MP chama de fora.
+   A validação é feita pelo paymentId no Firestore.
+───────────────────────────────────────────── */
+exports.mpWebhook = onRequest(
+  { region: "us-central1", cors: false },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).send("Method Not Allowed");
+      return;
+    }
+
+    const { type, data } = req.body || {};
+
+    if (type !== "payment" || !data?.id) {
+      res.status(200).send("OK");
+      return;
+    }
+
+    const paymentId = Number(data.id);
+
+    try {
+      /* Localiza o tenant dono deste pagamento */
+      const snap = await db
+        .collectionGroup("pagamentosQr")
+        .where("paymentId", "==", paymentId)
+        .limit(1)
+        .get();
+
+      if (snap.empty) {
+        res.status(200).send("OK");
+        return;
+      }
+
+      const payDoc    = snap.docs[0];
+      const { tenantUid } = payDoc.data();
+
+      /* Lê token do tenant */
+      const configSnap = await db.doc(`users/${tenantUid}/config/geral`).get();
+      const token      = configSnap.data()?.pagamentos?.mercadopago?.accessToken;
+
+      if (!token) {
+        console.error(`[mpWebhook] Token ausente para tenant ${tenantUid}`);
+        res.status(200).send("OK");
+        return;
+      }
+
+      /* Confirma status diretamente na API do MP */
+      const mpRes  = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+        headers: { "Authorization": `Bearer ${token}` },
+      });
+      const mpData = await mpRes.json();
+
+      const novoStatus = mpData.status || "unknown";
+
+      /* Atualiza Firestore → onSnapshot do PDV reage */
+      await payDoc.ref.update({
+        status:       novoStatus,
+        statusDetail: mpData.status_detail || null,
+        atualizadoEm: FieldValue.serverTimestamp(),
+      });
+
+      console.log(`[mpWebhook] ${paymentId} → ${novoStatus} (tenant: ${tenantUid})`);
+      res.status(200).send("OK");
+
+    } catch (err) {
+      console.error("[mpWebhook] Erro:", err);
+      res.status(200).send("OK"); // sempre 200 pro MP não reenviar em loop
+    }
+  }
+);
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO 6: consultarPagamento
+   Fallback de polling caso o webhook falhe.
+   O ModalQrPix chama a cada 8s como segurança.
+───────────────────────────────────────────── */
+exports.consultarPagamento = onCall(CALL_OPTIONS, async (request) => {
+  const callerUid = request.auth?.uid;
+  if (!callerUid) {
+    throw new HttpsError("unauthenticated", "Usuário não autenticado.");
+  }
+
+  const { tenantUid, paymentId } = request.data;
+
+  if (!tenantUid || !paymentId) {
+    throw new HttpsError("invalid-argument", "tenantUid e paymentId são obrigatórios.");
+  }
+
+  const configSnap = await db.doc(`users/${tenantUid}/config/geral`).get();
+  const token      = configSnap.data()?.pagamentos?.mercadopago?.accessToken;
+
+  if (!token) {
+    throw new HttpsError("failed-precondition", "Token não configurado.");
+  }
+
+  const mpRes  = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  const mpData = await mpRes.json();
+
+  const novoStatus = mpData.status || "unknown";
+
+  /* Sincroniza Firestore também — mantém onSnapshot atualizado */
+  try {
+    await db.doc(`users/${tenantUid}/pagamentosQr/${paymentId}`).update({
+      status:       novoStatus,
+      statusDetail: mpData.status_detail || null,
+      atualizadoEm: FieldValue.serverTimestamp(),
+    });
+  } catch { /* doc pode não existir ainda — sem problema */ }
+
+  return { status: novoStatus, statusDetail: mpData.status_detail || null };
+});
 
 /** Variação percentual entre dois valores. Retorna null se base for 0. */
 function varPct(atual, anterior) {
