@@ -1254,6 +1254,34 @@ export default function Usuarios() {
     try {
       const fn = httpsCallable(getFunctions(), "editarUsuario");
       await fn({ uid: usuarioEditando.uid, nome, cargo: novoCargo, vendedorId });
+
+      // ─────────────────────────────────────────────────────────────────
+      // SYNC BIDIRECIONAL: mantém usuarioId no documento do vendedor em
+      // sincronia com vendedorId no documento do usuário.
+      // Sem isso, Vendedores.jsx exibe "Sem vínculo" para vínculos feitos
+      // por aqui, pois busca por v.usuarioId (nunca preenchido via Usuarios).
+      // ─────────────────────────────────────────────────────────────────
+      const vendedorAnterior = usuarioEditando.vendedorId;
+
+      // 1. Remove vínculo do vendedor anterior (se mudou de vendedor)
+      if (vendedorAnterior && vendedorAnterior !== vendedorId) {
+        try {
+          await updateDoc(doc(db, "users", raiz, "vendedores", vendedorAnterior), {
+            usuarioId: "",
+          });
+        } catch (_) {
+          // Vendedor pode ter sido excluído — não bloqueia o fluxo
+        }
+      }
+
+      // 2. Seta usuarioId no novo vendedor vinculado
+      if (vendedorId) {
+        await updateDoc(doc(db, "users", raiz, "vendedores", vendedorId), {
+          usuarioId: usuarioEditando.uid,
+        });
+      }
+      // ─────────────────────────────────────────────────────────────────
+
       // Salva foto diretamente no documento do usuário (não passa pela CF)
       await updateDoc(doc(db, "users", raiz, "usuarios", usuarioEditando.uid), {
         fotoBase64: fotoBase64 || null,
