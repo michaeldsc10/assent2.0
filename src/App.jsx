@@ -2,31 +2,40 @@
    ASSENT v2.0 — App.jsx
    Dois providers empilhados:
    - AuthProviderCargo (contexts/AuthContext) → RotaProtegida + usePermissao
-   - AuthProvider (components/Auth)           → LoginForm + AppShell
+   - AuthProvider (components/Auth)           → LoginForm (login/resetPassword)
+
+   GATE DE RENDER: usa tenantUid + loadingAuth do AuthContext (application-level),
+   NÃO user/loading do Auth (Firebase-level). Isso evita o flash de dashboard
+   para usuários autenticados no Firebase mas sem registro no Firestore.
    ═══════════════════════════════════════════════════ */
 import "./App.css";
-import { AuthProvider, useAuth }              from "./components/Auth";
-import { AuthProvider as AuthProviderCargo }  from "./contexts/AuthContext";
-import { useAuth as useAuthCargo }            from "./contexts/AuthContext"; // expõe cargo/pro
-import LoginForm        from "./components/LoginForm";
-import BrandAnimation   from "./components/BrandAnimation";
-import Dashboard        from "./Dashboard";
-import AnnouncementModal from "./components/AnnouncementModal"; // ← NOVO
+import { AuthProvider, useAuth }             from "./components/Auth";
+import { AuthProvider as AuthProviderCargo } from "./contexts/AuthContext";
+import { useAuth as useAuthCargo }           from "./contexts/AuthContext";
+import LoginForm         from "./components/LoginForm";
+import BrandAnimation    from "./components/BrandAnimation";
+import Dashboard         from "./Dashboard";
+import AnnouncementModal from "./components/AnnouncementModal";
 
 /* ─────────────────────────────────────────
    Shell do app — decide o que renderizar
-   e injeta o modal de anúncio
 ───────────────────────────────────────── */
 function AppShell() {
-  const { user, loading } = useAuth(); // components/Auth → autenticação
-  const { cargo }         = useAuthCargo(); // contexts/AuthContext → cargo/plano
+  // components/Auth: só usamos `loading` para saber se o Firebase Auth
+  // já inicializou. Não usamos `user` para o gate de render.
+  const { loading } = useAuth();
 
-  /* Determina o plano do usuário para filtrar destinatários do anúncio.
-     Ajuste a lógica conforme o campo que indica PRO no seu AuthContext.
-     Exemplos: cargo === "pro", licenca?.pro === true, etc. */
+  // contexts/AuthContext: source of truth para autenticação no nível de aplicação.
+  // tenantUid só é preenchido após carregarPerfil validar o usuário no Firestore.
+  const { tenantUid, loadingAuth, cargo } = useAuthCargo();
+
+  // Plano do usuário para filtrar destinatários do AnnouncementModal
   const userPlan = cargo === "pro" ? "pro" : "free";
 
-  if (loading) {
+  // ── Aguarda AMBOS os sistemas resolverem antes de qualquer decisão ──
+  // loadingAuth cobre o caso principal (carregarPerfil em andamento).
+  // loading cobre o instante inicial em que o Firebase Auth ainda não disparou.
+  if (loading || loadingAuth) {
     return (
       <div
         style={{
@@ -44,11 +53,14 @@ function AppShell() {
     );
   }
 
-  if (user) {
+  // ── Gate em tenantUid, não em user ──────────────────────────────────
+  // tenantUid só existe quando o Firestore confirmou que o usuário tem
+  // perfil válido (admin/licença/convidado ativo). Isso elimina o flash
+  // de dashboard para usuários com conta Firebase mas sem registro.
+  if (tenantUid) {
     return (
       <>
         <Dashboard />
-        {/* Modal de anúncio: aparece logo após o login, uma vez por sessão */}
         <AnnouncementModal userPlan={userPlan} />
       </>
     );
@@ -71,8 +83,8 @@ function AppShell() {
 ───────────────────────────────────────── */
 function App() {
   return (
-    <AuthProviderCargo>   {/* fornece cargo/podeVer → RotaProtegida + usePermissao */}
-      <AuthProvider>      {/* fornece user/login/logout → LoginForm + AppShell */}
+    <AuthProviderCargo>   {/* fornece tenantUid/cargo/loadingAuth → gate de render */}
+      <AuthProvider>      {/* fornece login/resetPassword → LoginForm */}
         <AppShell />
       </AuthProvider>
     </AuthProviderCargo>
