@@ -1050,7 +1050,7 @@ export default function PDV({ onVoltar }) {
           taxaPct:        0,
           valorTaxa:      0,
           totalLiquido:   Number(total)       || 0,
-          data:           new Date().toISOString().slice(0, 10),
+          data:           (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })(),
           cliente:        cliente?.nome  || null,
           clienteId:      cliente?.id   || null,
           status:         "ativa",
