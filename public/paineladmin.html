@@ -934,6 +934,101 @@ th.sortable.sort-desc::after { content: ' ↓'; color: var(--gold); }
 .log-detalhe { font-size: 11px; color: var(--text2); margin-top: 3px; font-family: 'IBM Plex Mono', monospace; }
 .log-empty { text-align: center; padding: 60px 20px; color: var(--text3); font-size: 12px; font-family: 'IBM Plex Mono', monospace; }
 
+/* ════════════════════════════════════════
+   MODAL NOTIFICAÇÃO INDIVIDUAL
+════════════════════════════════════════ */
+#notifIndividualModal {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.8); backdrop-filter: blur(10px);
+  z-index: 400; align-items: flex-start; justify-content: center;
+  padding: 40px 16px;
+}
+#notifIndividualModal.open { display: flex; }
+.notif-ind-box {
+  background: var(--surface); border: 1px solid var(--border2);
+  border-radius: 20px; width: 100%; max-width: 560px;
+  max-height: calc(100vh - 80px); display: flex; flex-direction: column;
+  box-shadow: 0 40px 100px rgba(0,0,0,.6); position: relative; overflow: hidden;
+}
+.notif-ind-box::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+.notif-ind-head {
+  padding: 22px 26px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px; flex-shrink: 0;
+}
+.notif-ind-head-info { flex: 1; min-width: 0; }
+.notif-ind-head-title { font-size: 15px; font-weight: 700; }
+.notif-ind-head-sub {
+  font-size: 11px; color: var(--gold); font-family: 'IBM Plex Mono', monospace;
+  margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.notif-ind-close {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--surface2); border: 1px solid var(--border2);
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 13px; color: var(--text2); transition: all .15s; flex-shrink: 0;
+}
+.notif-ind-close:hover { border-color: var(--gold); color: var(--text); }
+.notif-ind-tabs {
+  display: flex; gap: 0; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.notif-ind-tab {
+  flex: 1; padding: 14px 20px; background: transparent; border: none;
+  color: var(--text2); font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .15s; position: relative; border-bottom: 2px solid transparent;
+}
+.notif-ind-tab.active { color: var(--gold); border-bottom-color: var(--gold); }
+.notif-ind-tab:hover:not(.active) { color: var(--text); background: var(--surface2); }
+.notif-ind-body { flex: 1; overflow-y: auto; padding: 24px 26px; }
+.notif-ind-panel { display: none; }
+.notif-ind-panel.active { display: block; }
+.notif-ind-footer {
+  padding: 16px 26px; border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 14px; flex-shrink: 0;
+}
+.btn-send-ind {
+  padding: 12px 28px;
+  background: linear-gradient(135deg, var(--gold-dark), var(--gold));
+  border: none; border-radius: 10px;
+  color: #050505; font-family: 'Syne', sans-serif;
+  font-size: 13px; font-weight: 700; letter-spacing: 1.5px;
+  cursor: pointer; transition: opacity .2s, transform .1s; text-transform: uppercase;
+}
+.btn-send-ind:hover { opacity: .88; }
+.btn-send-ind:active { transform: scale(.99); }
+.btn-send-ind:disabled { opacity: .5; cursor: not-allowed; }
+.notif-ind-user-card {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 12px; margin-bottom: 20px;
+}
+.notif-ind-avatar {
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+  object-fit: cover; border: 1.5px solid var(--gold-border);
+}
+.notif-ind-avatar-ph {
+  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+  background: var(--gold-glow); border: 1.5px solid var(--gold-border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 700; color: var(--gold);
+}
+/* Btn na tabela de membros */
+.btn-notif-member {
+  padding: 5px 12px; border-radius: 7px;
+  background: transparent; border: 1px solid var(--border2);
+  color: var(--text2); font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px; font-weight: 700; letter-spacing: .8px;
+  cursor: pointer; text-transform: uppercase;
+  transition: background .15s, border-color .15s, color .15s;
+  flex-shrink: 0; white-space: nowrap;
+}
+.btn-notif-member:hover {
+  background: var(--gold-glow); border-color: var(--gold-border); color: var(--gold);
+}
+
 /* Lista de anúncios */
 .anuncio-list { margin-top: 20px; }
 .anuncio-item {
@@ -1523,6 +1618,111 @@ th.sortable.sort-desc::after { content: ' ↓'; color: var(--gold); }
   </div><!-- /app-layout -->
 </div><!-- /mainApp -->
 
+<!-- MODAL NOTIFICAÇÃO INDIVIDUAL -->
+<div id="notifIndividualModal">
+  <div class="notif-ind-box">
+    <div class="notif-ind-head">
+      <div id="notifIndAvatarWrap">
+        <div class="notif-ind-avatar-ph">?</div>
+      </div>
+      <div class="notif-ind-head-info">
+        <div class="notif-ind-head-title" id="notifIndName">—</div>
+        <div class="notif-ind-head-sub" id="notifIndEmail">—</div>
+      </div>
+      <button class="notif-ind-close" id="notifIndClose">✕</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="notif-ind-tabs">
+      <button class="notif-ind-tab active" id="tabIndNotif" onclick="switchIndTab('notif')">
+        🔔 Notificação
+      </button>
+      <button class="notif-ind-tab" id="tabIndAnuncio" onclick="switchIndTab('anuncio')">
+        📢 Anúncio Modal
+      </button>
+    </div>
+
+    <div class="notif-ind-body">
+
+      <!-- Painel: Notificação -->
+      <div class="notif-ind-panel active" id="indPanelNotif">
+        <div style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-bottom:18px;letter-spacing:.5px">
+          Enviará uma notificação visível somente para este usuário.
+        </div>
+
+        <div class="field-group" style="margin-bottom:16px">
+          <div class="field-label">Título</div>
+          <input class="field-input" id="indNotifTitle" type="text" placeholder="Ex: Novidade exclusiva para você!">
+        </div>
+
+        <div class="field-group" style="margin-bottom:16px">
+          <div class="field-label">Mensagem</div>
+          <textarea class="field-input field-textarea" id="indNotifMsg" placeholder="Descreva a notificação..."></textarea>
+        </div>
+
+        <div class="form-2col">
+          <div class="field-group">
+            <div class="field-label">Texto do Botão <span style="color:var(--text3);font-weight:400">(opcional)</span></div>
+            <input class="field-input" id="indNotifBtnTexto" type="text" placeholder="Ex: Ver agora">
+          </div>
+          <div class="field-group">
+            <div class="field-label">URL do Botão <span style="color:var(--text3);font-weight:400">(opcional)</span></div>
+            <input class="field-input" id="indNotifBtnUrl" type="url" placeholder="https://...">
+          </div>
+        </div>
+      </div>
+
+      <!-- Painel: Anúncio Modal -->
+      <div class="notif-ind-panel" id="indPanelAnuncio">
+        <div style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace;margin-bottom:18px;letter-spacing:.5px">
+          Exibirá um modal ao próximo acesso deste usuário ao sistema.
+        </div>
+
+        <div class="field-group" style="margin-bottom:16px">
+          <div class="field-label">Título</div>
+          <input class="field-input" id="indAnuncioTitle" type="text" placeholder="Ex: Oferta especial para você! 🚀">
+        </div>
+
+        <div class="field-group" style="margin-bottom:16px">
+          <div class="field-label">Mensagem</div>
+          <textarea class="field-input field-textarea" id="indAnuncioMsg" placeholder="Descreva o anúncio de forma clara e objetiva..."></textarea>
+        </div>
+
+        <div class="form-2col">
+          <div class="field-group">
+            <div class="field-label">Texto do Botão <span style="color:var(--text3);font-weight:400">(opcional)</span></div>
+            <input class="field-input" id="indAnuncioBtnTexto" type="text" placeholder="Ex: Aproveitar agora!">
+          </div>
+          <div class="field-group">
+            <div class="field-label">URL do Botão <span style="color:var(--text3);font-weight:400">(opcional)</span></div>
+            <input class="field-input" id="indAnuncioBtnUrl" type="url" placeholder="https://...">
+          </div>
+        </div>
+
+        <div class="field-group" style="margin-top:16px">
+          <div class="field-label">Imagem <span style="color:var(--text3);font-weight:400">(opcional)</span></div>
+          <div id="indAnuncioImgArea" class="img-upload-area">
+            <input type="file" id="indAnuncioImgInput" accept="image/jpeg,image/png,image/gif,image/webp">
+            <div class="img-upload-icon">🖼</div>
+            <div class="img-upload-label">Clique ou arraste uma imagem</div>
+            <div class="img-upload-sub">JPG, PNG, WebP — máx. 800KB recomendado</div>
+          </div>
+          <div id="indImgThumbWrap" style="display:none;margin-top:10px;position:relative;display:none">
+            <img id="indImgThumb" class="img-thumb" src="" alt="">
+            <button class="img-remove-btn" id="indImgRemoveBtn" title="Remover">✕</button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /notif-ind-body -->
+
+    <div class="notif-ind-footer">
+      <button class="btn-send-ind" id="btnSendIndividual">📨 Enviar</button>
+      <span class="feedback-msg" id="indFeedback"></span>
+    </div>
+  </div>
+</div>
+
 <!-- LOG MODAL -->
 <div id="logModal">
   <div class="log-modal-box">
@@ -2082,6 +2282,7 @@ function mountTable(containerId, list) {
         <th>CNPJ</th>
         ${thSort('Status',   'status')}
         ${thSort('Cadastro', 'criadoEm')}
+        <th>Ação</th>
       </tr></thead>
       <tbody>
         ${list.map(m => `
@@ -2106,6 +2307,11 @@ function mountTable(containerId, list) {
               : '<span class="free-badge">FREE</span>'
             }</td>
             <td class="mono-sm">${m.criadoEm ? fmtDate(m.criadoEm) : '—'}</td>
+            <td onclick="event.stopPropagation()">
+              <button class="btn-notif-member" onclick="openNotifIndividualByUid('${m.uid}')">
+                📨 Notificar
+              </button>
+            </td>
           </tr>`).join('')}
       </tbody>
     </table>`;
@@ -3138,6 +3344,188 @@ document.getElementById('logModal').addEventListener('click', e => {
 document.getElementById('logEntrySearch').addEventListener('input', e => {
   logEntrySearchQ = e.target.value.toLowerCase().trim();
   renderLogEntries();
+});
+
+// ══════════════════════════════════════════════
+//  MODAL DE NOTIFICAÇÃO / ANÚNCIO INDIVIDUAL
+// ══════════════════════════════════════════════
+let indCurrentMember = null;
+let indCurrentTab    = 'notif'; // 'notif' | 'anuncio'
+let indImgBase64     = '';
+
+function openNotifIndividualByUid(uid) {
+  const m = allMembers.find(x => x.uid === uid);
+  if (m) openNotifIndividual(m);
+}
+
+function openNotifIndividual(m) {
+  indCurrentMember = m;
+  indImgBase64 = '';
+
+  // Avatar — usa wrapper para evitar problema de outerHTML com referência perdida
+  const avatarContainer = document.getElementById('notifIndAvatarWrap');
+  if (m.foto) {
+    avatarContainer.innerHTML = `<img class="notif-ind-avatar" src="${m.foto}" alt="">`;
+  } else {
+    avatarContainer.innerHTML = `<div class="notif-ind-avatar-ph">${(m.name||'?')[0].toUpperCase()}</div>`;
+  }
+
+  document.getElementById('notifIndName').textContent  = m.name  || '—';
+  document.getElementById('notifIndEmail').textContent = m.email || '—';
+
+  // Limpar campos
+  ['indNotifTitle','indNotifMsg','indNotifBtnTexto','indNotifBtnUrl',
+   'indAnuncioTitle','indAnuncioMsg','indAnuncioBtnTexto','indAnuncioBtnUrl'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  // Reset imagem
+  document.getElementById('indAnuncioImgArea').style.display = '';
+  document.getElementById('indImgThumbWrap').style.display   = 'none';
+  document.getElementById('indImgThumb').src = '';
+  document.getElementById('indAnuncioImgInput').value = '';
+
+  // Reset tabs
+  switchIndTab('notif');
+
+  document.getElementById('notifIndividualModal').classList.add('open');
+}
+
+function closeNotifIndividual() {
+  document.getElementById('notifIndividualModal').classList.remove('open');
+  indCurrentMember = null;
+}
+
+function switchIndTab(tab) {
+  indCurrentTab = tab;
+  document.getElementById('indPanelNotif').classList.toggle('active',   tab === 'notif');
+  document.getElementById('indPanelAnuncio').classList.toggle('active', tab === 'anuncio');
+  document.getElementById('tabIndNotif').classList.toggle('active',     tab === 'notif');
+  document.getElementById('tabIndAnuncio').classList.toggle('active',   tab === 'anuncio');
+  const btn = document.getElementById('btnSendIndividual');
+  btn.textContent = tab === 'notif' ? '📨 Enviar Notificação' : '📢 Publicar Anúncio';
+}
+
+// Upload de imagem no modal individual
+document.getElementById('indAnuncioImgInput').addEventListener('change', async function() {
+  const file = this.files[0];
+  if (!file) return;
+  try {
+    const b64 = await comprimirImagem(file);
+    indImgBase64 = b64;
+    document.getElementById('indImgThumb').src = b64;
+    document.getElementById('indImgThumbWrap').style.display = 'block';
+    document.getElementById('indAnuncioImgArea').style.display = 'none';
+  } catch(e) { alert('Erro ao processar imagem.'); }
+});
+
+document.getElementById('indImgRemoveBtn').addEventListener('click', () => {
+  indImgBase64 = '';
+  document.getElementById('indImgThumb').src = '';
+  document.getElementById('indImgThumbWrap').style.display = 'none';
+  document.getElementById('indAnuncioImgArea').style.display = '';
+  document.getElementById('indAnuncioImgInput').value = '';
+});
+
+// Arrastar imagem
+const indImgArea = document.getElementById('indAnuncioImgArea');
+indImgArea.addEventListener('dragover', e => { e.preventDefault(); indImgArea.classList.add('drag-over'); });
+indImgArea.addEventListener('dragleave', () => indImgArea.classList.remove('drag-over'));
+indImgArea.addEventListener('drop', async e => {
+  e.preventDefault(); indImgArea.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) {
+    try {
+      const b64 = await comprimirImagem(file);
+      indImgBase64 = b64;
+      document.getElementById('indImgThumb').src = b64;
+      document.getElementById('indImgThumbWrap').style.display = 'block';
+      document.getElementById('indAnuncioImgArea').style.display = 'none';
+    } catch(e) { alert('Erro ao processar imagem.'); }
+  }
+});
+
+// Enviar
+document.getElementById('btnSendIndividual').addEventListener('click', async () => {
+  if (!indCurrentMember) return;
+  const fb  = document.getElementById('indFeedback');
+  const btn = document.getElementById('btnSendIndividual');
+
+  if (indCurrentTab === 'notif') {
+    const titulo   = document.getElementById('indNotifTitle').value.trim();
+    const mensagem = document.getElementById('indNotifMsg').value.trim();
+    const btnTexto = document.getElementById('indNotifBtnTexto').value.trim();
+    const btnUrl   = document.getElementById('indNotifBtnUrl').value.trim();
+    if (!titulo || !mensagem) {
+      showFeedback(fb, 'Preencha título e mensagem.', 'var(--danger)'); return;
+    }
+    if (btnUrl && !btnUrl.startsWith('http')) {
+      showFeedback(fb, 'URL inválida.', 'var(--danger)'); return;
+    }
+    const origTxt = btn.textContent;
+    btn.textContent = 'Enviando...'; btn.disabled = true;
+    try {
+      const payload = {
+        titulo, mensagem,
+        destinatario: 'individual',
+        uid: indCurrentMember.uid,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+        criadoPor: auth.currentUser?.uid || ''
+      };
+      if (btnUrl)   payload.btnUrl   = btnUrl;
+      if (btnTexto) payload.btnTexto = btnTexto;
+      await db.collection('notificacoesAG').add(payload);
+      showFeedback(fb, '✓ Notificação enviada!', 'var(--success)');
+      setTimeout(closeNotifIndividual, 1800);
+      loadNotifications();
+    } catch(e) {
+      showFeedback(fb, 'Erro ao enviar.', 'var(--danger)');
+    } finally {
+      btn.textContent = origTxt; btn.disabled = false;
+    }
+
+  } else {
+    // Anúncio individual
+    const titulo   = document.getElementById('indAnuncioTitle').value.trim();
+    const mensagem = document.getElementById('indAnuncioMsg').value.trim();
+    const btnTexto = document.getElementById('indAnuncioBtnTexto').value.trim();
+    const btnUrl   = document.getElementById('indAnuncioBtnUrl').value.trim();
+    if (!titulo || !mensagem) {
+      showFeedback(fb, 'Preencha título e mensagem.', 'var(--danger)'); return;
+    }
+    if (btnUrl && !btnUrl.startsWith('http')) {
+      showFeedback(fb, 'URL inválida.', 'var(--danger)'); return;
+    }
+    const origTxt = btn.textContent;
+    btn.textContent = 'Publicando...'; btn.disabled = true;
+    try {
+      const payload = {
+        titulo, mensagem,
+        destinatario: 'individual',
+        uid: indCurrentMember.uid,
+        ativo: true,
+        criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+        criadoPor: auth.currentUser?.uid || ''
+      };
+      if (btnTexto) payload.btnTexto = btnTexto;
+      if (btnUrl)   payload.btnUrl   = btnUrl;
+      if (indImgBase64) payload.imageUrl = indImgBase64;
+      await db.collection('anunciosAG').add(payload);
+      showFeedback(fb, '✓ Anúncio publicado!', 'var(--success)');
+      setTimeout(closeNotifIndividual, 1800);
+      loadAnuncios();
+    } catch(e) {
+      showFeedback(fb, 'Erro ao publicar.', 'var(--danger)');
+      console.error(e);
+    } finally {
+      btn.textContent = origTxt; btn.disabled = false;
+    }
+  }
+});
+
+document.getElementById('notifIndClose').addEventListener('click', closeNotifIndividual);
+document.getElementById('notifIndividualModal').addEventListener('click', e => {
+  if (e.target.id === 'notifIndividualModal') closeNotifIndividual();
 });
 
 // ══════════════════════════════════════════════
