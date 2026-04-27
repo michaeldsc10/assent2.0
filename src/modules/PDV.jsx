@@ -1455,12 +1455,13 @@ export default function PDV({ onVoltar }) {
               <span className="pdv-carrinho-count">{carrinho.length} iten{carrinho.length !== 1 ? "s" : ""}</span>
             </div>
 
-            {/* ── Último produto adicionado ── */}
+            {/* ── Último produto adicionado — card vertical ── */}
             {carrinho.length > 0 && (() => {
               const ultimo = carrinho[carrinho.length - 1];
               const foto = ultimo?.produto?.foto || null;
               return (
                 <div className="pdv-ultimo-produto">
+                  {/* Fundo desfocado com a própria foto */}
                   {foto ? (
                     <div
                       className="pdv-ultimo-produto-bg"
@@ -1474,13 +1475,14 @@ export default function PDV({ onVoltar }) {
                   )}
                   <div className="pdv-ultimo-produto-grad" />
                   <span className="pdv-ultimo-produto-qty">×{ultimo.qty}</span>
+                  {/* Conteúdo vertical: foto grande centralizada + nome + preço */}
                   <div className="pdv-ultimo-produto-content">
                     <div className="pdv-ultimo-produto-foto">
                       {foto ? (
                         <img src={foto} alt={ultimo.produto.nome} draggable={false} />
                       ) : (
                         <div className="pdv-ultimo-produto-foto-placeholder">
-                          <Package size={28} />
+                          <Package size={36} />
                         </div>
                       )}
                     </div>
@@ -1490,7 +1492,7 @@ export default function PDV({ onVoltar }) {
                         {ultimo.produto.nome}
                       </span>
                       <span className="pdv-ultimo-produto-preco">
-                        {fmt(ultimo.precoUnit)} / un
+                        {fmt(ultimo.precoUnit)}
                       </span>
                     </div>
                   </div>
@@ -2080,15 +2082,14 @@ const CSS = `
 .cupom-empresa { font-size: 13px; font-weight: bold; text-align: center; margin-bottom: 2px; }
 .cupom-sub { font-size: 10px; color: #666; text-align: center; }
 /* ═══════════════════════════════════
-   ÚLTIMO PRODUTO ADICIONADO
+   ÚLTIMO PRODUTO ADICIONADO — card vertical
    ═══════════════════════════════════ */
 .pdv-ultimo-produto {
   position: relative;
   overflow: hidden;
-  margin: 0;
   flex-shrink: 0;
-  min-height: 160px;
-  max-height: 220px;
+  width: 100%;
+  height: 260px;
   display: flex;
   align-items: flex-end;
   border-bottom: 1px solid rgba(255,255,255,0.07);
@@ -2108,29 +2109,30 @@ const CSS = `
   inset: 0;
   background: linear-gradient(
     to bottom,
-    rgba(10,10,18,0.15) 0%,
-    rgba(10,10,18,0.55) 50%,
-    rgba(10,10,18,0.92) 100%
+    rgba(10,10,18,0.05) 0%,
+    rgba(10,10,18,0.4) 45%,
+    rgba(10,10,18,0.95) 100%
   );
 }
 .pdv-ultimo-produto-content {
   position: relative;
   z-index: 2;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
+  gap: 10px;
+  padding: 16px 16px 14px;
   width: 100%;
   animation: pdvUltimoIn .25s ease;
 }
 .pdv-ultimo-produto-foto {
-  width: 64px;
-  height: 64px;
+  width: 96px;
+  height: 96px;
   flex-shrink: 0;
-  border-radius: 10px;
+  border-radius: 14px;
   overflow: hidden;
-  border: 1.5px solid rgba(255,255,255,0.15);
-  box-shadow: 0 4px 20px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.08) inset;
+  border: 2px solid rgba(255,255,255,0.18);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.7), 0 1px 0 rgba(255,255,255,0.1) inset;
   background: rgba(255,255,255,0.06);
   display: flex;
   align-items: center;
@@ -2150,11 +2152,12 @@ const CSS = `
   color: rgba(255,255,255,0.2);
 }
 .pdv-ultimo-produto-info {
-  flex: 1;
-  min-width: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
 }
 .pdv-ultimo-produto-label {
   font-size: 9px;
@@ -2172,13 +2175,15 @@ const CSS = `
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
   text-shadow: 0 1px 8px rgba(0,0,0,0.8);
 }
 .pdv-ultimo-produto-preco {
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 800;
   color: var(--pdv-gold, #c8a55e);
-  opacity: 0.9;
+  letter-spacing: -.01em;
+  text-shadow: 0 1px 10px rgba(0,0,0,0.8);
 }
 .pdv-ultimo-produto-qty {
   position: absolute;
