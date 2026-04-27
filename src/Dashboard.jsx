@@ -54,7 +54,7 @@ import { usePermissao } from "./hooks/usePermissao";
 /* ── Firebase ──────────────────────────────────── */
 import { db, logout } from "./lib/firebase";
 import { useAuth } from "./contexts/AuthContext";
-import { doc, onSnapshot, collection, query, orderBy, limit } from "firebase/firestore";
+import { doc, onSnapshot, collection, query, orderBy, limit, where, getDocs, updateDoc } from "firebase/firestore";
 
 /* ── Hooks de dados ────────────────────────────── */
 import { useDashboardData, fmtR$, fmtData } from "./hooks/useDashboardData";
@@ -1167,6 +1167,7 @@ export default function Dashboard() {
   );
   const [notifDespesas, setNotifDespesas] = useState([]);
   const [notifInsights, setNotifInsights] = useState([]);
+  const [anuncioModal,  setAnuncioModal]  = useState(null);  // { id, titulo, mensagem, imageUrl, btnTexto, btnUrl }
   const notifRef = useRef(null);
   const [theme, setTheme] = useState(
     () => localStorage.getItem("ag_theme") || "dark"
@@ -1212,11 +1213,13 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     const unsub = onSnapshot(qOrdered, (snap) => {
       const todas = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       const filtradas = todas.filter((n) => {
-        // Filtro de plano
+        // Filtro de destinatário
         const planOk =
           n.destinatario === "todos" ||
           (n.destinatario === "pro"  && isPro) ||
-          (n.destinatario === "free" && !isPro);
+          (n.destinatario === "free" && !isPro) ||
+          // Notificação individual: verifica se é para este tenant/usuário
+          (n.destinatario === "individual" && (n.destinatarioUid === tenantUid || n.uid === tenantUid));
         if (!planOk) return false;
         // Filtro de 7 dias — ignora notificações antigas para o usuário
         const data = n.criadoEm?.toDate ? n.criadoEm.toDate() : null;
@@ -1227,6 +1230,84 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     }, () => {/* silencia erros de permissão */});
     return unsub;
   }, [tenantUid, isPro]);
+
+  /* ── Anúncios Modais — busca ao entrar, mostra o mais recente ativo ── */
+  useEffect(() => {
+    if (!tenantUid) return;
+
+    // Chave de sessão: evita re-exibir o mesmo anúncio na mesma sessão
+    const SESSAO_KEY = "ag_anuncios_vistos_sessao";
+    let vistos;
+    try { vistos = new Set(JSON.parse(sessionStorage.getItem(SESSAO_KEY) || "[]")); }
+    catch { vistos = new Set(); }
+
+    async function buscarAnuncio() {
+      try {
+        // 1. Busca anúncios individuais para este usuário
+        const qInd = query(
+          collection(db, "anunciosAG"),
+          where("destinatario", "==", "individual"),
+          where("destinatarioUid", "==", tenantUid),
+          where("ativo", "==", true),
+          orderBy("criadoEm", "desc"),
+          limit(5)
+        );
+        const snapInd = await getDocs(qInd);
+
+        // 2. Busca anúncios globais (todos / pro / free)
+        const qGlobal = query(
+          collection(db, "anunciosAG"),
+          where("ativo", "==", true),
+          orderBy("criadoEm", "desc"),
+          limit(10)
+        );
+        const snapGlobal = await getDocs(qGlobal);
+
+        // Candidatos individuais têm prioridade
+        const candidatos = [
+          ...snapInd.docs.map(d => ({ id: d.id, ...d.data(), _prioridade: 1 })),
+          ...snapGlobal.docs
+            .map(d => ({ id: d.id, ...d.data(), _prioridade: 0 }))
+            .filter(d =>
+              d.destinatario === "todos" ||
+              (d.destinatario === "pro"  && isPro) ||
+              (d.destinatario === "free" && !isPro)
+            ),
+        ];
+
+        // Filtra os já vistos nesta sessão
+        const naoVistos = candidatos.filter(a => !vistos.has(a.id));
+        if (!naoVistos.length) return;
+
+        // Mostra o mais recente / de maior prioridade
+        naoVistos.sort((a, b) => {
+          if (b._prioridade !== a._prioridade) return b._prioridade - a._prioridade;
+          const ta = a.criadoEm?.toDate ? a.criadoEm.toDate().getTime() : 0;
+          const tb = b.criadoEm?.toDate ? b.criadoEm.toDate().getTime() : 0;
+          return tb - ta;
+        });
+
+        setAnuncioModal(naoVistos[0]);
+      } catch(e) {
+        console.warn("Erro ao buscar anúncios:", e);
+      }
+    }
+
+    buscarAnuncio();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantUid, isPro]);
+
+  const fecharAnuncioModal = () => {
+    if (!anuncioModal) return;
+    // Marca como visto na sessão
+    const SESSAO_KEY = "ag_anuncios_vistos_sessao";
+    let vistos;
+    try { vistos = new Set(JSON.parse(sessionStorage.getItem(SESSAO_KEY) || "[]")); }
+    catch { vistos = new Set(); }
+    vistos.add(anuncioModal.id);
+    sessionStorage.setItem(SESSAO_KEY, JSON.stringify([...vistos]));
+    setAnuncioModal(null);
+  };
 
   /* ── Notificações automáticas de despesas próximas do vencimento ── */
   useEffect(() => {
@@ -2806,6 +2887,115 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         )}
 
       </div>
+
+      {/* ── MODAL DE ANÚNCIO ── */}
+      {anuncioModal && (
+        <div
+          onClick={fecharAnuncioModal}
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(0,0,0,0.78)", backdropFilter: "blur(10px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "24px 16px", animation: "ag-anuncio-fadein .25s ease",
+          }}
+        >
+          <style>{`
+            @keyframes ag-anuncio-fadein {
+              from { opacity: 0; }
+              to   { opacity: 1; }
+            }
+            @keyframes ag-anuncio-slidein {
+              from { opacity: 0; transform: translateY(24px) scale(.97); }
+              to   { opacity: 1; transform: translateY(0) scale(1); }
+            }
+          `}</style>
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: "var(--s1)", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: 20, width: "100%", maxWidth: 420,
+              overflow: "hidden", position: "relative",
+              boxShadow: "0 32px 80px rgba(0,0,0,0.6)",
+              animation: "ag-anuncio-slidein .28s cubic-bezier(0.4,0,0.2,1)",
+            }}
+          >
+            {/* Linha dourada topo */}
+            <div style={{
+              position: "absolute", top: 0, left: 0, right: 0, height: 2,
+              background: "linear-gradient(90deg, transparent, var(--gold), transparent)",
+            }} />
+
+            {/* Botão fechar */}
+            <button
+              onClick={fecharAnuncioModal}
+              style={{
+                position: "absolute", top: 12, right: 12, zIndex: 2,
+                width: 30, height: 30, borderRadius: "50%",
+                background: "rgba(0,0,0,0.4)", border: "1px solid rgba(255,255,255,0.12)",
+                color: "rgba(255,255,255,0.7)", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 14, lineHeight: 1, transition: "background .15s",
+              }}
+              onMouseOver={e => e.currentTarget.style.background = "rgba(0,0,0,0.65)"}
+              onMouseOut={e => e.currentTarget.style.background = "rgba(0,0,0,0.4)"}
+            >✕</button>
+
+            {/* Imagem (se houver) */}
+            {anuncioModal.imageUrl && (
+              <div style={{ width: "100%", maxHeight: 220, overflow: "hidden", background: "var(--s2)" }}>
+                <img
+                  src={anuncioModal.imageUrl}
+                  alt=""
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", maxHeight: 220 }}
+                />
+              </div>
+            )}
+
+            {/* Conteúdo */}
+            <div style={{ padding: "24px 22px 22px" }}>
+              <div style={{
+                fontSize: 17, fontWeight: 700, color: "var(--text)",
+                lineHeight: 1.3, marginBottom: 10,
+              }}>
+                {anuncioModal.titulo}
+              </div>
+              <div style={{
+                fontSize: 13, color: "var(--text-2)",
+                lineHeight: 1.6, marginBottom: anuncioModal.btnTexto ? 20 : 0,
+              }}>
+                {anuncioModal.mensagem}
+              </div>
+
+              {/* Botão CTA */}
+              {anuncioModal.btnTexto && (
+                <a
+                  href={anuncioModal.btnUrl || "#"}
+                  target={anuncioModal.btnUrl ? "_blank" : undefined}
+                  rel="noopener noreferrer"
+                  onClick={fecharAnuncioModal}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    width: "100%", padding: "13px 20px",
+                    background: "linear-gradient(135deg, #B8860B 0%, #D4AF37 60%, #F0D060 100%)",
+                    border: "none", borderRadius: 10,
+                    color: "#0a0808", fontFamily: "'DM Sans', sans-serif",
+                    fontSize: 13, fontWeight: 700, letterSpacing: "0.08em",
+                    cursor: "pointer", textDecoration: "none", textTransform: "uppercase",
+                    boxShadow: "0 4px 20px rgba(212,175,55,0.35)",
+                    transition: "opacity .2s, transform .1s",
+                  }}
+                  onMouseOver={e => { e.currentTarget.style.opacity = ".88"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                  onMouseOut={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "translateY(0)"; }}
+                >
+                  {anuncioModal.btnTexto}
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </>
   );
 }
