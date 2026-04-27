@@ -581,6 +581,34 @@ tbody tr:hover { background: var(--surface2); }
 .tl-date { font-size: 11px; color: var(--text3); font-family: 'IBM Plex Mono', monospace; margin-top: 3px; }
 
 /* ════════════════════════════════════════
+   SORT HEADERS
+════════════════════════════════════════ */
+th.sortable {
+  cursor: pointer; user-select: none;
+  transition: color .15s;
+  white-space: nowrap;
+}
+th.sortable:hover { color: var(--gold); }
+th.sortable.sort-asc::after  { content: ' ↑'; color: var(--gold); }
+th.sortable.sort-desc::after { content: ' ↓'; color: var(--gold); }
+
+/* ════════════════════════════════════════
+   FIELD FILTER
+════════════════════════════════════════ */
+.field-filter-wrap {
+  display: flex; gap: 4px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 3px;
+}
+.field-filter-btn {
+  padding: 4px 10px; border-radius: 5px; border: none; background: transparent;
+  color: var(--text2); font-size: 10px; font-weight: 600;
+  font-family: 'IBM Plex Mono', monospace; cursor: pointer; transition: all .15s;
+  letter-spacing: .5px;
+}
+.field-filter-btn.active { background: var(--gold); color: #050505; }
+
+/* ════════════════════════════════════════
    UTILS
 ════════════════════════════════════════ */
 .loading {
@@ -1218,7 +1246,12 @@ tbody tr:hover { background: var(--surface2); }
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
                   </svg>
-                  <input class="local-search-input" id="membersSearch" type="text" placeholder="Buscar por nome, email ou empresa...">
+                  <input class="local-search-input" id="membersSearch" type="text" placeholder="Buscar...">
+                </div>
+                <div class="field-filter-wrap" id="memberFieldFilter">
+                  <button class="field-filter-btn active" data-field="all">Tudo</button>
+                  <button class="field-filter-btn" data-field="name">Nome</button>
+                  <button class="field-filter-btn" data-field="email">E-mail</button>
                 </div>
                 <div class="filter-pills">
                   <button class="filter-pill active" data-filter="all">Todos</button>
@@ -1657,6 +1690,9 @@ let timeDays        = 30;   // 0 = tudo
 let memberFilter    = 'all';
 let searchQ         = '';
 let membersLocalSearch = '';
+let membersFieldFilter = 'all'; // 'all' | 'name' | 'email'
+let membersSortKey  = 'criadoEm'; // coluna ativa de sort
+let membersSortDir  = 'desc';     // 'asc' | 'desc'
 let logsSearch      = '';
 let chartPeriodMo   = 6;
 let selectedDest    = 'todos';
@@ -1732,6 +1768,19 @@ document.getElementById('searchInput').addEventListener('input', e => {
 // Busca local dentro da aba Membros
 document.getElementById('membersSearch').addEventListener('input', e => {
   membersLocalSearch = e.target.value.toLowerCase().trim();
+  renderMembersTable();
+});
+
+// Filtro de campo (Nome / E-mail / Tudo)
+document.getElementById('memberFieldFilter').addEventListener('click', e => {
+  const btn = e.target.closest('.field-filter-btn');
+  if (!btn) return;
+  document.querySelectorAll('#memberFieldFilter .field-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  membersFieldFilter = btn.dataset.field;
+  // Atualiza placeholder conforme campo selecionado
+  const placeholders = { all: 'Buscar...', name: 'Buscar por nome...', email: 'Buscar por e-mail...' };
+  document.getElementById('membersSearch').placeholder = placeholders[membersFieldFilter];
   renderMembersTable();
 });
 
@@ -1945,16 +1994,33 @@ function renderMembersTable() {
   if (memberFilter === 'pro')  list = list.filter(m => m.pro);
   if (memberFilter === 'free') list = list.filter(m => !m.pro);
   list = bySearch(list); // busca global do topbar
-  // busca local dentro da aba Membros
+  // busca local dentro da aba Membros, com filtro de campo
   if (membersLocalSearch) {
-    list = list.filter(m =>
-      m.name.toLowerCase().includes(membersLocalSearch) ||
-      m.email.toLowerCase().includes(membersLocalSearch) ||
-      (m.nomeEmpresa||'').toLowerCase().includes(membersLocalSearch) ||
-      (m.cnpj||'').includes(membersLocalSearch)
-    );
+    list = list.filter(m => {
+      if (membersFieldFilter === 'name')  return m.name.toLowerCase().includes(membersLocalSearch);
+      if (membersFieldFilter === 'email') return m.email.toLowerCase().includes(membersLocalSearch);
+      // 'all'
+      return (
+        m.name.toLowerCase().includes(membersLocalSearch) ||
+        m.email.toLowerCase().includes(membersLocalSearch) ||
+        (m.nomeEmpresa||'').toLowerCase().includes(membersLocalSearch) ||
+        (m.cnpj||'').includes(membersLocalSearch)
+      );
+    });
   }
-  list.sort((a,b) => (b.criadoEm||0) - (a.criadoEm||0));
+
+  // Ordenação por coluna
+  list.sort((a, b) => {
+    let va, vb;
+    if (membersSortKey === 'name')      { va = (a.name||'').toLowerCase();  vb = (b.name||'').toLowerCase(); }
+    else if (membersSortKey === 'email'){ va = (a.email||'').toLowerCase(); vb = (b.email||'').toLowerCase(); }
+    else if (membersSortKey === 'status'){ va = a.pro ? 1 : 0; vb = b.pro ? 1 : 0; }
+    else { va = a.criadoEm||0; vb = b.criadoEm||0; } // 'criadoEm'
+    if (va < vb) return membersSortDir === 'asc' ? -1 : 1;
+    if (va > vb) return membersSortDir === 'asc' ?  1 : -1;
+    return 0;
+  });
+
   mountTable('membersTable', list);
 }
 
@@ -1998,11 +2064,24 @@ function mountTable(containerId, list) {
   if (!list.length) {
     el.innerHTML = '<div class="empty">Nenhum membro encontrado</div>'; return;
   }
+
+  // Cabeçalhos com ordenação (só na tabela principal de membros)
+  const isMembersTable = containerId === 'membersTable';
+  function thSort(label, key) {
+    if (!isMembersTable) return `<th>${label}</th>`;
+    const isActive = membersSortKey === key;
+    const cls = `sortable${isActive ? ' sort-' + membersSortDir : ''}`;
+    return `<th class="${cls}" data-sort="${key}">${label}</th>`;
+  }
+
   el.innerHTML = `
     <table>
       <thead><tr>
-        <th>Membro</th><th>Empresa</th><th>Telefone</th>
-        <th>CNPJ</th><th>Status</th><th>Cadastro</th>
+        ${thSort('Membro',   'name')}
+        <th>Empresa</th><th>Telefone</th>
+        <th>CNPJ</th>
+        ${thSort('Status',   'status')}
+        ${thSort('Cadastro', 'criadoEm')}
       </tr></thead>
       <tbody>
         ${list.map(m => `
@@ -2030,6 +2109,23 @@ function mountTable(containerId, list) {
           </tr>`).join('')}
       </tbody>
     </table>`;
+
+  // Bind sort clicks (apenas na tabela de membros)
+  if (isMembersTable) {
+    el.querySelectorAll('th.sortable').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (membersSortKey === key) {
+          membersSortDir = membersSortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+          membersSortKey = key;
+          membersSortDir = key === 'criadoEm' ? 'desc' : 'asc';
+        }
+        renderMembersTable();
+      });
+    });
+  }
+
   bindTableClicks(el, list);
 }
 
