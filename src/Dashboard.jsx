@@ -54,7 +54,7 @@ import { usePermissao } from "./hooks/usePermissao";
 /* ── Firebase ──────────────────────────────────── */
 import { db, logout } from "./lib/firebase";
 import { useAuth } from "./contexts/AuthContext";
-import { doc, onSnapshot, collection, query, orderBy, limit, where, getDocs, updateDoc } from "firebase/firestore";
+import { doc, onSnapshot, collection, query, orderBy, limit, where, getDocs } from "firebase/firestore";
 
 /* ── Hooks de dados ────────────────────────────── */
 import { useDashboardData, fmtR$, fmtData } from "./hooks/useDashboardData";
@@ -1243,49 +1243,42 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
     async function buscarAnuncio() {
       try {
-        // 1. Busca anúncios individuais para este usuário
-        const qInd = query(
-          collection(db, "anunciosAG"),
-          where("destinatario", "==", "individual"),
-          where("destinatarioUid", "==", tenantUid),
-          where("ativo", "==", true),
-          orderBy("criadoEm", "desc"),
-          limit(5)
-        );
-        const snapInd = await getDocs(qInd);
-
-        // 2. Busca anúncios globais (todos / pro / free)
-        const qGlobal = query(
+        // Busca todos os anúncios ativos — sem orderBy para não precisar de índice composto
+        // Ordenação e filtragem feitas no cliente
+        const qTodos = query(
           collection(db, "anunciosAG"),
           where("ativo", "==", true),
-          orderBy("criadoEm", "desc"),
-          limit(10)
+          limit(30)
         );
-        const snapGlobal = await getDocs(qGlobal);
+        const snap = await getDocs(qTodos);
+        const todos = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-        // Candidatos individuais têm prioridade
+        // Separa individuais (deste usuário) e globais compatíveis com o plano
+        const individuais = todos.filter(d =>
+          d.destinatario === "individual" &&
+          (d.destinatarioUid === tenantUid || d.uid === tenantUid)
+        );
+        const globais = todos.filter(d =>
+          d.destinatario === "todos" ||
+          (d.destinatario === "pro"  && isPro) ||
+          (d.destinatario === "free" && !isPro)
+        );
+
+        // Individuais têm prioridade; dentro de cada grupo, mais recente primeiro
+        const ordenar = (arr) => arr.sort((a, b) => {
+          const ta = a.criadoEm?.toDate ? a.criadoEm.toDate().getTime() : 0;
+          const tb = b.criadoEm?.toDate ? b.criadoEm.toDate().getTime() : 0;
+          return tb - ta;
+        });
+
         const candidatos = [
-          ...snapInd.docs.map(d => ({ id: d.id, ...d.data(), _prioridade: 1 })),
-          ...snapGlobal.docs
-            .map(d => ({ id: d.id, ...d.data(), _prioridade: 0 }))
-            .filter(d =>
-              d.destinatario === "todos" ||
-              (d.destinatario === "pro"  && isPro) ||
-              (d.destinatario === "free" && !isPro)
-            ),
+          ...ordenar(individuais).map(d => ({ ...d, _prioridade: 1 })),
+          ...ordenar(globais).map(d => ({ ...d, _prioridade: 0 })),
         ];
 
         // Filtra os já vistos nesta sessão
         const naoVistos = candidatos.filter(a => !vistos.has(a.id));
         if (!naoVistos.length) return;
-
-        // Mostra o mais recente / de maior prioridade
-        naoVistos.sort((a, b) => {
-          if (b._prioridade !== a._prioridade) return b._prioridade - a._prioridade;
-          const ta = a.criadoEm?.toDate ? a.criadoEm.toDate().getTime() : 0;
-          const tb = b.criadoEm?.toDate ? b.criadoEm.toDate().getTime() : 0;
-          return tb - ta;
-        });
 
         setAnuncioModal(naoVistos[0]);
       } catch(e) {
