@@ -42,6 +42,7 @@ function sanitizarProduto(produto) {
     estoque:      produto.estoque != null ? Number(produto.estoque) : null,
     categoria:    typeof produto.categoria === "string" ? produto.categoria : "",
     unidade:      typeof produto.unidade    === "string" ? produto.unidade   : "",
+    foto:         typeof produto.foto === "string" && produto.foto ? produto.foto : null,
   };
 }
 const fmtNum = (v) =>
@@ -1454,6 +1455,49 @@ export default function PDV({ onVoltar }) {
               <span className="pdv-carrinho-count">{carrinho.length} iten{carrinho.length !== 1 ? "s" : ""}</span>
             </div>
 
+            {/* ── Último produto adicionado ── */}
+            {carrinho.length > 0 && (() => {
+              const ultimo = carrinho[carrinho.length - 1];
+              const foto = ultimo?.produto?.foto || null;
+              return (
+                <div className="pdv-ultimo-produto">
+                  {foto ? (
+                    <div
+                      className="pdv-ultimo-produto-bg"
+                      style={{ backgroundImage: `url(${foto})` }}
+                    />
+                  ) : (
+                    <div
+                      className="pdv-ultimo-produto-bg"
+                      style={{ background: "linear-gradient(135deg,#1a1c28,#0d0e14)" }}
+                    />
+                  )}
+                  <div className="pdv-ultimo-produto-grad" />
+                  <span className="pdv-ultimo-produto-qty">×{ultimo.qty}</span>
+                  <div className="pdv-ultimo-produto-content">
+                    <div className="pdv-ultimo-produto-foto">
+                      {foto ? (
+                        <img src={foto} alt={ultimo.produto.nome} draggable={false} />
+                      ) : (
+                        <div className="pdv-ultimo-produto-foto-placeholder">
+                          <Package size={28} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="pdv-ultimo-produto-info">
+                      <span className="pdv-ultimo-produto-label">Último adicionado</span>
+                      <span className="pdv-ultimo-produto-nome" title={ultimo.produto.nome}>
+                        {ultimo.produto.nome}
+                      </span>
+                      <span className="pdv-ultimo-produto-preco">
+                        {fmt(ultimo.precoUnit)} / un
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Tabela de itens */}
             <div className="pdv-carrinho-body">
               {carrinho.length === 0 ? (
@@ -2035,6 +2079,126 @@ const CSS = `
 .cupom-paper::-webkit-scrollbar-thumb { background: #ccc; border-radius: 2px; }
 .cupom-empresa { font-size: 13px; font-weight: bold; text-align: center; margin-bottom: 2px; }
 .cupom-sub { font-size: 10px; color: #666; text-align: center; }
+/* ═══════════════════════════════════
+   ÚLTIMO PRODUTO ADICIONADO
+   ═══════════════════════════════════ */
+.pdv-ultimo-produto {
+  position: relative;
+  overflow: hidden;
+  margin: 0;
+  flex-shrink: 0;
+  min-height: 160px;
+  max-height: 220px;
+  display: flex;
+  align-items: flex-end;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  background: #0d0e14;
+}
+.pdv-ultimo-produto-bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(22px) brightness(0.45) saturate(1.3);
+  transform: scale(1.12);
+  transition: background-image .35s ease;
+}
+.pdv-ultimo-produto-grad {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(10,10,18,0.15) 0%,
+    rgba(10,10,18,0.55) 50%,
+    rgba(10,10,18,0.92) 100%
+  );
+}
+.pdv-ultimo-produto-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  width: 100%;
+  animation: pdvUltimoIn .25s ease;
+}
+.pdv-ultimo-produto-foto {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1.5px solid rgba(255,255,255,0.15);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.6), 0 1px 0 rgba(255,255,255,0.08) inset;
+  background: rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pdv-ultimo-produto-foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pdv-ultimo-produto-foto-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: rgba(255,255,255,0.2);
+}
+.pdv-ultimo-produto-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pdv-ultimo-produto-label {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--pdv-gold, #c8a55e);
+  opacity: 0.75;
+}
+.pdv-ultimo-produto-nome {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f0f0fa;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.8);
+}
+.pdv-ultimo-produto-preco {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pdv-gold, #c8a55e);
+  opacity: 0.9;
+}
+.pdv-ultimo-produto-qty {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: var(--pdv-gold, #c8a55e);
+  color: #0a0a0a;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 20px;
+  padding: 2px 8px;
+  letter-spacing: .03em;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  z-index: 3;
+}
+@keyframes pdvUltimoIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .cupom-meta { font-size: 10px; color: #777; text-align: center; }
 .cupom-divider { border: none; border-top: 1px dashed #bbb; margin: 7px 0; }
 .cupom-item { display: flex; align-items: baseline; gap: 4px; padding: 2px 0; border-bottom: 1px dotted #ddd; }
