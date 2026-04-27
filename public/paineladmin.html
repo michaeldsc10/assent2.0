@@ -2453,7 +2453,18 @@ function renderNotifList(list) {
   if (!list.length) {
     el.innerHTML = '<div class="empty">Nenhuma notificação enviada ainda</div>'; return;
   }
-  const destTag = { todos: '<span class="tag-all">📢 Todos</span>', pro: '<span class="tag-pro">⭐ PRO</span>', free: '<span class="tag-free">👤 Free</span>' };
+  const destTag = {
+    todos: '<span class="tag-all">📢 Todos</span>',
+    pro:   '<span class="tag-pro">⭐ PRO</span>',
+    free:  '<span class="tag-free">👤 Free</span>'
+  };
+
+  function resolveDestTag(n) {
+    if (n.destinatario !== 'individual') return destTag[n.destinatario] || n.destinatario || '—';
+    const nome  = n.destinatarioNome  || n.destinatarioEmail || n.uid || '?';
+    const email = n.destinatarioEmail ? `<span style="color:var(--text3);font-size:10px;margin-left:4px">(${esc(n.destinatarioEmail)})</span>` : '';
+    return `<span style="color:var(--gold);font-family:'IBM Plex Mono',monospace;font-size:11px">👤 ${esc(nome)}</span>${email}`;
+  }
   el.innerHTML = list.map(n => `
     <div class="notif-item" id="notif-row-${n.id}">
       <div class="notif-dot"></div>
@@ -2468,7 +2479,7 @@ function renderNotifList(list) {
         </div>` : ''}
         <div class="notif-meta">
           ${fmtDateTime(n.criadoEm?.toDate?.() || null)} &nbsp;·&nbsp;
-          Para: ${destTag[n.destinatario] || n.destinatario || '—'}
+          Para: ${resolveDestTag(n)}
         </div>
       </div>
       <button
@@ -3130,6 +3141,10 @@ async function loadAnuncios() {
     }
 
     const destLabel = { todos:'📢 Todos', pro:'⭐ PRO', free:'👤 Free' };
+    function resolveAnuncioDest(d) {
+      if (d.destinatario !== 'individual') return destLabel[d.destinatario] || 'Todos';
+      return `👤 ${d.destinatarioNome || d.destinatarioEmail || d.uid || '?'}`;
+    }
     container.innerHTML = snap.docs.map(doc => {
       const d  = doc.data();
       const id = doc.id;
@@ -3143,7 +3158,7 @@ async function loadAnuncios() {
           <div class="anuncio-item-info">
             <div class="anuncio-item-title">${esc(d.titulo)}</div>
             <div class="anuncio-item-msg">${esc(d.mensagem)}</div>
-            <div class="anuncio-item-meta">${dt} · ${destLabel[d.destinatario]||'Todos'} · Botão: "${esc(d.btnTexto||'Vamos lá!')}"</div>
+            <div class="anuncio-item-meta">${dt} · ${resolveAnuncioDest(d)} · Botão: "${esc(d.btnTexto||'Vamos lá!')}"</div>
           </div>
           <div class="anuncio-item-actions">
             <button class="toggle-pill ${ativo ? 'ativo':'inativo'}"
@@ -3465,21 +3480,32 @@ document.getElementById('btnSendIndividual').addEventListener('click', async () 
     const origTxt = btn.textContent;
     btn.textContent = 'Enviando...'; btn.disabled = true;
     try {
-      const payload = {
+      const ts = firebase.firestore.FieldValue.serverTimestamp();
+      const basePayload = {
         titulo, mensagem,
         destinatario: 'individual',
-        uid: indCurrentMember.uid,
-        criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+        destinatarioUid:  indCurrentMember.uid,
+        destinatarioNome: indCurrentMember.name  || '',
+        destinatarioEmail:indCurrentMember.email || '',
+        criadoEm: ts,
         criadoPor: auth.currentUser?.uid || ''
       };
-      if (btnUrl)   payload.btnUrl   = btnUrl;
-      if (btnTexto) payload.btnTexto = btnTexto;
-      await db.collection('notificacoesAG').add(payload);
+      if (btnUrl)   basePayload.btnUrl   = btnUrl;
+      if (btnTexto) basePayload.btnTexto = btnTexto;
+
+      // 1. Grava na subcoleção do usuário — o app do cliente lê aqui
+      await db.collection('users').doc(indCurrentMember.uid)
+              .collection('notificacoes').add({ ...basePayload, lida: false });
+
+      // 2. Grava no histórico global do painel admin
+      await db.collection('notificacoesAG').add(basePayload);
+
       showFeedback(fb, '✓ Notificação enviada!', 'var(--success)');
       setTimeout(closeNotifIndividual, 1800);
       loadNotifications();
     } catch(e) {
       showFeedback(fb, 'Erro ao enviar.', 'var(--danger)');
+      console.error(e);
     } finally {
       btn.textContent = origTxt; btn.disabled = false;
     }
@@ -3499,18 +3525,28 @@ document.getElementById('btnSendIndividual').addEventListener('click', async () 
     const origTxt = btn.textContent;
     btn.textContent = 'Publicando...'; btn.disabled = true;
     try {
-      const payload = {
+      const ts = firebase.firestore.FieldValue.serverTimestamp();
+      const basePayload = {
         titulo, mensagem,
         destinatario: 'individual',
-        uid: indCurrentMember.uid,
+        destinatarioUid:  indCurrentMember.uid,
+        destinatarioNome: indCurrentMember.name  || '',
+        destinatarioEmail:indCurrentMember.email || '',
         ativo: true,
-        criadoEm: firebase.firestore.FieldValue.serverTimestamp(),
+        criadoEm: ts,
         criadoPor: auth.currentUser?.uid || ''
       };
-      if (btnTexto) payload.btnTexto = btnTexto;
-      if (btnUrl)   payload.btnUrl   = btnUrl;
-      if (indImgBase64) payload.imageUrl = indImgBase64;
-      await db.collection('anunciosAG').add(payload);
+      if (btnTexto) basePayload.btnTexto = btnTexto;
+      if (btnUrl)   basePayload.btnUrl   = btnUrl;
+      if (indImgBase64) basePayload.imageUrl = indImgBase64;
+
+      // 1. Grava na subcoleção do usuário — o app do cliente lê aqui
+      await db.collection('users').doc(indCurrentMember.uid)
+              .collection('anuncios').add({ ...basePayload });
+
+      // 2. Grava no histórico global do painel admin
+      await db.collection('anunciosAG').add(basePayload);
+
       showFeedback(fb, '✓ Anúncio publicado!', 'var(--success)');
       setTimeout(closeNotifIndividual, 1800);
       loadAnuncios();
