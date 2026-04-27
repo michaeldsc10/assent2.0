@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   ShoppingCart, Package, BarChart2, Plus, Edit2, Trash2, X,
   Eye, ChevronDown, AlertTriangle, CheckCircle, Clock, XCircle,
-  Search, Filter, ArrowDown, ArrowUp, Layers, Ban,
+  Search, Filter, ArrowDown, ArrowUp, Layers, Ban, Barcode,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
@@ -327,6 +327,18 @@ const CSS = `
     box-sizing:border-box;
   }
   .form-textarea:focus { border-color:var(--gold); box-shadow:0 0 0 3px rgba(200,165,94,.1); }
+
+  /* Campo código de barras */
+  .barcode-input-wrap {
+    position:relative; display:flex; align-items:center;
+  }
+  .barcode-input-icon {
+    position:absolute; left:10px; color:var(--text-3);
+    display:flex; align-items:center; pointer-events:none;
+    transition:color .15s;
+  }
+  .barcode-input-wrap:focus-within .barcode-input-icon { color:var(--gold); }
+  .barcode-input-field { padding-left:32px !important; }
 
   .form-check-row {
     display:flex; align-items:center; gap:10px;
@@ -1131,6 +1143,41 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved,
             {itens.map((it, idx) => (
               <div key={idx} className="cp-item-row">
                 <div>
+                  {/* Busca por código de barras */}
+                  <div className="barcode-input-wrap" style={{marginBottom:6}}>
+                    <span className="barcode-input-icon"><Barcode size={13}/></span>
+                    <input
+                      className="form-input barcode-input-field"
+                      placeholder="Cód. de barras..."
+                      autoComplete="off"
+                      spellCheck="false"
+                      style={{fontSize:11,padding:"6px 8px 6px 30px"}}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const cod = e.target.value.trim();
+                          if (!cod) return;
+                          const ins = insumos.find(i => i.codigoBarras === cod && i.ativo !== false);
+                          if (ins) {
+                            setItem(idx, "insumoId", ins.id);
+                            e.target.value = "";
+                          } else {
+                            e.target.style.borderColor = "var(--red)";
+                            setTimeout(() => { e.target.style.borderColor = ""; }, 1500);
+                          }
+                        }
+                      }}
+                      onChange={e => {
+                        /* Busca em tempo real ao digitar (leitores que não disparam Enter) */
+                        const cod = e.target.value.trim();
+                        const ins = insumos.find(i => i.codigoBarras === cod && i.ativo !== false);
+                        if (ins) {
+                          setItem(idx, "insumoId", ins.id);
+                          e.target.value = "";
+                        }
+                      }}
+                    />
+                  </div>
                   <select className={`form-input${erros[`item_ins_${idx}`]?" err":""}`}
                     value={it.insumoId} onChange={e => setItem(idx, "insumoId", e.target.value)}>
                     <option value="">Insumo...</option>
@@ -1344,6 +1391,7 @@ function ModalInsumo({ insumo, uid, onClose, onSaved }) {
     categoria:     insumo?.categoria     || "",
     estoqueMinimo: insumo?.estoqueMinimo != null ? String(insumo.estoqueMinimo) : "0",
     ativo:         insumo?.ativo !== false,
+    codigoBarras:  insumo?.codigoBarras  || "",
   });
   const [erros,    setErros]    = useState({});
   const [salvando, setSalvando] = useState(false);
@@ -1373,6 +1421,7 @@ function ModalInsumo({ insumo, uid, onClose, onSaved }) {
         categoria:     form.categoria.trim(),
         estoqueMinimo: parseBRL(form.estoqueMinimo),
         ativo:         form.ativo,
+        codigoBarras:  form.codigoBarras.trim(),
         atualizadoEm:  now,
       };
       if (isEdit) {
@@ -1433,6 +1482,30 @@ function ModalInsumo({ insumo, uid, onClose, onSaved }) {
             <label className="form-label">Categoria</label>
             <input className="form-input" placeholder="Ex: Matéria-prima, Embalagem..."
               value={form.categoria} onChange={e => set("categoria", e.target.value)} />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Código de Barras <span style={{color:"var(--text-3)",fontWeight:400}}>(opcional — EAN-13, QR etc.)</span></label>
+            <div className="barcode-input-wrap">
+              <span className="barcode-input-icon"><Barcode size={14}/></span>
+              <input
+                className="form-input barcode-input-field"
+                value={form.codigoBarras}
+                onChange={e => set("codigoBarras", e.target.value)}
+                placeholder="Leia com o leitor USB ou digite manualmente"
+                autoComplete="off"
+                spellCheck="false"
+                onKeyDown={e => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const inputs = Array.from(e.target.closest(".modal-box")?.querySelectorAll("input, select, textarea") || []);
+                    const idx = inputs.indexOf(e.target);
+                    if (idx >= 0 && inputs[idx + 1]) inputs[idx + 1].focus();
+                  }
+                }}
+              />
+            </div>
+            <div className="form-error" style={{color:"var(--text-3)",marginTop:4,fontSize:11}}>Compatível com leitor USB. Pressione Enter para avançar.</div>
           </div>
 
           <div className="form-group" style={{marginBottom:0}}>
@@ -1772,7 +1845,7 @@ function TabInsumos({ uid, insumos, isPro, podeCriarV, podeEditarV, podeExcluirV
   const filtrados = useMemo(() => {
     const q = search.trim().toLowerCase();
     return insumos
-      .filter(i => !q || i.nome?.toLowerCase().includes(q) || i.categoria?.toLowerCase().includes(q))
+      .filter(i => !q || i.nome?.toLowerCase().includes(q) || i.categoria?.toLowerCase().includes(q) || i.codigoBarras?.toLowerCase().includes(q))
       .sort((a,b) => (a.nome||"").localeCompare(b.nome||"", "pt-BR"));
   }, [insumos, search]);
 
@@ -1845,7 +1918,15 @@ function TabInsumos({ uid, insumos, isPro, podeCriarV, podeEditarV, podeExcluirV
             </div>
           ) : filtrados.map(ins => (
             <div key={ins.id} className="cp-row-insumo">
-              <span style={{color:"var(--text)",fontWeight:500}}>{ins.nome}</span>
+              <span style={{color:"var(--text)",fontWeight:500}}>
+                {ins.nome}
+                {ins.codigoBarras && (
+                  <span style={{display:"flex",alignItems:"center",gap:4,marginTop:2}}>
+                    <Barcode size={10} color="var(--text-3)"/>
+                    <span style={{fontSize:10,color:"var(--text-3)",fontFamily:"monospace"}}>{ins.codigoBarras}</span>
+                  </span>
+                )}
+              </span>
               <span>{ins.unidade}</span>
               <span style={{color:"var(--text-3)"}}>{ins.categoria || "—"}</span>
               <span>{ins.estoqueMinimo ?? 0}</span>
