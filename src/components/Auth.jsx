@@ -69,11 +69,28 @@ if (ld.ativo !== true || trialExpirado) {
         const { tenantUid } = indexSnap.data();
         const licencaTenantSnap = await getDoc(doc(db, "licencas", tenantUid));
 
-        if (!licencaTenantSnap.exists() || licencaTenantSnap.data().ativo !== true) {
+        if (!licencaTenantSnap.exists()) {
           await signOut(auth);
           throw new AuthError(
             "licenca-inativa",
             "A licença da empresa está inativa. Entre em contato com o administrador."
+          );
+        }
+
+        const lt = licencaTenantSnap.data();
+        const planoT = lt.plano ?? "trial";
+        let trialExpiradoT = false;
+        if (planoT === "trial") {
+          const expiraT = lt.trialExpira?.toDate?.() ?? null;
+          trialExpiradoT = expiraT ? Date.now() > expiraT.getTime() : false;
+        }
+        if (lt.ativo !== true || trialExpiradoT) {
+          await signOut(auth);
+          throw new AuthError(
+            trialExpiradoT ? "trial-expirado" : "licenca-inativa",
+            trialExpiradoT
+              ? "O período de trial da empresa encerrou. Entre em contato com o administrador."
+              : "A licença da empresa está inativa. Entre em contato com o administrador."
           );
         }
         return credential.user;
