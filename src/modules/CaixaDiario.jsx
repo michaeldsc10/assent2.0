@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
+import { fsError, fsSnapshotError } from "../utils/firestoreError";
 import { useAuth } from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO } from "../lib/logAction";
 import {
@@ -1551,7 +1552,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
     const unsub = onSnapshot(q, (snap) => {
       setLancamentos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
-    });
+    }, fsSnapshotError("CaixaDiario:lancamentos"));
     return unsub;
   }, [tenantUid]);
 
@@ -1562,7 +1563,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
     const unsub = onSnapshot(ref, (snap) => {
       if (snap.exists()) setResumo(snap.data());
       else               setResumo({ saldoAtual: 0 });
-    });
+    }, fsSnapshotError("CaixaDiario:resumo"));
     return unsub;
   }, [tenantUid]);
 
@@ -1573,7 +1574,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
     const unsub = onSnapshot(ref, (snap) => {
       if (snap.exists()) setTaxas({ ...TAXAS_DEFAULT, ...snap.data() });
       else               setTaxas(TAXAS_DEFAULT);
-    });
+    }, fsSnapshotError("CaixaDiario:taxas"));
     return unsub;
   }, [tenantUid]);
 
@@ -1586,7 +1587,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
     const unsub = onSnapshot(ref, (snap) => {
       setCaixaHoje(snap.exists() ? { id: snap.id, ...snap.data() } : null);
       setLoadingCaixa(false);
-    });
+    }, fsSnapshotError("CaixaDiario:caixaHoje"));
     return unsub;
   }, [tenantUid]);
 
@@ -1597,7 +1598,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
     const q   = query(ref, orderBy("data", "desc"), limit(30));
     const unsub = onSnapshot(q, (snap) => {
       setCaixasHist(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, fsSnapshotError("CaixaDiario:historico"));
     return unsub;
   }, [tenantUid]);
 
@@ -1613,7 +1614,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
           const d = l.data?.toDate ? l.data.toDate() : new Date(l.data ?? l.criadoEm);
           return d >= hoje;
         });
-        fecharCaixa(empresaId, uid, lancHoje, resumo.saldoAtual).catch(console.error);
+        fecharCaixa(empresaId, uid, lancHoje, resumo.saldoAtual).catch((err) => fsError(err, "CaixaDiario:fecharAutomatico"));
       }
     };
     checar(); // checa imediatamente ao montar
@@ -1636,7 +1637,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
       setModalNovo(false);
       showToast("Lançamento registrado com sucesso!");
     } catch (err) {
-      console.error("Erro ao criar lançamento:", err);
+      fsError(err, "CaixaDiario:criarLancamento");
       showToast(err.message || "Erro ao registrar lançamento.", "error");
       throw err; // para manter o modal aberto
     }
@@ -1651,7 +1652,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
       setModalAbrir(false);
       showToast("Caixa aberto com sucesso!");
     } catch (err) {
-      console.error("Erro ao abrir caixa:", err);
+      fsError(err, "CaixaDiario:abrirCaixa");
       showToast(err.message || "Erro ao abrir o caixa.", "error");
     }
   };
@@ -1670,7 +1671,7 @@ export default function CaixaDiario({ empresaId: empresaIdProp }) {
       setModalFechar(false);
       showToast("Caixa fechado com sucesso!");
     } catch (err) {
-      console.error("Erro ao fechar caixa:", err);
+      fsError(err, "CaixaDiario:fecharCaixa");
       showToast(err.message || "Erro ao fechar o caixa.", "error");
     }
   };
