@@ -10,7 +10,6 @@ import {
 
 import { db, storage } from "../lib/firebase";
 import { fsError, fsSnapshotError } from "../utils/firestoreError";
-import { fsError, fsSnapshotError } from "../utils/firestoreError";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useAuth } from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
