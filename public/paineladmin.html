@@ -294,6 +294,10 @@ body {
   display: grid; grid-template-columns: repeat(4, 1fr);
   gap: 16px; margin-bottom: 24px;
 }
+.stats-grid-plans {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 16px; margin-bottom: 24px;
+}
 .stat-card {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 14px; padding: 24px; position: relative;
@@ -320,6 +324,7 @@ body {
 .stat-value.c-gold { color: var(--gold); }
 .stat-value.c-danger { color: var(--danger); }
 .stat-value.c-success { color: var(--success); }
+.stat-value.c-warning { color: var(--warning); }
 .stat-sub { font-size: 11px; color: var(--text3); margin-top: 8px; font-family: 'IBM Plex Mono', monospace; }
 .stat-icon { position: absolute; top: 20px; right: 20px; font-size: 36px; opacity: .06; }
 
@@ -1230,7 +1235,10 @@ th.sortable.sort-desc::after { content: ' ↓'; color: var(--gold); }
 /* ════════════════════════════════════════
    RESPONSIVE
 ════════════════════════════════════════ */
-@media (max-width: 1280px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 1280px) {
+  .stats-grid       { grid-template-columns: repeat(2, 1fr); }
+  .stats-grid-plans { grid-template-columns: repeat(3, 1fr); }
+}
 @media (max-width: 1000px) {
   #sidebar { width: 56px; min-width: 56px; }
   .sidebar-brand .brand-name, .sidebar-brand .brand-sub,
@@ -1244,6 +1252,7 @@ th.sortable.sort-desc::after { content: ' ↓'; color: var(--gold); }
   .content-area { padding: 20px 16px; }
   .time-filter { display: none; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .stats-grid-plans { grid-template-columns: repeat(1, 1fr); }
   .info-grid, .form-2col { grid-template-columns: 1fr; }
 }
 </style>
@@ -1391,6 +1400,7 @@ th.sortable.sort-desc::after { content: ' ↓'; color: var(--gold); }
         <!-- ───── DASHBOARD ───── -->
         <div class="view active" id="view-dashboard">
 
+          <!-- Linha 1: totais gerais -->
           <div class="stats-grid">
             <div class="stat-card">
               <div class="stat-label">Total de Membros</div>
@@ -1399,22 +1409,43 @@ th.sortable.sort-desc::after { content: ' ↓'; color: var(--gold); }
               <div class="stat-icon">👥</div>
             </div>
             <div class="stat-card">
-              <div class="stat-label">Membros PRO</div>
-              <div class="stat-value c-gold" id="st-pro">—</div>
-              <div class="stat-sub" id="st-pro-pct">— % do total</div>
-              <div class="stat-icon">⭐</div>
+              <div class="stat-label">Profissional</div>
+              <div class="stat-value c-gold" id="st-profissional">—</div>
+              <div class="stat-sub" id="st-profissional-pct">— % do total</div>
+              <div class="stat-icon">★</div>
             </div>
             <div class="stat-card">
-              <div class="stat-label">Membros Free</div>
-              <div class="stat-value" id="st-free">—</div>
-              <div class="stat-sub">usuários sem PRO ativo</div>
-              <div class="stat-icon">👤</div>
+              <div class="stat-label">Essencial</div>
+              <div class="stat-value" id="st-essencial">—</div>
+              <div class="stat-sub" id="st-essencial-pct">— % do total</div>
+              <div class="stat-icon">📦</div>
             </div>
+            <div class="stat-card">
+              <div class="stat-label">Trial</div>
+              <div class="stat-value c-warning" id="st-trial">—</div>
+              <div class="stat-sub" id="st-trial-sub">novos usuários</div>
+              <div class="stat-icon">⏳</div>
+            </div>
+          </div>
+          <!-- Linha 2: alertas -->
+          <div class="stats-grid-plans">
             <div class="stat-card">
               <div class="stat-label">Alerta Ex-PRO</div>
               <div class="stat-value c-danger" id="st-expro">—</div>
               <div class="stat-sub">+30 dias sem renovar</div>
               <div class="stat-icon">⚠️</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Sem Plano</div>
+              <div class="stat-value" id="st-semplano" style="color:var(--text3)">—</div>
+              <div class="stat-sub">plano não configurado</div>
+              <div class="stat-icon">❓</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Profissional %</div>
+              <div class="stat-value c-gold" id="st-conv-pct" style="font-size:28px">—%</div>
+              <div class="stat-sub">taxa de conversão geral</div>
+              <div class="stat-icon">📈</div>
             </div>
           </div>
 
@@ -1459,8 +1490,9 @@ th.sortable.sort-desc::after { content: ' ↓'; color: var(--gold); }
                 </div>
                 <div class="filter-pills">
                   <button class="filter-pill active" data-filter="all">Todos</button>
-                  <button class="filter-pill" data-filter="pro">PRO</button>
-                  <button class="filter-pill" data-filter="free">Free</button>
+                  <button class="filter-pill" data-filter="trial">Trial</button>
+                  <button class="filter-pill" data-filter="essencial">Essencial</button>
+                  <button class="filter-pill" data-filter="profissional">Profissional</button>
                 </div>
               </div>
             </div>
@@ -1494,13 +1526,15 @@ th.sortable.sort-desc::after { content: ' ↓'; color: var(--gold); }
                 <div class="field-label">Título</div>
                 <input class="field-input" id="notifTitle" type="text" placeholder="Ex: Nova funcionalidade disponível!">
               </div>
-              <div class="field-group">
-                <div class="field-label">Destinatários</div>
-                <div class="dest-row" style="margin-bottom:0">
-                  <button class="dest-btn active" data-dest="todos">📢 Todos</button>
-                  <button class="dest-btn" data-dest="pro">⭐ Apenas PRO</button>
-                  <button class="dest-btn" data-dest="free">👤 Apenas Free</button>
-                </div>
+            </div>
+
+            <div class="field-group" style="margin-bottom:20px">
+              <div class="field-label">Destinatários</div>
+              <div class="dest-row" style="margin-bottom:0;flex-wrap:wrap">
+                <button class="dest-btn active" data-dest="todos">📢 Todos</button>
+                <button class="dest-btn" data-dest="profissional">★ Profissional</button>
+                <button class="dest-btn" data-dest="essencial">📦 Essencial</button>
+                <button class="dest-btn" data-dest="trial">⏳ Trial</button>
               </div>
             </div>
 
@@ -1645,10 +1679,11 @@ th.sortable.sort-desc::after { content: ' ↓'; color: var(--gold); }
 
               <div class="field-group" style="margin-bottom:22px">
                 <div class="field-label">Destinatários</div>
-                <div class="dest-row" style="margin-bottom:0">
+                <div class="dest-row" style="margin-bottom:0;flex-wrap:wrap">
                   <button class="dest-btn active" data-anuncio-dest="todos">📢 Todos</button>
-                  <button class="dest-btn" data-anuncio-dest="pro">⭐ Apenas PRO</button>
-                  <button class="dest-btn" data-anuncio-dest="free">👤 Apenas Free</button>
+                  <button class="dest-btn" data-anuncio-dest="profissional">★ Profissional</button>
+                  <button class="dest-btn" data-anuncio-dest="essencial">📦 Essencial</button>
+                  <button class="dest-btn" data-anuncio-dest="trial">⏳ Trial</button>
                 </div>
               </div>
 
@@ -2197,6 +2232,7 @@ async function loadAllMembers() {
           uid,
           ativo:          lic.ativo      || false,
           pro:            lic.pro        || false,
+          plano:          lic.plano      || '',
           admin:          lic.admin      || false,
           criadoEm:       toDate(lic.criadoEm),
           proExpiradoEm:  toDate(lic.proExpiradoEm),
@@ -2210,7 +2246,7 @@ async function loadAllMembers() {
           nomeEmpresa:    c.empresa?.nomeEmpresa || '',
         };
       } catch {
-        return { uid, ativo:true, pro:lic.pro||false, admin:false, criadoEm:null, proExpiradoEm:null,
+        return { uid, ativo:true, pro:lic.pro||false, plano:lic.plano||'', admin:false, criadoEm:null, proExpiradoEm:null,
                  email: lic.email||'', name: lic.name||'—', telefone: lic.telefone||'',
                  foto:'', endereco:'', cnpj:'', nomeEmpresa:'' };
       }
@@ -2261,16 +2297,26 @@ function getExproList() {
 // ══════════════════════════════════════════════
 function renderStats() {
   const base = byTime(allMembers);
-  const pro  = base.filter(m => m.pro).length;
-  const free = base.filter(m => !m.pro).length;
-  const exp  = getExproList().length;
-  const pct  = base.length ? Math.round(pro / base.length * 100) : 0;
+  const total = base.length;
+  const profissional = base.filter(m => m.plano === 'profissional').length;
+  const essencial    = base.filter(m => m.plano === 'essencial').length;
+  const trial        = base.filter(m => m.plano === 'trial').length;
+  const semPlano     = base.filter(m => !m.plano).length;
+  const exp          = getExproList().length;
+  const pctProf      = total ? Math.round(profissional / total * 100) : 0;
+  const pctEss       = total ? Math.round(essencial    / total * 100) : 0;
 
-  animNum('st-total', base.length);
-  animNum('st-pro',   pro);
-  animNum('st-free',  free);
-  animNum('st-expro', exp);
-  document.getElementById('st-pro-pct').textContent = pct + '% do total são PRO';
+  animNum('st-total',        total);
+  animNum('st-profissional', profissional);
+  animNum('st-essencial',    essencial);
+  animNum('st-trial',        trial);
+  animNum('st-expro',        exp);
+  animNum('st-semplano',     semPlano);
+
+  document.getElementById('st-profissional-pct').textContent = pctProf + '% do total';
+  document.getElementById('st-essencial-pct').textContent    = pctEss  + '% do total';
+  document.getElementById('st-trial-sub').textContent        = trial === 1 ? '1 usuário em trial' : `${trial} usuários em trial`;
+  document.getElementById('st-conv-pct').textContent         = pctProf + '%';
   document.getElementById('st-total-sub').textContent =
     timeDays ? `cadastrados nos últimos ${timeDays} dias` : 'membros ativos no total';
 }
@@ -2300,8 +2346,9 @@ function updateExproBadge() {
 // ══════════════════════════════════════════════
 function renderMembersTable() {
   let list = [...allMembers];
-  if (memberFilter === 'pro')  list = list.filter(m => m.pro);
-  if (memberFilter === 'free') list = list.filter(m => !m.pro);
+  if (['trial', 'essencial', 'profissional'].includes(memberFilter)) {
+    list = list.filter(m => m.plano === memberFilter);
+  }
   list = bySearch(list); // busca global do topbar
   // busca local dentro da aba Membros, com filtro de campo
   if (membersLocalSearch) {
@@ -2411,9 +2458,11 @@ function mountTable(containerId, list) {
             <td><span style="font-size:13px">${esc(m.nomeEmpresa)||'—'}</span></td>
             <td class="mono-sm">${esc(m.telefone)||'—'}</td>
             <td class="mono-sm">${esc(m.cnpj)||'—'}</td>
-            <td>${m.pro
-              ? '<span class="pro-badge">★ PRO</span>'
-              : '<span class="free-badge">FREE</span>'
+            <td>${
+              m.plano === 'profissional' ? '<span class="pro-badge">★ Profissional</span>'
+            : m.plano === 'essencial'    ? '<span class="free-badge" style="border-color:var(--border2);color:var(--text2)">Essencial</span>'
+            : m.plano === 'trial'        ? '<span class="free-badge" style="border-color:rgba(245,158,11,.4);color:var(--warning)">Trial</span>'
+            : '<span class="free-badge">—</span>'
             }</td>
             <td class="mono-sm">${m.criadoEm ? fmtDate(m.criadoEm) : '—'}</td>
             <td onclick="event.stopPropagation()">
@@ -2463,7 +2512,7 @@ function buildChartData() {
       .toLocaleString('pt-BR', { month: 'short', year: '2-digit' });
     labels.push(label);
     total.push(allMembers.filter(m => m.criadoEm && m.criadoEm < end).length);
-    pro.push(allMembers.filter(m => m.criadoEm && m.criadoEm < end && m.pro).length);
+    pro.push(allMembers.filter(m => m.criadoEm && m.criadoEm < end && m.plano === 'profissional').length);
   }
   return { labels, total, pro };
 }
@@ -2496,7 +2545,7 @@ function initChart() {
           pointBackgroundColor: '#EAEAEA', borderWidth: 2,
         },
         {
-          label: 'Membros PRO', data: pro,
+          label: 'Profissional', data: pro,
           borderColor: '#D4AF37', backgroundColor: 'rgba(212,175,55,0.08)',
           tension: .4, fill: true, pointRadius: 4, pointHoverRadius: 6,
           pointBackgroundColor: '#D4AF37', borderWidth: 2,
@@ -2563,9 +2612,13 @@ function renderNotifList(list) {
     el.innerHTML = '<div class="empty">Nenhuma notificação enviada ainda</div>'; return;
   }
   const destTag = {
-    todos: '<span class="tag-all">📢 Todos</span>',
-    pro:   '<span class="tag-pro">⭐ PRO</span>',
-    free:  '<span class="tag-free">👤 Free</span>'
+    todos:        '<span class="tag-all">📢 Todos</span>',
+    profissional: '<span class="tag-pro">★ Profissional</span>',
+    essencial:    '<span style="color:var(--text2);font-family:\'IBM Plex Mono\',monospace;font-size:11px">📦 Essencial</span>',
+    trial:        '<span style="color:var(--warning);font-family:\'IBM Plex Mono\',monospace;font-size:11px">⏳ Trial</span>',
+    // legado — notificações antigas
+    pro:          '<span class="tag-pro" title="Legado">⭐ PRO</span>',
+    free:         '<span class="tag-free" title="Legado">👤 Free</span>',
   };
 
   function resolveDestTag(n) {
