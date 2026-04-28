@@ -243,6 +243,16 @@ exports.criarUsuario = onCall(CALL_OPTIONS, async (request) => {
     throw new HttpsError("invalid-argument", "Campos obrigatórios ausentes.");
   }
 
+   const ADMIN_CALL_OPTIONS = {
+  enforceAppCheck: false,   // painel admin não usa App Check
+  cors: [
+    "https://ag.assentagencia.com.br",
+    "https://assent2-0.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+  ],
+};
+   
   const CARGOS_VALIDOS = ["financeiro", "comercial", "compras", "operacional", "vendedor", "suporte"];
   if (!CARGOS_VALIDOS.includes(cargo)) {
     throw new HttpsError("invalid-argument", "Cargo inválido.");
@@ -317,7 +327,7 @@ exports.criarUsuario = onCall(CALL_OPTIONS, async (request) => {
 /* ─────────────────────────────────────────────
    FUNÇÃO 2: Editar Usuário
 ───────────────────────────────────────────── */
-exports.editarUsuario = onCall(CALL_OPTIONS, async (request) => {
+exports.editarUsuario = onCall(ADMIN_CALL_OPTIONS, async (request) => {
   const tenantUid = await verificarAdmin(request.auth?.uid);
 
   const { uid, nome, cargo, vendedorId } = request.data;
