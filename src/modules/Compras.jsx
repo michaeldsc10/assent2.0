@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
+import { fsError, fsSnapshotError } from "../utils/firestoreError";
 import { useAuth } from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO } from "../lib/logAction";
 import {
@@ -891,7 +892,7 @@ function ModalNovaCompra({ compra, fornecedores, insumos, uid, onClose, onSaved,
       onSaved();
       onClose();
     } catch (err) {
-      console.error("[Compras] Erro ao salvar compra:", err);
+      fsError(err, "Compras:salvarCompra");
       alert("Erro ao salvar compra. Tente novamente.");
     } finally {
       setSalvando(false);
@@ -1289,7 +1290,7 @@ function ModalCancelarCompra({ compra, uid, nomeFornecedor, onClose }) {
 
       onClose();
     } catch (err) {
-      console.error("[Compras] Erro ao cancelar compra:", err);
+      fsError(err, "Compras:cancelarCompra");
       alert("Erro ao cancelar. Tente novamente.");
     } finally {
       setCancelando(false);
@@ -1435,7 +1436,7 @@ function ModalInsumo({ insumo, uid, onClose, onSaved }) {
       onSaved();
       onClose();
     } catch (err) {
-      console.error("[Compras] Erro ao salvar insumo:", err);
+      fsError(err, "Compras:salvarInsumo");
       alert("Erro ao salvar insumo. Tente novamente.");
     } finally {
       setSalvando(false);
@@ -1580,7 +1581,7 @@ function ModalMovimentacao({ insumos, uid, onClose, onSaved }) {
       onSaved();
       onClose();
     } catch (err) {
-      console.error("[Compras] Erro ao registrar movimentação:", err);
+      fsError(err, "Compras:movimentacao");
       alert("Erro ao registrar movimentação. Tente novamente.");
     } finally {
       setSalvando(false);
@@ -1718,7 +1719,7 @@ function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEdita
       await logAction({ tenantUid: uid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.COMPRAS, descricao: `Excluiu Compra de ${getNomeFornecedor(deletando, fornecedores)}` });
       setDeletando(null);
     } catch (err) {
-      console.error("[Compras] Erro ao excluir compra:", err);
+      fsError(err, "Compras:excluirCompra");
       alert("Erro ao excluir compra. Tente novamente.");
     }
   };
@@ -1855,7 +1856,7 @@ function TabInsumos({ uid, insumos, isPro, podeCriarV, podeEditarV, podeExcluirV
       await deleteDoc(doc(collection(db, "users", uid, "insumos"), deletando.id));
       setDeletando(null);
     } catch (err) {
-      console.error("[Compras] Erro ao excluir insumo:", err);
+      fsError(err, "Compras:excluirInsumo");
       alert("Erro ao excluir insumo. Tente novamente.");
     }
   };
@@ -1867,7 +1868,7 @@ function TabInsumos({ uid, insumos, isPro, podeCriarV, podeEditarV, podeExcluirV
         atualizadoEm: new Date().toISOString(),
       });
     } catch (err) {
-      console.error("[Compras] Erro ao atualizar status do insumo:", err);
+      fsError(err, "Compras:statusInsumo");
       alert("Erro ao atualizar status. Tente novamente.");
     }
   };
@@ -2082,7 +2083,7 @@ export default function Compras() {
     const unsub = onSnapshot(
       collection(db, "users", uid, "fornecedores"),
       snap => setFornecedores(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
-      err  => console.error("[Compras] fornecedores:", err)
+      fsSnapshotError("Compras:fornecedores")
     );
     return unsub;
   }, [uid]);
