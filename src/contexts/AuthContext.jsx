@@ -211,8 +211,15 @@ if (licencaDoc.exists()) {
       const licencaDoc = await getDoc(doc(db, "licencas", uid));
 
       if (licencaDoc.exists()) {
-        if (licencaDoc.data().ativo !== true) {
-          await _rejeitarAcesso("Licença inativa.");
+        const ld15 = licencaDoc.data();
+        const plano15 = ld15.plano ?? "trial";
+        let trialExpirado15 = false;
+        if (plano15 === "trial") {
+          const expira15 = ld15.trialExpira?.toDate?.() ?? null;
+          trialExpirado15 = expira15 ? Date.now() > expira15.getTime() : false;
+        }
+        if (ld15.ativo !== true || trialExpirado15) {
+          await _rejeitarAcesso(trialExpirado15 ? "Trial expirado." : "Licença inativa.");
           return;
         }
         // Licença ativa — primeiro acesso do Admin: cria documento base
@@ -239,6 +246,26 @@ if (licencaDoc.exists()) {
 
       const data = indexDoc.data();
       const tUid = data.tenantUid ?? data.tenantUID;
+
+      // ── Passo 2.5: verifica licença + trial do tenant ──────────────
+      const licencaTenantDoc = await getDoc(doc(db, "licencas", tUid));
+      if (licencaTenantDoc.exists()) {
+        const lt = licencaTenantDoc.data();
+        const planoT = lt.plano ?? "trial";
+        let trialExpiradoT = false;
+        if (planoT === "trial") {
+          const expiraT = lt.trialExpira?.toDate?.() ?? null;
+          trialExpiradoT = expiraT ? Date.now() > expiraT.getTime() : false;
+        }
+        if (lt.ativo !== true || trialExpiradoT) {
+          await _rejeitarAcesso(
+            trialExpiradoT
+              ? "Trial da empresa expirado."
+              : "Licença da empresa inativa."
+          );
+          return;
+        }
+      }
 
       // ── Passo 3: lê o perfil em /users/{tenantUid}/usuarios/{uid} ───
       const perfilDoc = await getDoc(doc(db, "users", tUid, "usuarios", uid));
