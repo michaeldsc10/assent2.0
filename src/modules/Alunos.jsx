@@ -30,6 +30,7 @@ import {
 import AuthContext from "../contexts/AuthContext";
 import { logAction, LOG_ACAO } from "../lib/logAction";
 import { db } from "../lib/firebase";
+import { fsError, fsSnapshotError } from "../utils/firestoreError";
 
 import {
   collection, doc, setDoc, deleteDoc, updateDoc,
@@ -1139,13 +1140,13 @@ export default function Alunos() {
     const unsub1 = onSnapshot(alunosQuery, (snap) => {
       setAlunos(snap.docs.map(d => ({ docId: d.id, ...d.data() })));
       setLoading(false);
-    }, () => setLoading(false));
+    }, (err) => { fsError(err, "Alunos:alunos"); setLoading(false); });
 
     /* Escuta todas as a_receber e filtra em memória — evita índice composto */
     const unsub2 = onSnapshot(arCol, (snap) => {
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setMensalidades(all.filter(a => a.origem === "mensalidade"));
-    }, () => {});
+    }, fsSnapshotError("Alunos:aReceber"));
 
     getDoc(configRef).then(s => {
       if (s.exists()) setConfig({ mensagemWhatsApp: MSG_WHATSAPP_DEFAULT, ...s.data() });
@@ -1235,7 +1236,7 @@ export default function Alunos() {
         setModalNovo(false);
       }
     } catch (err) {
-      console.error("[Alunos] Erro ao salvar:", err);
+      fsError(err, "Alunos:salvar");
       alert("Erro ao salvar. Tente novamente.");
     }
   };
@@ -1260,7 +1261,7 @@ export default function Alunos() {
         });
       }
     } catch (err) {
-      console.error("[Alunos] Erro ao gerar mensalidade:", err);
+      fsError(err, "Alunos:mensalidade");
       alert("Erro ao gerar mensalidade.");
     }
   };
@@ -1287,7 +1288,7 @@ export default function Alunos() {
       setExcluindo(null);
       setDetalhe(null);
     } catch (err) {
-      console.error("[Alunos] Erro ao excluir:", err);
+      fsError(err, "Alunos:excluir");
       alert("Erro ao excluir aluno.");
     }
   };
@@ -1310,7 +1311,7 @@ export default function Alunos() {
         descricao: "Atualizou configurações do módulo de Matrículas",
       });
     } catch (err) {
-      console.error("[Alunos] Erro ao salvar config:", err);
+      fsError(err, "Alunos:config");
       alert("Erro ao salvar configurações.");
     }
   };
