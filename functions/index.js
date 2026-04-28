@@ -5,6 +5,7 @@
    + CORS restrito ao domínio da Vercel
    ═══════════════════════════════════════════════════ */
 const { onSchedule }              = require("firebase-functions/v2/scheduler");
+const { onDocumentCreated }       = require("firebase-functions/v2/firestore");
 const { onCall, onRequest,
         HttpsError }              = require("firebase-functions/v2/https");
 const { getFirestore,
@@ -217,8 +218,14 @@ async function verificarAdmin(callerUid) {
   }
 
   const licenca = licencaSnap.data();
-  if (!licenca.clienteAG) {
-    throw new HttpsError("permission-denied", "Licença inválida.");
+
+  // Valida: licença deve estar ativa e ter um plano definido
+  // (substitui o campo clienteAG do modelo antigo)
+  if (!licenca.ativo) {
+    throw new HttpsError("permission-denied", "Licença inativa. Entre em contato com o suporte.");
+  }
+  if (!licenca.plano) {
+    throw new HttpsError("permission-denied", "Licença sem plano configurado.");
   }
 
   return callerUid;
@@ -245,10 +252,34 @@ exports.criarUsuario = onCall(CALL_OPTIONS, async (request) => {
     throw new HttpsError("invalid-argument", "Senha deve ter no mínimo 6 caracteres.");
   }
 
-  const usuariosSnap = await db.collection(`users/${tenantUid}/usuarios`).get();
+  // ── Limite dinâmico de usuários extras — lido do plano ativo ───────────
+  const [usuariosSnap, licencaParaLimiteSnap] = await Promise.all([
+    db.collection(`users/${tenantUid}/usuarios`).get(),
+    db.doc(`licencas/${tenantUid}`).get(),
+  ]);
+
   const ativos = usuariosSnap.docs.filter(d => d.data().ativo !== false).length;
-  if (ativos >= 10) {
-    throw new HttpsError("resource-exhausted", "Limite de 10 usuários adicionais atingido.");
+
+  // Lê o limite do subdoc do plano; fallback seguro = 5 (Essencial)
+  let limiteLoginsExtras = 5;
+  try {
+    const planoAtual = licencaParaLimiteSnap.data()?.plano;
+    if (planoAtual) {
+      const planoSnap = await db.doc(`licencas/${tenantUid}/plano/${planoAtual}`).get();
+      if (planoSnap.exists) {
+        limiteLoginsExtras = planoSnap.data()?.limites?.loginsExtras ?? 5;
+      }
+    }
+  } catch (err) {
+    console.warn(`[criarUsuario] Não foi possível ler limite do plano para ${tenantUid}:`, err.message);
+    // Mantém fallback = 5
+  }
+
+  if (ativos >= limiteLoginsExtras) {
+    throw new HttpsError(
+      "resource-exhausted",
+      `Limite de ${limiteLoginsExtras} usuários adicionais atingido para o seu plano.`
+    );
   }
 
   let novoUid;
@@ -765,3 +796,152 @@ exports.limparInsightsVelhos = onSchedule(
   }
 );
 
+
+/* ═══════════════════════════════════════════════════════════════
+   LICENÇAS & PLANOS — Controle de limites e trial
+═══════════════════════════════════════════════════════════════ */
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO: onVendaCreated
+   Dispara quando uma venda é criada.
+   Incrementa contagem.vendasMes no plano ativo.
+   Rejeita (log) se o limite mensal foi atingido.
+───────────────────────────────────────────── */
+exports.onVendaCreated = onDocumentCreated(
+  "users/{tenantUid}/vendas/{vendaId}",
+  async (event) => {
+    const { tenantUid } = event.params;
+
+    const licencaRef  = db.doc(`licencas/${tenantUid}`);
+    const licencaSnap = await licencaRef.get();
+
+    if (!licencaSnap.exists) {
+      console.error(`Licença não encontrada para tenant: ${tenantUid}`);
+      return;
+    }
+
+    const { plano, ativo } = licencaSnap.data();
+
+    if (!ativo) {
+      console.warn(`Licença inativa para tenant: ${tenantUid}`);
+      return;
+    }
+
+    const planoRef = db.doc(`licencas/${tenantUid}/plano/${plano}`);
+
+    await db.runTransaction(async (tx) => {
+      const planoSnap = await tx.get(planoRef);
+
+      if (!planoSnap.exists) {
+        console.error(`Subdoc do plano "${plano}" não encontrado para tenant: ${tenantUid}`);
+        return;
+      }
+
+      const { contagem, limites } = planoSnap.data();
+      const vendasMes    = contagem?.vendasMes ?? 0;
+      const limiteVendas = limites?.vendasMes  ?? 500; // trial tem o mesmo limite do essencial
+
+      if (vendasMes >= limiteVendas) {
+        console.warn(`Limite de vendas atingido para tenant: ${tenantUid} (${vendasMes}/${limiteVendas})`);
+        return;
+      }
+
+      tx.update(planoRef, {
+        "contagem.vendasMes": FieldValue.increment(1),
+      });
+    });
+  }
+);
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO: resetContagemMensal
+   Roda todo dia 1 às 00:00 (horário de Brasília).
+   Zera contagem.vendasMes em todos os planos ativos.
+───────────────────────────────────────────── */
+exports.resetContagemMensal = onSchedule(
+  {
+    schedule: "0 0 1 * *",
+    timeZone: "America/Sao_Paulo",
+  },
+  async () => {
+    const snapshot = await db
+      .collectionGroup("plano")
+      .where("ativo", "==", true)
+      .get();
+
+    if (snapshot.empty) {
+      console.log("Nenhum plano ativo encontrado para reset.");
+      return;
+    }
+
+    const BATCH_LIMIT = 500;
+    let batch = db.batch();
+    let count = 0;
+
+    for (const doc of snapshot.docs) {
+      batch.update(doc.ref, {
+        "contagem.vendasMes": 0,
+        "contagem.resetAt":   Timestamp.now(),
+      });
+      count++;
+
+      if (count % BATCH_LIMIT === 0) {
+        await batch.commit();
+        batch = db.batch();
+      }
+    }
+
+    if (count % BATCH_LIMIT !== 0) {
+      await batch.commit();
+    }
+
+    console.log(`Reset mensal aplicado em ${snapshot.size} planos.`);
+  }
+);
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO: onTrialExpiry
+   Roda todo dia às 03:00 (horário de Brasília).
+   Marca ativo: false em licenças trial vencidas.
+───────────────────────────────────────────── */
+exports.onTrialExpiry = onSchedule(
+  {
+    schedule: "0 6 * * *",       // 6h UTC = 3h BRT (UTC-3)
+    timeZone: "America/Sao_Paulo",
+  },
+  async () => {
+    const agora = Timestamp.now();
+
+    const snapshot = await db
+      .collection("licencas")
+      .where("plano",       "==", "trial")
+      .where("ativo",       "==", true)
+      .where("trialExpira", "<=", agora)
+      .get();
+
+    if (snapshot.empty) {
+      console.log("Nenhum trial vencido encontrado.");
+      return;
+    }
+
+    const BATCH_LIMIT = 500;
+    let batch = db.batch();
+    let count = 0;
+
+    for (const doc of snapshot.docs) {
+      batch.update(doc.ref, { ativo: false });
+      count++;
+
+      if (count % BATCH_LIMIT === 0) {
+        await batch.commit();
+        batch = db.batch();
+      }
+    }
+
+    if (count % BATCH_LIMIT !== 0) {
+      await batch.commit();
+    }
+
+    console.log(`${snapshot.size} licenças trial expiradas desativadas.`);
+  }
+);
