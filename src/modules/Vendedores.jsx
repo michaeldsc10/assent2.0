@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
+import { fsSnapshotError } from "../utils/firestoreError";
 import {
   collection,
   doc,
@@ -708,24 +709,27 @@ export default function Vendedores() {
 
     const unsubUser = onSnapshot(doc(db, "users", tenantUid), (snap) => {
       if (snap.exists()) setVendedorIdCnt(snap.data().vendedorIdCnt || 0);
-    });
+    }, fsSnapshotError("Vendedores:userRef"));
 
     const unsubVendedores = onSnapshot(
       collection(db, "users", tenantUid, "vendedores"),
       (snap) => {
         setVendedores(snap.docs.map(d => ({ id: d.id, ...d.data() })));
         setLoading(false);
-      }
+      },
+      fsSnapshotError("Vendedores:vendedores")
     );
 
     const unsubVendas = onSnapshot(
       collection(db, "users", tenantUid, "vendas"),
-      (snap) => setVendas(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      (snap) => setVendas(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      fsSnapshotError("Vendedores:vendas")
     );
 
     const unsubUsuarios = onSnapshot(
       collection(db, "users", tenantUid, "usuarios"),
-      (snap) => setUsuariosSistema(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      (snap) => setUsuariosSistema(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      fsSnapshotError("Vendedores:usuarios")
     );
 
     return () => { unsubUser(); unsubVendedores(); unsubVendas(); unsubUsuarios(); };
