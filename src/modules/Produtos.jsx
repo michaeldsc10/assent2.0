@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 
 import { db, storage } from "../lib/firebase";
+import { fsError, fsSnapshotError } from "../utils/firestoreError";
+import { fsError, fsSnapshotError } from "../utils/firestoreError";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useAuth } from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
@@ -431,7 +433,7 @@ function ModalNovoProduto({ produto, produtos, onSave, onClose }) {
       const url = await getDownloadURL(storageRef);
       set("foto", url);
     } catch (err) {
-      console.error("Erro ao fazer upload da foto:", err);
+      fsError(err, "Produtos:uploadFoto");
       alert("Erro ao enviar a imagem. Tente novamente.");
     } finally {
       setUploadando(false);
@@ -891,16 +893,16 @@ export default function Produtos({ isPro = false }) {
 
     const unsubUser = onSnapshot(userRef, (snap) => {
       if (snap.exists()) setProdutoIdCnt(snap.data().produtoIdCnt || 0);
-    });
+    }, fsSnapshotError("Produtos:userRef"));
 
     const unsubProdutos = onSnapshot(produtosCol, (snap) => {
       setProdutos(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
       setLoading(false);
-    });
+    }, fsSnapshotError("Produtos:produtos"));
 
     const unsubVendas = onSnapshot(vendasCol, (snap) => {
       setVendas(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
+    }, fsSnapshotError("Produtos:vendas"));
 
     return () => { unsubUser(); unsubProdutos(); unsubVendas(); };
   }, [tenantUid]);
