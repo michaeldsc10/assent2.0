@@ -734,7 +734,7 @@ const CSS = `
   .ag-dropdown-item.danger:hover { background: var(--red-d); }
 
   /* ══ CORPO ══ */
-  .ag-body { flex: 1; display: flex; overflow: hidden; }
+  .ag-body { flex: 1; min-height: 0; display: flex; overflow: hidden; }
 
   /* ══ SIDEBAR ══ */
   .ag-sidebar {
@@ -2806,9 +2806,9 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           </aside>
 
           {/* Conteúdo principal */}
-         <main className="ag-main">
-  {renderModulo()}
-</main>
+          <main className="ag-main" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}>
+            {renderModulo()}
+          </main>
 
         </div>
 
