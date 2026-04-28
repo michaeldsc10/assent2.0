@@ -1021,7 +1021,10 @@ function SecaoEmpresa({ config, onSave, uid }) {
   );
 }
 
-function SecaoSeguranca() {
+function SecaoSeguranca({ config, onSave }) {
+  const { isAdmin } = useAuth();
+
+  /* ── Trocar senha Firebase ── */
   const [form, setForm]         = useState({ senhaAtual: "", novaSenha: "", confirmar: "" });
   const [erros, setErros]       = useState({});
   const [salvando, setSalvando] = useState(false);
@@ -1034,9 +1037,9 @@ function SecaoSeguranca() {
 
   const validar = () => {
     const e = {};
-    if (!form.senhaAtual)                e.senhaAtual = "Informe a senha atual.";
-    if (form.novaSenha.length < 6)       e.novaSenha  = "Mínimo 6 caracteres.";
-    if (form.novaSenha !== form.confirmar) e.confirmar = "As senhas não conferem.";
+    if (!form.senhaAtual)                  e.senhaAtual = "Informe a senha atual.";
+    if (form.novaSenha.length < 6)         e.novaSenha  = "Mínimo 6 caracteres.";
+    if (form.novaSenha !== form.confirmar)  e.confirmar  = "As senhas não conferem.";
     setErros(e);
     return Object.keys(e).length === 0;
   };
@@ -1060,48 +1063,138 @@ function SecaoSeguranca() {
     }
   };
 
+  /* ── Senha de cancelamento (admin only) ── */
+  const jaTemSenha = !!(config?.senhaCancelamento);
+  const [cancForm, setCancForm]         = useState({ nova: "", confirmar: "" });
+  const [errosCanc, setErrosCanc]       = useState({});
+  const [salvandoCanc, setSalvandoCanc] = useState(false);
+  const [sucessoCanc, setSucessoCanc]   = useState(false);
+
+  const setCanc = (k, v) => {
+    setCancForm(f => ({ ...f, [k]: v }));
+    if (errosCanc[k]) setErrosCanc(e => ({ ...e, [k]: "" }));
+  };
+
+  const validarCanc = () => {
+    const e = {};
+    if (cancForm.nova.length < 4)              e.nova      = "Mínimo 4 caracteres.";
+    if (cancForm.nova !== cancForm.confirmar)  e.confirmar = "As senhas não conferem.";
+    setErrosCanc(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleSalvarCanc = async () => {
+    if (!validarCanc()) return;
+    setSalvandoCanc(true);
+    try {
+      await onSave({ senhaCancelamento: cancForm.nova });
+      setCancForm({ nova: "", confirmar: "" });
+      setSucessoCanc(true);
+      setTimeout(() => setSucessoCanc(false), 4000);
+    } finally {
+      setSalvandoCanc(false);
+    }
+  };
+
   return (
-    <div className="cfg-card">
-      <div className="cfg-card-header">
-        <div className="cfg-card-header-icon"><Lock size={15} /></div>
-        <div>
-          <div className="cfg-card-title">Trocar Senha</div>
-          <div className="cfg-card-sub">Autenticação via Firebase — confirme a senha atual</div>
-        </div>
-      </div>
-      <div className="cfg-card-body">
-        {sucesso && (
-          <div className="cfg-alert" style={{ background: "rgba(72,187,120,0.08)", border: "1px solid rgba(72,187,120,0.3)", color: "#48bb78", marginBottom: 16 }}>
-            <Check size={14} style={{ flexShrink: 0 }} />Senha alterada com sucesso!
-          </div>
-        )}
-        <div className="form-group">
-          <label className="form-label">Senha Atual <span className="form-label-req">*</span></label>
-          <PassInput value={form.senhaAtual} onChange={e => set("senhaAtual", e.target.value)}
-            placeholder="Digite sua senha atual" className={erros.senhaAtual ? "err" : ""} />
-          {erros.senhaAtual && <div className="form-error">{erros.senhaAtual}</div>}
-        </div>
-        <div className="form-row">
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Nova Senha <span className="form-label-req">*</span></label>
-            <PassInput value={form.novaSenha} onChange={e => set("novaSenha", e.target.value)}
-              placeholder="Mínimo 6 caracteres" className={erros.novaSenha ? "err" : ""} />
-            {erros.novaSenha && <div className="form-error">{erros.novaSenha}</div>}
-          </div>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Confirmar Nova Senha <span className="form-label-req">*</span></label>
-            <PassInput value={form.confirmar} onChange={e => set("confirmar", e.target.value)}
-              placeholder="Repita a nova senha" className={erros.confirmar ? "err" : ""} />
-            {erros.confirmar && <div className="form-error">{erros.confirmar}</div>}
+    <>
+      {/* Card: Trocar Senha Firebase */}
+      <div className="cfg-card">
+        <div className="cfg-card-header">
+          <div className="cfg-card-header-icon"><Lock size={15} /></div>
+          <div>
+            <div className="cfg-card-title">Trocar Senha</div>
+            <div className="cfg-card-sub">Autenticação via Firebase — confirme a senha atual</div>
           </div>
         </div>
+        <div className="cfg-card-body">
+          {sucesso && (
+            <div className="cfg-alert" style={{ background: "rgba(72,187,120,0.08)", border: "1px solid rgba(72,187,120,0.3)", color: "#48bb78", marginBottom: 16 }}>
+              <Check size={14} style={{ flexShrink: 0 }} />Senha alterada com sucesso!
+            </div>
+          )}
+          <div className="form-group">
+            <label className="form-label">Senha Atual <span className="form-label-req">*</span></label>
+            <PassInput value={form.senhaAtual} onChange={e => set("senhaAtual", e.target.value)}
+              placeholder="Digite sua senha atual" className={erros.senhaAtual ? "err" : ""} />
+            {erros.senhaAtual && <div className="form-error">{erros.senhaAtual}</div>}
+          </div>
+          <div className="form-row">
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Nova Senha <span className="form-label-req">*</span></label>
+              <PassInput value={form.novaSenha} onChange={e => set("novaSenha", e.target.value)}
+                placeholder="Mínimo 6 caracteres" className={erros.novaSenha ? "err" : ""} />
+              {erros.novaSenha && <div className="form-error">{erros.novaSenha}</div>}
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Confirmar Nova Senha <span className="form-label-req">*</span></label>
+              <PassInput value={form.confirmar} onChange={e => set("confirmar", e.target.value)}
+                placeholder="Repita a nova senha" className={erros.confirmar ? "err" : ""} />
+              {erros.confirmar && <div className="form-error">{erros.confirmar}</div>}
+            </div>
+          </div>
+        </div>
+        <div className="cfg-card-footer">
+          <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
+            {salvando ? <><span className="cfg-spinner" />Alterando...</> : <><Lock size={13} />Alterar Senha</>}
+          </button>
+        </div>
       </div>
-      <div className="cfg-card-footer">
-        <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
-          {salvando ? <><span className="cfg-spinner" />Alterando...</> : <><Lock size={13} />Alterar Senha</>}
-        </button>
-      </div>
-    </div>
+
+      {/* Card: Senha de Cancelamento — somente admin */}
+      {isAdmin && (
+        <div className="cfg-card">
+          <div className="cfg-card-header">
+            <div className="cfg-card-header-icon"><Shield size={15} /></div>
+            <div>
+              <div className="cfg-card-title">Senha de Cancelamento</div>
+              <div className="cfg-card-sub">Exigida para cancelar vendas no PDV e em Vendas</div>
+            </div>
+          </div>
+          <div className="cfg-card-body">
+            {!jaTemSenha && !sucessoCanc && (
+              <div className="cfg-alert" style={{ background: "rgba(224,82,82,0.07)", border: "1px solid rgba(224,82,82,0.25)", color: "#e05555", marginBottom: 16 }}>
+                <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                &nbsp;Sem senha cadastrada — qualquer operador pode cancelar vendas.
+              </div>
+            )}
+            {jaTemSenha && !sucessoCanc && (
+              <div className="cfg-alert" style={{ background: "rgba(72,187,120,0.06)", border: "1px solid rgba(72,187,120,0.25)", color: "#48bb78", marginBottom: 16 }}>
+                <CheckCircle2 size={14} style={{ flexShrink: 0 }} />
+                &nbsp;Senha cadastrada. Para alterar, defina uma nova abaixo.
+              </div>
+            )}
+            {sucessoCanc && (
+              <div className="cfg-alert" style={{ background: "rgba(72,187,120,0.08)", border: "1px solid rgba(72,187,120,0.3)", color: "#48bb78", marginBottom: 16 }}>
+                <Check size={14} style={{ flexShrink: 0 }} />Senha de cancelamento salva com sucesso!
+              </div>
+            )}
+            <div className="form-row">
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Nova Senha <span className="form-label-req">*</span></label>
+                <PassInput value={cancForm.nova} onChange={e => setCanc("nova", e.target.value)}
+                  placeholder="Mínimo 4 caracteres" className={errosCanc.nova ? "err" : ""} />
+                {errosCanc.nova && <div className="form-error">{errosCanc.nova}</div>}
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Confirmar <span className="form-label-req">*</span></label>
+                <PassInput value={cancForm.confirmar} onChange={e => setCanc("confirmar", e.target.value)}
+                  placeholder="Repita a senha" className={errosCanc.confirmar ? "err" : ""} />
+                {errosCanc.confirmar && <div className="form-error">{errosCanc.confirmar}</div>}
+              </div>
+            </div>
+          </div>
+          <div className="cfg-card-footer">
+            <button className="btn-primary" onClick={handleSalvarCanc} disabled={salvandoCanc}>
+              {salvandoCanc
+                ? <><span className="cfg-spinner" />Salvando...</>
+                : <><Lock size={13} />{jaTemSenha ? "Alterar Senha" : "Cadastrar Senha"}</>
+              }
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -1929,7 +2022,7 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
     if (loading) return <div className="cfg-loading">Carregando configurações...</div>;
     switch (secao) {
       case "empresa":    return <SecaoEmpresa    config={config} onSave={handleSave} uid={uid} />;
-      case "seguranca":  return <SecaoSeguranca />;
+      case "seguranca":  return <SecaoSeguranca config={config} onSave={handleSave} />;
       case "financeiro": return <SecaoFinanceiro config={config} onSave={handleSave} />;
       case "pagamentos": return <SecaoPagamentos config={config} onSave={handleSave} />;
       case "menu":       return <SecaoMenu       config={config} onSave={handleSave} />;
@@ -1995,6 +2088,7 @@ export function useConfiguracoes(uid) {
     taxas: { ...TAXAS_DEFAULT, ...(config?.taxas || {}) },
     estoqueMinimo: config?.estoqueMinimo ?? 5,
     menuVisivel: config?.menuVisivel || {},
+    senhaCancelamento: config?.senhaCancelamento || "",
     empresa: config?.empresa || { nomeEmpresa: config?.nomeEmpresa || "", cnpj: config?.cnpj || "", telefone: config?.telefone || "", endereco: config?.endereco || "", logo: config?.logo || "" },
   };
 }
