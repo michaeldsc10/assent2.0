@@ -10,7 +10,7 @@ import {
   CheckCircle, X, AlertCircle, Barcode, User,
   CreditCard, Banknote, QrCode, Package, ArrowLeft,
   Receipt, Loader2, ChevronDown, Printer, PlusCircle, Trash2 as TrashIcon,
-  Copy,
+  Copy, Eye, EyeOff,
 } from "lucide-react";
 
 import { auth, db, functions } from "../lib/firebase";
@@ -752,6 +752,138 @@ function ModalQrPix({ valor, descricao, tenantUid, onPago, onClose }) {
   );
 }
 
+/* ══════════════════════════════════════════════════════
+   MODAL SENHA CANCELAMENTO PDV
+   ══════════════════════════════════════════════════════ */
+function ModalSenhaCancelar({ senhaCadastrada, onConfirm, onClose }) {
+  const [senha, setSenha] = useState("");
+  const [erro, setErro]   = useState("");
+  const [show, setShow]   = useState(false);
+  const inputRef          = useRef(null);
+
+  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 80); }, []);
+
+  const confirmar = () => {
+    /* Se admin não cadastrou senha — libera sem bloqueio */
+    if (!senhaCadastrada) { onConfirm(); return; }
+    if (senha !== senhaCadastrada) {
+      setErro("Senha incorreta.");
+      setSenha("");
+      inputRef.current?.focus();
+      return;
+    }
+    onConfirm();
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 10000,
+        background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontFamily: "'DM Sans','Segoe UI',sans-serif",
+        animation: "fadeIn .15s ease",
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: "#16181f",
+          border: "1px solid rgba(224,82,82,0.3)",
+          borderRadius: 16, width: 320, padding: "24px 22px",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.75)",
+          display: "flex", flexDirection: "column", gap: 18,
+          animation: "slideUp .18s ease",
+        }}
+      >
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: 9,
+              background: "rgba(224,82,82,0.1)", border: "1px solid rgba(224,82,82,0.3)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <X size={16} color="#e05555" />
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#e8e8f0" }}>Cancelar Venda</div>
+              <div style={{ fontSize: 11, color: "#7a7c96" }}>Senha de autorização obrigatória</div>
+            </div>
+          </div>
+          <span role="button" onClick={onClose}
+            style={{ color: "#5c5e72", cursor: "pointer", display: "flex" }}>
+            <X size={15} />
+          </span>
+        </div>
+
+        {/* Input senha */}
+        <div>
+          <div style={{ fontSize: 11, color: "#5c5e72", marginBottom: 6,
+            textTransform: "uppercase", letterSpacing: ".05em" }}>
+            Senha de Cancelamento
+          </div>
+          <div style={{ position: "relative" }}>
+            <input
+              ref={inputRef}
+              type={show ? "text" : "password"}
+              value={senha}
+              onChange={e => { setSenha(e.target.value); setErro(""); }}
+              onKeyDown={e => e.key === "Enter" && confirmar()}
+              placeholder="••••••••"
+              style={{
+                width: "100%", boxSizing: "border-box",
+                background: "rgba(255,255,255,0.06)",
+                border: `1px solid ${erro ? "rgba(224,82,82,0.6)" : "rgba(255,255,255,0.15)"}`,
+                borderRadius: 9, padding: "11px 40px 11px 14px",
+                color: "#e8e8f0", fontSize: 15, outline: "none",
+                fontFamily: "'DM Sans',sans-serif",
+                transition: "border-color .15s",
+              }}
+            />
+            <span role="button" onClick={() => setShow(s => !s)}
+              style={{
+                position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
+                cursor: "pointer", color: "#5c5e72", display: "flex",
+              }}>
+              {show ? <EyeOff size={15} /> : <Eye size={15} />}
+            </span>
+          </div>
+          {erro && <div style={{ fontSize: 11, color: "#e05555", marginTop: 5 }}>{erro}</div>}
+        </div>
+
+        {/* Ações */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1, padding: "10px", borderRadius: 9,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              color: "#9193a5", fontSize: 13, cursor: "pointer",
+              fontFamily: "'DM Sans',sans-serif",
+            }}
+          >Voltar</button>
+          <button
+            onClick={confirmar}
+            style={{
+              flex: 2, padding: "10px", borderRadius: 9,
+              background: "rgba(224,82,82,0.15)",
+              border: "1px solid rgba(224,82,82,0.4)",
+              color: "#e05555", fontSize: 13, fontWeight: 700,
+              cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            }}
+          >
+            <X size={13} /> Confirmar Cancelamento
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ═══════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ═══════════════════════════════════════════════════ */
@@ -782,6 +914,9 @@ export default function PDV({ onVoltar }) {
 
   /* ── Pix QR Code (Mercado Pago) ── */
   const [showQrPix, setShowQrPix] = useState(false);
+
+  /* ── Senha de cancelamento ── */
+  const [showSenhaCancelar, setShowSenhaCancelar] = useState(false);
 
   /* ── UI states ── */
   const [finalizando, setFinalizando] = useState(false);
@@ -960,7 +1095,7 @@ export default function PDV({ onVoltar }) {
   const alterarQty = useCallback((idx, delta) => {
     setCarrinho((prev) => {
       const novo = [...prev];
-      const novaQty = Math.max(0.001, +(novo[idx].qty + delta).toFixed(3));
+      const novaQty = +(novo[idx].qty + delta).toFixed(3);
       if (novaQty <= 0) return prev.filter((_, i) => i !== idx);
       novo[idx] = { ...novo[idx], qty: novaQty, subtotal: novaQty * novo[idx].precoUnit };
       return novo;
@@ -1147,6 +1282,14 @@ export default function PDV({ onVoltar }) {
           taxas={taxas}
           onConfirm={(p) => { setPagamentos(ps => [...ps, p]); setShowPagModal(false); }}
           onClose={() => setShowPagModal(false)}
+        />
+      )}
+
+      {showSenhaCancelar && (
+        <ModalSenhaCancelar
+          senhaCadastrada={config?.senhaCancelamento || ""}
+          onConfirm={() => { setShowSenhaCancelar(false); limparVenda(); }}
+          onClose={() => setShowSenhaCancelar(false)}
         />
       )}
 
@@ -1633,7 +1776,7 @@ export default function PDV({ onVoltar }) {
             </span>
 
             {carrinho.length > 0 && (
-              <button className="pdv-btn-cancelar" onClick={limparVenda}>
+              <button className="pdv-btn-cancelar" onClick={() => setShowSenhaCancelar(true)}>
                 <X size={14} /> Cancelar venda
               </button>
             )}
