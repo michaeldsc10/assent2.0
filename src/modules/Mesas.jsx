@@ -28,6 +28,7 @@ import {
 import AuthContext from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO } from "../lib/logAction";
 import { db, auth } from "../lib/firebase";
+import { fsError, fsSnapshotError } from "../utils/firestoreError";
 import {
   collection, doc, setDoc, deleteDoc, updateDoc, getDoc,
   onSnapshot, runTransaction, increment, addDoc, serverTimestamp,
@@ -918,7 +919,7 @@ function useBluetooth() {
 
     } catch (err) {
       if (err.name !== "NotFoundError") { // Usuário cancelou — não alertar
-        console.error("[BT] Erro ao conectar:", err);
+        fsError(err, "Mesas:bluetoothConectar");
         alert(`Erro ao conectar à impressora: ${err.message}`);
       }
       setBtStatus("desconectado");
@@ -958,7 +959,7 @@ function useBluetooth() {
       }
       return true;
     } catch (err) {
-      console.error("[BT] Erro ao enviar dados:", err);
+      fsError(err, "Mesas:bluetoothEnviar");
       setBtStatus("desconectado");
       setBtChar(null);
       return false;
@@ -1327,7 +1328,7 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
       }
 
     } catch (err) {
-      console.error("[Mesas] Erro ao salvar comanda:", err);
+      fsError(err, "Mesas:salvarComanda");
       alert("Erro ao salvar comanda. Tente novamente.");
     }
     setSalvando(false);
@@ -1431,7 +1432,7 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
           criadoEm: new Date().toISOString(),
         });
       } catch (err) {
-        console.error("[Mesas] Erro ao lançar no caixa:", err);
+        fsError(err, "Mesas:lancarCaixa");
       }
 
       await logAction({ tenantUid: uid, nomeUsuario, cargo, acao: "criar", modulo: "Mesas", descricao: `Fechou Mesa ${mesa.numero} — Venda ${novoId} — R$ ${total.toFixed(2)}` });
@@ -1448,7 +1449,7 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
       });
       onClose();
     } catch (err) {
-      console.error("[Mesas] Erro ao fechar mesa:", err);
+      fsError(err, "Mesas:fecharMesa");
       alert("Erro ao fechar mesa. Tente novamente.");
     }
     setFechando(false);
@@ -1535,7 +1536,7 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
       onVendaSalva(null);
       onClose();
     } catch (err) {
-      console.error("[Mesas] Erro ao cancelar comanda:", err);
+      fsError(err, "Mesas:cancelarComanda");
       alert("Erro ao cancelar. Tente novamente.");
     }
     setCancelando(false);
@@ -2016,7 +2017,7 @@ function ModalConfigMesas({ uid, mesas, onClose, nomeUsuario, cargo }) {
       });
       onClose();
     } catch (err) {
-      console.error("[Mesas] Erro ao configurar:", err);
+      fsError(err, "Mesas:configurar");
       setErro("Erro ao salvar. Tente novamente.");
     }
     setSalvando(false);
@@ -2174,28 +2175,28 @@ export default function Mesas() {
       /* Listener mantido para manter a conexão com o doc do usuário ativa,
          mas o vendaIdCnt não é mais lido do estado React — sempre lemos
          direto do Firestore dentro das transações. */
-    });
+    }, fsSnapshotError("Mesas:userRef"));
 
     const u2 = onSnapshot(mesasCol, snap => {
       const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       arr.sort((a, b) => (a.numero || 0) - (b.numero || 0));
       setMesas(arr);
       setLoading(false);
-    });
+    }, fsSnapshotError("Mesas:mesas"));
 
     const u3 = onSnapshot(comandasCol, snap => {
       const map = {};
       snap.docs.forEach(d => { map[d.id] = { id: d.id, ...d.data() }; });
       setComandas(map);
-    });
+    }, fsSnapshotError("Mesas:comandas"));
 
     const u4 = onSnapshot(produtosCol, snap =>
-      setProdutos(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    );
+      setProdutos(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+    fsSnapshotError("Mesas:produtos"));
 
     const u5 = onSnapshot(servicosCol, snap =>
-      setServicos(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-    );
+      setServicos(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+    fsSnapshotError("Mesas:servicos"));
 
     /* Histórico de cancelamentos de mesa */
     const vendasCol = collection(db, "users", uid, "vendas");
@@ -2204,7 +2205,7 @@ export default function Mesas() {
       const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       arr.sort((a, b) => (b.criadoEm || "").localeCompare(a.criadoEm || ""));
       setHistorico(arr);
-    });
+    }, fsSnapshotError("Mesas:historico"));
 
     getDoc(doc(db, "users", uid, "config", "geral")).then(snap => {
       if (snap.exists() && snap.data().taxas) {
