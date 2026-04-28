@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
+import { fsError, fsSnapshotError } from "../utils/firestoreError";
 import { useAuth } from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
 import { TelaBloqueada } from "../hooks/LicencaUI.jsx";
@@ -1461,12 +1462,12 @@ export default function Orcamentos({ isPro = false }) {
     subs.push(onSnapshot(
       query(collection(db,"users",uid,"orcamentos"),orderBy("datas.criacao","desc")),
       snap=>{ setOrcamentos(snap.docs.map(d=>({id:d.id,...d.data()}))); setLoading(false); },
-      ()=>setLoading(false)
+      (err)=>{ fsError(err, "Orcamentos:orcamentos"); setLoading(false); }
     ));
-    subs.push(onSnapshot(collection(db,"users",uid,"clientes"),  snap=>setClientes(snap.docs.map(d=>({id:d.id,...d.data()})))));
-    subs.push(onSnapshot(collection(db,"users",uid,"produtos"),   snap=>setProdutos(snap.docs.map(d=>({id:d.id,...d.data()})))));
-    subs.push(onSnapshot(collection(db,"users",uid,"servicos"),   snap=>setServicos(snap.docs.map(d=>({id:d.id,...d.data()})))));
-    subs.push(onSnapshot(collection(db,"users",uid,"vendedores"), snap=>setVendedores(snap.docs.map(d=>({id:d.id,...d.data()})))));
+    subs.push(onSnapshot(collection(db,"users",uid,"clientes"),  snap=>setClientes(snap.docs.map(d=>({id:d.id,...d.data()}))), fsSnapshotError("Orcamentos:clientes")));
+    subs.push(onSnapshot(collection(db,"users",uid,"produtos"),   snap=>setProdutos(snap.docs.map(d=>({id:d.id,...d.data()}))), fsSnapshotError("Orcamentos:produtos")));
+    subs.push(onSnapshot(collection(db,"users",uid,"servicos"),   snap=>setServicos(snap.docs.map(d=>({id:d.id,...d.data()}))), fsSnapshotError("Orcamentos:servicos")));
+    subs.push(onSnapshot(collection(db,"users",uid,"vendedores"), snap=>setVendedores(snap.docs.map(d=>({id:d.id,...d.data()}))), fsSnapshotError("Orcamentos:vendedores")));
     getDoc(doc(db,"users",uid,"config","geral")).then(snap=>{
       if(snap.exists()){
         setEmpresa(snap.data()?.empresa||{});
@@ -1643,7 +1644,7 @@ export default function Orcamentos({ isPro = false }) {
       } catch(err) {
         /* A venda foi criada com sucesso. O caixa falhou isoladamente.
            Logamos mas não revertemos — a venda é consistente. */
-        console.error("[Orçamentos] Venda criada, mas erro ao lançar no Caixa:", err);
+        fsError(err, "Orcamentos:lancarCaixa");
       }
     }
   };
