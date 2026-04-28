@@ -3414,7 +3414,7 @@ function renderLogsMemberList() {
         ${m.nomeEmpresa ? `<div style="font-size:11px;color:var(--text3);margin-top:2px">${esc(m.nomeEmpresa)}</div>` : ''}
       </div>
       <div style="display:flex;align-items:center;gap:8px">
-        ${m.pro ? '<span class="pro-badge">★ PRO</span>' : '<span class="free-badge">FREE</span>'}
+        ${planBadgeHtml(m.plano)}
         <button class="btn-log-access" onclick="openLogModal('${m.uid}','${esc(m.name)}','${esc(m.email)}')">
           Acessar Log
         </button>
@@ -3740,9 +3740,25 @@ document.getElementById('notifIndividualModal').addEventListener('click', e => {
 // ══════════════════════════════════════════════
 //  MODAL DE MEMBRO
 // ══════════════════════════════════════════════
+
+/**
+ * Retorna o HTML do badge correto baseado no slug do plano.
+ * Fonte única de verdade — usada no cabeçalho do modal,
+ * no campo "Status Atual" e na lista de Logs.
+ */
+function planBadgeHtml(plano) {
+  if (plano === 'profissional')
+    return '<span class="pro-badge">★ Profissional</span>';
+  if (plano === 'essencial')
+    return '<span class="free-badge" style="border-color:var(--border2);color:var(--text2)">Essencial</span>';
+  if (plano === 'trial')
+    return '<span class="free-badge" style="border-color:rgba(245,158,11,.4);color:var(--warning)">⏳ Trial</span>';
+  return '<span class="free-badge">—</span>';
+}
+
 function openModal(m) {
   document.getElementById('modalTitle').innerHTML =
-    `${esc(m.name)}&ensp;${m.pro ? '<span class="pro-badge">★ PRO</span>' : '<span class="free-badge">FREE</span>'}`;
+    `${esc(m.name)}&ensp;${planBadgeHtml(m.plano)}`;
 
   const diasSemPro = (!m.pro && m.proExpiradoEm)
     ? Math.floor((new Date() - m.proExpiradoEm) / 86400000) : null;
@@ -3800,9 +3816,7 @@ function openModal(m) {
         <div class="info-field">
           <div class="info-field-label">Status Atual</div>
           <div class="info-field-value" style="margin-top:4px">
-            ${m.pro
-              ? '<span class="pro-badge">★ PRO ATIVO</span>'
-              : '<span class="free-badge">FREE</span>'}
+            ${planBadgeHtml(m.plano)}
           </div>
         </div>
         ${m.proExpiradoEm ? `
