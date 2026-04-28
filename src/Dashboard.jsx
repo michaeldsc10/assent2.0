@@ -1217,6 +1217,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         // Filtro de destinatário
         const planOk =
           n.destinatario === "todos" ||
+          (n.destinatario === "profissional" && isProfissional) ||
+          (n.destinatario === "essencial"    && isEssencial)    ||
           (n.destinatario === "pro"  && isPro) ||
           (n.destinatario === "free" && !isPro) ||
           // Notificação individual: verifica se é para este tenant/usuário
