@@ -42,10 +42,6 @@ export function AuthProvider({ children }) {
 
       if (licencaSnap.exists()) {
         // É o Admin — verifica se a licença está ativa
-        // Trecho atual:
-if (licencaSnap.data().ativo !== true) { ... }
-
-// Substituir por:
 const ld = licencaSnap.data();
 const plano = ld.plano ?? "trial";
 let trialExpirado = false;
