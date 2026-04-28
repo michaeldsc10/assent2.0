@@ -1220,8 +1220,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           (n.destinatario === "profissional" && isProfissional) ||
           (n.destinatario === "essencial"    && isEssencial)    ||
           (n.destinatario === "pro"  && isPro) ||
-          (n.destinatario === "free" && !isPro) ||
-          // Notificação individual: verifica se é para este tenant/usuário
+          (n.destinatario === "trial"        && isTrial)         ||
           (n.destinatario === "individual" && (n.destinatarioUid === tenantUid || n.uid === tenantUid));
         if (!planOk) return false;
         // Filtro de 7 dias — ignora notificações antigas para o usuário
@@ -1262,9 +1261,12 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           (d.destinatarioUid === tenantUid || d.uid === tenantUid)
         );
         const globais = todos.filter(d =>
-          d.destinatario === "todos" ||
-          (d.destinatario === "pro"  && isPro) ||
-          (d.destinatario === "free" && !isPro)
+          n.destinatario === "todos" ||
+          (n.destinatario === "profissional" && isProfissional) ||
+          (n.destinatario === "essencial"    && isEssencial)    ||
+          (n.destinatario === "pro"  && isPro) ||
+          (n.destinatario === "trial"        && isTrial)         ||
+          (n.destinatario === "individual" && (n.destinatarioUid === tenantUid || n.uid === tenantUid));
         );
 
         // Individuais têm prioridade; dentro de cada grupo, mais recente primeiro
@@ -2497,15 +2499,10 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               <div className="ag-header-logo-icon">{logoInitials}</div>
             )}
             <span className="ag-header-logo-name">{nomeEmpresa}</span>
-            {isPro && (
-              <span style={{
-                fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                background: "linear-gradient(135deg,#D4AF37,#e8ca60)",
-                WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                border: "1px solid rgba(200,165,94,0.4)",
-                borderRadius: 20, padding: "2px 7px", flexShrink: 0,
-              }}>PRO</span>
+            {(isEssencial || isProfissional) && (
+  <span style={{ /* mesmo estilo */ }}>
+    {isProfissional ? "PRO" : "ESSENCIAL"}
+  </span>
             )}
           </div>
 
