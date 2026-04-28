@@ -9,6 +9,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Search, Plus, Edit2, Trash2, X, Tag, Settings, AlertTriangle } from "lucide-react";
 
 import { db } from "../lib/firebase";
+import { fsSnapshotError } from "../utils/firestoreError";
 import { useAuth } from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
 import {LIMITES_FREE } from "../hooks/useLicenca";
@@ -832,20 +833,20 @@ export default function Servicos({ isPro = false }) {
         setServicoIdCnt(snap.data().servicoIdCnt || 0);
         setCatIdCnt(snap.data().catServicoIdCnt || 0);
       }
-    });
+    }, fsSnapshotError("Servicos:userRef"));
 
     const unsubServicos = onSnapshot(servicosCol, snap => {
       setServicos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
-    });
+    }, fsSnapshotError("Servicos:servicos"));
 
     const unsubCats = onSnapshot(categoriasCol, snap => {
       setCategorias(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, fsSnapshotError("Servicos:categorias"));
 
     const unsubVendas = onSnapshot(vendasCol, snap => {
       setVendas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, fsSnapshotError("Servicos:vendas"));
 
     return () => { unsubUser(); unsubServicos(); unsubCats(); unsubVendas(); };
   }, [tenantUid]);
