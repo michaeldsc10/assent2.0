@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { auth, db, functions } from "../lib/firebase";
+import { fsError, fsSnapshotError } from "../utils/firestoreError";
 import { useAuth } from "../contexts/AuthContext";
 import {
   collection, query, where, getDocs, runTransaction,
@@ -464,7 +465,7 @@ function ModalQrPix({ valor, descricao, tenantUid, onPago, onClose }) {
             setFase("erro");
           }
         }
-      });
+      }, fsSnapshotError("PDV:pagamentoQr"));
 
       /* ── Fallback polling a cada 8s ──
          Garante confirmação mesmo se o webhook falhar */
@@ -1072,7 +1073,7 @@ export default function PDV({ onVoltar }) {
       });
 
     } catch (e) {
-      console.error(e);
+      fsError(e, "PDV:finalizarVenda");
       setErro("Erro ao finalizar venda. Tente novamente.");
     } finally {
       setFinalizando(false);
