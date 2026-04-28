@@ -176,6 +176,27 @@ export function AuthProvider({ children }) {
       // ── Passo 1: verifica se é o Admin/dono do tenant ──────────────
       const adminDoc = await getDoc(doc(db, "users", uid));
       if (adminDoc.exists()) {
+        // ── DEPOIS de confirmar adminDoc.exists(), ANTES de setUser ──
+// Verifica se a licença está ativa e o trial não expirou
+const licencaDoc = await getDoc(doc(db, "licencas", uid));
+if (licencaDoc.exists()) {
+  const ld = licencaDoc.data();
+  const ativo = ld.ativo === true;
+  const plano = ld.plano ?? "trial";
+
+  let trialExpirado = false;
+  if (plano === "trial") {
+    const expira = ld.trialExpira?.toDate?.() ?? null;
+    trialExpirado = expira ? Date.now() > expira.getTime() : false;
+  }
+
+  if (!ativo || trialExpirado) {
+    await _rejeitarAcesso(
+      trialExpirado ? "Trial expirado." : "Licença inativa."
+    );
+    return;
+  }
+}
         setUser(firebaseUser);
         setTenantUid(uid);
         setCargo(CARGOS.ADMIN);
@@ -184,6 +205,7 @@ export function AuthProvider({ children }) {
         setNomeUsuario(firebaseUser.displayName || firebaseUser.email);
         return;
       }
+      
 
       // ── Passo 1.5: pode ser Admin no primeiro acesso (bootstrapping) ──
       const licencaDoc = await getDoc(doc(db, "licencas", uid));
