@@ -1199,7 +1199,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
   /* ── Hooks de dados — declarados aqui para isPro estar disponível nos useEffects abaixo ── */
   const empresa = useEmpresa(uid);
-  const { isPro } = useLicenca(tenantUid);
+  const { isPro, isEssencial, isProfissional, isTrial, plano, licencaAtiva } = useLicenca(tenantUid);
   const dash    = useDashboardData(
     uid, period,
     period === "Personalizado" && customRange.from && customRange.to ? customRange : null
