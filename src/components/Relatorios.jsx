@@ -94,7 +94,7 @@ const CSS = `
   display: flex; flex-direction: column; gap: 22px;
   align-items: stretch;
 }
-.rel-content > * { min-height: 0; }
+.rel-content > * { min-height: 0; flex-shrink: 0; }
 .rel-content::-webkit-scrollbar { width: 3px; }
 .rel-content::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
 
