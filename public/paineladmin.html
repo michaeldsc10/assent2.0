@@ -1119,6 +1119,115 @@ th.sortable.sort-desc::after { content: ' ↓'; color: var(--gold); }
 .announcement-close:hover { background: rgba(255,255,255,0.14); color: var(--text); border-color: var(--gold); }
 
 /* ════════════════════════════════════════
+   GESTÃO DE PLANO (modal de membro)
+════════════════════════════════════════ */
+.plan-slug-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 4px 12px; border-radius: 20px;
+  font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+  font-family: 'IBM Plex Mono', monospace; text-transform: uppercase;
+}
+.plan-slug-badge.essencial {
+  border: 1.5px solid var(--border2); color: var(--text2); background: var(--surface3);
+}
+.plan-slug-badge.profissional {
+  border: 1.5px solid var(--gold); color: var(--gold); background: var(--gold-glow);
+}
+.plan-slug-badge.trial {
+  border: 1.5px solid var(--warning); color: var(--warning); background: rgba(245,158,11,.08);
+}
+.plan-slug-badge.nenhum {
+  border: 1.5px solid var(--border2); color: var(--text3); background: transparent;
+}
+.plan-info-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.plan-actions-row {
+  display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap;
+}
+.btn-plan-action {
+  padding: 7px 16px; border-radius: 8px; font-size: 11px; font-weight: 700;
+  font-family: 'IBM Plex Mono', monospace; letter-spacing: .8px;
+  cursor: pointer; border: 1px solid; transition: all .15s; text-transform: uppercase;
+  background: transparent;
+}
+.btn-plan-action.switch {
+  border-color: var(--gold-border); color: var(--gold);
+}
+.btn-plan-action.switch:hover { background: var(--gold-glow); }
+.btn-plan-action.date {
+  border-color: var(--border2); color: var(--text2);
+}
+.btn-plan-action.date:hover { border-color: var(--gold-border); color: var(--gold); background: var(--gold-glow); }
+.plan-panel {
+  margin-top: 14px; padding: 18px;
+  background: var(--surface3); border: 1px solid var(--border2); border-radius: 10px;
+  display: none;
+}
+.plan-panel.open { display: block; }
+.plan-panel-label {
+  font-size: 9px; letter-spacing: 2px; color: var(--text3);
+  text-transform: uppercase; font-family: 'IBM Plex Mono', monospace; margin-bottom: 14px;
+}
+.plan-options-row { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.plan-option-card {
+  flex: 1; min-width: 130px; padding: 14px 16px; border-radius: 10px; cursor: pointer;
+  border: 1.5px solid var(--border2); background: var(--surface2);
+  transition: all .15s; position: relative;
+}
+.plan-option-card:hover { background: var(--surface); }
+.plan-option-card.selected { border-color: var(--gold); background: var(--gold-glow); }
+.plan-option-card .poc-slug {
+  font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+  font-family: 'IBM Plex Mono', monospace; text-transform: uppercase;
+  color: var(--text); margin-bottom: 8px; padding-right: 24px;
+}
+.plan-option-card.selected .poc-slug { color: var(--gold); }
+.plan-option-card .poc-detail {
+  font-size: 10px; color: var(--text3); font-family: 'IBM Plex Mono', monospace;
+  line-height: 1.7;
+}
+.plan-option-card .poc-check {
+  position: absolute; top: 10px; right: 10px;
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 1.5px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 9px; transition: all .15s; background: transparent; color: transparent;
+}
+.plan-option-card.selected .poc-check {
+  border-color: var(--gold); background: var(--gold); color: #050505;
+}
+.btn-plan-confirm {
+  padding: 10px 22px; border-radius: 8px; font-size: 11px; font-weight: 700;
+  letter-spacing: 1px; cursor: pointer; border: none; text-transform: uppercase;
+  font-family: 'Syne', sans-serif;
+  background: linear-gradient(135deg, var(--gold-dark), var(--gold));
+  color: #050505; transition: opacity .2s;
+}
+.btn-plan-confirm:hover { opacity: .88; }
+.btn-plan-confirm:disabled { opacity: .4; cursor: not-allowed; }
+.btn-plan-cancel {
+  padding: 10px 16px; border-radius: 8px; font-size: 11px; font-weight: 600;
+  letter-spacing: .5px; cursor: pointer; font-family: 'Syne', sans-serif;
+  background: transparent; border: 1px solid var(--border2); color: var(--text2);
+  transition: all .15s;
+}
+.btn-plan-cancel:hover { border-color: var(--danger); color: var(--danger); }
+.plan-date-input {
+  width: 100%; padding: 10px 14px; background: var(--surface2);
+  border: 1px solid var(--border2); border-radius: 8px;
+  color: var(--text); font-family: 'IBM Plex Mono', monospace; font-size: 13px;
+  outline: none; margin-bottom: 14px; transition: border-color .2s;
+  color-scheme: dark;
+}
+.plan-date-input:focus { border-color: var(--gold); }
+.plan-feedback {
+  font-size: 11px; font-family: 'IBM Plex Mono', monospace;
+  margin-left: 4px; display: none;
+}
+
+/* ════════════════════════════════════════
    RESPONSIVE
 ════════════════════════════════════════ */
 @media (max-width: 1280px) { .stats-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -3691,9 +3800,18 @@ function openModal(m) {
       <div style="font-size:10px;color:var(--text3);padding:14px 0;font-family:'IBM Plex Mono',monospace;letter-spacing:1px">
         ·· Histórico detalhado de assinaturas PRO será exibido aqui ··
       </div>
+    </div>
+
+    <!-- Plano & Licença -->
+    <div class="modal-section" id="planSection">
+      <div class="section-label">Plano &amp; Licença</div>
+      <div id="planLoadState" style="display:flex;align-items:center;gap:10px;color:var(--text3);font-family:'IBM Plex Mono',monospace;font-size:11px">
+        <div class="spinner"></div>&nbsp;Carregando plano...
+      </div>
     </div>`;
 
   document.getElementById('memberModal').classList.add('open');
+  loadMemberPlan(m.uid);
 }
 
 document.getElementById('modalClose').addEventListener('click', closeModal);
@@ -3701,6 +3819,330 @@ document.getElementById('memberModal').addEventListener('click', e => {
   if (e.target.id === 'memberModal') closeModal();
 });
 function closeModal() { document.getElementById('memberModal').classList.remove('open'); }
+
+// ══════════════════════════════════════════════
+//  GESTÃO DE PLANO — carregamento e renderização
+// ══════════════════════════════════════════════
+const PLAN_CONFIGS = {
+  essencial: {
+    label: 'Essencial',
+    limites:  { loginsExtras: 5,  vendasMes: 500  },
+    features: { instaInsights: false },
+    details:  ['500 vendas/mês', '5 logins extras', 'Sem Insta Insights'],
+  },
+  profissional: {
+    label: 'Profissional',
+    limites:  { loginsExtras: 15, vendasMes: 2500 },
+    features: { instaInsights: true },
+    details:  ['2 500 vendas/mês', '15 logins extras', '★ Insta Insights'],
+  },
+};
+
+async function loadMemberPlan(uid) {
+  const section = document.getElementById('planSection');
+  if (!section) return;
+  try {
+    const licSnap = await db.collection('licencas').doc(uid).get();
+    if (!licSnap.exists) {
+      document.getElementById('planLoadState').innerHTML =
+        '<span style="color:var(--danger)">Licença não encontrada.</span>';
+      return;
+    }
+    const licData    = licSnap.data();
+    const currentSlug = licData.plano || null;
+
+    if (!currentSlug) {
+      renderPlanSection(uid, null, null);
+      return;
+    }
+
+    const planoSnap = await db.collection('licencas').doc(uid)
+                               .collection('plano').doc(currentSlug).get();
+    renderPlanSection(uid, currentSlug, planoSnap.exists ? planoSnap.data() : null);
+  } catch (e) {
+    console.error('[loadMemberPlan]', e);
+    const ls = document.getElementById('planLoadState');
+    if (ls) ls.innerHTML = '<span style="color:var(--danger)">Erro ao carregar plano.</span>';
+  }
+}
+
+function renderPlanSection(uid, slug, data) {
+  const section = document.getElementById('planSection');
+  if (!section) return;
+
+  const safeSlug   = slug || '';
+  const badgeClass = safeSlug === 'profissional' ? 'profissional'
+                   : safeSlug === 'trial'        ? 'trial'
+                   : safeSlug                    ? 'essencial'
+                   : 'nenhum';
+  const badgeIcon  = safeSlug === 'profissional' ? '★ ' : '';
+  const badgeLabel = safeSlug || 'Sem plano';
+
+  const venc = data?.dataVencimento
+    ? fmtDate(data.dataVencimento.toDate ? data.dataVencimento.toDate() : new Date(data.dataVencimento))
+    : '—';
+  const vendas    = data?.contagem?.vendasMes  ?? '—';
+  const limVendas = data?.limites?.vendasMes   ?? '—';
+  const limLogins = data?.limites?.loginsExtras ?? '—';
+  const instaOk   = data?.features?.instaInsights;
+
+  const planOptionsHtml = Object.entries(PLAN_CONFIGS).map(([s, cfg]) => `
+    <div class="plan-option-card${s === safeSlug ? ' selected' : ''}"
+         onclick="selectPlanOption('${s}')" data-slug="${s}">
+      <div class="poc-check">${s === safeSlug ? '✓' : ''}</div>
+      <div class="poc-slug">${esc(cfg.label)}</div>
+      <div class="poc-detail">${cfg.details.map(d => '· ' + d).join('<br>')}</div>
+    </div>`).join('');
+
+  const vencInputMin   = new Date().toISOString().split('T')[0];
+  const vencInputValue = data?.dataVencimento ? toInputDate(data.dataVencimento) : '';
+
+  section.innerHTML = `
+    <div class="section-label">Plano &amp; Licença</div>
+
+    <div class="plan-info-row">
+      <span class="plan-slug-badge ${badgeClass}">${badgeIcon}${esc(badgeLabel)}</span>
+      <span style="font-size:11px;color:var(--text3);font-family:'IBM Plex Mono',monospace">
+        Vence em: <span style="color:var(--text)">${venc}</span>
+      </span>
+    </div>
+
+    <div class="info-grid" style="margin-bottom:16px">
+      <div class="info-field">
+        <div class="info-field-label">Vendas no Mês</div>
+        <div class="info-field-value" style="font-family:'IBM Plex Mono',monospace">
+          ${vendas} <span style="color:var(--text3);font-size:11px">/ ${limVendas}</span>
+        </div>
+      </div>
+      <div class="info-field">
+        <div class="info-field-label">Logins Extras</div>
+        <div class="info-field-value" style="font-family:'IBM Plex Mono',monospace">${limLogins}</div>
+      </div>
+      <div class="info-field">
+        <div class="info-field-label">Insta Insights</div>
+        <div class="info-field-value" style="font-size:12px;color:${instaOk ? 'var(--success)' : 'var(--text3)'}">
+          ${instaOk ? '✓ Ativo' : '✕ Inativo'}
+        </div>
+      </div>
+    </div>
+
+    <div class="plan-actions-row">
+      <button class="btn-plan-action switch"
+              onclick="togglePlanPanel('switchPanel_${uid.slice(0,8)}', '${uid}', '${safeSlug}')">
+        ⇄ Mudar Plano
+      </button>
+      ${safeSlug ? `
+      <button class="btn-plan-action date"
+              onclick="togglePlanPanel('vencPanel_${uid.slice(0,8)}', '${uid}', '${safeSlug}')">
+        📅 Alterar Vencimento
+      </button>` : ''}
+    </div>
+
+    <!-- Panel: Mudar Plano -->
+    <div class="plan-panel" id="switchPanel_${uid.slice(0,8)}">
+      <div class="plan-panel-label">Selecione o novo plano</div>
+      <div class="plan-options-row" id="planOptionsRow_${uid.slice(0,8)}">
+        ${planOptionsHtml}
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <button class="btn-plan-confirm" id="btnConfirmPlan_${uid.slice(0,8)}"
+                onclick="confirmChangePlan('${uid}', '${safeSlug}')">
+          Confirmar Mudança
+        </button>
+        <button class="btn-plan-cancel"
+                onclick="togglePlanPanel('switchPanel_${uid.slice(0,8)}', '${uid}', '${safeSlug}')">
+          Cancelar
+        </button>
+        <span class="plan-feedback" id="planSwitchFb_${uid.slice(0,8)}"></span>
+      </div>
+    </div>
+
+    <!-- Panel: Alterar Vencimento -->
+    ${safeSlug ? `
+    <div class="plan-panel" id="vencPanel_${uid.slice(0,8)}">
+      <div class="plan-panel-label">Nova data de vencimento</div>
+      <input type="date" class="plan-date-input" id="vencDateInput_${uid.slice(0,8)}"
+             min="${vencInputMin}" value="${vencInputValue}">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <button class="btn-plan-confirm" id="btnConfirmVenc_${uid.slice(0,8)}"
+                onclick="confirmAlterarVencimento('${uid}', '${safeSlug}')">
+          Confirmar Data
+        </button>
+        <button class="btn-plan-cancel"
+                onclick="togglePlanPanel('vencPanel_${uid.slice(0,8)}', '${uid}', '${safeSlug}')">
+          Cancelar
+        </button>
+        <span class="plan-feedback" id="planVencFb_${uid.slice(0,8)}"></span>
+      </div>
+    </div>` : ''}
+  `;
+
+  // Inicializar seleção de plano com o slug atual
+  _selectedPlanSlug = safeSlug;
+}
+
+function toInputDate(ts) {
+  try {
+    const d = ts?.toDate ? ts.toDate() : new Date(ts);
+    return d.toISOString().split('T')[0];
+  } catch { return ''; }
+}
+
+// Slug selecionado no panel de troca de plano
+let _selectedPlanSlug = '';
+
+function selectPlanOption(slug) {
+  // Whitelist: apenas slugs conhecidos são aceitos
+  if (!PLAN_CONFIGS[slug]) return;
+  _selectedPlanSlug = slug;
+  document.querySelectorAll('[id^="planOptionsRow_"] .plan-option-card').forEach(card => {
+    const selected = card.dataset.slug === slug;
+    card.classList.toggle('selected', selected);
+    card.querySelector('.poc-check').textContent = selected ? '✓' : '';
+  });
+}
+
+function togglePlanPanel(panelId, uid, currentSlug) {
+  const uidKey = uid.slice(0, 8);
+  const panels = [`switchPanel_${uidKey}`, `vencPanel_${uidKey}`];
+  panels.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (id === panelId) el.classList.toggle('open');
+    else el.classList.remove('open');
+  });
+  // Resetar seleção ao abrir o panel de troca
+  if (panelId === `switchPanel_${uidKey}`) {
+    _selectedPlanSlug = currentSlug;
+  }
+}
+
+async function confirmChangePlan(uid, currentSlug) {
+  const uidKey = uid.slice(0, 8);
+  const fb  = document.getElementById(`planSwitchFb_${uidKey}`);
+  const btn = document.getElementById(`btnConfirmPlan_${uidKey}`);
+
+  const newSlug = _selectedPlanSlug;
+
+  // Whitelist rigorosa — só planos definidos em PLAN_CONFIGS
+  if (!newSlug || !PLAN_CONFIGS[newSlug]) {
+    showPlanFeedback(fb, 'Selecione um plano.', 'var(--warning)'); return;
+  }
+  if (newSlug === currentSlug) {
+    showPlanFeedback(fb, 'O membro já está neste plano.', 'var(--warning)'); return;
+  }
+
+  const origTxt = btn.textContent;
+  btn.textContent = 'Salvando...'; btn.disabled = true;
+
+  try {
+    const cfg   = PLAN_CONFIGS[newSlug];
+    const ts    = firebase.firestore.FieldValue.serverTimestamp();
+    const nowTs = firebase.firestore.Timestamp.now();
+    const batch = db.batch();
+
+    // 1. Buscar dataVencimento do plano atual para migrar
+    let dataVenc = null;
+    if (currentSlug) {
+      const oldSnap = await db.collection('licencas').doc(uid)
+                               .collection('plano').doc(currentSlug).get();
+      if (oldSnap.exists && oldSnap.data().dataVencimento) {
+        dataVenc = oldSnap.data().dataVencimento;
+      }
+      // Desativar plano antigo
+      batch.update(
+        db.collection('licencas').doc(uid).collection('plano').doc(currentSlug),
+        { ativo: false }
+      );
+    }
+
+    // 2. Verificar se o doc do novo plano já existe
+    const newPlanoRef  = db.collection('licencas').doc(uid).collection('plano').doc(newSlug);
+    const newPlanoSnap = await newPlanoRef.get();
+
+    if (!newPlanoSnap.exists) {
+      batch.set(newPlanoRef, {
+        slug:     newSlug,
+        ativo:    true,
+        limites:  cfg.limites,
+        features: cfg.features,
+        contagem: { vendasMes: 0, resetAt: nowTs },
+        dataInicio:     ts,
+        dataVencimento: dataVenc || ts,
+      });
+    } else {
+      // Reativar e atualizar limites/features
+      batch.update(newPlanoRef, {
+        ativo:    true,
+        limites:  cfg.limites,
+        features: cfg.features,
+      });
+    }
+
+    // 3. Atualizar slug na raiz da licença
+    batch.update(db.collection('licencas').doc(uid), { plano: newSlug });
+
+    await batch.commit();
+
+    showPlanFeedback(fb, `✓ Plano alterado para ${cfg.label}!`, 'var(--success)');
+    setTimeout(() => loadMemberPlan(uid), 1600);
+  } catch (e) {
+    console.error('[confirmChangePlan]', e);
+    showPlanFeedback(fb, 'Erro ao alterar plano.', 'var(--danger)');
+  } finally {
+    btn.textContent = origTxt; btn.disabled = false;
+  }
+}
+
+async function confirmAlterarVencimento(uid, slug) {
+  const uidKey    = uid.slice(0, 8);
+  const fb        = document.getElementById(`planVencFb_${uidKey}`);
+  const btn       = document.getElementById(`btnConfirmVenc_${uidKey}`);
+  const dateInput = document.getElementById(`vencDateInput_${uidKey}`);
+
+  const dateVal = dateInput?.value;
+  if (!dateVal) {
+    showPlanFeedback(fb, 'Selecione uma data.', 'var(--danger)'); return;
+  }
+
+  // Whitelist de slugs válidos (inclui trial para segurança)
+  const validSlugs = [...Object.keys(PLAN_CONFIGS), 'trial'];
+  if (!slug || !validSlugs.includes(slug)) {
+    showPlanFeedback(fb, 'Plano inválido.', 'var(--danger)'); return;
+  }
+
+  // A data selecionada no input type=date é local; forçamos o fim do dia local
+  const selectedDate = new Date(dateVal + 'T23:59:59');
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  if (selectedDate < hoje) {
+    showPlanFeedback(fb, 'A data não pode ser no passado.', 'var(--danger)'); return;
+  }
+
+  const origTxt = btn.textContent;
+  btn.textContent = 'Salvando...'; btn.disabled = true;
+
+  try {
+    const novaData = firebase.firestore.Timestamp.fromDate(selectedDate);
+    await db.collection('licencas').doc(uid).collection('plano').doc(slug)
+            .update({ dataVencimento: novaData });
+
+    showPlanFeedback(fb, `✓ Vencimento: ${fmtDate(selectedDate)}`, 'var(--success)');
+    setTimeout(() => loadMemberPlan(uid), 1600);
+  } catch (e) {
+    console.error('[confirmAlterarVencimento]', e);
+    showPlanFeedback(fb, 'Erro ao atualizar data.', 'var(--danger)');
+  } finally {
+    btn.textContent = origTxt; btn.disabled = false;
+  }
+}
+
+function showPlanFeedback(el, msg, color) {
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color  = color;
+  el.style.display = 'inline';
+  setTimeout(() => { if (el) { el.style.display = 'none'; el.textContent = ''; } }, 3500);
+}
 
 // ══════════════════════════════════════════════
 //  LIGHTBOX DE FOTO
