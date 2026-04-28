@@ -8,6 +8,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -2005,11 +2006,19 @@ async function initFirebase() {
     const firebaseConfig = await res.json();
 
     firebase.initializeApp(firebaseConfig);
-    auth    = firebase.auth();
-db      = firebase.firestore();
-storage = firebase.storage();
+    auth      = firebase.auth();
+db        = firebase.firestore();
+storage   = firebase.storage();
 functions = firebase.functions();
-await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+
+    // App Check — reCAPTCHA v3
+    const appCheck = firebase.appCheck();
+    appCheck.activate(
+      new firebase.appCheck.ReCaptchaV3Provider('6LfdB8ksAAAAAAQPouJJugr2oCUlCP5I8VcerCeK'),
+      true  // auto-refresh token
+    );
+
+    await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
     // Inicia os listeners de auth após o Firebase estar pronto
     setupAuth();
