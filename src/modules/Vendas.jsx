@@ -2194,6 +2194,8 @@ export default function Vendas() {
   const [tab, setTab]                   = useState("ativas");
   const [sortKey, setSortKey]           = useState("data");
   const [sortDir, setSortDir]           = useState("desc");
+  const [pdvSortKey, setPdvSortKey]     = useState("data");
+  const [pdvSortDir, setPdvSortDir]     = useState("desc");
 
   /* ── Nome real do admin (licencas/{tenantUid}/name) ──
      O AuthContext expõe o email do Firebase Auth como displayName para admins.
@@ -2789,7 +2791,7 @@ useEffect(() => {
 
   /* Filtros — canceladas (mesmo período e busca) */
   const vendasCanceladas = useMemo(() => {
-    let lista = filtrarPorPeriodo(vendas.filter(v => v.status === "cancelada" && v.origem !== "pdv"), period, dataInicio, dataFim);
+    let lista = filtrarPorPeriodo(vendas.filter(v => v.status === "cancelada"), period, dataInicio, dataFim);
     if (search.trim()) {
       const q = search.toLowerCase();
       lista = lista.filter(v =>
@@ -2816,11 +2818,21 @@ useEffect(() => {
       );
     }
     return lista.sort((a, b) => {
-      const da = a.criadoEm?.toDate ? a.criadoEm.toDate() : new Date(a.criadoEm || 0);
-      const db_ = b.criadoEm?.toDate ? b.criadoEm.toDate() : new Date(b.criadoEm || 0);
-      return db_ - da;
+      let va, vb;
+      if (pdvSortKey === "id") {
+        va = parseInt((a.idVenda || a.id)?.replace(/\D/g, "") || "0", 10);
+        vb = parseInt((b.idVenda || b.id)?.replace(/\D/g, "") || "0", 10);
+      } else {
+        va = a.data?.toDate ? a.data.toDate() : new Date(a.data || 0);
+        vb = b.data?.toDate ? b.data.toDate() : new Date(b.data || 0);
+      }
+      if (va < vb) return pdvSortDir === "asc" ? -1 : 1;
+      if (va > vb) return pdvSortDir === "asc" ? 1 : -1;
+      const ca = new Date(a.criadoEm || 0);
+      const cb = new Date(b.criadoEm || 0);
+      return cb - ca;
     });
-  }, [vendas, period, dataInicio, dataFim, search]);
+  }, [vendas, period, dataInicio, dataFim, search, pdvSortKey, pdvSortDir]);
 
   if (!tenantUid) return <div className="vd-loading">Carregando autenticação...</div>;
 
@@ -2834,9 +2846,25 @@ useEffect(() => {
     }
   };
 
+  const handlePdvSort = (key) => {
+    if (pdvSortKey === key) {
+      setPdvSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setPdvSortKey(key);
+      setPdvSortDir("desc");
+    }
+  };
+
   const SortIcon = ({ col }) => {
     if (sortKey !== col) return <ChevronsUpDown size={10} style={{ opacity: .4 }} />;
     return sortDir === "asc"
+      ? <ChevronUp size={10} style={{ color: "var(--gold)" }} />
+      : <ChevronDown size={10} style={{ color: "var(--gold)" }} />;
+  };
+
+  const SortPdvIcon = ({ col }) => {
+    if (pdvSortKey !== col) return <ChevronsUpDown size={10} style={{ opacity: .4 }} />;
+    return pdvSortDir === "asc"
       ? <ChevronUp size={10} style={{ color: "var(--gold)" }} />
       : <ChevronDown size={10} style={{ color: "var(--gold)" }} />;
   };
@@ -3097,9 +3125,17 @@ useEffect(() => {
             </div>
 
             <div className="vd-row vd-row-head">
-              <span>ID</span>
+              <span>
+                <span className={`vd-th-sort ${pdvSortKey === "id" ? "active" : ""}`} onClick={() => handlePdvSort("id")}>
+                  ID <SortPdvIcon col="id" />
+                </span>
+              </span>
               <span>CLIENTE</span>
-              <span>DATA</span>
+              <span>
+                <span className={`vd-th-sort ${pdvSortKey === "data" ? "active" : ""}`} onClick={() => handlePdvSort("data")}>
+                  DATA <SortPdvIcon col="data" />
+                </span>
+              </span>
               <span>PAGAMENTOS</span>
               <span>OPERADOR</span>
               <span>ITENS</span>
