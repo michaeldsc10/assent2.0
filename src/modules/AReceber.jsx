@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
+import { fsError } from "../utils/firestoreError";
 import { useAuth } from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
 import {
@@ -763,7 +764,7 @@ export default function AReceber() {
         setLoading(false);
       },
       (err) => {
-        console.error("[AReceber] Erro ao carregar contas:", err);
+        fsError(err, "AReceber:contas");
         setLoading(false);
       }
     );
@@ -784,7 +785,7 @@ export default function AReceber() {
       await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.A_RECEBER, descricao: montarDescricao("criar", "Conta a Receber", dados.clienteNome || dados.descricao, arRef.id) });
       setModalNovo(false);
     } catch (err) {
-      console.error("[AReceber] Erro ao criar conta:", err);
+      fsError(err, "AReceber:criar");
       alert("Erro ao criar conta. Tente novamente.");
     }
   }, [tenantUid]);
@@ -801,7 +802,7 @@ export default function AReceber() {
       await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.A_RECEBER, descricao: montarDescricao("editar", "Conta a Receber", dados.clienteNome || dados.descricao || editando.clienteNome, editando.id) });
       setEditando(null);
     } catch (err) {
-      console.error("[AReceber] Erro ao editar conta:", err);
+      fsError(err, "AReceber:editar");
       alert("Erro ao salvar alterações. Tente novamente.");
     }
   }, [tenantUid, editando]);
@@ -928,12 +929,12 @@ export default function AReceber() {
       } catch (errCaixa) {
         /* O a_receber já foi atualizado. O Caixa falhou isoladamente.
            Não reverte o pagamento — exibe aviso discreto no console. */
-        console.error("[AReceber] Pagamento registrado, mas erro ao lançar no Caixa:", errCaixa);
+        fsError(errCaixa, "AReceber:lancarCaixa");
       }
 
       setPagamento(null);
     } catch (err) {
-      console.error("[AReceber] Erro ao registrar pagamento:", err);
+      fsError(err, "AReceber:pagamento");
       alert("Erro ao registrar pagamento. Tente novamente.");
     }
   }, [tenantUid, pagamento]);
@@ -946,7 +947,7 @@ export default function AReceber() {
       await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.A_RECEBER, descricao: montarDescricao("excluir", "Conta a Receber", deletando.clienteNome || deletando.descricao, deletando.id) });
       setDeletando(null);
     } catch (err) {
-      console.error("[AReceber] Erro ao excluir conta:", err);
+      fsError(err, "AReceber:excluir");
       alert("Erro ao excluir conta. Tente novamente.");
     }
   }, [tenantUid, deletando]);
