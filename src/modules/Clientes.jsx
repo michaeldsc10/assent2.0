@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
+import { fsSnapshotError } from "../utils/firestoreError";
 import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -718,16 +719,16 @@ export default function Clientes() {
 
     const unsubUser = onSnapshot(userRef, (snap) => {
       if (snap.exists()) setClienteIdCnt(snap.data().clienteIdCnt || 0);
-    });
+    }, fsSnapshotError("Clientes:userRef"));
 
     const unsubClientes = onSnapshot(clientesCol, (snap) => {
       setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
-    });
+    }, fsSnapshotError("Clientes:clientes"));
 
     const unsubVendas = onSnapshot(vendasCol, (snap) => {
       setVendas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    }, fsSnapshotError("Clientes:vendas"));
 
     return () => { unsubUser(); unsubClientes(); unsubVendas(); };
   }, [tenantUid]);
