@@ -42,13 +42,26 @@ export function AuthProvider({ children }) {
 
       if (licencaSnap.exists()) {
         // É o Admin — verifica se a licença está ativa
-        if (licencaSnap.data().ativo !== true) {
-          await signOut(auth);
-          throw new AuthError(
-            "licenca-inativa",
-            "Sua licença está inativa. Entre em contato com o suporte."
-          );
-        }
+        // Trecho atual:
+if (licencaSnap.data().ativo !== true) { ... }
+
+// Substituir por:
+const ld = licencaSnap.data();
+const plano = ld.plano ?? "trial";
+let trialExpirado = false;
+if (plano === "trial") {
+  const expira = ld.trialExpira?.toDate?.() ?? null;
+  trialExpirado = expira ? Date.now() > expira.getTime() : false;
+}
+if (ld.ativo !== true || trialExpirado) {
+  await signOut(auth);
+  throw new AuthError(
+    trialExpirado ? "trial-expirado" : "licenca-inativa",
+    trialExpirado
+      ? "Seu período de trial encerrou. Faça upgrade para continuar."
+      : "Sua licença está inativa. Entre em contato com o suporte."
+  );
+}
         return credential.user;
       }
 
