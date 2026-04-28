@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
+import { fsError, fsSnapshotError } from "../utils/firestoreError";
 import { useAuth } from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
 import {  LIMITES_FREE } from "../hooks/useLicenca";
@@ -578,7 +579,7 @@ function useCategorias(tenantUid) {
           .map(d => ({ id: d.id, ...d.data() }))
           .filter(c => c.ativa !== false)
       );
-    });
+    }, fsSnapshotError("Despesas:categorias"));
     return unsub;
   }, [tenantUid]);
 
@@ -1414,7 +1415,7 @@ export default function Despesas({ isPro = false }) {
 
     const unsubUser = onSnapshot(userRef, (snap) => {
       if (snap.exists()) setDespesaIdCnt(snap.data().despesaIdCnt || 0);
-    });
+    }, fsSnapshotError("Despesas:userRef"));
 
     const unsubDesp = onSnapshot(q, (snap) => {
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -1436,7 +1437,7 @@ export default function Despesas({ isPro = false }) {
 
       setDespesas(docs.map(d => ({ ...d, status: calcularStatus(d.vencimento, d.status) })));
       setLoading(false);
-    });
+    }, fsSnapshotError("Despesas:despesas"));
 
     return () => { unsubUser(); unsubDesp(); };
   }, [tenantUid]);
@@ -1598,7 +1599,7 @@ export default function Despesas({ isPro = false }) {
           }
         });
       } catch (err) {
-        console.warn("[Despesas] Não foi possível cancelar entradas em A Receber:", err);
+        fsError(err, "Despesas:cancelarAReceber");
       }
 
       await batch.commit();
