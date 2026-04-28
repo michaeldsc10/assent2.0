@@ -55,6 +55,7 @@ import { usePermissao } from "./hooks/usePermissao";
 import { db, logout } from "./lib/firebase";
 import { useAuth } from "./contexts/AuthContext";
 import { doc, onSnapshot, collection, query, orderBy, limit, where, getDocs } from "firebase/firestore";
+import { fsError, fsSnapshotError } from "./utils/firestoreError";
 
 /* ── Hooks de dados ────────────────────────────── */
 import { useDashboardData, fmtR$, fmtData } from "./hooks/useDashboardData";
@@ -1227,7 +1228,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         return true;
       });
       setNotificacoes(filtradas);
-    }, () => {/* silencia erros de permissão */});
+    }, fsSnapshotError("Dashboard:notificacoes"));
     return unsub;
   }, [tenantUid, isPro]);
 
@@ -1282,7 +1283,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
         setAnuncioModal(naoVistos[0]);
       } catch(e) {
-        console.warn("Erro ao buscar anúncios:", e);
+        fsError(e, "Dashboard:anuncios");
       }
     }
 
@@ -1370,7 +1371,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       // Ordena: vence hoje → 1 dia → 2 dias → 3 dias
       alertas.sort((a, b) => a.diffDias - b.diffDias);
       setNotifDespesas(alertas);
-    }, () => {});
+    }, fsSnapshotError("Dashboard:despesas"));
     return unsub;
   }, [uid]);
 
@@ -1384,7 +1385,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     );
     const unsub = onSnapshot(q, (snap) => {
       setNotifInsights(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    }, () => {});
+    }, fsSnapshotError("Dashboard:insights"));
     return unsub;
   }, [uid]);
 
@@ -1467,7 +1468,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           authUser?.email?.split("@")[0] ||
           "Usuário";
         setUserName(name);
-      });
+      }, fsSnapshotError("Dashboard:nomeAdmin"));
     } else {
       // Convidado: nome salvo em users/{tenantUid}/usuarios/{authUser.uid}
       return onSnapshot(doc(db, "users", uid, "usuarios", authUser.uid), (snap) => {
@@ -1478,7 +1479,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           authUser?.email?.split("@")[0] ||
           "Usuário";
         setUserName(name);
-      });
+      }, fsSnapshotError("Dashboard:nomeConvidado"));
     }
   }, [uid, authUser, nomeUsuario, isAdmin]);
 
@@ -1496,13 +1497,13 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         } else {
           setUserAvatar(null);
         }
-      }, () => setUserAvatar(null));
+      }, (err) => { fsError(err, "Dashboard:avatarAdmin"); setUserAvatar(null); });
     } else {
       // Convidado: foto salva no próprio documento do usuário
       return onSnapshot(doc(db, "users", uid, "usuarios", authUser.uid), (snap) => {
         const fotoBase64 = snap.data()?.fotoBase64 || null;
         setUserAvatar(fotoBase64);
-      }, () => setUserAvatar(null));
+      }, (err) => { fsError(err, "Dashboard:avatarConvidado"); setUserAvatar(null); });
     }
   }, [uid, authUser, isAdmin]);
 
@@ -1511,7 +1512,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     if (!uid) return;
     return onSnapshot(doc(db, "users", uid, "config", "geral"), (snap) => {
       if (snap.exists()) setMenuVisivel(snap.data().menuVisivel || {});
-    });
+    }, fsSnapshotError("Dashboard:configGeral"));
   }, [uid]);
 
   /* ── Datas de cadastro dos clientes (gráfico de crescimento) ── */
@@ -1519,7 +1520,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     if (!uid) return;
     return onSnapshot(collection(db, "users", uid, "clientes"), (snap) => {
       setClientesCadastro(snap.docs.map(d => ({ criadoEm: d.data().criadoEm || null })));
-    });
+    }, fsSnapshotError("Dashboard:clientes"));
   }, [uid]);
 
   /* ── Atalhos de teclado ── */
