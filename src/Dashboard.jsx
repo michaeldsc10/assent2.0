@@ -1199,7 +1199,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
   /* ── Hooks de dados — declarados aqui para isPro estar disponível nos useEffects abaixo ── */
   const empresa = useEmpresa(uid);
-  const { isPro, isEssencial, isProfissional, isTrial, plano, licencaAtiva } = useLicenca(tenantUid);
+  const { isPro, plano: licencaSlug } = useLicenca(tenantUid);
   const dash    = useDashboardData(
     uid, period,
     period === "Personalizado" && customRange.from && customRange.to ? customRange : null
@@ -1217,10 +1217,9 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         // Filtro de destinatário
         const planOk =
           n.destinatario === "todos" ||
-          (n.destinatario === "profissional" && isProfissional) ||
-          (n.destinatario === "essencial"    && isEssencial)    ||
           (n.destinatario === "pro"  && isPro) ||
-          (n.destinatario === "trial"        && isTrial)         ||
+          (n.destinatario === "free" && !isPro) ||
+          // Notificação individual: verifica se é para este tenant/usuário
           (n.destinatario === "individual" && (n.destinatarioUid === tenantUid || n.uid === tenantUid));
         if (!planOk) return false;
         // Filtro de 7 dias — ignora notificações antigas para o usuário
@@ -1260,15 +1259,11 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           d.destinatario === "individual" &&
           (d.destinatarioUid === tenantUid || d.uid === tenantUid)
         );
-     const globais = todos.filter(n =>
-  n.destinatario === "todos" ||
-  (n.destinatario === "profissional" && isProfissional) ||
-  (n.destinatario === "essencial" && isEssencial) ||
-  (n.destinatario === "pro" && isPro) ||
-  (n.destinatario === "trial" && isTrial) ||
-  (n.destinatario === "individual" &&
-    (n.destinatarioUid === tenantUid || n.uid === tenantUid))
-);
+        const globais = todos.filter(d =>
+          d.destinatario === "todos" ||
+          (d.destinatario === "pro"  && isPro) ||
+          (d.destinatario === "free" && !isPro)
+        );
 
         // Individuais têm prioridade; dentro de cada grupo, mais recente primeiro
         const ordenar = (arr) => arr.sort((a, b) => {
@@ -1578,6 +1573,38 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     .map((w) => w[0]).join("").toUpperCase();
 
   const userInitial = userName.charAt(0).toUpperCase();
+
+  /* ── Badge de plano — renderizado no header e na sidebar mobile ──
+     Fonte única de verdade: usa licencaSlug (slug do Firestore).
+     Nunca usa isPro para exibição — só para lógica de permissão. */
+  const PLAN_TAG_STYLES = {
+    base: {
+      fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
+      textTransform: "uppercase", borderRadius: 20,
+      padding: "2px 7px", flexShrink: 0,
+    },
+  };
+  const planTagEl =
+    licencaSlug === "profissional" ? (
+      <span style={{
+        ...PLAN_TAG_STYLES.base,
+        background: "linear-gradient(135deg,#D4AF37,#e8ca60)",
+        WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+        border: "1px solid rgba(200,165,94,0.4)",
+      }}>★ Profissional</span>
+    ) : licencaSlug === "trial" ? (
+      <span style={{
+        ...PLAN_TAG_STYLES.base,
+        color: "var(--amber)",
+        border: "1px solid rgba(245,158,11,0.4)",
+      }}>⏳ Trial</span>
+    ) : licencaSlug === "essencial" ? (
+      <span style={{
+        ...PLAN_TAG_STYLES.base,
+        color: "var(--text-2)",
+        border: "1px solid rgba(255,255,255,0.12)",
+      }}>Essencial</span>
+    ) : null;
 
   /* ── KPI Main ── */
   const kpiMain = [
@@ -2500,11 +2527,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               <div className="ag-header-logo-icon">{logoInitials}</div>
             )}
             <span className="ag-header-logo-name">{nomeEmpresa}</span>
-            {(isEssencial || isProfissional) && (
-  <span style={{ /* mesmo estilo */ }}>
-    {isProfissional ? "PRO" : "ESSENCIAL"}
-  </span>
-            )}
+            {planTagEl}
           </div>
 
           <div className="ag-header-spacer" />
@@ -2833,16 +2856,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     <div className="ag-header-logo-icon">{logoInitials}</div>
                   )}
                   <span className="ag-header-logo-name">{nomeEmpresa}</span>
-                  {isPro && (
-                    <span style={{
-                      fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
-                      textTransform: "uppercase",
-                      background: "linear-gradient(135deg,#D4AF37,#e8ca60)",
-                      WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-                      border: "1px solid rgba(200,165,94,0.4)",
-                      borderRadius: 20, padding: "2px 7px", flexShrink: 0,
-                    }}>PRO</span>
-                  )}
+                  {planTagEl}
                 </div>
                 <button
                   className="ag-sidebar-mobile-close"
