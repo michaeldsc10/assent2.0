@@ -12,7 +12,7 @@ import {
   Search, Plus, Edit2, Trash2, X, Printer,
   ShoppingCart, Package, ChevronDown, ChevronUp,
   Download, Copy, Filter, Calendar, Ban, ChevronsUpDown, Barcode,
-  QrCode, CheckCircle, AlertCircle,
+  QrCode, CheckCircle, AlertCircle, Eye, EyeOff,
 } from "lucide-react";
 
 import AuthContext from "../contexts/AuthContext";
@@ -2003,10 +2003,24 @@ function ModalDetalheVenda({ venda, onClose, onEditar, onCancelar, onExcluirDef,
 /* ══════════════════════════════════════════════════
    MODAL: Confirmar Cancelamento de Venda
    ══════════════════════════════════════════════════ */
-function ModalCancelarVenda({ venda, onConfirm, onClose }) {
+function ModalCancelarVenda({ venda, senhaCancelamento, onConfirm, onClose }) {
   const [cancelando, setCancelando] = useState(false);
+  const [senha, setSenha]           = useState("");
+  const [erro, setErro]             = useState("");
+  const [showPass, setShowPass]     = useState(false);
+  const inputRef                    = useRef(null);
+
+  useEffect(() => {
+    if (senhaCancelamento) setTimeout(() => inputRef.current?.focus(), 80);
+  }, [senhaCancelamento]);
 
   const handleConfirm = async () => {
+    if (senhaCancelamento && senha !== senhaCancelamento) {
+      setErro("Senha incorreta.");
+      setSenha("");
+      inputRef.current?.focus();
+      return;
+    }
     setCancelando(true);
     await onConfirm();
     setCancelando(false);
@@ -2032,6 +2046,49 @@ function ModalCancelarVenda({ venda, onConfirm, onClose }) {
               A venda ficará salva no histórico com status <strong>Cancelada</strong>.
             </span>
           </p>
+
+          {/* Campo de senha — só exibe se admin cadastrou uma */}
+          {senhaCancelamento && (
+            <div style={{ marginTop: 16, textAlign: "left" }}>
+              <div style={{
+                fontSize: 10, fontWeight: 600, letterSpacing: ".07em",
+                textTransform: "uppercase", color: "var(--text-2)", marginBottom: 7,
+              }}>
+                Senha de Cancelamento <span style={{ color: "var(--gold)" }}>*</span>
+              </div>
+              <div style={{ position: "relative" }}>
+                <input
+                  ref={inputRef}
+                  type={showPass ? "text" : "password"}
+                  value={senha}
+                  onChange={e => { setSenha(e.target.value); setErro(""); }}
+                  onKeyDown={e => e.key === "Enter" && handleConfirm()}
+                  placeholder="••••••••"
+                  style={{
+                    width: "100%", boxSizing: "border-box",
+                    background: "var(--s2)",
+                    border: `1px solid ${erro ? "var(--red)" : "var(--border)"}`,
+                    borderRadius: 9, padding: "10px 40px 10px 13px",
+                    color: "var(--text)", fontSize: 13, outline: "none",
+                    fontFamily: "'DM Sans',sans-serif",
+                    transition: "border-color .15s",
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPass(s => !s)}
+                  style={{
+                    position: "absolute", right: 11, top: "50%", transform: "translateY(-50%)",
+                    background: "none", border: "none", cursor: "pointer",
+                    color: "var(--text-3)", display: "flex", alignItems: "center", padding: 0,
+                  }}
+                >
+                  {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+              {erro && <div style={{ fontSize: 11, color: "var(--red)", marginTop: 5 }}>{erro}</div>}
+            </div>
+          )}
         </div>
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Voltar</button>
@@ -2178,7 +2235,8 @@ export default function Vendas() {
   const [vendedores, setVendedores] = useState([]);
   const [vendaIdCnt, setVendaIdCnt] = useState(0);
   /* Taxas de cartão — carregadas uma vez do Firestore, com fallback nos defaults */
-  const [taxas, setTaxas] = useState(TAXAS_DEFAULT);
+  const [taxas, setTaxas]                     = useState(TAXAS_DEFAULT);
+  const [senhaCancelamento, setSenhaCancelamento] = useState("");
 
   const [search, setSearch]   = useState("");
   const [period, setPeriod]   = useState("Tudo");
@@ -2237,8 +2295,10 @@ useEffect(() => {
   /* Carrega taxas de cartão uma vez (getDoc, não listener — dado estático da sessão) */
   getDoc(doc(db, "users", tenantUid, "config", "geral"))
     .then(snap => {
-      if (snap.exists() && snap.data().taxas) {
-        setTaxas(prev => ({ ...TAXAS_DEFAULT, ...snap.data().taxas }));
+      if (snap.exists()) {
+        const d = snap.data();
+        if (d.taxas)               setTaxas(prev => ({ ...TAXAS_DEFAULT, ...d.taxas }));
+        if (d.senhaCancelamento)   setSenhaCancelamento(d.senhaCancelamento);
       }
     })
     .catch(() => { /* mantém os TAXAS_DEFAULT em caso de falha */ });
@@ -3232,6 +3292,7 @@ useEffect(() => {
       {deletando && (
         <ModalCancelarVenda
           venda={deletando}
+          senhaCancelamento={senhaCancelamento}
           onConfirm={handleCancelar}
           onClose={() => setDeletando(null)}
         />
