@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
+import { fsError, fsSnapshotError } from "../utils/firestoreError";
 import { useAuth } from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
 import {
@@ -360,7 +361,7 @@ function ModalFornecedor({ fornecedor, uid, onSave, onClose }) {
 
       return true;
     } catch (error) {
-      console.error("Erro ao verificar duplicidade de fornecedor:", error);
+      fsError(error, "Fornecedores:duplicidade");
       /* Em caso de erro de leitura, bloquear como precaução */
       throw new Error("Não foi possível verificar duplicidade. Tente novamente.");
     }
@@ -403,7 +404,7 @@ function ModalFornecedor({ fornecedor, uid, onSave, onClose }) {
 
       await onSave(payload, isEdit ? fornecedor : null);
     } catch (error) {
-      console.error("Erro ao salvar fornecedor:", error);
+      fsError(error, "Fornecedores:salvar");
       setErroDup(error.message || "Erro ao salvar. Tente novamente.");
       setSalvando(false);
     }
@@ -615,7 +616,7 @@ export default function Fornecedores() {
         setLoading(false);
       },
       (error) => {
-        console.error("Erro ao carregar fornecedores:", error);
+        fsError(error, "Fornecedores:carregar");
         setLoading(false);
       }
     );
@@ -642,7 +643,7 @@ export default function Fornecedores() {
         setModalNovo(false);
       }
     } catch (error) {
-      console.error("Erro ao persistir fornecedor:", error);
+      fsError(error, "Fornecedores:persistir");
       /* Re-lança para o modal tratar e exibir para o usuário */
       throw new Error("Falha ao salvar no banco de dados. Tente novamente.");
     }
@@ -661,7 +662,7 @@ export default function Fornecedores() {
         dataAtualizacao: new Date().toISOString(),
       });
     } catch (error) {
-      console.error("Erro ao alterar status do fornecedor:", error);
+      fsError(error, "Fornecedores:status");
     } finally {
       setToggleAlvo(null);
     }
