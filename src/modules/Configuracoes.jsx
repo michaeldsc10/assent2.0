@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { db, functions } from "../lib/firebase";
+import { fsError } from "../utils/firestoreError";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, startAfter } from "firebase/firestore";
@@ -1713,7 +1714,7 @@ function SecaoLog({ tenantUid }) {
       setUltimoDoc(fatia[fatia.length - 1] ?? null);
       setTemMais(temProximo);
     } catch (err) {
-      console.error("[SecaoLog] Erro ao carregar logs:", err);
+      fsError(err, "Configuracoes:carregarLogs");
     } finally {
       setCarregando(false);
       setCarregandoMais(false);
