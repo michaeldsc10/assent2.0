@@ -18,6 +18,7 @@ import {
 import AuthContext from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO } from "../lib/logAction";
 import { db, auth } from "../lib/firebase";
+import { fsError, fsSnapshotError } from "../utils/firestoreError";
 import { getIdToken } from "firebase/auth";
 
 import {
@@ -808,7 +809,7 @@ function ModalQrPixVendas({ valor, descricao, tenantUid, onPago, onClose }) {
             setFase("erro");
           }
         }
-      });
+      }, fsSnapshotError("Vendas:pagamentoQr"));
 
       pollingRef.current = setInterval(async () => {
         if (!mountedRef.current || confirmadoRef.current) return;
@@ -2231,7 +2232,7 @@ useEffect(() => {
 
   const unsub1 = onSnapshot(userRef, (snap) => {
     if (snap.exists()) setVendaIdCnt(snap.data().vendaIdCnt || 0);
-  });
+  }, fsSnapshotError("Vendas:userRef"));
 
   /* Carrega taxas de cartão uma vez (getDoc, não listener — dado estático da sessão) */
   getDoc(doc(db, "users", tenantUid, "config", "geral"))
@@ -2251,20 +2252,20 @@ useEffect(() => {
     });
     setVendas(arr);
     setLoading(false);
-  });
+  }, fsSnapshotError("Vendas:vendas"));
 
   const unsub3 = onSnapshot(clientesCol, (snap) => 
-    setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-  );
+    setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+  fsSnapshotError("Vendas:clientes"));
   const unsub4 = onSnapshot(produtosCol, (snap) => 
-    setProdutos(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-  );
+    setProdutos(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+  fsSnapshotError("Vendas:produtos"));
   const unsub5 = onSnapshot(servicosCol, (snap) => 
-    setServicos(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-  );
+    setServicos(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+  fsSnapshotError("Vendas:servicos"));
   const unsub6 = onSnapshot(vendsCol, (snap) => 
-    setVendedores(snap.docs.map(d => ({ id: d.id, ...d.data() })))
-  );
+    setVendedores(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+  fsSnapshotError("Vendas:vendedores"));
 
   return () => {
     unsub1();
@@ -2353,7 +2354,7 @@ useEffect(() => {
           alert("Estoque insuficiente para um ou mais produtos. A venda não foi salva.");
           return;
         }
-        console.error("[Vendas] Erro na transação de edição:", errTx);
+        fsError(errTx, "Vendas:edicaoTransacao");
         alert("Erro ao salvar a venda. Tente novamente.");
         return;
       }
@@ -2424,7 +2425,7 @@ useEffect(() => {
       } catch (errFinanceiro) {
         /* A venda e o estoque já foram atualizados com sucesso.
            Falha isolada no reset financeiro — loga para diagnóstico. */
-        console.error("[Vendas] Venda editada, mas erro no reset financeiro:", errFinanceiro);
+        fsError(errFinanceiro, "Vendas:resetFinanceiro");
         alert(
           `Venda ${vendaId} atualizada!\n\n` +
           `⚠️ Não foi possível ajustar os lançamentos financeiros automaticamente. ` +
@@ -2498,7 +2499,7 @@ useEffect(() => {
         tx.set(doc(db, "users", tenantUid), { vendaIdCnt: currentCnt + 1 }, { merge: true });
       });
     } catch (err) {
-      console.error("[Vendas] Erro ao criar venda:", err);
+      fsError(err, "Vendas:criar");
       if (err.message === "ESTOQUE_INSUFICIENTE") {
         // A validação local já exibiu o modal — aqui é só a barreira do Firestore.
         // Nada a fazer; o modal no ModalNovaVenda já foi disparado antes do onSave.
@@ -2529,7 +2530,7 @@ useEffect(() => {
           criadoEm:       new Date().toISOString(),
         });
       } catch (err) {
-        console.error("[Vendas] Venda salva, mas erro ao lançar no Caixa:", err);
+        fsError(err, "Vendas:lancarCaixa");
         // A venda existe e é consistente — só o lançamento de caixa falhou.
         // Não exibe alerta aqui para não poluir o fluxo normal.
       }
@@ -2562,7 +2563,7 @@ useEffect(() => {
          * A venda já foi salva. O A Receber falhou — alerta o usuário
          * mas não desfaz a venda (ela existe e é consistente).
          */
-        console.error("[Vendas] Venda salva, mas erro ao criar A Receber:", err);
+        fsError(err, "Vendas:criarAReceber");
         alert(
           `Venda ${novoId} registrada com sucesso!\n\n` +
           `⚠️ Não foi possível criar o lançamento em "A Receber" automaticamente. ` +
@@ -2608,7 +2609,7 @@ useEffect(() => {
       );
       await Promise.all(caixaSnap.docs.map((d) => deleteDoc(d.ref)));
     } catch (err) {
-      console.error("[Vendas] Venda cancelada, mas erro ao remover lançamentos do Caixa:", err);
+      fsError(err, "Vendas:cancelarCaixa");
     }
 
     /* 3. Remover A Receber vinculado a esta venda (origin "venda" — sinal parcial) */
@@ -2622,7 +2623,7 @@ useEffect(() => {
       );
       await Promise.all(arSnap.docs.map((d) => deleteDoc(d.ref)));
     } catch (err) {
-      console.error("[Vendas] Venda cancelada, mas erro ao remover A Receber:", err);
+      fsError(err, "Vendas:cancelarAReceber");
     }
 
     /* 4. Reverter pagamento no A Receber de mensalidade vinculado a esta venda.
@@ -2655,7 +2656,7 @@ useEffect(() => {
           });
         }
       } catch (err) {
-        console.error("[Vendas] Venda cancelada, mas erro ao reverter pagamento em A Receber (mensalidade):", err);
+        fsError(err, "Vendas:cancelarReverteMensalidade");
       }
     }
 
@@ -2691,7 +2692,7 @@ useEffect(() => {
       );
       await Promise.all(caixaSnap.docs.map((d) => deleteDoc(d.ref)));
     } catch (err) {
-      console.error("[Vendas] Venda excluída, mas erro ao remover lançamentos do Caixa:", err);
+      fsError(err, "Vendas:excluirCaixa");
     }
 
     /* 3. Remover A Receber vinculado a esta venda (origin "venda" — sinal parcial) */
@@ -2705,7 +2706,7 @@ useEffect(() => {
       );
       await Promise.all(arSnap.docs.map((d) => deleteDoc(d.ref)));
     } catch (err) {
-      console.error("[Vendas] Venda excluída, mas erro ao remover A Receber:", err);
+      fsError(err, "Vendas:excluirAReceber");
     }
 
     /* 4. Reverter pagamento no A Receber de mensalidade vinculado a esta venda.
@@ -2737,7 +2738,7 @@ useEffect(() => {
           });
         }
       } catch (err) {
-        console.error("[Vendas] Venda excluída, mas erro ao reverter pagamento em A Receber (mensalidade):", err);
+        fsError(err, "Vendas:excluirReverteMensalidade");
       }
     }
 
