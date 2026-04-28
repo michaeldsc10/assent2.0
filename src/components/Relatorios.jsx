@@ -94,7 +94,7 @@ const CSS = `
   display: flex; flex-direction: column; gap: 22px;
   align-items: stretch;
 }
-.rel-content > * { min-height: 0; flex-shrink: 0; }
+.rel-content > * { min-height: 0; }
 .rel-content::-webkit-scrollbar { width: 3px; }
 .rel-content::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
 
@@ -5071,6 +5071,20 @@ const TITULO_RELATORIO = {
    ══════════════════════════════════════════════════════ */
 function RelatorioVendedores({ vendas, vendedores, intervalo }) {
   const [vendedorSel, setVendedorSel] = useState("todos");
+  const [vendedorDropOpen, setVendedorDropOpen] = useState(false);
+  const vendedorDropRef = useRef(null);
+
+  /* Fecha o dropdown ao clicar fora */
+  useEffect(() => {
+    if (!vendedorDropOpen) return;
+    const handler = (e) => {
+      if (vendedorDropRef.current && !vendedorDropRef.current.contains(e.target)) {
+        setVendedorDropOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [vendedorDropOpen]);
 
   /* ── Vendas ativas do período (excluir canceladas) ── */
   const vendasPeriodo = useMemo(() =>
@@ -5206,7 +5220,7 @@ function RelatorioVendedores({ vendas, vendedores, intervalo }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
-      {/* ── Filtro de vendedor — dropdown ── */}
+      {/* ── Filtro de vendedor — dropdown customizado ── */}
       <div style={{
         display: "flex", alignItems: "center", gap: 12,
         padding: "11px 16px",
@@ -5215,29 +5229,165 @@ function RelatorioVendedores({ vendas, vendedores, intervalo }) {
         <span style={{
           fontSize: 10, fontWeight: 600, textTransform: "uppercase",
           letterSpacing: ".07em", color: "var(--text-3)", flexShrink: 0,
+          display: "flex", alignItems: "center", gap: 5,
         }}>
-          Vendedor
+          <Users size={12} /> Vendedor
         </span>
 
-        <select
-          className="form-input"
-          style={{ maxWidth: 260, padding: "6px 12px", fontSize: 13 }}
-          value={vendedorSel}
-          onChange={e => setVendedorSel(e.target.value)}
-        >
-          <option value="todos">Todos (Ranking)</option>
-          {ranking.map((r) => (
-            <option key={r.id} value={r.id}>{r.nome}</option>
-          ))}
-          {vendedores
-            .filter((v) => !statsMap[v.id])
-            .map((v) => (
-              <option key={v.id} value={v.id} style={{ opacity: 0.5 }}>
-                {v.nome} (sem vendas)
-              </option>
-            ))
-          }
-        </select>
+        {/* Dropdown customizado */}
+        <div ref={vendedorDropRef} style={{ position: "relative" }}>
+          <button
+            onClick={() => setVendedorDropOpen(v => !v)}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "6px 12px", borderRadius: 8,
+              background: vendedorDropOpen ? "var(--s2)" : "var(--s3)",
+              border: `1px solid ${vendedorDropOpen ? "var(--gold)" : "var(--border-h)"}`,
+              color: "var(--text)", cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500,
+              minWidth: 200, maxWidth: 280,
+              transition: "all .13s",
+            }}
+          >
+            <span style={{
+              flex: 1, textAlign: "left", overflow: "hidden",
+              textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>
+              {vendedorSel === "todos"
+                ? "Todos (Ranking)"
+                : (statsMap[vendedorSel]?.nome
+                    || vendedores.find(v => v.id === vendedorSel)?.nome
+                    || vendedorSel)}
+            </span>
+            <ChevronDown
+              size={14}
+              style={{
+                color: "var(--text-3)", flexShrink: 0,
+                transition: "transform .2s ease",
+                transform: vendedorDropOpen ? "rotate(180deg)" : "rotate(0deg)",
+              }}
+            />
+          </button>
+
+          {vendedorDropOpen && (
+            <div style={{
+              position: "absolute", top: "calc(100% + 6px)", left: 0,
+              minWidth: "100%", width: "max-content", maxWidth: 320,
+              background: "var(--s1)", border: "1px solid var(--border-h)",
+              borderRadius: 10, boxShadow: "0 12px 36px rgba(0,0,0,0.45)",
+              overflow: "hidden", zIndex: 400,
+              animation: "rel-dd-in .13s ease",
+            }}>
+              {/* Opção "Todos" */}
+              <button
+                onClick={() => { setVendedorSel("todos"); setVendedorDropOpen(false); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 9,
+                  width: "100%", padding: "9px 12px", border: "none",
+                  background: vendedorSel === "todos" ? "rgba(200,165,94,0.12)" : "transparent",
+                  color: vendedorSel === "todos" ? "var(--gold)" : "var(--text)",
+                  fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500,
+                  cursor: "pointer", textAlign: "left", transition: "background .1s",
+                }}
+                onMouseEnter={e => { if (vendedorSel !== "todos") e.currentTarget.style.background = "var(--s2)"; }}
+                onMouseLeave={e => { if (vendedorSel !== "todos") e.currentTarget.style.background = "transparent"; }}
+              >
+                <span style={{
+                  width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                  background: vendedorSel === "todos" ? "var(--gold)" : "var(--border-h)",
+                  boxShadow: vendedorSel === "todos" ? "0 0 6px rgba(200,165,94,.5)" : "none",
+                }} />
+                Todos (Ranking)
+              </button>
+
+              {/* Divider se houver vendedores */}
+              {ranking.length > 0 && (
+                <div style={{ height: 1, background: "var(--border)", margin: "2px 0" }} />
+              )}
+
+              {/* Lista com scroll */}
+              <div style={{ maxHeight: 220, overflowY: "auto", padding: "4px 0" }}>
+                <div style={{
+                  fontSize: 9, fontWeight: 700, letterSpacing: ".08em",
+                  textTransform: "uppercase", color: "var(--text-3)",
+                  padding: "4px 12px 2px",
+                }}>
+                  Com vendas no período
+                </div>
+                {ranking.map((r) => (
+                  <button
+                    key={r.id}
+                    onClick={() => { setVendedorSel(r.id); setVendedorDropOpen(false); }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 9,
+                      width: "100%", padding: "8px 12px", border: "none",
+                      background: vendedorSel === r.id ? "rgba(200,165,94,0.12)" : "transparent",
+                      color: vendedorSel === r.id ? "var(--gold)" : "var(--text-2)",
+                      fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 500,
+                      cursor: "pointer", textAlign: "left", transition: "background .1s",
+                    }}
+                    onMouseEnter={e => { if (vendedorSel !== r.id) e.currentTarget.style.background = "var(--s2)"; }}
+                    onMouseLeave={e => { if (vendedorSel !== r.id) e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <span style={{
+                      width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                      background: vendedorSel === r.id ? "var(--gold)" : "var(--border-h)",
+                      boxShadow: vendedorSel === r.id ? "0 0 6px rgba(200,165,94,.5)" : "none",
+                    }} />
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {r.nome}
+                    </span>
+                    <span style={{ fontSize: 11, color: "var(--text-3)", flexShrink: 0 }}>
+                      {r.qtd} venda{r.qtd !== 1 ? "s" : ""}
+                    </span>
+                  </button>
+                ))}
+
+                {/* Vendedores sem vendas */}
+                {vendedores.filter((v) => !statsMap[v.id]).length > 0 && (
+                  <>
+                    <div style={{
+                      fontSize: 9, fontWeight: 700, letterSpacing: ".08em",
+                      textTransform: "uppercase", color: "var(--text-3)",
+                      padding: "8px 12px 2px",
+                      borderTop: "1px solid var(--border)", marginTop: 2,
+                    }}>
+                      Sem vendas no período
+                    </div>
+                    {vendedores.filter((v) => !statsMap[v.id]).map((v) => (
+                      <button
+                        key={v.id}
+                        onClick={() => { setVendedorSel(v.id); setVendedorDropOpen(false); }}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 9,
+                          width: "100%", padding: "8px 12px", border: "none",
+                          background: vendedorSel === v.id ? "rgba(200,165,94,0.08)" : "transparent",
+                          color: vendedorSel === v.id ? "var(--gold)" : "var(--text-3)",
+                          fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 400,
+                          cursor: "pointer", textAlign: "left", opacity: 0.65,
+                          transition: "background .1s",
+                        }}
+                        onMouseEnter={e => { if (vendedorSel !== v.id) e.currentTarget.style.background = "var(--s2)"; }}
+                        onMouseLeave={e => { if (vendedorSel !== v.id) e.currentTarget.style.background = "transparent"; }}
+                      >
+                        <span style={{
+                          width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                          background: "var(--border-h)",
+                        }} />
+                        <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {v.nome}
+                        </span>
+                        <span style={{ fontSize: 11, color: "var(--text-3)", flexShrink: 0 }}>
+                          sem vendas
+                        </span>
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ══════════════════════════════════
