@@ -9,6 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions-compat.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
 /* ════════════════════════════════════════
@@ -1995,7 +1996,7 @@ th.sortable.sort-desc::after { content: ' ↓'; color: var(--gold); }
 //  As credenciais ficam nas env vars da Vercel.
 //  Arquivo da rota: /api/firebase-config.js
 // ══════════════════════════════════════════════
-let auth, db, storage;
+let auth, db, storage, functions;
 
 async function initFirebase() {
   try {
@@ -2007,6 +2008,7 @@ async function initFirebase() {
     auth    = firebase.auth();
 db      = firebase.firestore();
 storage = firebase.storage();
+functions = firebase.functions();
 await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
     // Inicia os listeners de auth após o Firebase estar pronto
@@ -3902,7 +3904,18 @@ async function loadMemberPlan(uid) {
       return;
     }
     const licData    = licSnap.data();
-    const currentSlug = licData.plano || null;
+    let currentSlug  = licData.plano || null;
+
+    // Fallback: se o campo raiz plano estiver ausente,
+    // busca o subdoc ativo diretamente na subcoleção
+    if (!currentSlug) {
+      const subSnap = await db.collection('licencas').doc(uid)
+        .collection('plano').where('ativo', '==', true).limit(1).get();
+      if (!subSnap.empty) {
+        // Usa o ID do doc (= slug) ou o campo slug interno
+        currentSlug = subSnap.docs[0].data().slug || subSnap.docs[0].id;
+      }
+    }
 
     if (!currentSlug) {
       renderPlanSection(uid, null, null);
@@ -4089,59 +4102,15 @@ async function confirmChangePlan(uid, currentSlug) {
   btn.textContent = 'Salvando...'; btn.disabled = true;
 
   try {
-    const cfg   = PLAN_CONFIGS[newSlug];
-    const ts    = firebase.firestore.FieldValue.serverTimestamp();
-    const nowTs = firebase.firestore.Timestamp.now();
-    const batch = db.batch();
+    const atualizarPlano = functions.httpsCallable('atualizarPlano');
+    await atualizarPlano({ targetUid: uid, action: 'changePlan', newSlug });
 
-    // 1. Buscar dataVencimento do plano atual para migrar
-    let dataVenc = null;
-    if (currentSlug) {
-      const oldSnap = await db.collection('licencas').doc(uid)
-                               .collection('plano').doc(currentSlug).get();
-      if (oldSnap.exists && oldSnap.data().dataVencimento) {
-        dataVenc = oldSnap.data().dataVencimento;
-      }
-      // Desativar plano antigo
-      batch.update(
-        db.collection('licencas').doc(uid).collection('plano').doc(currentSlug),
-        { ativo: false }
-      );
-    }
-
-    // 2. Verificar se o doc do novo plano já existe
-    const newPlanoRef  = db.collection('licencas').doc(uid).collection('plano').doc(newSlug);
-    const newPlanoSnap = await newPlanoRef.get();
-
-    if (!newPlanoSnap.exists) {
-      batch.set(newPlanoRef, {
-        slug:     newSlug,
-        ativo:    true,
-        limites:  cfg.limites,
-        features: cfg.features,
-        contagem: { vendasMes: 0, resetAt: nowTs },
-        dataInicio:     ts,
-        dataVencimento: dataVenc || ts,
-      });
-    } else {
-      // Reativar e atualizar limites/features
-      batch.update(newPlanoRef, {
-        ativo:    true,
-        limites:  cfg.limites,
-        features: cfg.features,
-      });
-    }
-
-    // 3. Atualizar slug na raiz da licença
-    batch.update(db.collection('licencas').doc(uid), { plano: newSlug });
-
-    await batch.commit();
-
-    showPlanFeedback(fb, `✓ Plano alterado para ${cfg.label}!`, 'var(--success)');
+    showPlanFeedback(fb, `✓ Plano alterado para ${PLAN_CONFIGS[newSlug].label}!`, 'var(--success)');
     setTimeout(() => loadMemberPlan(uid), 1600);
   } catch (e) {
     console.error('[confirmChangePlan]', e);
-    showPlanFeedback(fb, 'Erro ao alterar plano.', 'var(--danger)');
+    const msg = e?.message || 'Erro ao alterar plano.';
+    showPlanFeedback(fb, msg, 'var(--danger)');
   } finally {
     btn.textContent = origTxt; btn.disabled = false;
   }
@@ -4158,13 +4127,7 @@ async function confirmAlterarVencimento(uid, slug) {
     showPlanFeedback(fb, 'Selecione uma data.', 'var(--danger)'); return;
   }
 
-  // Whitelist de slugs válidos (inclui trial para segurança)
-  const validSlugs = [...Object.keys(PLAN_CONFIGS), 'trial'];
-  if (!slug || !validSlugs.includes(slug)) {
-    showPlanFeedback(fb, 'Plano inválido.', 'var(--danger)'); return;
-  }
-
-  // A data selecionada no input type=date é local; forçamos o fim do dia local
+  // A data do input é local; fim do dia local para ser generoso
   const selectedDate = new Date(dateVal + 'T23:59:59');
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
   if (selectedDate < hoje) {
@@ -4175,15 +4138,19 @@ async function confirmAlterarVencimento(uid, slug) {
   btn.textContent = 'Salvando...'; btn.disabled = true;
 
   try {
-    const novaData = firebase.firestore.Timestamp.fromDate(selectedDate);
-    await db.collection('licencas').doc(uid).collection('plano').doc(slug)
-            .update({ dataVencimento: novaData });
+    const atualizarPlano = functions.httpsCallable('atualizarPlano');
+    await atualizarPlano({
+      targetUid:         uid,
+      action:            'updateVencimento',
+      newDataVencimento: selectedDate.getTime(),  // ms timestamp
+    });
 
     showPlanFeedback(fb, `✓ Vencimento: ${fmtDate(selectedDate)}`, 'var(--success)');
     setTimeout(() => loadMemberPlan(uid), 1600);
   } catch (e) {
     console.error('[confirmAlterarVencimento]', e);
-    showPlanFeedback(fb, 'Erro ao atualizar data.', 'var(--danger)');
+    const msg = e?.message || 'Erro ao atualizar data.';
+    showPlanFeedback(fb, msg, 'var(--danger)');
   } finally {
     btn.textContent = origTxt; btn.disabled = false;
   }
