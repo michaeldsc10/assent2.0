@@ -984,9 +984,7 @@ export default function PDV({ onVoltar }) {
     setCarrinho([]);
     setCliente(null);
     setBuscaCliente("");
-    setFormaPag("dinheiro");
-    setParcelas(1);
-    setValorRecebido("");
+    setPagamentos([]);
     setErro("");
     setVendaFinalizada(null);
   };
@@ -1050,7 +1048,7 @@ export default function PDV({ onVoltar }) {
           taxaPct:        0,
           valorTaxa:      0,
           totalLiquido:   Number(total)       || 0,
-          data:           (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; })(),
+          data:           (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}T00:00:00`; })(),
           cliente:        cliente?.nome  || null,
           clienteId:      cliente?.id   || null,
           status:         "ativa",
