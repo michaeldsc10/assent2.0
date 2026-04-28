@@ -1713,7 +1713,7 @@ export default function PDV({ onVoltar }) {
                       <span className="pdv-item-unit">{fmt(item.precoUnit)}</span>
                       <span className="pdv-item-sub">{fmt(item.subtotal)}</span>
                       <button className="pdv-item-del" onClick={() => removerItem(idx)}>
-                        <Trash2 size={13} />
+                        <X size={13} color="var(--pdv-text-2)" />
                       </button>
                     </div>
                   ))}
@@ -2081,7 +2081,7 @@ const CSS = `
 .pdv-item-qty button svg { stroke: #b0b2c8; }
 .pdv-item-qty button:hover svg { stroke: var(--pdv-gold); }
 .pdv-qty-input {
-  width: 40px; background: rgba(255,255,255,0.06);
+  width: 52px; background: rgba(255,255,255,0.06);
   border: 1.5px solid rgba(255,255,255,0.18);
   border-radius: 6px; padding: 3px 6px;
   font-size: 13px; font-weight: 600; color: var(--pdv-text);
@@ -2095,11 +2095,13 @@ const CSS = `
 .pdv-item-unit { font-size: 12px; color: var(--pdv-text-3); }
 .pdv-item-sub  { font-size: 13px; font-weight: 600; color: var(--pdv-text); }
 .pdv-item-del {
-  background: none; border: none; cursor: pointer; color: var(--pdv-text-2);
+  width: 28px; height: 28px; border-radius: 7px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  border-radius: 5px; width: 26px; height: 26px; transition: all .15s;
+  cursor: pointer; border: 1px solid var(--pdv-border);
+  background: rgba(255,255,255,0.06); color: var(--pdv-text-2);
+  transition: all .13s; padding: 0;
 }
-.pdv-item-del:hover { background: rgba(224,85,85,0.1); color: var(--pdv-error); }
+.pdv-item-del:hover { background: rgba(224,82,82,0.12); border-color: rgba(224,82,82,0.3); color: var(--pdv-error); }
 
 /* Total */
 .pdv-total-section {
