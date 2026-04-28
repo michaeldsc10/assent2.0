@@ -30,11 +30,12 @@ import { getAuth, sendPasswordResetEmail } from "firebase/auth";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { db } from "../lib/firebase";
 import AuthContext from "../contexts/AuthContext";
+import { useLicenca } from "../hooks/useLicenca";
 
 /* ─────────────────────────────────────────────
    CONSTANTES
 ───────────────────────────────────────────── */
-const MAX_USUARIOS = 10; // máximo de usuários adicionais (exceto o Admin)
+// MAX_USUARIOS é dinâmico — vem do plano via useLicenca (veja dentro do componente)
 
 const CARGOS = [
   { value: "financeiro",  label: "Financeiro",          cor: "#5b8ef0", bg: "rgba(91,142,240,0.12)"  },
@@ -1160,6 +1161,14 @@ function ModalDetalhes({ usr, vendedores, onFechar, onResetSenha, resetando }) {
 export default function Usuarios() {
   const { user, cargo, tenantUid, isAdmin } = useContext(AuthContext);
 
+  // tenantUid = uid do Admin dono da conta (raiz do Firestore)
+  const raiz = tenantUid || user?.uid;
+
+  // ── Plano: limite dinâmico de usuários extras ──────────────────────
+  // Essencial: 5 | Profissional: 15 | Trial: 15 (acesso total)
+  const { limites, plano, isTrial, isEssencial, isProfissional } = useLicenca(raiz);
+  const MAX_USUARIOS = limites?.loginsExtras ?? 10; // fallback seguro
+
   const [usuarios,   setUsuarios]   = useState([]);
   const [vendedores, setVendedores] = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -1169,9 +1178,6 @@ export default function Usuarios() {
   const [toast,      setToast]      = useState(null); // { msg, tipo }
   const [detalhe,    setDetalhe]    = useState(null); // usr sendo visualizado
   const [resetando,  setResetando]  = useState(false);
-
-  // tenantUid = uid do Admin dono da conta (raiz do Firestore)
-  const raiz = tenantUid || user?.uid;
 
   /* ── Firestore: ouvir usuários ── */
   useEffect(() => {
@@ -1241,7 +1247,7 @@ export default function Usuarios() {
       if (msg.includes("já está em uso"))       setErro("Este e-mail já está em uso em outra conta.");
       else if (msg.includes("E-mail inválido")) setErro("E-mail inválido.");
       else if (msg.includes("6 caracteres"))    setErro("Senha muito fraca. Use pelo menos 6 caracteres.");
-      else if (msg.includes("Limite"))          setErro("Limite de 10 usuários atingido.");
+      else if (msg.includes("Limite"))          setErro(`Limite de ${MAX_USUARIOS} usuários atingido. Considere fazer upgrade do seu plano.`);
       else                                      setErro("Erro ao criar usuário. Tente novamente.");
     } finally {
       setSalvando(false);
@@ -1413,7 +1419,23 @@ export default function Usuarios() {
         <div className="usr-topbar">
           <div className="usr-topbar-title">
             <h2>Usuários</h2>
-            <p>Gerencie os acessos da sua equipe</p>
+            <p>Gerencie os acessos da sua equipe
+              {plano && (
+                <span style={{
+                  marginLeft: 8, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  background: isProfissional
+                    ? "linear-gradient(135deg,#D4AF37,#e8ca60)"
+                    : "rgba(200,165,94,0.2)",
+                  WebkitBackgroundClip: isProfissional ? "text" : undefined,
+                  WebkitTextFillColor: isProfissional ? "transparent" : "var(--gold)",
+                  border: "1px solid rgba(200,165,94,0.35)",
+                  borderRadius: 20, padding: "1px 7px",
+                }}>
+                  {isTrial ? "Trial" : isEssencial ? "Essencial" : "Profissional"}
+                </span>
+              )}
+            </p>
           </div>
 
           <div className="usr-topbar-spacer" />
