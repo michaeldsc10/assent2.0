@@ -9,6 +9,7 @@ import {
   Edit2, Trash2, ArrowDownCircle, ArrowUpCircle, Eye,
 } from "lucide-react";
 import { db } from "../lib/firebase";
+import { fsError, fsSnapshotError } from "../utils/firestoreError";
 import {
   collection, doc, onSnapshot,
   serverTimestamp, runTransaction,
@@ -567,7 +568,7 @@ function ModalEntrada({ tenantUid, nomeUsuario, cargo, produtos, fornecedores, m
       }
       onClose();
     } catch (err) {
-      console.error("Erro ao salvar entrada:", err);
+      fsError(err, "EntradaEstoque:salvar");
       setErrGlobal(err.message || "Erro ao salvar. Tente novamente.");
     } finally {
       setSalvando(false);
@@ -847,7 +848,7 @@ function ModalSaida({ tenantUid, nomeUsuario, cargo, produtos, onSalvo, onClose 
       onSalvo("Saída registrada com sucesso!");
       onClose();
     } catch (err) {
-      console.error("Erro ao registrar saída:", err);
+      fsError(err, "EntradaEstoque:saida");
       setErrGlobal(err.message || "Erro ao registrar saída. Tente novamente.");
     } finally {
       setSalvando(false);
@@ -1047,7 +1048,7 @@ function ModalConfirmDelete({ tenantUid, nomeUsuario, cargo, movimentacao, produ
       onSalvo("Entrada excluída e estoque revertido.");
       onClose();
     } catch (err) {
-      console.error("Erro ao excluir entrada:", err);
+      fsError(err, "EntradaEstoque:excluir");
       setErrGlobal(err.message || "Erro ao excluir. Tente novamente.");
     } finally {
       setExcluindo(false);
@@ -1233,12 +1234,14 @@ export default function EntradaEstoque() {
 
     const unsubP = onSnapshot(
       collection(db, "users", tenantUid, "produtos"),
-      (snap) => setProdutos(snap.docs.map((d) => ({ ...d.data(), id: d.id, _docId: d.id })))
+      (snap) => setProdutos(snap.docs.map((d) => ({ ...d.data(), id: d.id, _docId: d.id }))),
+      fsSnapshotError("EntradaEstoque:produtos")
     );
 
     const unsubF = onSnapshot(
       collection(db, "users", tenantUid, "fornecedores"),
-      (snap) => setFornecedores(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+      (snap) => setFornecedores(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      fsSnapshotError("EntradaEstoque:fornecedores")
     );
 
     const unsubM = onSnapshot(
@@ -1254,7 +1257,8 @@ export default function EntradaEstoque() {
         setEntradas(todos.filter((m) => m.tipo === "entrada"));
         setSaidas(todos.filter((m) => m.tipo === "saida"));
         setLoading(false);
-      }
+      },
+      fsSnapshotError("EntradaEstoque:movimentacoes")
     );
 
     return () => { unsubP(); unsubF(); unsubM(); };
