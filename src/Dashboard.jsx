@@ -1260,14 +1260,15 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           d.destinatario === "individual" &&
           (d.destinatarioUid === tenantUid || d.uid === tenantUid)
         );
-        const globais = todos.filter(d =>
-          n.destinatario === "todos" ||
-          (n.destinatario === "profissional" && isProfissional) ||
-          (n.destinatario === "essencial"    && isEssencial)    ||
-          (n.destinatario === "pro"  && isPro) ||
-          (n.destinatario === "trial"        && isTrial)         ||
-          (n.destinatario === "individual" && (n.destinatarioUid === tenantUid || n.uid === tenantUid));
-        );
+     const globais = todos.filter(n =>
+  n.destinatario === "todos" ||
+  (n.destinatario === "profissional" && isProfissional) ||
+  (n.destinatario === "essencial" && isEssencial) ||
+  (n.destinatario === "pro" && isPro) ||
+  (n.destinatario === "trial" && isTrial) ||
+  (n.destinatario === "individual" &&
+    (n.destinatarioUid === tenantUid || n.uid === tenantUid))
+);
 
         // Individuais têm prioridade; dentro de cada grupo, mais recente primeiro
         const ordenar = (arr) => arr.sort((a, b) => {
