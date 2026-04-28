@@ -799,7 +799,7 @@ const CSS = `
   .ag-sidebar.collapsed .ag-nav-item:hover::after { opacity: 1; }
 
   /* ══ MAIN ══ */
-  .ag-main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .ag-main { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 
   /* ── Acesso Negado (RotaProtegida) ── */
   .acesso-negado { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.75rem; text-align: center; padding: 2rem; color: var(--text-3); }
@@ -847,7 +847,7 @@ const CSS = `
   .ag-period-btn.active { background: var(--gold-d); border-color: rgba(200,165,94,.3); color: var(--gold); }
 
   /* ══ CONTENT ══ */
-  .ag-content { flex: 1; overflow-y: auto; padding: 20px 24px 36px; -webkit-overflow-scrolling: touch; }
+  .ag-content { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px 36px; -webkit-overflow-scrolling: touch; }
   .ag-content::-webkit-scrollbar { width: 4px; }
   .ag-content::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
 
