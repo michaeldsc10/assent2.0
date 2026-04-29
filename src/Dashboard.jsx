@@ -2866,6 +2866,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 tenantUid={tenantUid}
                 nomeEmpresa={nomeEmpresa}
                 onVoltar={() => setSistemaAtivo("gestao")}
+                theme={theme}
+                onToggleTheme={toggleTheme}
               />
             ) : (
               renderModulo()
