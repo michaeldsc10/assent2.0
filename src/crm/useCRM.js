@@ -7,7 +7,7 @@ import {
   deleteDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { db } from "./firebase";
+import { db } from "../lib/firebase";
 
 // ─── Configuração padrão do Radar ────────────────────────────────────────────
 // Salva em dadosCRM/{empresaId} → radar
