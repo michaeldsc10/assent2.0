@@ -888,7 +888,7 @@ function Chip({ color, children }) {
 // ─── Componente principal exportado ──────────────────────────────────────────
 // Recebe T, bp, empresaId e config — mesma assinatura das outras seções do App.
 
-export default function LeadsPage({ T, bp, empresaId, config }) {
+export default function LeadsPage({ T, bp, empresaId, config, funilOculto = false, apenasFlnil = false }) {
   const { leads, metricas, automacoes, carregando, erro, acoesDisparadas } = useLeads(empresaId);
   const [subAba, setSubAba] = useState("lista");
   const [leadSelecionado, setLeadSelecionado] = useState(null);
@@ -961,50 +961,54 @@ export default function LeadsPage({ T, bp, empresaId, config }) {
       {subAba === "lista" && (
         <>
           {/* Métricas — leads passados para cálculo dinâmico de temperatura */}
-          <MetricasLeads leads={leads} metricas={metricas} T={T} bp={bp} />
+          {!funilOculto && <MetricasLeads leads={leads} metricas={metricas} T={T} bp={bp} />}
 
-          {/* Barra de filtros */}
-          <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
-            <input
-              value={busca}
-              onChange={e => setBusca(e.target.value)}
-              placeholder="Buscar por nome ou email..."
-              style={{
-                flex: 1, minWidth: 160, padding: "8px 12px", borderRadius: 7, fontSize: 12,
-                border: `1px solid ${T.borderAlt}`, outline: "none",
-                background: T.surfaceAlt, color: T.text, fontFamily: "inherit",
-              }}
-            />
-            {[
-              { val: filtroTemp,   set: setFiltroTemp,   options: [["","Temperatura"],["quente","Quente"],["morno","Morno"],["frio","Frio"]] },
-              { val: filtroStatus, set: setFiltroStatus, options: [["","Status"],["novo","Novo"],["contactado","Contactado"],["qualificado","Qualificado"],["convertido","Convertido"],["perdido","Perdido"]] },
-            ].map((f, i) => (
-              <select key={i} value={f.val} onChange={e => f.set(e.target.value)} style={{
-                padding: "8px 10px", borderRadius: 7, fontSize: 12,
-                border: `1px solid ${T.borderAlt}`, outline: "none",
-                background: T.surfaceAlt, color: T.text, fontFamily: "inherit", cursor: "pointer",
-              }}>
-                {f.options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </select>
-            ))}
-            <button
-              onClick={() => setCriandoLead(true)}
-              style={{
-                fontSize: 11, fontWeight: 700, padding: "8px 14px", borderRadius: 7,
-                background: T.gold, color: "#000", border: "none", cursor: "pointer",
-                letterSpacing: "0.04em", textTransform: "uppercase", whiteSpace: "nowrap",
-              }}
-            >+ Lead</button>
-          </div>
+          {/* Barra de filtros + tabela — ocultos quando exibido apenas o funil */}
+          {!apenasFlnil && (
+            <>
+              <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+                <input
+                  value={busca}
+                  onChange={e => setBusca(e.target.value)}
+                  placeholder="Buscar por nome ou email..."
+                  style={{
+                    flex: 1, minWidth: 160, padding: "8px 12px", borderRadius: 7, fontSize: 12,
+                    border: `1px solid ${T.borderAlt}`, outline: "none",
+                    background: T.surfaceAlt, color: T.text, fontFamily: "inherit",
+                  }}
+                />
+                {[
+                  { val: filtroTemp,   set: setFiltroTemp,   options: [["","Temperatura"],["quente","Quente"],["morno","Morno"],["frio","Frio"]] },
+                  { val: filtroStatus, set: setFiltroStatus, options: [["","Status"],["novo","Novo"],["contactado","Contactado"],["qualificado","Qualificado"],["convertido","Convertido"],["perdido","Perdido"]] },
+                ].map((f, i) => (
+                  <select key={i} value={f.val} onChange={e => f.set(e.target.value)} style={{
+                    padding: "8px 10px", borderRadius: 7, fontSize: 12,
+                    border: `1px solid ${T.borderAlt}`, outline: "none",
+                    background: T.surfaceAlt, color: T.text, fontFamily: "inherit", cursor: "pointer",
+                  }}>
+                    {f.options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                ))}
+                <button
+                  onClick={() => setCriandoLead(true)}
+                  style={{
+                    fontSize: 11, fontWeight: 700, padding: "8px 14px", borderRadius: 7,
+                    background: T.gold, color: "#000", border: "none", cursor: "pointer",
+                    letterSpacing: "0.04em", textTransform: "uppercase", whiteSpace: "nowrap",
+                  }}
+                >+ Lead</button>
+              </div>
 
-          {leadsFiltrados.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "48px 0", color: T.textDim, fontSize: 13, border: `1px dashed ${T.border}`, borderRadius: 10 }}>
-              {leads.length === 0 ? "Nenhum lead ainda. Adicione o primeiro!" : "Nenhum lead encontrado com esses filtros."}
-            </div>
-          ) : bp.isMobile ? (
-            leadsFiltrados.map(l => <LeadCard key={l.id || l.email} lead={l} T={T} onSelect={setLeadSelecionado} />)
-          ) : (
-            <TabelaLeads leads={leadsFiltrados} T={T} onSelect={setLeadSelecionado} />
+              {leadsFiltrados.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "48px 0", color: T.textDim, fontSize: 13, border: `1px dashed ${T.border}`, borderRadius: 10 }}>
+                  {leads.length === 0 ? "Nenhum lead ainda. Adicione o primeiro!" : "Nenhum lead encontrado com esses filtros."}
+                </div>
+              ) : bp.isMobile ? (
+                leadsFiltrados.map(l => <LeadCard key={l.id || l.email} lead={l} T={T} onSelect={setLeadSelecionado} />)
+              ) : (
+                <TabelaLeads leads={leadsFiltrados} T={T} onSelect={setLeadSelecionado} />
+              )}
+            </>
           )}
         </>
       )}
