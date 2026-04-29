@@ -2548,7 +2548,7 @@ function RelatorioVendas({ vendas, intervalo }) {
         nome: "Vendas",
         colunas: ["ID", "Data", "Cliente", "Forma Pagamento", "Total (R$)"],
         dados: dados.filtradas.map((v) => [
-          v.id, fmtData(v.data), v.clienteNome || v.cliente || "—",
+          v.idVenda || v.id, fmtData(v.data), v.clienteNome || v.cliente || "—",
           v.formaPagamento || "—", Number(v.total || 0).toFixed(2),
         ]),
       },
@@ -2639,7 +2639,7 @@ function RelatorioVendas({ vendas, intervalo }) {
             empty="Nenhuma venda no período."
             data={dados.filtradas}
             columns={[
-              { key: "id",    label: "ID", render: (v) => <span style={{ color: "var(--gold)", fontFamily: "'Sora', sans-serif", fontSize: 11 }}>{v}</span> },
+              { key: "idVenda", label: "ID", render: (v, row) => <span style={{ color: "var(--gold)", fontFamily: "'Sora', sans-serif", fontSize: 11 }}>{v || row.id}</span> },
               { key: "data",  label: "Data", render: (v) => fmtData(v) },
               { key: "clienteNome", label: "Cliente", render: (v, row) => v || row.cliente || "—" },
               { key: "formaPagamento", label: "Pagamento" },
