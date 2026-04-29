@@ -11,7 +11,7 @@
    ✓ CSS responsivo global injetado via useEffect
    ═══════════════════════════════════════════════════ */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -1176,6 +1176,14 @@ export default function Dashboard() {
     () => localStorage.getItem("ag_theme") || "dark"
   );
   const [dashView, setDashView] = useState("overview"); // "overview" | "charts"
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const allModulos = useMemo(() => NAV.flatMap(sec => sec.items), []);
+  const searchResults = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return [];
+    return allModulos.filter(item => item.label.toLowerCase().includes(q));
+  }, [searchQuery, allModulos]);
   const [clientesCadastro, setClientesCadastro] = useState([]);
    
 const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin } = usePermissao();
@@ -1807,9 +1815,46 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         </div>
 
         <div style={{ flex: 1 }} />
-        <div className="ag-search">
+        <div className="ag-search" style={{ position: "relative" }}>
           <Search size={13} color="var(--text-3)" />
-          <input placeholder="Buscar módulos, clientes..." />
+          <input
+            placeholder="Buscar módulos..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter" && searchResults.length > 0) {
+                navigateTo(searchResults[0].label);
+                setSearchQuery("");
+              }
+              if (e.key === "Escape") setSearchQuery("");
+            }}
+          />
+          {searchResults.length > 0 && (
+            <div style={{
+              position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0,
+              background: "var(--s1)", border: "1px solid var(--border)",
+              borderRadius: 10, zIndex: 999, overflow: "hidden",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.3)"
+            }}>
+              {searchResults.map(item => (
+                <div
+                  key={item.label}
+                  onClick={() => { navigateTo(item.label); setSearchQuery(""); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "9px 14px", cursor: "pointer",
+                    fontSize: 13, color: "var(--text)",
+                    transition: "background .1s",
+                  }}
+                  onMouseOver={e => e.currentTarget.style.background = "var(--s2)"}
+                  onMouseOut={e => e.currentTarget.style.background = "transparent"}
+                >
+                  <item.icone size={14} color="var(--text-3)" />
+                  {item.label}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <div className="ag-periods">
           {PERIODS.map((p) => (
