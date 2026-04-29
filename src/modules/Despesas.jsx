@@ -1454,6 +1454,9 @@ export default function Despesas({ isPro = false }) {
       const batch = writeBatch(db);
       const baseNum = cnt; // número sequencial desse grupo
 
+       const valorTotal    = Number(form.valor);
+const valorParcela  = parseFloat((valorTotal / form.totalParcelas).toFixed(2));
+       
       for (let i = 0; i < form.totalParcelas; i++) {
         const newDocId = `${gerarIdBase(baseNum)}-${i + 1}-${Date.now()}-${i}`;
         const idShow = gerarIdShow(baseNum, i + 1, form.totalParcelas);
@@ -1463,7 +1466,13 @@ export default function Despesas({ isPro = false }) {
           return d.toISOString().split("T")[0];
         })();
         const status = calcularStatus(dataVenc, "pendente");
-
+// ─── NOVO: última parcela absorve centavos de arredondamento ─
+    const isUltima  = i === form.totalParcelas - 1;
+    const valorEsta = isUltima
+      ? parseFloat((valorTotal - valorParcela * (form.totalParcelas - 1)).toFixed(2))
+      : valorParcela;
+    // ─────────────────────────────────────────────────────────────
+         
         batch.set(doc(db, "users", tenantUid, "despesas", newDocId), {
           ...form, parcelado: true, grupoId,
           parcelaAtual: i + 1,
