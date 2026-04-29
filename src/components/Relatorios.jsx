@@ -5791,7 +5791,7 @@ function RelatorioPDV({ vendas, intervalo, isAdmin }) {
       nome: "PDV",
       colunas: ["ID", "Data", "Cliente", "Itens", "Forma Pagamento", "Total"],
       dados: vendasPDV.map((v) => [
-        v.idVenda || v.id?.slice(0, 8).toUpperCase() || "—",
+        v.idVenda || "—",
         fmtData(v.data),
         v.cliente || "—",
         (v.itens || []).map(i => `${i.nome || "?"} x${i.qty || 1}`).join(", ") || "—",
@@ -5916,7 +5916,7 @@ function RelatorioPDV({ vendas, intervalo, isAdmin }) {
             return (
               <div key={v.id} className="tr-row" style={{ gridTemplateColumns: "88px 90px 1fr 1fr 120px 110px" }}>
                 <span style={{ fontFamily: "'Sora',sans-serif", fontSize: 11, color: "var(--text-3)" }}>{fmtData(v.data)}</span>
-                <span style={{ fontFamily: "monospace", fontSize: 11, color: "var(--gold)" }}>{v.idVenda || v.id?.slice(0, 8).toUpperCase() || "—"}</span>
+                <span style={{ fontFamily: "monospace", fontSize: 11, color: "var(--gold)" }}>{v.idVenda || "—"}</span>
                 <span style={{ fontWeight: 500, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.cliente || "—"}</span>
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--text-2)", fontSize: 11 }}>{descItens}</span>
                 <span style={{ fontSize: 11, color: "var(--text-3)" }}>{v.formaPagamento || "—"}</span>
