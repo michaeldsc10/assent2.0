@@ -15,10 +15,10 @@ import {
   ignorarCliente,
   reativarCliente,
 } from "./useCRM";
-import LeadsPage          from "../crm/LeadsPage";
-import ConfigPage         from "../crm/ConfigPage";
-import NotificacoesLeads  from "../crm/NotificacoesLeads";
-import { useLeads }       from "../crm/useLeads";
+import LeadsPage          from "./LeadsPage";
+import ConfigPage         from "./ConfigPage";
+import NotificacoesLeads  from "./NotificacoesLeads";
+import { useLeads }       from "./useLeads";
 
 // ── Fontes do CRM (Outfit + Cormorant Garamond) ────────────────────────────
 if (!document.getElementById("crm-fonts")) {
@@ -620,10 +620,10 @@ function ClientesIgnorados({ ignorados, empresaId, T }) {
 // CRMModule — componente principal
 // Recebe tenantUid, nomeEmpresa e onVoltar do AG (Dashboard.jsx)
 // ═══════════════════════════════════════════════════════════════
-export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar }) {
+export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onToggleTheme }) {
   const [aba,           setAba]          = useState("radar");
   const [busca,         setBusca]        = useState("");
-  const [tema,          setTema]         = useState(() => localStorage.getItem("crm-tema") || "dark");
+  const tema = theme || "dark";
   const [sidebarAberta, setSidebarAberta] = useState(true);
   const [clienteAtivo,  setClienteAtivo] = useState(null);
 
@@ -634,12 +634,6 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar }) {
     if (bp.isMobile) setSidebarAberta(false);
     else setSidebarAberta(true);
   }, [bp.isMobile]);
-
-  function alternarTema() {
-    const novo = tema === "dark" ? "light" : "dark";
-    setTema(novo);
-    localStorage.setItem("crm-tema", novo);
-  }
 
   // Hooks de dados — usam tenantUid diretamente (sem licencas lookup)
   const { clientes, insights, metricas, dadosBrutos, ignorados } = useCRM(tenantUid);
@@ -851,7 +845,7 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar }) {
               onVerLead={() => {}}
             />
             <button
-              onClick={alternarTema}
+              onClick={onToggleTheme}
               title={tema === "dark" ? "Modo claro" : "Modo escuro"}
               style={{
                 width: 34, height: 34, borderRadius: 9,
