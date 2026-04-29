@@ -11,7 +11,7 @@
    ✓ CSS responsivo global injetado via useEffect
    ═══════════════════════════════════════════════════ */
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -1176,14 +1176,11 @@ export default function Dashboard() {
     () => localStorage.getItem("ag_theme") || "dark"
   );
   const [dashView, setDashView] = useState("overview"); // "overview" | "charts"
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery]     = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   const allModulos = useMemo(() => NAV.flatMap(sec => sec.items), []);
-  const searchResults = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return [];
-    return allModulos.filter(item => item.label.toLowerCase().includes(q));
-  }, [searchQuery, allModulos]);
   const [clientesCadastro, setClientesCadastro] = useState([]);
    
 const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin } = usePermissao();
@@ -1461,6 +1458,103 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     setModule(label);
     setMobileMenuOpen(false);
   };
+
+  /* ── Busca global no Firestore ── */
+  const searchDebounceRef = useRef(null);
+
+  const runSearch = useCallback(async (q) => {
+    if (!uid || !q.trim()) { setSearchResults([]); return; }
+    setSearchLoading(true);
+    try {
+      const term = q.trim().toLowerCase();
+      const col = (name) => collection(db, "users", uid, name);
+      const snap = (name) => getDocs(col(name));
+
+      const [
+        clientesSnap, produtosSnap, vendasSnap,
+        servicosSnap, despesasSnap, vendedoresSnap,
+      ] = await Promise.all([
+        snap("clientes"), snap("produtos"), snap("vendas"),
+        snap("servicos"), snap("despesas"), snap("vendedores"),
+      ]);
+
+      const grupos = [];
+
+      // Módulos
+      const modulos = allModulos.filter(m => m.label.toLowerCase().includes(term));
+      if (modulos.length) grupos.push({ tipo: "Módulos", items: modulos.map(m => ({
+        label: m.label, sub: "Ir para o módulo", icone: m.icone,
+        onClick: () => { navigateTo(m.label); setSearchQuery(""); setSearchResults([]); }
+      }))});
+
+      // Clientes / Alunos
+      const clientesRes = clientesSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(c => c.nome?.toLowerCase().includes(term));
+      if (clientesRes.length) grupos.push({ tipo: "Clientes", items: clientesRes.slice(0,5).map(c => ({
+        label: c.nome, sub: c.telefone || c.email || c.id, icone: Users,
+        onClick: () => { navigateTo(c.aluno ? "Matriculas" : "Clientes"); setSearchQuery(""); setSearchResults([]); }
+      }))});
+
+      // Produtos
+      const produtosRes = produtosSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(p => p.nome?.toLowerCase().includes(term));
+      if (produtosRes.length) grupos.push({ tipo: "Produtos", items: produtosRes.slice(0,5).map(p => ({
+        label: p.nome, sub: p.precoVenda != null ? fmtR$(p.precoVenda) : "", icone: Package,
+        onClick: () => { navigateTo("Produtos"); setSearchQuery(""); setSearchResults([]); }
+      }))});
+
+      // Vendas
+      const vendasRes = vendasSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(v => v.cliente?.toLowerCase().includes(term) || String(v.idVenda || "").toLowerCase().includes(term));
+      if (vendasRes.length) grupos.push({ tipo: "Vendas", items: vendasRes.slice(0,5).map(v => ({
+        label: v.cliente || v.idVenda || v.id, sub: `${v.idVenda || v.id} · ${fmtR$(v.total)}`, icone: ShoppingCart,
+        onClick: () => { navigateTo("Vendas"); setSearchQuery(""); setSearchResults([]); }
+      }))});
+
+      // Serviços
+      const servicosRes = servicosSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(s => s.nome?.toLowerCase().includes(term));
+      if (servicosRes.length) grupos.push({ tipo: "Serviços", items: servicosRes.slice(0,5).map(s => ({
+        label: s.nome, sub: s.preco != null ? fmtR$(s.preco) : "", icone: Wrench,
+        onClick: () => { navigateTo("Serviços"); setSearchQuery(""); setSearchResults([]); }
+      }))});
+
+      // Despesas
+      const despesasRes = despesasSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(d => d.descricao?.toLowerCase().includes(term));
+      if (despesasRes.length) grupos.push({ tipo: "Despesas", items: despesasRes.slice(0,5).map(d => ({
+        label: d.descricao, sub: fmtR$(d.valor), icone: TrendingDown,
+        onClick: () => { navigateTo("Despesas"); setSearchQuery(""); setSearchResults([]); }
+      }))});
+
+      // Vendedores
+      const vendedoresRes = vendedoresSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(v => v.nome?.toLowerCase().includes(term));
+      if (vendedoresRes.length) grupos.push({ tipo: "Vendedores", items: vendedoresRes.slice(0,5).map(v => ({
+        label: v.nome, sub: v.email || "", icone: Users,
+        onClick: () => { navigateTo("Vendedores"); setSearchQuery(""); setSearchResults([]); }
+      }))});
+
+      setSearchResults(grupos);
+    } catch (err) {
+      console.error("Busca global:", err);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, [uid, allModulos]);
+
+  useEffect(() => {
+    clearTimeout(searchDebounceRef.current);
+    if (!searchQuery.trim()) { setSearchResults([]); return; }
+    searchDebounceRef.current = setTimeout(() => runSearch(searchQuery), 350);
+    return () => clearTimeout(searchDebounceRef.current);
+  }, [searchQuery, runSearch]);
 
   /* ── Nome do usuário ──
      Admin  → lê licencas/{tenantUid} → campo name
@@ -1818,39 +1912,58 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         <div className="ag-search" style={{ position: "relative" }}>
           <Search size={13} color="var(--text-3)" />
           <input
-            placeholder="Buscar módulos..."
+            placeholder="Buscar módulos, clientes, vendas..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             onKeyDown={e => {
               if (e.key === "Enter" && searchResults.length > 0) {
-                navigateTo(searchResults[0].label);
-                setSearchQuery("");
+                searchResults[0].items[0].onClick();
               }
               if (e.key === "Escape") setSearchQuery("");
             }}
           />
-          {searchResults.length > 0 && (
+          {(searchLoading || searchResults.length > 0) && searchQuery.trim() && (
             <div style={{
-              position: "absolute", top: "calc(100% + 6px)", left: 0, right: 0,
+              position: "absolute", top: "calc(100% + 6px)", left: 0,
+              width: "320px",
               background: "var(--s1)", border: "1px solid var(--border)",
-              borderRadius: 10, zIndex: 999, overflow: "hidden",
-              boxShadow: "0 8px 24px rgba(0,0,0,0.3)"
+              borderRadius: 12, zIndex: 999, overflow: "hidden",
+              boxShadow: "0 12px 32px rgba(0,0,0,0.35)"
             }}>
-              {searchResults.map(item => (
-                <div
-                  key={item.label}
-                  onClick={() => { navigateTo(item.label); setSearchQuery(""); }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 10,
-                    padding: "9px 14px", cursor: "pointer",
-                    fontSize: 13, color: "var(--text)",
-                    transition: "background .1s",
-                  }}
-                  onMouseOver={e => e.currentTarget.style.background = "var(--s2)"}
-                  onMouseOut={e => e.currentTarget.style.background = "transparent"}
-                >
-                  <item.icone size={14} color="var(--text-3)" />
-                  {item.label}
+              {searchLoading ? (
+                <div style={{ padding: "14px", fontSize: 13, color: "var(--text-3)", textAlign: "center" }}>
+                  Buscando...
+                </div>
+              ) : searchResults.length === 0 ? (
+                <div style={{ padding: "14px", fontSize: 13, color: "var(--text-3)", textAlign: "center" }}>
+                  Nenhum resultado para "{searchQuery}"
+                </div>
+              ) : searchResults.map(grupo => (
+                <div key={grupo.tipo}>
+                  <div style={{
+                    padding: "8px 14px 4px",
+                    fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
+                    color: "var(--text-3)", textTransform: "uppercase"
+                  }}>{grupo.tipo}</div>
+                  {grupo.items.map((item, i) => (
+                    <div
+                      key={i}
+                      onClick={item.onClick}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 10,
+                        padding: "8px 14px", cursor: "pointer",
+                        transition: "background .1s",
+                      }}
+                      onMouseOver={e => e.currentTarget.style.background = "var(--s2)"}
+                      onMouseOut={e => e.currentTarget.style.background = "transparent"}
+                    >
+                      <item.icone size={14} color="var(--text-3)" style={{ flexShrink: 0 }} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 13, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.label}</div>
+                        {item.sub && <div style={{ fontSize: 11, color: "var(--text-3)" }}>{item.sub}</div>}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
