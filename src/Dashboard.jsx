@@ -24,7 +24,7 @@ import {
   ShoppingCart, Clock, Wallet, TrendingDown, Truck, BarChart3,
   Calendar, Settings, Zap, UserCheck, UserPlus, Search, ArrowUpRight,
   ArrowDownRight, ChevronRight, Bell, LogOut, ChevronDown,
-  PanelLeftClose, PanelLeftOpen, Menu, X, Sun, Moon, LayoutGrid, GraduationCap, TrendingUp, Barcode,
+  PanelLeftClose, PanelLeftOpen, Menu, X, Sun, Moon, LayoutGrid, GraduationCap, TrendingUp, Barcode, CreditCard,
 } from "lucide-react";
 
 /* ── Módulos ───────────────────────────────────── */
@@ -1472,10 +1472,10 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
       const [
         clientesSnap, produtosSnap, vendasSnap,
-        servicosSnap, despesasSnap, vendedoresSnap,
+        servicosSnap, despesasSnap, vendedoresSnap, aReceberSnap,
       ] = await Promise.all([
         snap("clientes"), snap("produtos"), snap("vendas"),
-        snap("servicos"), snap("despesas"), snap("vendedores"),
+        snap("servicos"), snap("despesas"), snap("vendedores"), snap("a_receber"),
       ]);
 
       const grupos = [];
@@ -1549,6 +1549,26 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         label: v.nome, sub: v.email || "", icone: Users,
         onClick: () => { navigateTo("Vendedores"); setSearchQuery(""); setSearchResults([]); }
       }))});
+
+      // Mensalidades (a_receber com origem = "mensalidade")
+      const MESES = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+      const mensalidadesRes = aReceberSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(m => m.origem === "mensalidade" &&
+          (m.clienteNome?.toLowerCase().includes(term) ||
+           m.mesReferencia?.toLowerCase().includes(term))
+        );
+      if (mensalidadesRes.length) grupos.push({ tipo: "Mensalidades", items: mensalidadesRes.slice(0,5).map(m => {
+        const [ano, mes] = (m.mesReferencia || "").split("-");
+        const mesLabel = mes ? `${MESES[Number(mes)-1]}/${ano}` : m.mesReferencia || "";
+        const aberta = Number(m.valorRestante || 0) > 0;
+        return {
+          label: m.clienteNome || "—",
+          sub: `${mesLabel} · ${fmtR$(aberta ? m.valorRestante : m.valorTotal)} · ${aberta ? "em aberto" : "paga"}`,
+          icone: CreditCard,
+          onClick: () => { navigateTo("Matriculas"); setSearchQuery(""); setSearchResults([]); }
+        };
+      })});
 
       setSearchResults(grupos);
     } catch (err) {
