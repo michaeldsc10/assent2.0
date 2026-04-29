@@ -15,6 +15,7 @@ import {
   removerLead,
   montarPromptLead,
 } from "./useLeads";
+import { calcularTemperaturaLead } from "./CRMModule";
 
 // ─── Helpers locais ───────────────────────────────────────────────────────────
 function iniciais(nome = "") {
@@ -54,6 +55,15 @@ async function chamarIA(system, user) {
   const d = await r.json();
   if (!r.ok) throw new Error(d.error?.message || "Erro na IA");
   return d.candidates?.[0]?.content?.parts?.[0]?.text || "";
+}
+
+// ─── Wrapper de temperatura com normalização de case ─────────────────────────
+// O status pode chegar capitalizado do Cloud Function ("Novo") ou em
+// minúsculas do select manual ("novo"). Normalizamos antes de pontuar.
+function tempLead(lead) {
+  const st = (lead.status || "");
+  const normalizado = st.charAt(0).toUpperCase() + st.slice(1).toLowerCase();
+  return calcularTemperaturaLead({ ...lead, status: normalizado });
 }
 
 // ─── Temperatura badge ────────────────────────────────────────────────────────
@@ -101,7 +111,8 @@ const STATUS_CORES = {
 };
 
 function StatusBadge({ status, T }) {
-  const s = STATUS_CORES[status] || STATUS_CORES.novo;
+  const key = (status || "").toLowerCase();
+  const s = STATUS_CORES[key] || STATUS_CORES.novo;
   const labels = { novo: "Novo", contactado: "Contactado", qualificado: "Qualificado", convertido: "Convertido", perdido: "Perdido" };
   return (
     <span style={{
@@ -109,14 +120,18 @@ function StatusBadge({ status, T }) {
       background: s.bg, color: s.color,
       textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap",
     }}>
-      {labels[status] || status}
+      {labels[key] || status}
     </span>
   );
 }
 
 // ─── Seção: Métricas de leads ─────────────────────────────────────────────────
-function MetricasLeads({ metricas, T, bp }) {
-  if (!metricas) return null;
+// Recebe `leads` para calcular temperatura dinamicamente (scoring automático).
+// O campo `metricas.scoreMedio` vem do hook — os demais são recalculados aqui.
+function MetricasLeads({ leads = [], metricas, T, bp }) {
+  const quentes = leads.filter(l => tempLead(l) === "quente").length;
+  const mornos  = leads.filter(l => tempLead(l) === "morno").length;
+
   return (
     <div style={{
       display: "grid",
@@ -124,10 +139,10 @@ function MetricasLeads({ metricas, T, bp }) {
       gap: 10, marginBottom: 20,
     }}>
       {[
-        { val: metricas.total,      label: "Total de leads",  color: T.blue   },
-        { val: metricas.quentes,    label: "Leads quentes",   color: T.red    },
-        { val: metricas.mornos,     label: "Em nurturing",    color: T.yellow },
-        { val: metricas.scoreMedio, label: "Score médio",     color: T.gold   },
+        { val: leads.length,          label: "Total de leads",  color: T.blue   },
+        { val: quentes,               label: "Leads quentes",   color: T.red    },
+        { val: mornos,                label: "Em nurturing",    color: T.yellow },
+        { val: metricas?.scoreMedio ?? 0, label: "Score médio", color: T.gold   },
       ].map(m => (
         <div key={m.label} style={{
           background: T.surface, border: `1px solid ${T.border}`,
@@ -166,7 +181,8 @@ function LeadCard({ lead, T, onSelect }) {
         <ScoreBadge score={lead.score} T={T} />
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <TempBadge temp={lead.temperatura} T={T} />
+        {/* Temperatura calculada automaticamente via scoring */}
+        <TempBadge temp={tempLead(lead)} T={T} />
         <StatusBadge status={lead.status} T={T} />
         {lead.utmCampanha && (
           <span style={{ fontSize: 10, color: T.textDim }}>📢 {lead.utmCampanha}</span>
@@ -227,7 +243,8 @@ function TabelaLeads({ leads, T, onSelect }) {
                   <div style={{ fontSize: 11, color: T.textMid }}>{l.utmSource || "—"}</div>
                   {l.utmCampanha && <div style={{ fontSize: 10, color: T.textDim }}>{l.utmCampanha}</div>}
                 </td>
-                <td style={{ padding: "12px 14px" }}><TempBadge temp={l.temperatura} T={T} /></td>
+                {/* Temperatura calculada via scoring automático */}
+                <td style={{ padding: "12px 14px" }}><TempBadge temp={tempLead(l)} T={T} /></td>
                 <td style={{ padding: "12px 14px" }}><ScoreBadge score={l.score} T={T} /></td>
                 <td style={{ padding: "12px 14px" }}><StatusBadge status={l.status} T={T} /></td>
                 <td style={{ padding: "12px 14px", fontSize: 11, color: T.textDim, whiteSpace: "nowrap" }}>
@@ -255,6 +272,10 @@ function DetalheLeadPanel({ lead, empresaId, empresaNome, T, onFechar }) {
   const [hoveredEventoId, setHoveredEventoId] = useState(null);
 
   const telLimpo = (lead.telefone || "").replace(/\D/g, "");
+
+  // Lead com status atualizado localmente (para scoring em tempo real no painel)
+  const leadComStatus = { ...lead, status };
+  const tempAtual = tempLead(leadComStatus);
 
   const EVENTO_ICONES = {
     form_submit:   "📋",
@@ -400,9 +421,9 @@ function DetalheLeadPanel({ lead, empresaId, empresaNome, T, onFechar }) {
 
         <div style={{ padding: "20px", flex: 1 }}>
 
-          {/* Badges de temperatura e status */}
+          {/* Badges — temperatura calculada dinamicamente conforme status atual */}
           <div style={{ display: "flex", gap: 8, marginBottom: 18, flexWrap: "wrap" }}>
-            <TempBadge temp={lead.temperatura} T={T} />
+            <TempBadge temp={tempAtual} T={T} />
             <ScoreBadge score={lead.score} T={T} />
             <StatusBadge status={status} T={T} />
           </div>
@@ -606,7 +627,7 @@ function DetalheLeadPanel({ lead, empresaId, empresaNome, T, onFechar }) {
 }
 
 // ─── Painel de automações ─────────────────────────────────────────────────────
-function AutomacoesPanel({ automacoes, empresaId, acoesDisparadas = [], T, bp }) {
+function AutomacoesPanel({ automacoes, leads = [], empresaId, acoesDisparadas = [], T, bp }) {
   const [criando, setCriando] = useState(false);
   const [form, setForm] = useState({ nome: "", gatilho: "score_acima", gatilhoValor: 30, acao: "notificar_vendas", acaoDados: { url: "" } });
   const [salvando, setSalvando] = useState(false);
@@ -666,8 +687,9 @@ function AutomacoesPanel({ automacoes, empresaId, acoesDisparadas = [], T, bp })
                   {automacao.nome}
                 </span>
                 <span style={{ fontSize: 12, color: T.textMid }}> · </span>
+                {/* Temperatura exibida aqui também usa scoring automático */}
                 <span style={{ fontSize: 12, color: T.textMid }}>
-                  {lead.nome} — {lead.temperatura}, score {lead.score}
+                  {lead.nome} — {tempLead(lead)}, score {lead.score}
                 </span>
               </div>
             </div>
@@ -789,7 +811,6 @@ function AutomacoesPanel({ automacoes, empresaId, acoesDisparadas = [], T, bp })
                 </select>
               </div>
 
-              {/* Dica: Notificar no CRM */}
               {form.acao === "notificar_vendas" && (
                 <div style={{
                   marginBottom: 20, padding: "10px 12px", borderRadius: 7,
@@ -800,7 +821,6 @@ function AutomacoesPanel({ automacoes, empresaId, acoesDisparadas = [], T, bp })
                 </div>
               )}
 
-              {/* Campo URL do webhook */}
               {form.acao === "webhook" && (
                 <div style={{ marginBottom: 20 }}>
                   <label style={{ fontSize: 11, color: T.textMid, display: "block", marginBottom: 5 }}>
@@ -870,13 +890,14 @@ function Chip({ color, children }) {
 
 export default function LeadsPage({ T, bp, empresaId, config }) {
   const { leads, metricas, automacoes, carregando, erro, acoesDisparadas } = useLeads(empresaId);
-  const [subAba, setSubAba] = useState("lista");     // "lista" | "automacoes"
+  const [subAba, setSubAba] = useState("lista");
   const [leadSelecionado, setLeadSelecionado] = useState(null);
 
-  // Mantém o painel de detalhe sempre sincronizado com o snapshot do Firestore
+  // Painel sempre sincronizado com o snapshot mais recente do Firestore
   const leadAtualizado = leadSelecionado
     ? (leads.find(l => l.id === leadSelecionado.id) || leadSelecionado)
     : null;
+
   const [busca, setBusca] = useState("");
   const [filtroTemp, setFiltroTemp] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
@@ -884,12 +905,12 @@ export default function LeadsPage({ T, bp, empresaId, config }) {
   const [formLead, setFormLead] = useState({ nome: "", email: "", telefone: "", empresa: "", cargo: "" });
   const [salvandoLead, setSalvandoLead] = useState(false);
 
-  // Filtros aplicados
+  // Filtros — temperatura filtrada via scoring automático, não pelo campo armazenado
   const leadsFiltrados = leads
     .filter(l => !busca || l.nome?.toLowerCase().includes(busca.toLowerCase()) || l.email?.toLowerCase().includes(busca.toLowerCase()))
-    .filter(l => !filtroTemp   || l.temperatura === filtroTemp)
-    .filter(l => !filtroStatus || l.status === filtroStatus)
-    .sort((a, b) => b.score - a.score);
+    .filter(l => !filtroTemp   || tempLead(l) === filtroTemp)
+    .filter(l => !filtroStatus || (l.status || "").toLowerCase() === filtroStatus)
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
   async function salvarNovoLead(e) {
     e.preventDefault();
@@ -939,7 +960,8 @@ export default function LeadsPage({ T, bp, empresaId, config }) {
       {/* ── Aba Lista ── */}
       {subAba === "lista" && (
         <>
-          <MetricasLeads metricas={metricas} T={T} bp={bp} />
+          {/* Métricas — leads passados para cálculo dinâmico de temperatura */}
+          <MetricasLeads leads={leads} metricas={metricas} T={T} bp={bp} />
 
           {/* Barra de filtros */}
           <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
@@ -989,7 +1011,14 @@ export default function LeadsPage({ T, bp, empresaId, config }) {
 
       {/* ── Aba Automações ── */}
       {subAba === "automacoes" && (
-        <AutomacoesPanel automacoes={automacoes} empresaId={empresaId} acoesDisparadas={acoesDisparadas} T={T} bp={bp} />
+        <AutomacoesPanel
+          automacoes={automacoes}
+          leads={leads}
+          empresaId={empresaId}
+          acoesDisparadas={acoesDisparadas}
+          T={T}
+          bp={bp}
+        />
       )}
 
       {/* Painel lateral de detalhe */}
