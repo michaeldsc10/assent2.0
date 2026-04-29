@@ -12,7 +12,7 @@
 
 import { useState, useEffect } from "react";
 import { doc, onSnapshot, updateDoc, setDoc, arrayUnion, arrayRemove, getDoc } from "firebase/firestore";
-import { db } from "./firebase";
+import { db } from "../lib/firebase";
 
 // ─── Scoring de leads (qualificação por engajamento) ─────────────────────────
 // Paralelo ao calcularScoreChurn do useCRM, mas para leads de captação.
