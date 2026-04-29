@@ -397,17 +397,7 @@ const CSS = `
 .mat-mens-mes { color:var(--text); font-weight:500; }
 .mat-mens-valor { font-family:'JetBrains Mono',monospace; color:var(--text); }
 
-/* ── Gerenciar Turmas ── */
-.turmas-list { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
-.turma-item { display:flex; align-items:center; gap:8px; background:var(--s2);
-  border:1px solid var(--border); border-radius:8px; padding:8px 11px; min-height:38px; }
-.turma-item-nome { flex:1; font-size:13px; color:var(--text); word-break:break-word; }
-.turma-item-input { flex:1; background:transparent; border:none; outline:none;
-  font-size:13px; color:var(--text); font-family:'DM Sans',sans-serif;
-  padding:0; min-width:0; }
-.turmas-add-row { display:flex; gap:8px; margin-top:4px; }
-.turmas-add-row .form-input { flex:1; }
-.turmas-empty { font-size:12px; color:var(--text-3); padding:8px 0; text-align:center; }
+/* Pill de turma no detalhe do aluno */
 .turma-pill { display:inline-flex; align-items:center; gap:5px;
   padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600;
   background:rgba(91,142,240,.12); color:var(--blue);
@@ -1038,59 +1028,17 @@ function ModalDetalheAluno({
 }
 
 /* ══════════════════════════════════════════════════
-   MODAL: Configurações (template WhatsApp + turmas)
+   MODAL: Configurações (template WhatsApp)
+   Turmas são gerenciadas em Configurações → Matrículas
    ══════════════════════════════════════════════════ */
-function ModalConfigMatriculas({ config, turmas = [], isAdmin = false, onSave, onClose }) {
-  const [mensagem, setMensagem]   = useState(config?.mensagemWhatsApp || MSG_WHATSAPP_DEFAULT);
-  const [salvando, setSalvando]   = useState(false);
-
-  /* ── Estado das turmas ── */
-  const [listaTurmas, setListaTurmas]     = useState([...turmas]);
-  const [novaTurma, setNovaTurma]         = useState("");
-  const [editIdx, setEditIdx]             = useState(null);   // índice sendo editado
-  const [editVal, setEditVal]             = useState("");
-
-  const MAX_TURMAS    = 50;
-  const MAX_NOME_LEN  = 60;
-
-  const addTurma = () => {
-    const nome = novaTurma.trim().slice(0, MAX_NOME_LEN);
-    if (!nome) return;
-    if (listaTurmas.some(t => t.toLowerCase() === nome.toLowerCase())) {
-      alert("Já existe uma turma com esse nome."); return;
-    }
-    if (listaTurmas.length >= MAX_TURMAS) {
-      alert(`Limite de ${MAX_TURMAS} turmas atingido.`); return;
-    }
-    setListaTurmas(l => [...l, nome]);
-    setNovaTurma("");
-  };
-
-  const removeTurma = (idx) => {
-    if (!window.confirm("Remover esta turma? Os alunos vinculados não serão afetados.")) return;
-    setListaTurmas(l => l.filter((_, i) => i !== idx));
-    if (editIdx === idx) setEditIdx(null);
-  };
-
-  const startEdit = (idx) => {
-    setEditIdx(idx);
-    setEditVal(listaTurmas[idx]);
-  };
-
-  const confirmEdit = () => {
-    const nome = editVal.trim().slice(0, MAX_NOME_LEN);
-    if (!nome) { setEditIdx(null); return; }
-    if (listaTurmas.some((t, i) => i !== editIdx && t.toLowerCase() === nome.toLowerCase())) {
-      alert("Já existe uma turma com esse nome."); return;
-    }
-    setListaTurmas(l => l.map((t, i) => i === editIdx ? nome : t));
-    setEditIdx(null);
-  };
+function ModalConfigMatriculas({ config, onSave, onClose }) {
+  const [mensagem, setMensagem] = useState(config?.mensagemWhatsApp || MSG_WHATSAPP_DEFAULT);
+  const [salvando, setSalvando] = useState(false);
 
   const handleSave = async () => {
     setSalvando(true);
     try {
-      await onSave({ mensagemWhatsApp: mensagem, turmas: listaTurmas });
+      await onSave({ mensagemWhatsApp: mensagem });
       onClose();
     } finally {
       setSalvando(false);
@@ -1103,113 +1051,22 @@ function ModalConfigMatriculas({ config, turmas = [], isAdmin = false, onSave, o
         <div className="modal-header">
           <div>
             <div className="modal-title">Configurações do módulo</div>
-            <div className="modal-sub">WhatsApp · Turmas e horários</div>
+            <div className="modal-sub">Template de cobrança via WhatsApp</div>
           </div>
           <button className="modal-close" onClick={onClose}><X size={16} /></button>
         </div>
         <div className="modal-body">
-
-          {/* ── Template WhatsApp ── */}
-          <div className="mat-section-title"><MessageCircle size={14} /> Mensagem de cobrança</div>
           <div className="form-group">
-            <textarea className="form-textarea" style={{ minHeight: 120 }}
+            <label className="form-label">Mensagem de cobrança</label>
+            <textarea className="form-textarea" style={{ minHeight: 140 }}
               value={mensagem} onChange={(e) => setMensagem(e.target.value)} />
             <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 8, lineHeight: 1.6 }}>
-              Variáveis disponíveis:{" "}
-              <code style={{ color: "var(--gold)" }}>[nome]</code> — primeiro nome do aluno ·{" "}
-              <code style={{ color: "var(--gold)" }}>[mes]</code> — mês da mensalidade ·{" "}
-              <code style={{ color: "var(--gold)" }}>[valor]</code> — valor formatado
+              Variáveis disponíveis:<br />
+              <code style={{ color: "var(--gold)" }}>[nome]</code> — primeiro nome do aluno<br />
+              <code style={{ color: "var(--gold)" }}>[mes]</code> — mês da mensalidade (ex: "maio/2026")<br />
+              <code style={{ color: "var(--gold)" }}>[valor]</code> — valor formatado (ex: "R$ 250,00")
             </div>
           </div>
-
-          {/* ── Turmas (só admin) ── */}
-          {isAdmin && (
-            <>
-              <div className="mat-section-title" style={{ marginTop: 8 }}>
-                <Users size={14} /> Turmas / Horários
-              </div>
-              <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 12, lineHeight: 1.6 }}>
-                Gerencie as categorias de turma disponíveis no cadastro de alunos.
-                Remover uma turma <strong>não afeta</strong> os alunos já vinculados.
-              </div>
-
-              <div className="turmas-list">
-                {listaTurmas.length === 0 && (
-                  <div className="turmas-empty">Nenhuma turma cadastrada ainda.</div>
-                )}
-                {listaTurmas.map((t, idx) => (
-                  <div key={idx} className="turma-item">
-                    {editIdx === idx ? (
-                      <input
-                        className="turma-item-input"
-                        value={editVal}
-                        maxLength={MAX_NOME_LEN}
-                        autoFocus
-                        onChange={(e) => setEditVal(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") confirmEdit();
-                          if (e.key === "Escape") setEditIdx(null);
-                        }}
-                      />
-                    ) : (
-                      <span className="turma-item-nome">{t}</span>
-                    )}
-                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                      {editIdx === idx ? (
-                        <>
-                          <button className="btn-icon" style={{ color: "var(--green)" }}
-                            onClick={confirmEdit} title="Confirmar">
-                            <CheckCircle size={13} />
-                          </button>
-                          <button className="btn-icon" style={{ color: "var(--text-3)" }}
-                            onClick={() => setEditIdx(null)} title="Cancelar">
-                            <X size={13} />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button className="btn-icon btn-icon-edit"
-                            onClick={() => startEdit(idx)} title="Renomear">
-                            <Edit2 size={13} />
-                          </button>
-                          <button className="btn-icon btn-icon-del"
-                            onClick={() => removeTurma(idx)} title="Remover">
-                            <Trash2 size={13} />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Adicionar nova */}
-              {listaTurmas.length < MAX_TURMAS && (
-                <div className="turmas-add-row">
-                  <input
-                    className="form-input"
-                    type="text"
-                    placeholder="Nome da turma (ex: Turma A, Terça 19h…)"
-                    value={novaTurma}
-                    maxLength={MAX_NOME_LEN}
-                    onChange={(e) => setNovaTurma(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addTurma()}
-                  />
-                  <button className="btn-primary" onClick={addTurma} disabled={!novaTurma.trim()}>
-                    <Plus size={14} /> Adicionar
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-
-          {!isAdmin && (
-            <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 8, padding: "8px 12px",
-              background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 8 }}>
-              O gerenciamento de turmas está disponível apenas para administradores.
-            </div>
-          )}
-
         </div>
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
@@ -1772,8 +1629,6 @@ export default function Alunos() {
       {modalConfig && (
         <ModalConfigMatriculas
           config={config}
-          turmas={turmas}
-          isAdmin={cargo === "admin"}
           onSave={handleSaveConfig}
           onClose={() => setModalConfig(false)}
         />
