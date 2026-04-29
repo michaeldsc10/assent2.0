@@ -99,6 +99,40 @@ async function chamarIA(system, user) {
   return d.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
 
+// ─── Lead Scoring automático ──────────────────────────────────────────────────
+// Calcula temperatura com base em sinais objetivos.
+// Exportado para uso em LeadsPage.jsx:
+//   import { calcularTemperaturaLead } from "./CRMModule"
+export function calcularTemperaturaLead(lead) {
+  // Casos determinísticos — status define temperatura diretamente
+  if (lead.status === "Convertido") return "quente";
+  if (lead.status === "Perdido")    return "frio";
+
+  // 1. Estágio no funil (0–55 pts) — principal sinal
+  const pStage = { Novo: 0, Contactado: 25, Qualificado: 55 };
+  const stageScore = pStage[lead.status] ?? 0;
+
+  // 2. Recência — dias desde a captura (−20 a +25 pts)
+  let recScore = 0;
+  if (lead.criadoEm) {
+    const dt   = lead.criadoEm?.toDate ? lead.criadoEm.toDate() : new Date(lead.criadoEm);
+    const dias = Math.floor((Date.now() - dt.getTime()) / 86400000);
+    recScore   = dias <= 2 ? 25 : dias <= 7 ? 15 : dias <= 14 ? 5 : dias <= 30 ? -5 : -20;
+  }
+
+  // 3. Engajamento — anotações e atividades registradas (0–20 pts)
+  const engScore = Math.min((lead.atividades?.length || 0) * 7, 20);
+
+  // 4. Score acumulado manual, normalizado para 0–10 pts
+  const manualScore = Math.min(((lead.score || 0) / 100) * 10, 10);
+
+  const total = stageScore + recScore + engScore + manualScore;
+
+  if (total >= 50) return "quente";
+  if (total >= 20) return "morno";
+  return "frio";
+}
+
 // ─── Badge de Risco ───────────────────────────────────────────────────────────
 function RiscoBadge({ risco, T }) {
   const map = {
