@@ -2518,6 +2518,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             onClick={toggleSidebar}
             title={collapsed ? "Expandir menu" : "Recolher menu"}
             aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+            style={sistemaAtivo === "crm" ? { display: "none" } : {}}
           >
             {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
           </button>
@@ -2769,28 +2770,43 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   Sistemas
                 </div>
 
-                <button
-                  className="ag-dropdown-item"
-                  onClick={() => { setSistemaAtivo("crm"); setDropdownOpen(false); }}
-                  style={{ display: "flex", alignItems: "center", gap: 8 }}
-                >
-                  <span style={{
-                    width: 20, height: 20, borderRadius: 5,
-                    background: "rgba(200,165,94,0.15)",
-                    border: "1px solid rgba(200,165,94,0.28)",
-                    display: "inline-flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 11, flexShrink: 0,
-                  }}>◈</span>
-                  <span style={{ flex: 1 }}>Assent CRM</span>
-                  <span style={{
-                    fontSize: 8, fontWeight: 700,
-                    padding: "1px 5px", borderRadius: 999,
-                    background: "rgba(200,165,94,0.15)",
-                    color: "var(--gold)",
-                    border: "1px solid rgba(200,165,94,0.28)",
-                    letterSpacing: "0.08em", textTransform: "uppercase", flexShrink: 0,
-                  }}>NOVO</span>
-                </button>
+                {sistemaAtivo === "gestao" ? (
+                  <button
+                    className="ag-dropdown-item"
+                    onClick={() => { setSistemaAtivo("crm"); setDropdownOpen(false); }}
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    <img
+                      src="/crm_logo.png"
+                      alt="Assent CRM"
+                      style={{ width: 20, height: 20, borderRadius: 5, objectFit: "cover", flexShrink: 0 }}
+                      onError={(e) => { e.target.style.display = "none"; }}
+                    />
+                    <span style={{ flex: 1 }}>Assent CRM</span>
+                    <span style={{
+                      fontSize: 8, fontWeight: 700,
+                      padding: "1px 5px", borderRadius: 999,
+                      background: "rgba(200,165,94,0.15)",
+                      color: "var(--gold)",
+                      border: "1px solid rgba(200,165,94,0.28)",
+                      letterSpacing: "0.08em", textTransform: "uppercase", flexShrink: 0,
+                    }}>NOVO</span>
+                  </button>
+                ) : (
+                  <button
+                    className="ag-dropdown-item"
+                    onClick={() => { setSistemaAtivo("gestao"); setDropdownOpen(false); }}
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    <img
+                      src="/logo.png"
+                      alt="Assent Gestão"
+                      style={{ width: 20, height: 20, borderRadius: 5, objectFit: "cover", flexShrink: 0 }}
+                      onError={(e) => { e.target.style.display = "none"; }}
+                    />
+                    <span style={{ flex: 1 }}>Assent Gestão</span>
+                  </button>
+                )}
 
                 <div className="ag-dropdown-divider" />
 
@@ -2815,8 +2831,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         {/* ── CORPO: sidebar + main ── */}
         <div className="ag-body">
 
-          {/* Sidebar desktop recolhível */}
-          <aside className={`ag-sidebar ${collapsed ? "collapsed" : ""}`}>
+          {/* Sidebar desktop recolhível — oculta no Assent CRM */}
+          <aside className={`ag-sidebar ${collapsed ? "collapsed" : ""}`} style={sistemaAtivo === "crm" ? { display: "none" } : {}}>
             <nav className="ag-nav">
               {NAV.map((sec) => (
                 <div key={sec.section}>
