@@ -1487,13 +1487,22 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         onClick: () => { navigateTo(m.label); setSearchQuery(""); setSearchResults([]); }
       }))});
 
-      // Clientes / Alunos
-      const clientesRes = clientesSnap.docs
+      // Clientes e Matrículas (mesma coleção, separados por perfil)
+      const todosClientes = clientesSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(c => c.nome?.toLowerCase().includes(term));
+
+      const clientesRes = todosClientes.filter(c => !(c.perfis || []).includes("aluno"));
+      const alunosRes   = todosClientes.filter(c =>  (c.perfis || []).includes("aluno"));
+
       if (clientesRes.length) grupos.push({ tipo: "Clientes", items: clientesRes.slice(0,5).map(c => ({
         label: c.nome, sub: c.telefone || c.email || c.id, icone: Users,
-        onClick: () => { navigateTo(c.aluno ? "Matriculas" : "Clientes"); setSearchQuery(""); setSearchResults([]); }
+        onClick: () => { navigateTo("Clientes"); setSearchQuery(""); setSearchResults([]); }
+      }))});
+
+      if (alunosRes.length) grupos.push({ tipo: "Matrículas", items: alunosRes.slice(0,5).map(a => ({
+        label: a.nome, sub: a.turma ? `Turma: ${a.turma}` : (a.telefone || a.email || ""), icone: GraduationCap,
+        onClick: () => { navigateTo("Matriculas"); setSearchQuery(""); setSearchResults([]); }
       }))});
 
       // Produtos
