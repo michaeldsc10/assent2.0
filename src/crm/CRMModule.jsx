@@ -15,10 +15,10 @@ import {
   ignorarCliente,
   reativarCliente,
 } from "./useCRM";
-import LeadsPage          from "./LeadsPage";
-import ConfigPage         from "./ConfigPage";
-import NotificacoesLeads  from "./NotificacoesLeads";
-import { useLeads }       from "./useLeads";
+import LeadsPage          from "../crm/LeadsPage";
+import ConfigPage         from "../crm/ConfigPage";
+import NotificacoesLeads  from "../crm/NotificacoesLeads";
+import { useLeads }       from "../crm/useLeads";
 
 // ── Fontes do CRM (Outfit + Cormorant Garamond) ────────────────────────────
 if (!document.getElementById("crm-fonts")) {
