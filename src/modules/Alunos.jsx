@@ -397,6 +397,22 @@ const CSS = `
 .mat-mens-mes { color:var(--text); font-weight:500; }
 .mat-mens-valor { font-family:'JetBrains Mono',monospace; color:var(--text); }
 
+/* ── Gerenciar Turmas ── */
+.turmas-list { display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+.turma-item { display:flex; align-items:center; gap:8px; background:var(--s2);
+  border:1px solid var(--border); border-radius:8px; padding:8px 11px; min-height:38px; }
+.turma-item-nome { flex:1; font-size:13px; color:var(--text); word-break:break-word; }
+.turma-item-input { flex:1; background:transparent; border:none; outline:none;
+  font-size:13px; color:var(--text); font-family:'DM Sans',sans-serif;
+  padding:0; min-width:0; }
+.turmas-add-row { display:flex; gap:8px; margin-top:4px; }
+.turmas-add-row .form-input { flex:1; }
+.turmas-empty { font-size:12px; color:var(--text-3); padding:8px 0; text-align:center; }
+.turma-pill { display:inline-flex; align-items:center; gap:5px;
+  padding:3px 10px; border-radius:20px; font-size:11px; font-weight:600;
+  background:rgba(91,142,240,.12); color:var(--blue);
+  border:1px solid rgba(91,142,240,.2); white-space:nowrap; }
+
 @media (max-width: 900px) {
   .form-row, .form-row-3 { grid-template-columns: 1fr; }
   .mat-row, .mat-row-head { grid-template-columns: 60px 1fr 100px 100px; }
@@ -464,7 +480,7 @@ const CSS = `
 /* ══════════════════════════════════════════════════
    MODAL: Nova / Editar Matrícula
    ══════════════════════════════════════════════════ */
-function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
+function ModalMatricula({ aluno, alunosExistentes, onSave, onClose, turmas = [] }) {
   const isEdit = !!aluno;
 
   const [form, setForm] = useState({
@@ -748,10 +764,26 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose }) {
 
           <div className="form-group">
             <label className="form-label">Turma / Horário</label>
-            <input className="form-input" type="text"
-              value={form.turma}
-              onChange={(e) => set("turma", e.target.value)}
-              placeholder="Ex: Turma A, Terça 19h, Equipe Juvenil…" />
+            {turmas.length > 0 ? (() => {
+              /* Se o aluno tem uma turma que não está mais na lista (dado legado),
+                 inclui como opção temporária para não perder a informação */
+              const opts = turmas.includes(form.turma) || !form.turma
+                ? turmas
+                : [...turmas, form.turma];
+              return (
+                <select className="form-input" value={form.turma}
+                  onChange={(e) => set("turma", e.target.value)}>
+                  <option value="">— Selecione uma turma —</option>
+                  {opts.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              );
+            })() : (
+              <div style={{ fontSize: 12, color: "var(--text-3)", padding: "10px 13px",
+                background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 9 }}>
+                Nenhuma turma cadastrada. Configure em{" "}
+                <span style={{ color: "var(--gold)" }}>⚙ Configurações</span>.
+              </div>
+            )}
           </div>
 
           <div className="form-group">
@@ -898,7 +930,9 @@ function ModalDetalheAluno({
             {aluno.turma && (
               <div className="mat-detail-item">
                 <div className="mat-detail-label">Turma / Horário</div>
-                <div className="mat-detail-value">{aluno.turma}</div>
+                <div className="mat-detail-value">
+                  <span className="turma-pill">{aluno.turma}</span>
+                </div>
               </div>
             )}
           </div>
@@ -1004,16 +1038,59 @@ function ModalDetalheAluno({
 }
 
 /* ══════════════════════════════════════════════════
-   MODAL: Configurações (template WhatsApp)
+   MODAL: Configurações (template WhatsApp + turmas)
    ══════════════════════════════════════════════════ */
-function ModalConfigMatriculas({ config, onSave, onClose }) {
-  const [mensagem, setMensagem] = useState(config?.mensagemWhatsApp || MSG_WHATSAPP_DEFAULT);
-  const [salvando, setSalvando] = useState(false);
+function ModalConfigMatriculas({ config, turmas = [], isAdmin = false, onSave, onClose }) {
+  const [mensagem, setMensagem]   = useState(config?.mensagemWhatsApp || MSG_WHATSAPP_DEFAULT);
+  const [salvando, setSalvando]   = useState(false);
+
+  /* ── Estado das turmas ── */
+  const [listaTurmas, setListaTurmas]     = useState([...turmas]);
+  const [novaTurma, setNovaTurma]         = useState("");
+  const [editIdx, setEditIdx]             = useState(null);   // índice sendo editado
+  const [editVal, setEditVal]             = useState("");
+
+  const MAX_TURMAS    = 50;
+  const MAX_NOME_LEN  = 60;
+
+  const addTurma = () => {
+    const nome = novaTurma.trim().slice(0, MAX_NOME_LEN);
+    if (!nome) return;
+    if (listaTurmas.some(t => t.toLowerCase() === nome.toLowerCase())) {
+      alert("Já existe uma turma com esse nome."); return;
+    }
+    if (listaTurmas.length >= MAX_TURMAS) {
+      alert(`Limite de ${MAX_TURMAS} turmas atingido.`); return;
+    }
+    setListaTurmas(l => [...l, nome]);
+    setNovaTurma("");
+  };
+
+  const removeTurma = (idx) => {
+    if (!window.confirm("Remover esta turma? Os alunos vinculados não serão afetados.")) return;
+    setListaTurmas(l => l.filter((_, i) => i !== idx));
+    if (editIdx === idx) setEditIdx(null);
+  };
+
+  const startEdit = (idx) => {
+    setEditIdx(idx);
+    setEditVal(listaTurmas[idx]);
+  };
+
+  const confirmEdit = () => {
+    const nome = editVal.trim().slice(0, MAX_NOME_LEN);
+    if (!nome) { setEditIdx(null); return; }
+    if (listaTurmas.some((t, i) => i !== editIdx && t.toLowerCase() === nome.toLowerCase())) {
+      alert("Já existe uma turma com esse nome."); return;
+    }
+    setListaTurmas(l => l.map((t, i) => i === editIdx ? nome : t));
+    setEditIdx(null);
+  };
 
   const handleSave = async () => {
     setSalvando(true);
     try {
-      await onSave({ mensagemWhatsApp: mensagem });
+      await onSave({ mensagemWhatsApp: mensagem, turmas: listaTurmas });
       onClose();
     } finally {
       setSalvando(false);
@@ -1026,22 +1103,113 @@ function ModalConfigMatriculas({ config, onSave, onClose }) {
         <div className="modal-header">
           <div>
             <div className="modal-title">Configurações do módulo</div>
-            <div className="modal-sub">Template de cobrança via WhatsApp</div>
+            <div className="modal-sub">WhatsApp · Turmas e horários</div>
           </div>
           <button className="modal-close" onClick={onClose}><X size={16} /></button>
         </div>
         <div className="modal-body">
+
+          {/* ── Template WhatsApp ── */}
+          <div className="mat-section-title"><MessageCircle size={14} /> Mensagem de cobrança</div>
           <div className="form-group">
-            <label className="form-label">Mensagem de cobrança</label>
-            <textarea className="form-textarea" style={{ minHeight: 140 }}
+            <textarea className="form-textarea" style={{ minHeight: 120 }}
               value={mensagem} onChange={(e) => setMensagem(e.target.value)} />
             <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 8, lineHeight: 1.6 }}>
-              Variáveis disponíveis:<br />
-              <code style={{ color: "var(--gold)" }}>[nome]</code> — primeiro nome do aluno<br />
-              <code style={{ color: "var(--gold)" }}>[mes]</code> — mês da mensalidade (ex: "maio/2026")<br />
-              <code style={{ color: "var(--gold)" }}>[valor]</code> — valor formatado (ex: "R$ 250,00")
+              Variáveis disponíveis:{" "}
+              <code style={{ color: "var(--gold)" }}>[nome]</code> — primeiro nome do aluno ·{" "}
+              <code style={{ color: "var(--gold)" }}>[mes]</code> — mês da mensalidade ·{" "}
+              <code style={{ color: "var(--gold)" }}>[valor]</code> — valor formatado
             </div>
           </div>
+
+          {/* ── Turmas (só admin) ── */}
+          {isAdmin && (
+            <>
+              <div className="mat-section-title" style={{ marginTop: 8 }}>
+                <Users size={14} /> Turmas / Horários
+              </div>
+              <div style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 12, lineHeight: 1.6 }}>
+                Gerencie as categorias de turma disponíveis no cadastro de alunos.
+                Remover uma turma <strong>não afeta</strong> os alunos já vinculados.
+              </div>
+
+              <div className="turmas-list">
+                {listaTurmas.length === 0 && (
+                  <div className="turmas-empty">Nenhuma turma cadastrada ainda.</div>
+                )}
+                {listaTurmas.map((t, idx) => (
+                  <div key={idx} className="turma-item">
+                    {editIdx === idx ? (
+                      <input
+                        className="turma-item-input"
+                        value={editVal}
+                        maxLength={MAX_NOME_LEN}
+                        autoFocus
+                        onChange={(e) => setEditVal(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") confirmEdit();
+                          if (e.key === "Escape") setEditIdx(null);
+                        }}
+                      />
+                    ) : (
+                      <span className="turma-item-nome">{t}</span>
+                    )}
+                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                      {editIdx === idx ? (
+                        <>
+                          <button className="btn-icon" style={{ color: "var(--green)" }}
+                            onClick={confirmEdit} title="Confirmar">
+                            <CheckCircle size={13} />
+                          </button>
+                          <button className="btn-icon" style={{ color: "var(--text-3)" }}
+                            onClick={() => setEditIdx(null)} title="Cancelar">
+                            <X size={13} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button className="btn-icon btn-icon-edit"
+                            onClick={() => startEdit(idx)} title="Renomear">
+                            <Edit2 size={13} />
+                          </button>
+                          <button className="btn-icon btn-icon-del"
+                            onClick={() => removeTurma(idx)} title="Remover">
+                            <Trash2 size={13} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Adicionar nova */}
+              {listaTurmas.length < MAX_TURMAS && (
+                <div className="turmas-add-row">
+                  <input
+                    className="form-input"
+                    type="text"
+                    placeholder="Nome da turma (ex: Turma A, Terça 19h…)"
+                    value={novaTurma}
+                    maxLength={MAX_NOME_LEN}
+                    onChange={(e) => setNovaTurma(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addTurma()}
+                  />
+                  <button className="btn-primary" onClick={addTurma} disabled={!novaTurma.trim()}>
+                    <Plus size={14} /> Adicionar
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+
+          {!isAdmin && (
+            <div style={{ fontSize: 12, color: "var(--text-3)", marginTop: 8, padding: "8px 12px",
+              background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 8 }}>
+              O gerenciamento de turmas está disponível apenas para administradores.
+            </div>
+          )}
+
         </div>
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
@@ -1106,6 +1274,7 @@ export default function Alunos() {
   const [alunos, setAlunos]           = useState([]);
   const [mensalidades, setMensalidades] = useState([]);
   const [config, setConfig]           = useState({ mensagemWhatsApp: MSG_WHATSAPP_DEFAULT });
+  const [turmas, setTurmas]           = useState([]);
   const [loading, setLoading]         = useState(true);
 
   const [modalNovo, setModalNovo]     = useState(false);
@@ -1114,9 +1283,10 @@ export default function Alunos() {
   const [excluindo, setExcluindo]     = useState(null);
   const [modalConfig, setModalConfig] = useState(false);
 
-  const [search, setSearch]           = useState("");
+  const [search, setSearch]             = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
-  const [sortDir, setSortDir]         = useState("asc");
+  const [turmaFilter, setTurmaFilter]   = useState("todas");
+  const [sortDir, setSortDir]           = useState("asc");
   const [fotoVisualizando, setFotoVisualizando] = useState(null);
 
   const toggleSort = () => setSortDir(d => d === "asc" ? "desc" : "asc");
@@ -1149,7 +1319,11 @@ export default function Alunos() {
     }, fsSnapshotError("Alunos:aReceber"));
 
     getDoc(configRef).then(s => {
-      if (s.exists()) setConfig({ mensagemWhatsApp: MSG_WHATSAPP_DEFAULT, ...s.data() });
+      if (s.exists()) {
+        const data = s.data();
+        setConfig({ mensagemWhatsApp: MSG_WHATSAPP_DEFAULT, ...data });
+        setTurmas(Array.isArray(data.turmas) ? data.turmas : []);
+      }
     }).catch(() => {});
 
     return () => { unsub1(); unsub2(); };
@@ -1305,6 +1479,7 @@ export default function Alunos() {
         { merge: true }
       );
       setConfig(c => ({ ...c, ...novaConfig }));
+      if (Array.isArray(novaConfig.turmas)) setTurmas(novaConfig.turmas);
       await logAction({
         tenantUid, nomeUsuario, cargo,
         acao: LOG_ACAO.EDITAR, modulo: "Matrículas",
@@ -1346,6 +1521,13 @@ export default function Alunos() {
         if (statusFilter === "vencendo" && a._situacao !== "vencendo") return false;
         if (statusFilter === "vencidos" && a._situacao !== "vencido")  return false;
       }
+      if (turmaFilter !== "todas") {
+        if (turmaFilter === "__sem_turma__") {
+          if (a.turma) return false;
+        } else {
+          if ((a.turma || "") !== turmaFilter) return false;
+        }
+      }
       if (!q) return true;
       return (
         a.nome?.toLowerCase().includes(q) ||
@@ -1356,7 +1538,7 @@ export default function Alunos() {
       const cmp = (a.nome || "").localeCompare(b.nome || "", "pt-BR", { sensitivity: "base" });
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [alunosComStatus, search, statusFilter, sortDir]);
+  }, [alunosComStatus, search, statusFilter, turmaFilter, sortDir]);
 
   const kpis = useMemo(() => {
     const total    = alunos.filter(a => a.status === "ativo").length;
@@ -1446,6 +1628,14 @@ export default function Alunos() {
                   <option value="vencidos">Vencidos</option>
                   <option value="inativos">Inativos/Trancados</option>
                 </select>
+                {turmas.length > 0 && (
+                  <select className="mat-filter-select" value={turmaFilter}
+                    onChange={(e) => setTurmaFilter(e.target.value)}>
+                    <option value="todas">Todas as turmas</option>
+                    {turmas.map(t => <option key={t} value={t}>{t}</option>)}
+                    <option value="__sem_turma__">Sem turma</option>
+                  </select>
+                )}
               </div>
 
               <div className="mat-quick-filters">
@@ -1543,6 +1733,7 @@ export default function Alunos() {
       {modalNovo && (
         <ModalMatricula
           alunosExistentes={alunos}
+          turmas={turmas}
           onSave={handleSaveAluno}
           onClose={() => setModalNovo(false)}
         />
@@ -1551,6 +1742,7 @@ export default function Alunos() {
         <ModalMatricula
           aluno={editando}
           alunosExistentes={alunos}
+          turmas={turmas}
           onSave={handleSaveAluno}
           onClose={() => setEditando(null)}
         />
@@ -1580,6 +1772,8 @@ export default function Alunos() {
       {modalConfig && (
         <ModalConfigMatriculas
           config={config}
+          turmas={turmas}
+          isAdmin={cargo === "admin"}
           onSave={handleSaveConfig}
           onClose={() => setModalConfig(false)}
         />
