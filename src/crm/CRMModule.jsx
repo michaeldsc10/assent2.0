@@ -99,6 +99,208 @@ async function chamarIA(system, user) {
   return d.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
 
+// ─── Lead Scoring automático ──────────────────────────────────────────────────
+// Calcula temperatura com base em sinais objetivos.
+// Substitui o campo manual `lead.temperatura` no display.
+// Exportado para uso em LeadsPage.jsx via: import { calcularTemperaturaLead } from "./CRMModule"
+export function calcularTemperaturaLead(lead) {
+  // Casos determinísticos — status define temperatura diretamente
+  if (lead.status === "Convertido") return "quente";
+  if (lead.status === "Perdido")    return "frio";
+
+  // 1. Estágio no funil (0–55 pts) — principal sinal
+  const pStage = { Novo: 0, Contactado: 25, Qualificado: 55 };
+  const stageScore = pStage[lead.status] ?? 0;
+
+  // 2. Recência — dias desde a captura (−20 a +25 pts)
+  let recScore = 0;
+  if (lead.criadoEm) {
+    const dt   = lead.criadoEm?.toDate ? lead.criadoEm.toDate() : new Date(lead.criadoEm);
+    const dias = Math.floor((Date.now() - dt.getTime()) / 86400000);
+    recScore   = dias <= 2 ? 25 : dias <= 7 ? 15 : dias <= 14 ? 5 : dias <= 30 ? -5 : -20;
+  }
+
+  // 3. Engajamento — anotações e atividades registradas (0–20 pts)
+  const engScore = Math.min((lead.atividades?.length || 0) * 7, 20);
+
+  // 4. Score acumulado manual, normalizado para 0–10 pts
+  const manualScore = Math.min(((lead.score || 0) / 100) * 10, 10);
+
+  const total = stageScore + recScore + engScore + manualScore;
+
+  if (total >= 50) return "quente";
+  if (total >= 20) return "morno";
+  return "frio";
+}
+
+// ─── Funil de Conversão de Leads ─────────────────────────────────────────────
+function FunilLeads({ leads = [], T, bp }) {
+  const ETAPAS = [
+    { status: "Novo",        label: "Novos",        cor: "#D4AF37" },
+    { status: "Contactado",  label: "Contactados",  cor: "#C49920" },
+    { status: "Qualificado", label: "Qualificados", cor: "#9E7415" },
+    { status: "Convertido",  label: "Convertidos",  cor: "#D4AF37" },
+  ];
+
+  const total    = leads.length;
+  const perdidos = leads.filter((l) => l.status === "Perdido").length;
+  const ativos   = total - perdidos;
+
+  const contagens = ETAPAS.map((e) => ({
+    ...e,
+    n: leads.filter((l) => l.status === e.status).length,
+  }));
+
+  const txConv = ativos > 0
+    ? Math.round((contagens[3].n / ativos) * 100)
+    : 0;
+
+  // Maior queda entre etapas consecutivas = gargalo
+  let gargalIdx = 0, maiorQueda = 0;
+  for (let i = 0; i < contagens.length - 1; i++) {
+    const q = contagens[i].n - contagens[i + 1].n;
+    if (q > maiorQueda) { maiorQueda = q; gargalIdx = i; }
+  }
+
+  // SVG funnel — viewBox 400x207, centrado em CX=200
+  const CX = 200, SH = 46, GAP = 5;
+  const HWS = [175, 128, 84, 50]; // half-widths decrescentes por etapa
+
+  function trapezoid(i) {
+    const y  = i * (SH + GAP);
+    const tw = HWS[i];
+    const bw = i < 3 ? HWS[i + 1] : tw - 18;
+    return {
+      pts:  `${CX - tw},${y} ${CX + tw},${y} ${CX + bw},${y + SH} ${CX - bw},${y + SH}`,
+      midY: y + SH / 2,
+    };
+  }
+
+  const pct = (i) => ativos > 0 ? Math.round((contagens[i].n / ativos) * 100) : 0;
+
+  if (total === 0) return (
+    <div style={{
+      background: T.surface, border: `1px dashed ${T.border}`, borderRadius: 16,
+      padding: "28px", textAlign: "center", color: T.textDim, fontSize: 13,
+      fontFamily: FONT, fontWeight: 300, marginBottom: 16,
+    }}>
+      Nenhum lead captado ainda. Configure o formulário de captura em Configurações.
+    </div>
+  );
+
+  return (
+    <div style={{
+      background: T.surface, border: `1px solid ${T.border}`,
+      borderRadius: 16, padding: bp.isMobile ? "16px 14px" : "20px 24px",
+      marginBottom: 16, fontFamily: FONT,
+    }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>
+            Funil de conversão
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 600, color: T.text, fontFamily: FONT_DISPLAY, letterSpacing: "-0.01em" }}>
+            {total} leads
+            {perdidos > 0 && (
+              <span style={{ fontSize: 12, color: T.textDim, fontWeight: 400 }}> · {perdidos} perdidos</span>
+            )}
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 24, fontWeight: 600, color: T.gold, fontFamily: FONT_DISPLAY, lineHeight: 1 }}>{txConv}%</div>
+          <div style={{ fontSize: 9, color: T.textDim, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 3 }}>
+            Taxa de conversão
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: bp.isMobile ? "1fr" : "1fr 210px", gap: 16, alignItems: "start" }}>
+        {/* SVG Funnel */}
+        <svg
+          viewBox="0 0 400 207"
+          style={{ display: "block", width: "100%", overflow: "visible" }}
+          role="img"
+          aria-label={`Funil com ${total} leads: ${contagens.map((c) => `${c.n} ${c.label}`).join(", ")}`}
+        >
+          {contagens.map((e, i) => {
+            const { pts, midY } = trapezoid(i);
+            // Etapas intermediárias (1 e 2) têm fundo escuro → texto claro
+            const tc = i > 0 && i < 3 ? "#F0D890" : "#1A0C00";
+            const opacity = i === 3 ? 1 : 0.92 - i * 0.06;
+            return (
+              <g key={e.status}>
+                <polygon points={pts} fill={e.cor} opacity={opacity} />
+                <text
+                  x={CX} y={midY - 6}
+                  textAnchor="middle" fill={tc}
+                  fontSize={10} fontWeight="500"
+                  fontFamily="'Trebuchet MS', system-ui, sans-serif"
+                >
+                  {e.label}
+                </text>
+                <text
+                  x={CX} y={midY + 8}
+                  textAnchor="middle" fill={tc}
+                  fontSize={9} opacity={0.85}
+                  fontFamily="'Trebuchet MS', system-ui, sans-serif"
+                >
+                  {e.n} · {pct(i)}%
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Stage breakdown */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+          {contagens.map((e, i) => {
+            const pctVal = pct(i);
+            const isGargalo = i === gargalIdx && maiorQueda > 0;
+            return (
+              <div key={e.status} style={{
+                background: T.surfaceAlt,
+                border: `1px solid ${isGargalo ? T.redBorder : T.border}`,
+                borderRadius: 10, padding: "9px 12px",
+                borderLeft: `3px solid ${isGargalo ? T.red : e.cor}`,
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
+                  <span style={{ fontSize: 10, color: T.textMid, fontWeight: 300 }}>{e.label}</span>
+                  <span style={{ fontSize: 16, fontWeight: 600, color: i === 3 ? T.gold : T.text, fontFamily: FONT_DISPLAY }}>{e.n}</span>
+                </div>
+                <div style={{ height: 2, background: T.border, borderRadius: 1 }}>
+                  <div style={{
+                    height: "100%", width: `${pctVal}%`, background: e.cor,
+                    borderRadius: 1, opacity: i === 3 ? 1 : 0.8,
+                  }} />
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Insight de gargalo */}
+          {maiorQueda > 0 && (
+            <div style={{
+              background: T.redDim, border: `1px solid ${T.redBorder}`,
+              borderRadius: 10, padding: "9px 12px",
+            }}>
+              <div style={{ fontSize: 9, color: T.textDim, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>
+                Maior gargalo
+              </div>
+              <div style={{ fontSize: 11, color: T.text }}>
+                {contagens[gargalIdx].label} → {contagens[gargalIdx + 1].label}
+              </div>
+              <div style={{ fontSize: 10, color: T.red, marginTop: 2 }}>
+                −{maiorQueda} lead{maiorQueda !== 1 ? "s" : ""} caindo aqui
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Badge de Risco ───────────────────────────────────────────────────────────
 function RiscoBadge({ risco, T }) {
   const map = {
@@ -985,7 +1187,12 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
 
           {/* ── Leads ── */}
           {aba === "leads" && (
-            <LeadsPage T={T} bp={bp} empresaId={tenantUid} config={null} />
+            <>
+              {/* Funil de conversão — alimentado pelos leads em tempo real */}
+              <FunilLeads leads={leadsData.leads} T={T} bp={bp} />
+              {/* Lista + automações */}
+              <LeadsPage T={T} bp={bp} empresaId={tenantUid} config={null} />
+            </>
           )}
 
           {/* ── Configurações ── */}
