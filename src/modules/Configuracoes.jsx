@@ -11,6 +11,7 @@ import {
   Filter, RefreshCw, Search, ChevronDown,
   Zap, Copy, ExternalLink, BookOpen, X, CheckCircle2,
   Wallet, ArrowRight, ServerCog, Wifi, WifiOff,
+  GraduationCap, Plus, Edit2, Trash2,
 } from "lucide-react";
 
 import { db, functions } from "../lib/firebase";
@@ -106,6 +107,7 @@ const NAV = [
   { id: "pagamentos", label: "Pagamentos Online",    icon: Zap            },
   { id: "menu",       label: "Menu do Sistema",      icon: LayoutDashboard},
   { id: "estoque",    label: "Estoque",              icon: Package        },
+  { id: "matriculas", label: "Matrículas",           icon: GraduationCap  },
   { id: "atalhos",    label: "Atalhos",              icon: Keyboard       },
   { id: "log",        label: "Log de Atividades",    icon: Activity       },
 ];
@@ -572,6 +574,37 @@ const CSS = `
   .log-count-bar {
     font-size: 11px; color: var(--text-3); text-align: right; padding-top: 4px;
   }
+
+  /* ── Seção Matrículas — Turmas ── */
+  .turmas-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .turma-item {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 12px; min-height: 40px;
+    transition: border-color .13s;
+  }
+  .turma-item:hover { border-color: var(--border-h); }
+  .turma-item-nome { flex: 1; font-size: 13px; color: var(--text); word-break: break-word; }
+  .turma-item-input {
+    flex: 1; background: transparent; border: none; outline: none; min-width: 0;
+    font-size: 13px; color: var(--text); font-family: 'DM Sans', sans-serif; padding: 0;
+  }
+  .turmas-add-row { display: flex; gap: 8px; }
+  .turmas-add-row .form-input { flex: 1; }
+  .turmas-empty { font-size: 12px; color: var(--text-3); padding: 14px 0; text-align: center; }
+  .turma-btn-base {
+    width: 28px; height: 28px; border-radius: 7px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border: 1px solid transparent; background: transparent; transition: all .13s;
+  }
+  .turma-btn-ok     { color: #48bb78; }
+  .turma-btn-ok:hover     { background: rgba(72,187,120,.12); border-color: rgba(72,187,120,.25); }
+  .turma-btn-cancel { color: var(--text-3); }
+  .turma-btn-cancel:hover { background: var(--s3); border-color: var(--border); }
+  .turma-btn-edit   { color: #5b8ef0; }
+  .turma-btn-edit:hover   { background: rgba(91,142,240,.1); border-color: rgba(91,142,240,.2); }
+  .turma-btn-del    { color: #e05252; }
+  .turma-btn-del:hover    { background: rgba(224,82,82,.1); border-color: rgba(224,82,82,.2); }
 
   /* ── Seção Pagamentos Online ── */
   .pag-wrap { display: flex; flex-direction: column; gap: 24px; }
@@ -1974,13 +2007,197 @@ function SecaoLog({ tenantUid }) {
 }
 
 /* ══════════════════════════════════════════════════════
+   SEÇÃO MATRÍCULAS — Gerenciamento de turmas/horários
+   Firestore: users/{tenantUid}/config/matriculas → turmas[]
+   ══════════════════════════════════════════════════════ */
+function SecaoMatriculas({ tenantUid }) {
+  const [turmas, setTurmas]       = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [salvando, setSalvando]   = useState(false);
+  const [salvo, setSalvo]         = useState(false);  // feedback visual
+
+  const [novaTurma, setNovaTurma] = useState("");
+  const [editIdx, setEditIdx]     = useState(null);
+  const [editVal, setEditVal]     = useState("");
+
+  const MAX_TURMAS   = 50;
+  const MAX_NOME_LEN = 60;
+
+  useEffect(() => {
+    if (!tenantUid) { setLoading(false); return; }
+    getDoc(doc(db, "users", tenantUid, "config", "matriculas"))
+      .then(snap => {
+        if (snap.exists()) {
+          const data = snap.data();
+          setTurmas(Array.isArray(data.turmas) ? data.turmas : []);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [tenantUid]);
+
+  const addTurma = () => {
+    const nome = novaTurma.trim().slice(0, MAX_NOME_LEN);
+    if (!nome) return;
+    if (turmas.some(t => t.toLowerCase() === nome.toLowerCase())) {
+      alert("Já existe uma turma com esse nome."); return;
+    }
+    if (turmas.length >= MAX_TURMAS) {
+      alert(`Limite de ${MAX_TURMAS} turmas atingido.`); return;
+    }
+    setTurmas(l => [...l, nome]);
+    setNovaTurma("");
+  };
+
+  const removeTurma = (idx) => {
+    if (!window.confirm("Remover esta turma? Os alunos vinculados não serão afetados.")) return;
+    setTurmas(l => l.filter((_, i) => i !== idx));
+    if (editIdx === idx) setEditIdx(null);
+  };
+
+  const startEdit = (idx) => { setEditIdx(idx); setEditVal(turmas[idx]); };
+
+  const confirmEdit = () => {
+    const nome = editVal.trim().slice(0, MAX_NOME_LEN);
+    if (!nome) { setEditIdx(null); return; }
+    if (turmas.some((t, i) => i !== editIdx && t.toLowerCase() === nome.toLowerCase())) {
+      alert("Já existe uma turma com esse nome."); return;
+    }
+    setTurmas(l => l.map((t, i) => (i === editIdx ? nome : t)));
+    setEditIdx(null);
+  };
+
+  const handleSalvar = async () => {
+    if (!tenantUid) return;
+    setSalvando(true);
+    try {
+      await setDoc(
+        doc(db, "users", tenantUid, "config", "matriculas"),
+        { turmas, atualizadoEm: new Date().toISOString() },
+        { merge: true }
+      );
+      setSalvo(true);
+      setTimeout(() => setSalvo(false), 2500);
+    } catch (err) {
+      fsError(err, "Configuracoes:turmas");
+      alert("Erro ao salvar turmas. Tente novamente.");
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  if (loading) return <div className="cfg-loading">Carregando turmas...</div>;
+
+  return (
+    <div className="cfg-card">
+      <div className="cfg-card-header">
+        <div className="cfg-card-header-icon"><GraduationCap size={15} /></div>
+        <div>
+          <div className="cfg-card-title">Turmas / Horários</div>
+          <div className="cfg-card-sub">Categorias disponíveis no cadastro de alunos</div>
+        </div>
+      </div>
+
+      <div className="cfg-card-body">
+        <p style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 18, lineHeight: 1.7 }}>
+          Defina as turmas e horários que aparecem como opções no módulo de Matrículas.
+          Remover uma turma <strong style={{ color: "var(--text-2)" }}>não afeta</strong> os alunos já vinculados a ela.
+        </p>
+
+        {/* Lista de turmas */}
+        <div className="turmas-list">
+          {turmas.length === 0 && (
+            <div className="turmas-empty">Nenhuma turma cadastrada ainda. Adicione a primeira abaixo.</div>
+          )}
+          {turmas.map((t, idx) => (
+            <div key={idx} className="turma-item">
+              {editIdx === idx ? (
+                <input
+                  className="turma-item-input"
+                  value={editVal}
+                  maxLength={MAX_NOME_LEN}
+                  autoFocus
+                  onChange={(e) => setEditVal(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter")  confirmEdit();
+                    if (e.key === "Escape") setEditIdx(null);
+                  }}
+                />
+              ) : (
+                <span className="turma-item-nome">{t}</span>
+              )}
+              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                {editIdx === idx ? (
+                  <>
+                    <button className="turma-btn-base turma-btn-ok"
+                      onClick={confirmEdit} title="Confirmar (Enter)">
+                      <Check size={13} />
+                    </button>
+                    <button className="turma-btn-base turma-btn-cancel"
+                      onClick={() => setEditIdx(null)} title="Cancelar (Esc)">
+                      <X size={13} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button className="turma-btn-base turma-btn-edit"
+                      onClick={() => startEdit(idx)} title="Renomear">
+                      <Edit2 size={13} />
+                    </button>
+                    <button className="turma-btn-base turma-btn-del"
+                      onClick={() => removeTurma(idx)} title="Remover">
+                      <Trash2 size={13} />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Adicionar nova turma */}
+        {turmas.length < MAX_TURMAS && (
+          <div className="turmas-add-row">
+            <input
+              className="form-input"
+              type="text"
+              placeholder="Nome da turma (ex: Turma A, Terça 19h, Equipe Juvenil…)"
+              value={novaTurma}
+              maxLength={MAX_NOME_LEN}
+              onChange={(e) => setNovaTurma(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addTurma()}
+            />
+            <button className="btn-primary" onClick={addTurma} disabled={!novaTurma.trim()}>
+              <Plus size={14} /> Adicionar
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="cfg-card-footer">
+        <span style={{ fontSize: 11, color: "var(--text-3)", flex: 1, alignSelf: "center" }}>
+          {turmas.length} turma{turmas.length !== 1 ? "s" : ""} cadastrada{turmas.length !== 1 ? "s" : ""}
+        </span>
+        <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
+          {salvando
+            ? <><span className="cfg-spinner" /> Salvando...</>
+            : salvo
+            ? <><CheckCircle2 size={13} /> Salvo!</>
+            : <><Save size={13} /> Salvar turmas</>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════ */
 /* ─────────────────────────────────────────────
    Seções visíveis por cargo
 ───────────────────────────────────────────── */
 const SECOES_POR_CARGO = {
-  admin:       ["empresa", "seguranca", "financeiro", "pagamentos", "menu", "estoque", "atalhos", "log"],
+  admin:       ["empresa", "seguranca", "financeiro", "pagamentos", "menu", "estoque", "matriculas", "atalhos", "log"],
   financeiro:  ["seguranca", "financeiro", "atalhos"],
   comercial:   ["seguranca", "atalhos"],
   compras:     ["seguranca", "estoque", "atalhos"],
@@ -2027,6 +2244,7 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
       case "pagamentos": return <SecaoPagamentos config={config} onSave={handleSave} />;
       case "menu":       return <SecaoMenu       config={config} onSave={handleSave} />;
       case "estoque":    return <SecaoEstoque    config={config} onSave={handleSave} />;
+      case "matriculas": return <SecaoMatriculas tenantUid={uid} />;
       case "atalhos":    return <SecaoAtalhos    menuVisivel={menuVisivelProp ?? config?.menuVisivel ?? {}} />;
       case "log":        return <SecaoLog        tenantUid={uid} />;
       default:           return null;
