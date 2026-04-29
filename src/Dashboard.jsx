@@ -47,6 +47,7 @@ import Compras       from "./modules/Compras.jsx";
 import Mesas         from "./modules/Mesas.jsx";
 import Alunos        from "./modules/Alunos.jsx";
 import PDV          from "./modules/PDV.jsx";
+import CRMModule    from "./crm/CRMModule.jsx";
 
 import RotaProtegida from "./contexts/RotaProtegida";
 import { usePermissao } from "./hooks/usePermissao";
@@ -1153,6 +1154,7 @@ export default function Dashboard() {
   const [period,        setPeriod]       = useState("Este mês");
   const [customRange,   setCustomRange]  = useState({ from: "", to: "" });
   const [module,        setModule]       = useState("Dashboard");
+  const [sistemaAtivo,  setSistemaAtivo] = useState("gestao"); // "gestao" | "crm"
   const [userName,      setUserName]     = useState("Usuário");
   const [userAvatar,    setUserAvatar]   = useState(null);
   const [menuVisivel,   setMenuVisivel]  = useState({});
@@ -2756,6 +2758,42 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
             {dropdownOpen && (
               <div className="ag-user-dropdown" role="menu">
+
+                {/* ── Sistemas ── */}
+                <div style={{
+                  padding: "5px 12px 3px",
+                  fontSize: 9, fontWeight: 700,
+                  letterSpacing: "0.10em", textTransform: "uppercase",
+                  color: "var(--text-3)",
+                }}>
+                  Sistemas
+                </div>
+
+                <button
+                  className="ag-dropdown-item"
+                  onClick={() => { setSistemaAtivo("crm"); setDropdownOpen(false); }}
+                  style={{ display: "flex", alignItems: "center", gap: 8 }}
+                >
+                  <span style={{
+                    width: 20, height: 20, borderRadius: 5,
+                    background: "rgba(200,165,94,0.15)",
+                    border: "1px solid rgba(200,165,94,0.28)",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 11, flexShrink: 0,
+                  }}>◈</span>
+                  <span style={{ flex: 1 }}>Assent CRM</span>
+                  <span style={{
+                    fontSize: 8, fontWeight: 700,
+                    padding: "1px 5px", borderRadius: 999,
+                    background: "rgba(200,165,94,0.15)",
+                    color: "var(--gold)",
+                    border: "1px solid rgba(200,165,94,0.28)",
+                    letterSpacing: "0.08em", textTransform: "uppercase", flexShrink: 0,
+                  }}>NOVO</span>
+                </button>
+
+                <div className="ag-dropdown-divider" />
+
                 <button
                   className="ag-dropdown-item"
                   onClick={() => { setModule("Configurações"); setDropdownOpen(false); }}
@@ -2807,7 +2845,15 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
           {/* Conteúdo principal */}
           <main className="ag-main" style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0, overflow: "hidden" }}>
-            {renderModulo()}
+            {sistemaAtivo === "crm" ? (
+              <CRMModule
+                tenantUid={tenantUid}
+                nomeEmpresa={nomeEmpresa}
+                onVoltar={() => setSistemaAtivo("gestao")}
+              />
+            ) : (
+              renderModulo()
+            )}
           </main>
 
         </div>
