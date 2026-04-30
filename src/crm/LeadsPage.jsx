@@ -865,6 +865,158 @@ function AutomacoesPanel({ automacoes, leads = [], empresaId, acoesDisparadas = 
   );
 }
 
+// ─── Funil de Conversão ───────────────────────────────────────────────────────
+function FunilLeads({ leads = [], T, bp }) {
+  const ETAPAS = [
+    { status: "Novo",        label: "Novos",        cor: "#D4AF37" },
+    { status: "Contactado",  label: "Contactados",  cor: "#C49920" },
+    { status: "Qualificado", label: "Qualificados", cor: "#9E7415" },
+    { status: "Convertido",  label: "Convertidos",  cor: "#D4AF37" },
+  ];
+
+  const total    = leads.length;
+  const perdidos = leads.filter(l => (l.status || "").toLowerCase() === "perdido").length;
+  const ativos   = total - perdidos;
+
+  const contagens = ETAPAS.map(e => ({
+    ...e,
+    n: leads.filter(l => (l.status || "").toLowerCase() === e.status.toLowerCase()).length,
+  }));
+
+  const txConv = ativos > 0
+    ? Math.round((contagens[3].n / ativos) * 100)
+    : 0;
+
+  // Maior queda entre etapas consecutivas = gargalo
+  let gargalIdx = 0, maiorQueda = 0;
+  for (let i = 0; i < contagens.length - 1; i++) {
+    const q = contagens[i].n - contagens[i + 1].n;
+    if (q > maiorQueda) { maiorQueda = q; gargalIdx = i; }
+  }
+
+  // SVG funnel — trapézios decrescentes
+  const CX = 200, SH = 46, GAP = 5;
+  const HWS = [175, 128, 84, 50];
+
+  function trapezoid(i) {
+    const y  = i * (SH + GAP);
+    const tw = HWS[i];
+    const bw = i < 3 ? HWS[i + 1] : tw - 18;
+    return {
+      pts:  `${CX - tw},${y} ${CX + tw},${y} ${CX + bw},${y + SH} ${CX - bw},${y + SH}`,
+      midY: y + SH / 2,
+    };
+  }
+
+  const pct = i => ativos > 0 ? Math.round((contagens[i].n / ativos) * 100) : 0;
+
+  if (total === 0) return (
+    <div style={{
+      textAlign: "center", padding: "40px 0",
+      color: T.textDim, fontSize: 13, fontWeight: 300,
+      border: `1px dashed ${T.border}`, borderRadius: 14,
+    }}>
+      Nenhum lead captado ainda.
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 18, flexWrap: "wrap", gap: 10 }}>
+        <div>
+          <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>
+            Pipeline de conversão
+          </div>
+          <div style={{ fontSize: 20, fontWeight: 700, color: T.text, letterSpacing: "-0.01em" }}>
+            {total} leads
+            {perdidos > 0 && <span style={{ fontSize: 12, color: T.textDim, fontWeight: 400 }}> · {perdidos} perdidos</span>}
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 26, fontWeight: 700, color: T.gold, lineHeight: 1 }}>{txConv}%</div>
+          <div style={{ fontSize: 9, color: T.textDim, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: 3 }}>taxa de conversão</div>
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: bp?.isMobile ? "1fr" : "1fr 200px", gap: 16, alignItems: "start" }}>
+        {/* SVG */}
+        <svg viewBox="0 0 400 207" style={{ display: "block", width: "100%", overflow: "visible" }}
+          role="img" aria-label={`Funil com ${total} leads em ${contagens.filter(c => c.n > 0).length} etapas`}>
+          {contagens.map((e, i) => {
+            const { pts, midY } = trapezoid(i);
+            const tc = i > 0 && i < 3 ? "#F0D890" : "#1A0C00";
+            return (
+              <g key={e.status}>
+                <polygon points={pts} fill={e.cor} opacity={i === 3 ? 1 : 0.92 - i * 0.06} />
+                <text x={CX} y={midY - 6} textAnchor="middle" fill={tc} fontSize={10} fontWeight="600"
+                  fontFamily="system-ui, sans-serif">{e.label}</text>
+                <text x={CX} y={midY + 8} textAnchor="middle" fill={tc} fontSize={9} opacity={0.85}
+                  fontFamily="system-ui, sans-serif">{e.n} · {pct(i)}%</text>
+              </g>
+            );
+          })}
+        </svg>
+
+        {/* Breakdown + gargalo */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {contagens.map((e, i) => {
+            const pctVal = pct(i);
+            const isGargalo = i === gargalIdx && maiorQueda > 0;
+            return (
+              <div key={e.status} style={{
+                background: T.surfaceAlt,
+                border: `1px solid ${isGargalo ? T.redBorder : T.border}`,
+                borderLeft: `3px solid ${isGargalo ? T.red : e.cor}`,
+                borderRadius: 9, padding: "8px 11px",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 5 }}>
+                  <span style={{ fontSize: 10, color: T.textMid }}>{e.label}</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: i === 3 ? T.gold : T.text }}>{e.n}</span>
+                </div>
+                <div style={{ height: 2, background: T.border, borderRadius: 1 }}>
+                  <div style={{ height: "100%", width: `${pctVal}%`, background: e.cor, borderRadius: 1, opacity: i === 3 ? 1 : 0.8 }} />
+                </div>
+              </div>
+            );
+          })}
+
+          {maiorQueda > 0 && (
+            <div style={{ background: T.redDim, border: `1px solid ${T.redBorder}`, borderRadius: 9, padding: "8px 11px" }}>
+              <div style={{ fontSize: 9, color: T.textDim, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Maior gargalo</div>
+              <div style={{ fontSize: 11, color: T.text }}>{contagens[gargalIdx].label} → {contagens[gargalIdx + 1].label}</div>
+              <div style={{ fontSize: 10, color: T.red, marginTop: 2 }}>−{maiorQueda} lead{maiorQueda !== 1 ? "s" : ""} caindo aqui</div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal do Funil ───────────────────────────────────────────────────────────
+function ModalFunil({ leads, T, bp, onFechar }) {
+  return (
+    <div
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 95, padding: 16, backdropFilter: "blur(4px)" }}
+      onClick={onFechar}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: "24px", width: "100%", maxWidth: 660, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 60px rgba(0,0,0,0.6)" }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: T.gold, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+            ◈ Funil de Leads
+          </div>
+          <button onClick={onFechar} style={{ background: "none", border: "none", color: T.textDim, fontSize: 18, cursor: "pointer", lineHeight: 1 }}>✕</button>
+        </div>
+        <FunilLeads leads={leads} T={T} bp={bp} />
+      </div>
+    </div>
+  );
+}
+
 // ─── Sub-componentes auxiliares ───────────────────────────────────────────────
 function SecaoTitulo({ T, children }) {
   return (
@@ -888,10 +1040,11 @@ function Chip({ color, children }) {
 // ─── Componente principal exportado ──────────────────────────────────────────
 // Recebe T, bp, empresaId e config — mesma assinatura das outras seções do App.
 
-export default function LeadsPage({ T, bp, empresaId, config, funilOculto = false, apenasFlnil = false }) {
+export default function LeadsPage({ T, bp, empresaId, config }) {
   const { leads, metricas, automacoes, carregando, erro, acoesDisparadas } = useLeads(empresaId);
   const [subAba, setSubAba] = useState("lista");
   const [leadSelecionado, setLeadSelecionado] = useState(null);
+  const [funilAberto, setFunilAberto] = useState(false);
 
   // Painel sempre sincronizado com o snapshot mais recente do Firestore
   const leadAtualizado = leadSelecionado
@@ -938,7 +1091,7 @@ export default function LeadsPage({ T, bp, empresaId, config, funilOculto = fals
   return (
     <div>
       {/* Sub-navegação */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 20, borderBottom: `1px solid ${T.border}`, paddingBottom: 12 }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 20, borderBottom: `1px solid ${T.border}`, paddingBottom: 12, alignItems: "center" }}>
         {[
           { id: "lista",      label: `Leads${leads.length ? ` (${leads.length})` : ""}` },
           { id: "automacoes", label: `Automações${automacoes.length ? ` (${automacoes.length})` : ""}` },
@@ -955,17 +1108,30 @@ export default function LeadsPage({ T, bp, empresaId, config, funilOculto = fals
             }}
           >{s.label}</button>
         ))}
+        {/* Botão funil — sempre visível, abre modal */}
+        <button
+          onClick={() => setFunilAberto(true)}
+          style={{
+            marginLeft: "auto", fontSize: 11, fontWeight: 600,
+            padding: "6px 14px", borderRadius: 6, cursor: "pointer",
+            background: "transparent",
+            border: `1px solid ${T.goldBorder}`,
+            color: T.gold, fontFamily: "inherit",
+            display: "flex", alignItems: "center", gap: 6,
+          }}
+        >
+          <span style={{ fontSize: 13 }}>◈</span> Ver funil
+        </button>
       </div>
 
       {/* ── Aba Lista ── */}
       {subAba === "lista" && (
         <>
-          {/* Métricas — leads passados para cálculo dinâmico de temperatura */}
-          {!funilOculto && <MetricasLeads leads={leads} metricas={metricas} T={T} bp={bp} />}
+          {/* Métricas de leads */}
+          <MetricasLeads leads={leads} metricas={metricas} T={T} bp={bp} />
 
-          {/* Barra de filtros + tabela — ocultos quando exibido apenas o funil */}
-          {!apenasFlnil && (
-            <>
+          {/* Barra de filtros + tabela */}
+          <>
               <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
                 <input
                   value={busca}
@@ -1008,8 +1174,7 @@ export default function LeadsPage({ T, bp, empresaId, config, funilOculto = fals
               ) : (
                 <TabelaLeads leads={leadsFiltrados} T={T} onSelect={setLeadSelecionado} />
               )}
-            </>
-          )}
+          </>
         </>
       )}
 
@@ -1033,6 +1198,16 @@ export default function LeadsPage({ T, bp, empresaId, config, funilOculto = fals
           empresaNome={config?.empresaNome}
           T={T}
           onFechar={() => setLeadSelecionado(null)}
+        />
+      )}
+
+      {/* Modal Funil de Conversão */}
+      {funilAberto && (
+        <ModalFunil
+          leads={leads}
+          T={T}
+          bp={bp}
+          onFechar={() => setFunilAberto(false)}
         />
       )}
 
