@@ -124,9 +124,9 @@ const UpgradeRequired = ({ onVoltar }) => (
       <div style={{ width:52, height:52, borderRadius:12, margin:"0 auto 18px", background:"var(--gold-d)", border:"1px solid rgba(200,165,94,0.3)", display:"flex", alignItems:"center", justifyContent:"center", fontSize:22, color:"var(--gold)" }}>◷</div>
       <h2 style={{ color:"var(--gold)", fontSize:19, fontWeight:700, marginBottom:10, marginTop:0 }}>Assent Flow</h2>
       <p style={{ color:"var(--text-2)", fontSize:13, lineHeight:1.75, marginBottom:24 }}>
-        O módulo <strong style={{ color:"var(--text)" }}>Assent Flow</strong> está disponível exclusivamente no <strong style={{ color:"var(--gold)" }}>Plano Premium</strong>.
+        O módulo <strong style={{ color:"var(--text)" }}>Assent Flow</strong> está disponível exclusivamente no <strong style={{ color:"var(--gold)" }}>Plano Profissional</strong>.
       </p>
-      <button className="fl-btn-primary" style={{ marginBottom:12 }}>Conhecer o Plano Premium</button>
+      <button className="fl-btn-primary" style={{ marginBottom:12 }}>Conhecer o Plano Profissional</button>
       <div>{onVoltar && <button onClick={onVoltar} className="fl-back-btn" style={{ justifyContent:"center", margin:"0 auto" }}><ArrowLeft size={12} /> Voltar ao Assent Gestão</button>}</div>
     </div>
   </div>
@@ -157,7 +157,7 @@ const Sidebar = ({ tela, setTela, isAdmin, onVoltar, theme, onToggleTheme }) => 
       ))}
     </nav>
     <div className="fl-sidebar-footer">
-      <span className="fl-badge-premium">● Premium</span>
+      <span className="fl-badge-premium">● Profissional</span>
       <div style={{ flex:1 }} />
       {onToggleTheme && (
         <div className="ag-theme-btn" onClick={onToggleTheme} role="button" tabIndex={0}
@@ -466,7 +466,7 @@ export default function AssFlow({ tenantUid:tenantUidProp, plano, theme, onToggl
 
   if (!tenantUid) return null;
 
-  if (plano && plano !== "premium") {
+  if (plano && plano !== "profissional") {
     return (
       <>
         <style>{FLOW_CSS}</style>
