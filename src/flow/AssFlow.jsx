@@ -753,23 +753,67 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
   // meuPrestadorId: admin="admin", membro=user.uid (se ativo no Flow)
   const meuPrestadorId = isAdmin ? "admin" : (prestadores.find(p=>p.linkedUserId===user?.uid&&p.ativo)?.id || null);
 
-  // ── Auto-criação do prestador admin no primeiro acesso ────────────────
-  // ID fixo "admin" — representa sempre o dono da conta
+  // ── Auto-init admin: garante prestador + config existem ─────────────────
+  // Executado uma vez por sessão quando admin abre o Flow.
+  // Lógica:
+  //   1. agendamento_prestadores/admin  → cria se não existe
+  //   2. agendamento_configuracoes/admin → migra de /config (formato antigo)
+  //                                        ou cria vazio com defaults
   useEffect(()=>{
     if(!tenantUid||!user||!isAdmin) return;
-    const ref=doc(db,"users",tenantUid,"agendamento_prestadores","admin");
-    getDoc(ref).then(snap=>{
-      if(!snap.exists()){
-        setDoc(ref,{
-          nome:        user.displayName || user.email?.split("@")[0] || "Administrador",
+
+    async function initAdmin(){
+      // ── 1. Prestador admin ──────────────────────────────────────────
+      const prestRef=doc(db,"users",tenantUid,"agendamento_prestadores","admin");
+      const prestSnap=await getDoc(prestRef);
+      if(!prestSnap.exists()){
+        await setDoc(prestRef,{
+          nome:         user.displayName || user.email?.split("@")[0] || "Administrador",
           especialidade:"",
           linkedUserId: user.uid,
-          ativo:       true,
-          isAdmin:     true,
-          criadoEm:    serverTimestamp(),
+          ativo:        true,
+          isAdmin:      true,
+          criadoEm:     serverTimestamp(),
         });
       }
-    });
+
+      // ── 2. Config admin ─────────────────────────────────────────────
+      const cfgAdminRef=doc(db,"users",tenantUid,"agendamento_configuracoes","admin");
+      const cfgAdminSnap=await getDoc(cfgAdminRef);
+
+      if(!cfgAdminSnap.exists()){
+        // Verifica se existe config no formato antigo (/configuracoes/config)
+        const cfgOldRef=doc(db,"users",tenantUid,"agendamento_configuracoes","config");
+        const cfgOldSnap=await getDoc(cfgOldRef);
+
+        if(cfgOldSnap.exists()){
+          // ► MIGRAÇÃO: copia dados antigos para /admin
+          const oldData=cfgOldSnap.data();
+          await setDoc(cfgAdminRef,{
+            ...oldData,
+            // Garante campo correto (antigo usava "servicos" sem acento)
+            serviços: oldData.serviços || oldData.servicos || [],
+            migradoEm: serverTimestamp(),
+          });
+          // Opcional: marca o doc antigo como migrado (não apaga para segurança)
+          await updateDoc(cfgOldRef,{ _migrado:"admin", _migradoEm:serverTimestamp() });
+        } else {
+          // ► NOVO: cria config padrão vazia (admin configura depois)
+          await setDoc(cfgAdminRef,{
+            serviços:            [],
+            diasAtivos:          ["seg","ter","qua","qui","sex"],
+            horaInicio:          "08:00",
+            horaFim:             "18:00",
+            granularidadeMinutos: 30,
+            nomeEmpresa:         "",
+            descricao:           "",
+            criadoEm:            serverTimestamp(),
+          });
+        }
+      }
+    }
+
+    initAdmin().catch(err=>console.error("[Flow] initAdmin error:", err));
   },[tenantUid, user?.uid]);
 
   // ── Carrega prestadores em tempo real ──────────────────────────────────
