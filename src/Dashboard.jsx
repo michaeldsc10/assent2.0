@@ -48,6 +48,7 @@ import Mesas         from "./modules/Mesas.jsx";
 import Alunos        from "./modules/Alunos.jsx";
 import PDV          from "./modules/PDV.jsx";
 import CRMModule    from "./crm/CRMModule.jsx";
+import AssFlow      from "./flow/AssFlow.jsx";
 
 import RotaProtegida from "./contexts/RotaProtegida";
 import { usePermissao } from "./hooks/usePermissao";
@@ -1154,7 +1155,7 @@ export default function Dashboard() {
   const [period,        setPeriod]       = useState("Este mês");
   const [customRange,   setCustomRange]  = useState({ from: "", to: "" });
   const [module,        setModule]       = useState("Dashboard");
-  const [sistemaAtivo,  setSistemaAtivo] = useState("gestao"); // "gestao" | "crm"
+  const [sistemaAtivo,  setSistemaAtivo] = useState("gestao"); // "gestao" | "crm" | "flow"
   const [userName,      setUserName]     = useState("Usuário");
   const [userAvatar,    setUserAvatar]   = useState(null);
   const [menuVisivel,   setMenuVisivel]  = useState({});
@@ -2705,7 +2706,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             onClick={toggleSidebar}
             title={collapsed ? "Expandir menu" : "Recolher menu"}
             aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-            style={sistemaAtivo === "crm" ? { display: "none" } : {}}
+            style={sistemaAtivo === "crm" || sistemaAtivo === "flow" ? { display: "none" } : {}}
           >
             {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
           </button>
@@ -2957,41 +2958,85 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   Sistemas
                 </div>
 
-                {sistemaAtivo === "gestao" ? (
-                  <button
-                    className="ag-dropdown-item"
-                    onClick={() => { setSistemaAtivo("crm"); setDropdownOpen(false); }}
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
-                  >
-                    <img
-                      src="/crm_logo.png"
-                      alt="Assent CRM"
-                      style={{ width: 20, height: 20, borderRadius: 5, objectFit: "cover", flexShrink: 0 }}
-                      onError={(e) => { e.target.style.display = "none"; }}
-                    />
-                    <span style={{ flex: 1 }}>Assent CRM</span>
+                {/* ── Assent Gestão ── */}
+                <button
+                  className="ag-dropdown-item"
+                  onClick={() => { setSistemaAtivo("gestao"); setDropdownOpen(false); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    background: sistemaAtivo === "gestao" ? "var(--gold-d)" : "transparent",
+                    color: sistemaAtivo === "gestao" ? "var(--gold)" : "var(--text-2)",
+                  }}
+                >
+                  <img
+                    src="/logo.png"
+                    alt="Assent Gestão"
+                    style={{ width: 20, height: 20, borderRadius: 5, objectFit: "cover", flexShrink: 0 }}
+                    onError={(e) => { e.target.style.display = "none"; }}
+                  />
+                  <span style={{ flex: 1 }}>Assent Gestão</span>
+                  {sistemaAtivo === "gestao" && (
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />
+                  )}
+                </button>
+
+                {/* ── Assent CRM ── */}
+                <button
+                  className="ag-dropdown-item"
+                  onClick={() => { setSistemaAtivo("crm"); setDropdownOpen(false); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    background: sistemaAtivo === "crm" ? "var(--gold-d)" : "transparent",
+                    color: sistemaAtivo === "crm" ? "var(--gold)" : "var(--text-2)",
+                  }}
+                >
+                  <img
+                    src="/crm_logo.png"
+                    alt="Assent CRM"
+                    style={{ width: 20, height: 20, borderRadius: 5, objectFit: "cover", flexShrink: 0 }}
+                    onError={(e) => { e.target.style.display = "none"; }}
+                  />
+                  <span style={{ flex: 1 }}>Assent CRM</span>
+                  {sistemaAtivo === "crm" ? (
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />
+                  ) : (
                     <span style={{
-                      fontSize: 8, fontWeight: 700,
-                      padding: "1px 5px", borderRadius: 999,
-                      background: "rgba(200,165,94,0.15)",
-                      color: "var(--gold)",
+                      fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 999,
+                      background: "rgba(200,165,94,0.15)", color: "var(--gold)",
                       border: "1px solid rgba(200,165,94,0.28)",
                       letterSpacing: "0.08em", textTransform: "uppercase", flexShrink: 0,
                     }}>NOVO</span>
-                  </button>
-                ) : (
+                  )}
+                </button>
+
+                {/* ── Assent Flow — só aparece se plano for premium ── */}
+                {(isPro || licencaSlug === "premium") && (
                   <button
                     className="ag-dropdown-item"
-                    onClick={() => { setSistemaAtivo("gestao"); setDropdownOpen(false); }}
-                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                    onClick={() => { setSistemaAtivo("flow"); setDropdownOpen(false); }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      background: sistemaAtivo === "flow" ? "var(--gold-d)" : "transparent",
+                      color: sistemaAtivo === "flow" ? "var(--gold)" : "var(--text-2)",
+                    }}
                   >
-                    <img
-                      src="/logo.png"
-                      alt="Assent Gestão"
-                      style={{ width: 20, height: 20, borderRadius: 5, objectFit: "cover", flexShrink: 0 }}
-                      onError={(e) => { e.target.style.display = "none"; }}
-                    />
-                    <span style={{ flex: 1 }}>Assent Gestão</span>
+                    <div style={{
+                      width: 20, height: 20, borderRadius: 5, flexShrink: 0,
+                      background: "rgba(200,165,94,0.12)", border: "1px solid rgba(200,165,94,0.25)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 11, color: "var(--gold)",
+                    }}>◷</div>
+                    <span style={{ flex: 1 }}>Assent Flow</span>
+                    {sistemaAtivo === "flow" ? (
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />
+                    ) : (
+                      <span style={{
+                        fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 999,
+                        background: "rgba(200,165,94,0.15)", color: "var(--gold)",
+                        border: "1px solid rgba(200,165,94,0.28)",
+                        letterSpacing: "0.08em", textTransform: "uppercase", flexShrink: 0,
+                      }}>NOVO</span>
+                    )}
                   </button>
                 )}
 
@@ -3019,7 +3064,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         <div className="ag-body">
 
           {/* Sidebar desktop recolhível — oculta no Assent CRM */}
-          <aside className={`ag-sidebar ${collapsed ? "collapsed" : ""}`} style={sistemaAtivo === "crm" ? { display: "none" } : {}}>
+          <aside className={`ag-sidebar ${collapsed ? "collapsed" : ""}`} style={sistemaAtivo === "crm" || sistemaAtivo === "flow" ? { display: "none" } : {}}>
             <nav className="ag-nav">
               {NAV.map((sec) => (
                 <div key={sec.section}>
@@ -3052,6 +3097,15 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               <CRMModule
                 tenantUid={tenantUid}
                 nomeEmpresa={nomeEmpresa}
+                onVoltar={() => setSistemaAtivo("gestao")}
+                theme={theme}
+                onToggleTheme={toggleTheme}
+              />
+            ) : sistemaAtivo === "flow" ? (
+              <AssFlow
+                tenantUid={tenantUid}
+                nomeEmpresa={nomeEmpresa}
+                plano={licencaSlug}
                 onVoltar={() => setSistemaAtivo("gestao")}
                 theme={theme}
                 onToggleTheme={toggleTheme}
