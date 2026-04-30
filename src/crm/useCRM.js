@@ -206,6 +206,131 @@ function gerarInsights(clientesComScore, vendas = [], servicos = [], ignorados =
   return insights.sort((a, b) => a.prioridade - b.prioridade);
 }
 
+// ─── Gerador de dicas de crescimento ─────────────────────────────────────────
+// Analisa os dados reais do negócio e gera sugestões acionáveis.
+// Não depende de clientes em risco — funciona mesmo com base zerada.
+function gerarDicas(clientesComScore, vendas = [], servicos = []) {
+  const dicas = [];
+  const hoje = new Date();
+
+  const comVendas = clientesComScore.filter(c => !c._semVendas);
+  const fieis     = comVendas.filter(c => c.risco === "baixo" && c.totalCompras >= 2);
+  const novos     = comVendas.filter(c => c.totalCompras === 1);
+  const semVendas = clientesComScore.filter(c => c._semVendas);
+
+  const v7d  = vendas.filter(v => (hoje - toDate(v.data)) < 7  * 86400000);
+  const v30d = vendas.filter(v => (hoje - toDate(v.data)) < 30 * 86400000);
+  const v60d = vendas.filter(v => (hoje - toDate(v.data)) < 60 * 86400000);
+
+  // 1. Semana parada → campanha
+  if (v7d.length === 0 && v30d.length > 0) {
+    dicas.push({
+      id: "dica-semana-parada",
+      tipo: "dica",
+      prioridade: 4,
+      icone: "📅",
+      titulo: "Semana sem vendas",
+      descricao: `Nenhuma venda nos últimos 7 dias — mas você teve ${v30d.length} no último mês. Bom momento para reativar a base com uma mensagem rápida.`,
+      acao: "Reativar clientes",
+    });
+  }
+
+  // 2. Clientes fiéis → pedir indicação
+  if (fieis.length >= 2) {
+    const exemplo = fieis[0]?.nome?.split(" ")[0];
+    dicas.push({
+      id: "dica-indicacao",
+      tipo: "dica",
+      prioridade: 4,
+      icone: "🤝",
+      titulo: `${fieis.length} clientes fiéis — peça indicações`,
+      descricao: `Clientes fiéis como ${exemplo} já confiam no seu trabalho. Um pedido direto de indicação costuma trazer 1 novo cliente a cada 3 abordagens.`,
+      acao: "Pedir indicação",
+    });
+  }
+
+  // 3. Clientes cadastrados sem nenhuma venda
+  if (semVendas.length > 0) {
+    dicas.push({
+      id: "dica-sem-vendas",
+      tipo: "dica",
+      prioridade: 5,
+      icone: "👤",
+      titulo: `${semVendas.length} cliente${semVendas.length > 1 ? "s" : ""} sem histórico de compra`,
+      descricao: `Você tem contatos cadastrados que nunca fecharam. Uma abordagem personalizada agora pode converter antes que esfriem.`,
+      acao: "Abordar contatos",
+    });
+  }
+
+  // 4. Clientes novos → fidelizar antes de perder
+  if (novos.length > 0) {
+    const pct = Math.round((novos.length / Math.max(comVendas.length, 1)) * 100);
+    dicas.push({
+      id: "dica-novos",
+      tipo: "dica",
+      prioridade: 5,
+      icone: "✨",
+      titulo: `${novos.length} cliente${novos.length > 1 ? "s" : ""} com apenas 1 compra (${pct}% da base)`,
+      descricao: `Clientes que compram uma segunda vez têm 5× mais chance de virar fiéis. Entre em contato com quem comprou pela primeira vez nos últimos 30 dias.`,
+      acao: "Fidelizar novos",
+    });
+  }
+
+  // 5. Serviço mais vendido → criar combo / upsell
+  if (servicos.length > 0 && vendas.length > 0) {
+    const contagem = {};
+    vendas.forEach(v =>
+      (v.itens || []).forEach(i => {
+        const nome = i.nome || i.produto;
+        if (nome) contagem[nome] = (contagem[nome] || 0) + 1;
+      })
+    );
+    const [[topServico, topQtd] = []] = Object.entries(contagem).sort((a, b) => b[1] - a[1]);
+    const srvObj = servicos.find(s => s.nome === topServico);
+    if (topServico && topQtd >= 3) {
+      dicas.push({
+        id: "dica-top-servico",
+        tipo: "dica",
+        prioridade: 6,
+        icone: "⭐",
+        titulo: `"${topServico}" é seu serviço mais vendido`,
+        descricao: `Vendido ${topQtd}× no histórico${srvObj?.preco ? ` (R$ ${srvObj.preco} cada)` : ""}. Considere criar um pacote ou combo em torno dele para aumentar o ticket médio.`,
+        acao: "Criar pacote",
+      });
+    }
+  }
+
+  // 6. Base pequena → prospecção ativa
+  if (comVendas.length > 0 && comVendas.length < 5) {
+    dicas.push({
+      id: "dica-base-pequena",
+      tipo: "dica",
+      prioridade: 6,
+      icone: "🎯",
+      titulo: "Base de clientes ainda pequena",
+      descricao: `Você tem ${comVendas.length} cliente${comVendas.length > 1 ? "s" : ""} com histórico. Para crescer, foque em prospecção ativa: Instagram, grupos de WhatsApp e parcerias locais costumam trazer os primeiros 10 clientes.`,
+      acao: "Prospectar",
+    });
+  }
+
+  // 7. Receita recente crescendo → investir em tráfego
+  const receitaV30 = v30d.reduce((a, v) => a + (v.total ?? v.custoTotal ?? 0), 0);
+  const receitaV60 = v60d.reduce((a, v) => a + (v.total ?? v.custoTotal ?? 0), 0);
+  if (receitaV30 >= 500 && receitaV30 > receitaV60 * 0.7) {
+    dicas.push({
+      id: "dica-momento-trafego",
+      tipo: "dica",
+      prioridade: 7,
+      icone: "📈",
+      titulo: "Momento favorável para investir em tráfego",
+      descricao: `Você gerou R$ ${receitaV30.toLocaleString("pt-BR")} nos últimos 30 dias. Com a base aquecida, é um bom momento para impulsionar posts ou rodar uma campanha de Meta Ads.`,
+      acao: "Investir em tráfego",
+    });
+  }
+
+  return dicas;
+}
+
 // ─── Métricas do painel ───────────────────────────────────────────────────────
 function calcularMetricas(clientesComScore, vendas = []) {
   const hoje = new Date();
@@ -277,12 +402,19 @@ export function useCRM(empresaId) {
 
       const radar = { ...RADAR_PADRAO, ...buffer.radar };
       const clientesComScore = calcularScoreChurn(buffer.clientes, buffer.vendas, radar);
-      const insights = gerarInsights(
+      const insightsRisco = gerarInsights(
         clientesComScore,
         buffer.vendas,
         buffer.servicos,
         buffer.ignorados
       );
+      const dicas = gerarDicas(
+        clientesComScore,
+        buffer.vendas,
+        buffer.servicos
+      );
+      // Dicas aparecem após os alertas de risco
+      const insights = [...insightsRisco, ...dicas];
       const metricas = calcularMetricas(clientesComScore, buffer.vendas);
 
       setEstado({
