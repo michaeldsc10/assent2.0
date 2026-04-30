@@ -3,7 +3,7 @@
 // Convenções AG v2.0: guard tenantUid, paths /users/{tenantUid}/..., serverTimestamp()
 
 import { useState, useEffect } from "react";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../contexts/AuthContext.jsx";
 import {
   getFirestore, collection, doc, onSnapshot,
   setDoc, updateDoc, deleteDoc, addDoc,
