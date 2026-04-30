@@ -638,187 +638,196 @@ function ClientesIgnorados({ ignorados, empresaId, T }) {
 
 
 // ─── Aba Crescimento ──────────────────────────────────────────────────────────
-const CAT_CONFIG = {
-  "Captação":    { cor: "#4a8fd4", corDim: "#0d1e35", icone: "◎" },
-  "Fidelização": { cor: "#3aad78", corDim: "#0d2419", icone: "◉" },
-  "Receita":     { cor: "#c8a44a", corDim: "#2a1a00", icone: "◈" },
-  "Digital":     { cor: "#a855f7", corDim: "#1e0a30", icone: "▦" },
-  "Operacional": { cor: "#7a7990", corDim: "#18181c", icone: "◧" },
+const FASES_LABEL = {
+  base_vazia:       { label: "Base em construção",    cor: "#4a8fd4" },
+  construcao:       { label: "Fase de construção",    cor: "#4a8fd4" },
+  crescendo:        { label: "Em crescimento",        cor: "#3aad78" },
+  retencao_critica: { label: "Atenção: retenção",     cor: "#e05252" },
+  estagnado:        { label: "Atividade baixa",       cor: "#d4903a" },
+  escalonando:      { label: "Escalonando",           cor: "#c8a44a" },
 };
 
-const IMPACTO_COR = {
-  alto:  { label: "Impacto alto",  cor: "#c8a44a" },
-  médio: { label: "Impacto médio", cor: "#7a7990" },
-  baixo: { label: "Impacto baixo", cor: "#3e3d50" },
+const CAT_COR = {
+  "Captação":    "#4a8fd4",
+  "Retenção":    "#e05252",
+  "Fidelização": "#3aad78",
+  "Receita":     "#c8a44a",
+  "Ativação":    "#d4903a",
+  "Operacional": "#7a7990",
 };
 
-const DIFIC_COR = {
-  "fácil":  { label: "Fácil",   cor: "#3aad78" },
-  "médio":  { label: "Médio",   cor: "#c8a44a" },
-  "avançado":{ label: "Avançado", cor: "#e05252" },
-};
-
-function DicaCard({ dica, T }) {
-  const cat      = CAT_CONFIG[dica.categoria] || CAT_CONFIG["Operacional"];
-  const impacto  = IMPACTO_COR[dica.impacto]  || IMPACTO_COR["médio"];
-  const dific    = DIFIC_COR[dica.dificuldade] || DIFIC_COR["médio"];
+function InsightCrescimentoCard({ insight, idx, T }) {
   const [expandido, setExpandido] = useState(false);
+  const catCor = CAT_COR[insight.categoria] || T.gold;
 
   return (
     <div
       onClick={() => setExpandido(v => !v)}
       style={{
         background: T.surface,
-        border: `1px solid ${expandido ? cat.cor + "55" : T.border}`,
-        borderLeft: `3px solid ${cat.cor}`,
-        borderRadius: 14, padding: "16px 18px",
-        cursor: "pointer", transition: "border-color 0.18s, background 0.18s",
+        border: `1px solid ${expandido ? catCor + "40" : T.border}`,
+        borderRadius: 14, overflow: "hidden",
+        cursor: "pointer",
+        transition: "border-color 0.2s",
         fontFamily: FONT,
       }}
     >
-      {/* Header do card */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 13 }}>
-        {/* Ícone */}
-        <div style={{
-          width: 40, height: 40, borderRadius: 10, flexShrink: 0,
-          background: cat.corDim, border: `1px solid ${cat.cor}33`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 20,
-        }}>
-          {dica.icone}
+      {/* Barra de categoria no topo */}
+      <div style={{ height: 2, background: catCor, opacity: 0.9 }} />
+
+      <div style={{ padding: "20px 22px" }}>
+        {/* Linha superior: categoria + métrica */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
+          <span style={{
+            fontSize: 9, fontWeight: 700, color: catCor,
+            letterSpacing: "0.12em", textTransform: "uppercase",
+          }}>
+            {insight.categoria}
+          </span>
+          <div style={{ textAlign: "right" }}>
+            <div style={{
+              fontSize: 22, fontWeight: 600, color: catCor,
+              fontFamily: FONT_DISPLAY, lineHeight: 1, letterSpacing: "-0.02em",
+            }}>
+              {insight.metrica.valor}
+            </div>
+            <div style={{ fontSize: 9, color: T.textDim, marginTop: 2, letterSpacing: "0.04em" }}>
+              {insight.metrica.label}
+            </div>
+          </div>
         </div>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {/* Categoria + badges */}
-          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
-            <span style={{
-              fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 4,
-              background: cat.corDim, color: cat.cor,
-              textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap",
-            }}>{dica.categoria}</span>
-            <span style={{
-              fontSize: 9, fontWeight: 600, padding: "2px 7px", borderRadius: 4,
-              background: "transparent", color: impacto.cor,
-              border: `1px solid ${impacto.cor}44`,
-              letterSpacing: "0.06em", whiteSpace: "nowrap",
-            }}>{impacto.label}</span>
-            <span style={{
-              fontSize: 9, fontWeight: 600, padding: "2px 7px", borderRadius: 4,
-              background: "transparent", color: dific.cor,
-              border: `1px solid ${dific.cor}44`,
-              letterSpacing: "0.06em", whiteSpace: "nowrap",
-            }}>{dific.label}</span>
-            <span style={{ marginLeft: "auto", fontSize: 12, color: T.textDim, flexShrink: 0 }}>
-              {expandido ? "▲" : "▼"}
-            </span>
-          </div>
+        {/* Título */}
+        <div style={{
+          fontSize: 14, fontWeight: 600, color: T.text,
+          lineHeight: 1.35, marginBottom: 10,
+          letterSpacing: "-0.01em",
+        }}>
+          {insight.titulo}
+        </div>
 
-          {/* Título */}
-          <div style={{ fontSize: 13, fontWeight: 600, color: T.text, lineHeight: 1.4 }}>
-            {dica.titulo}
+        {/* Diagnóstico — sempre visível, curto */}
+        <p style={{
+          fontSize: 12, color: T.textMid, lineHeight: 1.65,
+          margin: 0, fontWeight: 300,
+        }}>
+          {insight.diagnostico}
+        </p>
+
+        {/* Recomendação — expande ao clicar */}
+        <div style={{
+          maxHeight: expandido ? 200 : 0,
+          overflow: "hidden",
+          transition: "max-height 0.25s ease",
+        }}>
+          <div style={{
+            marginTop: 14, paddingTop: 14,
+            borderTop: `1px solid ${T.border}`,
+          }}>
+            <div style={{
+              fontSize: 9, fontWeight: 700, color: T.textDim,
+              letterSpacing: "0.10em", textTransform: "uppercase", marginBottom: 8,
+            }}>
+              Próximo passo
+            </div>
+            <p style={{
+              fontSize: 12.5, color: T.text, lineHeight: 1.7,
+              margin: "0 0 16px", fontWeight: 300,
+            }}>
+              {insight.recomendacao}
+            </p>
           </div>
+        </div>
+
+        {/* Toggle hint */}
+        <div style={{
+          marginTop: 12, display: "flex", alignItems: "center", gap: 6,
+        }}>
+          <div style={{ flex: 1, height: 1, background: T.border }} />
+          <span style={{ fontSize: 9, color: T.textDim, letterSpacing: "0.06em" }}>
+            {expandido ? "RECOLHER" : "VER RECOMENDAÇÃO"}
+          </span>
+          <div style={{ flex: 1, height: 1, background: T.border }} />
         </div>
       </div>
-
-      {/* Expandido: descrição + CTA */}
-      {expandido && (
-        <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${T.border}` }}>
-          <p style={{ fontSize: 12.5, color: T.textMid, lineHeight: 1.7, margin: "0 0 14px", fontWeight: 300 }}>
-            {dica.descricao}
-          </p>
-          <span style={{
-            display: "inline-flex", alignItems: "center", gap: 6,
-            fontSize: 11, fontWeight: 700, padding: "7px 16px", borderRadius: 8,
-            background: cat.cor, color: "#000",
-            letterSpacing: "0.04em", textTransform: "uppercase",
-          }}>
-            {dica.acao} →
-          </span>
-        </div>
-      )}
     </div>
   );
 }
 
-function CrescimentoPage({ dicas = [], T, bp }) {
-  const [catAtiva, setCatAtiva] = useState("Todas");
+function CrescimentoPage({ crescimento, T, bp }) {
+  const { momento, ativos } = crescimento || { momento: null, ativos: [] };
+  const fase = FASES_LABEL[momento?.fase] || { label: "Analisando...", cor: T.textDim };
 
-  const categorias = ["Todas", ...Object.keys(CAT_CONFIG).filter(
-    cat => dicas.some(d => d.categoria === cat)
-  )];
-
-  const dicasFiltradas = catAtiva === "Todas"
-    ? dicas
-    : dicas.filter(d => d.categoria === catAtiva);
-
-  // Agrupar por categoria para exibir separadores
-  const grupos = catAtiva === "Todas"
-    ? Object.keys(CAT_CONFIG).filter(cat => dicas.some(d => d.categoria === cat)).map(cat => ({
-        cat,
-        items: dicas.filter(d => d.categoria === cat),
-      }))
-    : [{ cat: catAtiva, items: dicasFiltradas }];
-
-  if (dicas.length === 0) return (
+  if (!momento) return (
     <div style={{
       textAlign: "center", padding: "60px 0",
       color: T.textDim, fontSize: 13, fontFamily: FONT, fontWeight: 300,
       border: `1px dashed ${T.border}`, borderRadius: 14,
     }}>
-      <div style={{ fontSize: 32, marginBottom: 12 }}>🌱</div>
-      Cadastre clientes e vendas no Assent Gestão para receber dicas personalizadas.
+      Carregando diagnóstico do negócio...
     </div>
   );
 
+  if (ativos.length === 0) return (
+    <div style={{
+      textAlign: "center", padding: "60px 0",
+      color: T.textDim, fontSize: 13, fontFamily: FONT, fontWeight: 300,
+      border: `1px dashed ${T.border}`, borderRadius: 14,
+    }}>
+      Nenhum insight disponível para o momento atual. Cadastre mais clientes e vendas no Assent Gestão.
+    </div>
+  );
+
+  // Agrupar por categoria
+  const categorias = [...new Set(ativos.map(a => a.categoria))];
+
   return (
-    <div>
-      {/* Header */}
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>
-          Crescimento do negócio
-        </div>
-        <div style={{ fontSize: 17, fontWeight: 600, color: T.text, fontFamily: FONT_DISPLAY, letterSpacing: "-0.01em" }}>
-          {dicas.length} sugestão{dicas.length !== 1 ? "ões" : ""} para você agir hoje
-        </div>
-      </div>
+    <div style={{ fontFamily: FONT }}>
 
-      {/* Filtro por categoria */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 22, flexWrap: "wrap" }}>
-        {categorias.map(cat => {
-          const cfg = CAT_CONFIG[cat];
-          const ativo = catAtiva === cat;
-          return (
-            <button
-              key={cat}
-              onClick={() => setCatAtiva(cat)}
-              style={{
-                fontSize: 11, fontWeight: 600, padding: "6px 14px", borderRadius: 8,
-                border: ativo ? `1px solid ${cfg?.cor || T.goldBorder}` : `1px solid ${T.border}`,
-                background: ativo ? (cfg?.corDim || T.goldGlow) : "transparent",
-                color: ativo ? (cfg?.cor || T.gold) : T.textMid,
-                cursor: "pointer", fontFamily: FONT, transition: "all 0.15s",
-                letterSpacing: "0.03em",
-              }}
-            >{cat === "Todas" ? `Todas (${dicas.length})` : cat}</button>
-          );
-        })}
-      </div>
-
-      {/* Cards agrupados */}
-      {grupos.map(({ cat, items }) => (
-        <div key={cat} style={{ marginBottom: 24 }}>
-          {catAtiva === "Todas" && (
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-              <span style={{ fontSize: 9, fontWeight: 700, color: CAT_CONFIG[cat]?.cor || T.textDim, letterSpacing: "0.10em", textTransform: "uppercase" }}>
-                {cat}
-              </span>
-              <div style={{ flex: 1, height: 1, background: T.border }} />
-              <span style={{ fontSize: 9, color: T.textDim }}>{items.length}</span>
+      {/* Diagnóstico do momento — card de contexto */}
+      <div style={{
+        background: T.surface, border: `1px solid ${T.border}`,
+        borderLeft: `3px solid ${fase.cor}`,
+        borderRadius: 14, padding: "18px 22px", marginBottom: 24,
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>
+              Momento do negócio
             </div>
-          )}
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {items.map(dica => (
-              <DicaCard key={dica.id} dica={dica} T={T} />
+            <div style={{ fontSize: 18, fontWeight: 600, color: fase.cor, fontFamily: FONT_DISPLAY, letterSpacing: "-0.01em" }}>
+              {fase.label}
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+            {[
+              { val: momento.totalClientes, label: "Clientes" },
+              { val: momento.fieis,         label: "Fiéis" },
+              { val: momento.emRisco,       label: "Em risco" },
+            ].map(m => (
+              <div key={m.label} style={{ textAlign: "right" }}>
+                <div style={{ fontSize: 20, fontWeight: 600, color: T.text, fontFamily: FONT_DISPLAY, lineHeight: 1 }}>{m.val}</div>
+                <div style={{ fontSize: 9, color: T.textDim, marginTop: 3, letterSpacing: "0.06em", textTransform: "uppercase" }}>{m.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Insights agrupados por categoria */}
+      {categorias.map(cat => (
+        <div key={cat} style={{ marginBottom: 24 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+            <div style={{ width: 3, height: 14, borderRadius: 2, background: CAT_COR[cat] || T.gold, flexShrink: 0 }} />
+            <span style={{ fontSize: 9, fontWeight: 700, color: CAT_COR[cat] || T.textDim, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+              {cat}
+            </span>
+            <div style={{ flex: 1, height: 1, background: T.border }} />
+            <span style={{ fontSize: 9, color: T.textDim }}>{ativos.filter(a => a.categoria === cat).length}</span>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {ativos.filter(a => a.categoria === cat).map((ins, i) => (
+              <InsightCrescimentoCard key={ins.id} insight={ins} idx={i} T={T} />
             ))}
           </div>
         </div>
@@ -848,7 +857,7 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
   }, [bp.isMobile]);
 
   // Hooks de dados — usam tenantUid diretamente (sem licencas lookup)
-  const { clientes, insights, dicas, metricas, dadosBrutos, ignorados } = useCRM(tenantUid);
+  const { clientes, insights, crescimento, metricas, dadosBrutos, ignorados } = useCRM(tenantUid);
   const leadsData = useLeads(tenantUid);
 
   const clientesFiltrados = clientes.filter((c) => {
@@ -860,13 +869,13 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
 
   // ── Abas ────────────────────────────────────────────────────────────────────
   const abas = [
-    { id: "radar",       icon: "◈", label: "Radar",       labelFull: "Radar do dia",      badge: insights.length || null },
-    { id: "clientes",    icon: "◉", label: "Clientes",    labelFull: "Clientes",           badge: null },
-    { id: "crescimento", icon: "✶", label: "Crescimento", labelFull: "Crescimento",        badge: dicas.length || null },
-    { id: "ia",          icon: "✦", label: "IA",           labelFull: "Assistente IA",     badge: null },
-    { id: "painel",      icon: "▦", label: "Painel",       labelFull: "Painel",             badge: null },
-    { id: "leads",       icon: "◎", label: "Leads",        labelFull: "Gestão de Leads",   badge: null },
-    { id: "config",      icon: "⚙", label: "Config",       labelFull: "Configurações",     badge: null },
+    { id: "radar",       icon: "◈", label: "Radar",       labelFull: "Radar do dia",    badge: insights.length || null },
+    { id: "clientes",    icon: "◉", label: "Clientes",    labelFull: "Clientes",         badge: null },
+    { id: "crescimento", icon: "✶", label: "Crescimento", labelFull: "Crescimento",      badge: crescimento?.ativos?.length || null },
+    { id: "ia",          icon: "✦", label: "IA",           labelFull: "Assistente IA",   badge: null },
+    { id: "painel",      icon: "▦", label: "Painel",       labelFull: "Painel",           badge: null },
+    { id: "leads",       icon: "◎", label: "Leads",        labelFull: "Gestão de Leads", badge: null },
+    { id: "config",      icon: "⚙", label: "Config",       labelFull: "Configurações",   badge: null },
   ];
 
   const sidebarWidth = bp.isMobile ? 0 : sidebarAberta ? 234 : 60;
@@ -1198,7 +1207,7 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
 
           {/* ── Crescimento ── */}
           {aba === "crescimento" && (
-            <CrescimentoPage dicas={dicas} T={T} bp={bp} />
+            <CrescimentoPage crescimento={crescimento} T={T} bp={bp} />
           )}
 
           {/* ── Leads ── */}
