@@ -53,6 +53,9 @@ export const PERMISSOES = {
   mesas:          { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "vce", vendedor: "vc",  suporte: ""   },
   usuarios:       { admin: "vcex", financeiro: "",    comercial: "",    compras: "",    operacional: "",    vendedor: "",    suporte: ""   },
   configuracoes:  { admin: "vcex", financeiro: "",    comercial: "",    compras: "",    operacional: "",    vendedor: "",    suporte: ""   },
+  // Assent Flow — módulo de agendamento online
+  // admin/operacional: acesso completo | comercial: ver+criar+editar | vendedor: ver+criar | financeiro/suporte: só ver
+  agendamento:    { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "vcex",vendedor: "vc",  suporte: "v"  },
 };
 
 // ─────────────────────────────────────────────
