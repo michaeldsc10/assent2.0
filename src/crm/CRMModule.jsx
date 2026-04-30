@@ -179,44 +179,11 @@ function InsightCard({ insight, empresaNome, empresaId, T }) {
     risco_medio:  { borda: T.yellow, badgeBg: T.yellowDim, badgeColor: T.yellow, border: T.yellowBorder, label: "Atenção"        },
     oportunidade: { borda: T.blue,   badgeBg: T.blueDim,   badgeColor: T.blue,   border: T.blueBorder,   label: "Oportunidade"   },
     fidelizacao:  { borda: T.green,  badgeBg: T.greenDim,  badgeColor: T.green,  border: T.greenBorder,  label: "Fidelização"    },
-    dica:         { borda: T.gold,   badgeBg: T.goldGlow,  badgeColor: T.gold,   border: T.goldBorder,   label: "Dica"           },
   };
   const tipoKey = insight.tipo === "risco"
     ? (insight.prioridade === 1 ? "risco_alto" : "risco_medio")
     : insight.tipo;
-  const cor = cores[tipoKey] || cores.risco_alto;
-
-  // Dicas têm layout próprio — mais simples, sem ações de WhatsApp
-  if (insight.tipo === "dica") {
-    return (
-      <div style={{
-        background: T.surface, border: `1px solid ${T.border}`,
-        borderLeft: `3px solid ${T.gold}`,
-        borderRadius: 16, marginBottom: 10, overflow: "hidden",
-      }}>
-        <div style={{ padding: "16px 18px" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-            <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.2 }}>{insight.icone || "💡"}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: T.text, fontFamily: FONT }}>
-                  {insight.titulo}
-                </span>
-                <span style={{
-                  fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
-                  background: T.goldGlow, color: T.gold, border: `1px solid ${T.goldBorder}`,
-                  textTransform: "uppercase", letterSpacing: "0.07em", whiteSpace: "nowrap",
-                }}>Dica</span>
-              </div>
-              <p style={{ fontSize: 12, color: T.textMid, lineHeight: 1.65, margin: 0, fontFamily: FONT, fontWeight: 300 }}>
-                {insight.descricao}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const cor     = cores[tipoKey] || cores.risco_alto;
   const telLimpo = (insight.telefone || "").replace(/\D/g, "");
 
   async function gerarMensagem() {
@@ -669,6 +636,197 @@ function ClientesIgnorados({ ignorados, empresaId, T }) {
   );
 }
 
+
+// ─── Aba Crescimento ──────────────────────────────────────────────────────────
+const CAT_CONFIG = {
+  "Captação":    { cor: "#4a8fd4", corDim: "#0d1e35", icone: "◎" },
+  "Fidelização": { cor: "#3aad78", corDim: "#0d2419", icone: "◉" },
+  "Receita":     { cor: "#c8a44a", corDim: "#2a1a00", icone: "◈" },
+  "Digital":     { cor: "#a855f7", corDim: "#1e0a30", icone: "▦" },
+  "Operacional": { cor: "#7a7990", corDim: "#18181c", icone: "◧" },
+};
+
+const IMPACTO_COR = {
+  alto:  { label: "Impacto alto",  cor: "#c8a44a" },
+  médio: { label: "Impacto médio", cor: "#7a7990" },
+  baixo: { label: "Impacto baixo", cor: "#3e3d50" },
+};
+
+const DIFIC_COR = {
+  "fácil":  { label: "Fácil",   cor: "#3aad78" },
+  "médio":  { label: "Médio",   cor: "#c8a44a" },
+  "avançado":{ label: "Avançado", cor: "#e05252" },
+};
+
+function DicaCard({ dica, T }) {
+  const cat      = CAT_CONFIG[dica.categoria] || CAT_CONFIG["Operacional"];
+  const impacto  = IMPACTO_COR[dica.impacto]  || IMPACTO_COR["médio"];
+  const dific    = DIFIC_COR[dica.dificuldade] || DIFIC_COR["médio"];
+  const [expandido, setExpandido] = useState(false);
+
+  return (
+    <div
+      onClick={() => setExpandido(v => !v)}
+      style={{
+        background: T.surface,
+        border: `1px solid ${expandido ? cat.cor + "55" : T.border}`,
+        borderLeft: `3px solid ${cat.cor}`,
+        borderRadius: 14, padding: "16px 18px",
+        cursor: "pointer", transition: "border-color 0.18s, background 0.18s",
+        fontFamily: FONT,
+      }}
+    >
+      {/* Header do card */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 13 }}>
+        {/* Ícone */}
+        <div style={{
+          width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+          background: cat.corDim, border: `1px solid ${cat.cor}33`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 20,
+        }}>
+          {dica.icone}
+        </div>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Categoria + badges */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
+            <span style={{
+              fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 4,
+              background: cat.corDim, color: cat.cor,
+              textTransform: "uppercase", letterSpacing: "0.08em", whiteSpace: "nowrap",
+            }}>{dica.categoria}</span>
+            <span style={{
+              fontSize: 9, fontWeight: 600, padding: "2px 7px", borderRadius: 4,
+              background: "transparent", color: impacto.cor,
+              border: `1px solid ${impacto.cor}44`,
+              letterSpacing: "0.06em", whiteSpace: "nowrap",
+            }}>{impacto.label}</span>
+            <span style={{
+              fontSize: 9, fontWeight: 600, padding: "2px 7px", borderRadius: 4,
+              background: "transparent", color: dific.cor,
+              border: `1px solid ${dific.cor}44`,
+              letterSpacing: "0.06em", whiteSpace: "nowrap",
+            }}>{dific.label}</span>
+            <span style={{ marginLeft: "auto", fontSize: 12, color: T.textDim, flexShrink: 0 }}>
+              {expandido ? "▲" : "▼"}
+            </span>
+          </div>
+
+          {/* Título */}
+          <div style={{ fontSize: 13, fontWeight: 600, color: T.text, lineHeight: 1.4 }}>
+            {dica.titulo}
+          </div>
+        </div>
+      </div>
+
+      {/* Expandido: descrição + CTA */}
+      {expandido && (
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${T.border}` }}>
+          <p style={{ fontSize: 12.5, color: T.textMid, lineHeight: 1.7, margin: "0 0 14px", fontWeight: 300 }}>
+            {dica.descricao}
+          </p>
+          <span style={{
+            display: "inline-flex", alignItems: "center", gap: 6,
+            fontSize: 11, fontWeight: 700, padding: "7px 16px", borderRadius: 8,
+            background: cat.cor, color: "#000",
+            letterSpacing: "0.04em", textTransform: "uppercase",
+          }}>
+            {dica.acao} →
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CrescimentoPage({ dicas = [], T, bp }) {
+  const [catAtiva, setCatAtiva] = useState("Todas");
+
+  const categorias = ["Todas", ...Object.keys(CAT_CONFIG).filter(
+    cat => dicas.some(d => d.categoria === cat)
+  )];
+
+  const dicasFiltradas = catAtiva === "Todas"
+    ? dicas
+    : dicas.filter(d => d.categoria === catAtiva);
+
+  // Agrupar por categoria para exibir separadores
+  const grupos = catAtiva === "Todas"
+    ? Object.keys(CAT_CONFIG).filter(cat => dicas.some(d => d.categoria === cat)).map(cat => ({
+        cat,
+        items: dicas.filter(d => d.categoria === cat),
+      }))
+    : [{ cat: catAtiva, items: dicasFiltradas }];
+
+  if (dicas.length === 0) return (
+    <div style={{
+      textAlign: "center", padding: "60px 0",
+      color: T.textDim, fontSize: 13, fontFamily: FONT, fontWeight: 300,
+      border: `1px dashed ${T.border}`, borderRadius: 14,
+    }}>
+      <div style={{ fontSize: 32, marginBottom: 12 }}>🌱</div>
+      Cadastre clientes e vendas no Assent Gestão para receber dicas personalizadas.
+    </div>
+  );
+
+  return (
+    <div>
+      {/* Header */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 4 }}>
+          Crescimento do negócio
+        </div>
+        <div style={{ fontSize: 17, fontWeight: 600, color: T.text, fontFamily: FONT_DISPLAY, letterSpacing: "-0.01em" }}>
+          {dicas.length} sugestão{dicas.length !== 1 ? "ões" : ""} para você agir hoje
+        </div>
+      </div>
+
+      {/* Filtro por categoria */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 22, flexWrap: "wrap" }}>
+        {categorias.map(cat => {
+          const cfg = CAT_CONFIG[cat];
+          const ativo = catAtiva === cat;
+          return (
+            <button
+              key={cat}
+              onClick={() => setCatAtiva(cat)}
+              style={{
+                fontSize: 11, fontWeight: 600, padding: "6px 14px", borderRadius: 8,
+                border: ativo ? `1px solid ${cfg?.cor || T.goldBorder}` : `1px solid ${T.border}`,
+                background: ativo ? (cfg?.corDim || T.goldGlow) : "transparent",
+                color: ativo ? (cfg?.cor || T.gold) : T.textMid,
+                cursor: "pointer", fontFamily: FONT, transition: "all 0.15s",
+                letterSpacing: "0.03em",
+              }}
+            >{cat === "Todas" ? `Todas (${dicas.length})` : cat}</button>
+          );
+        })}
+      </div>
+
+      {/* Cards agrupados */}
+      {grupos.map(({ cat, items }) => (
+        <div key={cat} style={{ marginBottom: 24 }}>
+          {catAtiva === "Todas" && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <span style={{ fontSize: 9, fontWeight: 700, color: CAT_CONFIG[cat]?.cor || T.textDim, letterSpacing: "0.10em", textTransform: "uppercase" }}>
+                {cat}
+              </span>
+              <div style={{ flex: 1, height: 1, background: T.border }} />
+              <span style={{ fontSize: 9, color: T.textDim }}>{items.length}</span>
+            </div>
+          )}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {items.map(dica => (
+              <DicaCard key={dica.id} dica={dica} T={T} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════
 // CRMModule — componente principal
 // Recebe tenantUid, nomeEmpresa e onVoltar do AG (Dashboard.jsx)
@@ -690,7 +848,7 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
   }, [bp.isMobile]);
 
   // Hooks de dados — usam tenantUid diretamente (sem licencas lookup)
-  const { clientes, insights, metricas, dadosBrutos, ignorados } = useCRM(tenantUid);
+  const { clientes, insights, dicas, metricas, dadosBrutos, ignorados } = useCRM(tenantUid);
   const leadsData = useLeads(tenantUid);
 
   const clientesFiltrados = clientes.filter((c) => {
@@ -702,12 +860,13 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
 
   // ── Abas ────────────────────────────────────────────────────────────────────
   const abas = [
-    { id: "radar",    icon: "◈", label: "Radar",    labelFull: "Radar do dia",    badge: insights.length || null },
-    { id: "clientes", icon: "◉", label: "Clientes", labelFull: "Clientes",         badge: null },
-    { id: "ia",       icon: "✦", label: "IA",        labelFull: "Assistente IA",   badge: null },
-    { id: "painel",   icon: "▦", label: "Painel",    labelFull: "Painel",           badge: null },
-    { id: "leads",    icon: "◎", label: "Leads",     labelFull: "Gestão de Leads", badge: null },
-    { id: "config",   icon: "⚙", label: "Config",    labelFull: "Configurações",   badge: null },
+    { id: "radar",       icon: "◈", label: "Radar",       labelFull: "Radar do dia",      badge: insights.length || null },
+    { id: "clientes",    icon: "◉", label: "Clientes",    labelFull: "Clientes",           badge: null },
+    { id: "crescimento", icon: "✶", label: "Crescimento", labelFull: "Crescimento",        badge: dicas.length || null },
+    { id: "ia",          icon: "✦", label: "IA",           labelFull: "Assistente IA",     badge: null },
+    { id: "painel",      icon: "▦", label: "Painel",       labelFull: "Painel",             badge: null },
+    { id: "leads",       icon: "◎", label: "Leads",        labelFull: "Gestão de Leads",   badge: null },
+    { id: "config",      icon: "⚙", label: "Config",       labelFull: "Configurações",     badge: null },
   ];
 
   const sidebarWidth = bp.isMobile ? 0 : sidebarAberta ? 234 : 60;
@@ -1035,6 +1194,11 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                 </div>
               </div>
             </>
+          )}
+
+          {/* ── Crescimento ── */}
+          {aba === "crescimento" && (
+            <CrescimentoPage dicas={dicas} T={T} bp={bp} />
           )}
 
           {/* ── Leads ── */}
