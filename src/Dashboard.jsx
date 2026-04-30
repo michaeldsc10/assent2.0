@@ -3010,7 +3010,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 </button>
 
                 {/* ── Assent Flow — só aparece se plano for premium ── */}
-                {(isPro || licencaSlug === "premium") && (
+                {(isPro || licencaSlug === "profissional") && (
                   <button
                     className="ag-dropdown-item"
                     onClick={() => { setSistemaAtivo("flow"); setDropdownOpen(false); }}
