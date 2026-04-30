@@ -207,301 +207,236 @@ function gerarInsights(clientesComScore, vendas = [], servicos = [], ignorados =
 }
 
 
-// ─── Banco de dicas de crescimento ───────────────────────────────────────────
-// Cada dica tem: id, categoria, icone, titulo, descricao, dificuldade, impacto,
-// acao, e uma função `quando(ctx)` que decide se ela é relevante no contexto.
-// ctx = { comVendas, fieis, novos, semVendas, dormentes, v7d, v30d,
-//          receitaV30, receitaV60, topServico, topQtd, servicos, vendas }
+// ─── Diagnóstico do momento da empresa ───────────────────────────────────────
+// Detecta em qual fase o negócio está com base nos dados reais.
+// Retorna um objeto `momento` que filtra quais insights são relevantes.
+export function diagnosticarMomento(clientesComScore, vendas = []) {
+  const hoje      = new Date();
+  const comVendas = clientesComScore.filter(c => !c._semVendas);
+  const semVendas = clientesComScore.filter(c => c._semVendas);
 
-const BANCO_DICAS = [
+  const v7d  = vendas.filter(v => { try { return (hoje - (v.data?.toDate ? v.data.toDate() : new Date(v.data))) < 7*86400000; } catch { return false; } });
+  const v30d = vendas.filter(v => { try { return (hoje - (v.data?.toDate ? v.data.toDate() : new Date(v.data))) < 30*86400000; } catch { return false; } });
+  const v90d = vendas.filter(v => { try { return (hoje - (v.data?.toDate ? v.data.toDate() : new Date(v.data))) < 90*86400000; } catch { return false; } });
 
-  // ── CAPTAÇÃO ──────────────────────────────────────────────────────────────
-  {
-    id: "cap-indicacao-fieis",
-    categoria: "Captação",
-    icone: "🤝",
-    titulo: (ctx) => `${ctx.fieis.length} clientes fiéis prontos para indicar`,
-    descricao: (ctx) => `${ctx.fieis[0]?.nome?.split(" ")[0]} e mais ${ctx.fieis.length - 1} cliente${ctx.fieis.length > 2 ? "s" : ""} já confiam no seu trabalho. Um pedido direto de indicação — via WhatsApp, com um script curto — costuma trazer 1 novo cliente a cada 3 abordagens.`,
-    dificuldade: "fácil", impacto: "alto", acao: "Pedir indicação",
-    quando: (ctx) => ctx.fieis.length >= 2,
-  },
-  {
-    id: "cap-parcerias-locais",
-    categoria: "Captação",
-    icone: "🏪",
-    titulo: () => "Parcerias locais como canal de aquisição",
-    descricao: (ctx) => `Com ${ctx.comVendas.length} cliente${ctx.comVendas.length !== 1 ? "s" : ""} na base, parcerias com negócios complementares (eventos, decoração, buffet) podem dobrar sua visibilidade sem custo de mídia. Ofereça uma comissão ou troca de indicações.`,
-    dificuldade: "médio", impacto: "alto", acao: "Mapear parceiros",
-    quando: (ctx) => ctx.comVendas.length < 20,
-  },
-  {
-    id: "cap-contatos-frios",
-    categoria: "Captação",
-    icone: "👤",
-    titulo: (ctx) => `${ctx.semVendas.length} contato${ctx.semVendas.length > 1 ? "s" : ""} cadastrado${ctx.semVendas.length > 1 ? "s" : ""} sem nenhuma compra`,
-    descricao: () => `Esses leads já demonstraram interesse mas não fecharam. Uma mensagem curta e personalizada agora — sem pitch de venda, apenas verificando se ainda têm a necessidade — costuma converter 10–20% deles.`,
-    dificuldade: "fácil", impacto: "médio", acao: "Abordar contatos",
-    quando: (ctx) => ctx.semVendas.length > 0,
-  },
-  {
-    id: "cap-depoimentos",
-    categoria: "Captação",
-    icone: "⭐",
-    titulo: () => "Depoimentos de clientes como prova social",
-    descricao: (ctx) => `Peça um depoimento rápido (texto ou vídeo de 30s) para ${ctx.fieis[0]?.nome?.split(" ")[0] || "seus clientes fiéis"}. Depoimentos reais no Instagram ou Google Meu Negócio aumentam a conversão de novos clientes em até 40%.`,
-    dificuldade: "fácil", impacto: "médio", acao: "Coletar depoimento",
-    quando: (ctx) => ctx.fieis.length >= 1,
-  },
-  {
-    id: "cap-google-meu-negocio",
-    categoria: "Captação",
-    icone: "📍",
-    titulo: () => "Google Meu Negócio: captação gratuita local",
-    descricao: () => `Um perfil otimizado no Google Meu Negócio aparece em buscas como "fotógrafo em [cidade]" sem custo. Adicione fotos do seu trabalho, horários e peça avaliações — é a fonte de captação local mais subestimada.`,
-    dificuldade: "fácil", impacto: "alto", acao: "Otimizar perfil",
-    quando: () => true,
-  },
-  {
-    id: "cap-reativacao-base",
-    categoria: "Captação",
-    icone: "📅",
-    titulo: (ctx) => `Semana parada — ${ctx.v30d.length} venda${ctx.v30d.length !== 1 ? "s" : ""} no mês`,
-    descricao: (ctx) => `Nenhuma venda nos últimos 7 dias. Reativar quem já comprou é 5× mais barato do que captar novo cliente. Escolha ${Math.min(3, ctx.comVendas.length)} clientes e mande uma mensagem hoje.`,
-    dificuldade: "fácil", impacto: "alto", acao: "Reativar agora",
-    quando: (ctx) => ctx.v7d.length === 0 && ctx.v30d.length > 0,
-  },
-
-  // ── FIDELIZAÇÃO ───────────────────────────────────────────────────────────
-  {
-    id: "fid-segunda-compra",
-    categoria: "Fidelização",
-    icone: "✨",
-    titulo: (ctx) => `${ctx.novos.length} cliente${ctx.novos.length > 1 ? "s" : ""} com apenas 1 compra`,
-    descricao: (ctx) => `Quem compra pela segunda vez tem 5× mais chance de virar cliente recorrente. De ${ctx.novos.length} cliente${ctx.novos.length > 1 ? "s" : ""} novos, uma oferta personalizada agora pode transformar vários em fiéis antes de esfriarem.`,
-    dificuldade: "fácil", impacto: "alto", acao: "Fidelizar novos",
-    quando: (ctx) => ctx.novos.length > 0,
-  },
-  {
-    id: "fid-aniversario",
-    categoria: "Fidelização",
-    icone: "🎂",
-    titulo: () => "Mensagem de aniversário como touchpoint de retenção",
-    descricao: () => `Uma mensagem no aniversário do cliente (com um desconto exclusivo ou mimo) gera lembrança da marca e aumenta a retenção. Peça a data no cadastro e automatize com uma automação no CRM.`,
-    dificuldade: "médio", impacto: "médio", acao: "Configurar automação",
-    quando: () => true,
-  },
-  {
-    id: "fid-programa-fidelidade",
-    categoria: "Fidelização",
-    icone: "🏆",
-    titulo: (ctx) => `Com ${ctx.comVendas.length} clientes, vale criar um programa de fidelidade`,
-    descricao: () => `Um cartão simples de "compre 5, ganhe 1" aumenta a frequência de retorno em até 30%. Não precisa de app — um cartão impresso ou digital no WhatsApp já funciona.`,
-    dificuldade: "fácil", impacto: "médio", acao: "Criar programa",
-    quando: (ctx) => ctx.comVendas.length >= 5,
-  },
-  {
-    id: "fid-reativar-dormentes",
-    categoria: "Fidelização",
-    icone: "😴",
-    titulo: (ctx) => `${ctx.dormentes} cliente${ctx.dormentes > 1 ? "s" : ""} dormentes (+60 dias sem comprar)`,
-    descricao: (ctx) => `${ctx.dormentes} cliente${ctx.dormentes > 1 ? "s estão" : " está"} há mais de 2 meses sem aparecer. Uma campanha de reativação com desconto exclusivo ou novidade costuma trazer 15–25% de volta.`,
-    dificuldade: "fácil", impacto: "alto", acao: "Reativar dormentes",
-    quando: (ctx) => ctx.dormentes > 0,
-  },
-  {
-    id: "fid-followup-pos-servico",
-    categoria: "Fidelização",
-    icone: "💬",
-    titulo: () => "Follow-up pós-serviço: o toque que fideliza",
-    descricao: () => `Mandar uma mensagem 3–5 dias após o serviço ("como ficou?") aumenta a satisfação percebida e abre espaço para indicações espontâneas. Leva menos de 1 minuto e é altamente subestimado.`,
-    dificuldade: "fácil", impacto: "médio", acao: "Criar rotina",
-    quando: () => true,
-  },
-
-  // ── RECEITA ───────────────────────────────────────────────────────────────
-  {
-    id: "rec-combo-top-servico",
-    categoria: "Receita",
-    icone: "📦",
-    titulo: (ctx) => `"${ctx.topServico}" vendido ${ctx.topQtd}× — hora de criar um pacote`,
-    descricao: (ctx) => `Seu serviço mais vendido tem demanda comprovada. Um pacote combinando "${ctx.topServico}" com um serviço complementar pode aumentar o ticket médio em 30–50% sem precisar de novos clientes.`,
-    dificuldade: "médio", impacto: "alto", acao: "Criar pacote",
-    quando: (ctx) => ctx.topServico && ctx.topQtd >= 3,
-  },
-  {
-    id: "rec-precificacao",
-    categoria: "Receita",
-    icone: "💰",
-    titulo: () => "Quando foi a última vez que você reajustou os preços?",
-    descricao: (ctx) => `Com ticket médio de R$ ${ctx.ticketMedio?.toLocaleString("pt-BR") || "—"}, um reajuste de 10–15% bem comunicado raramente perde clientes fiéis e pode aumentar a receita mensal sem captar ninguém novo.`,
-    dificuldade: "médio", impacto: "alto", acao: "Revisar preços",
-    quando: (ctx) => ctx.comVendas.length >= 3,
-  },
-  {
-    id: "rec-upsell-complementar",
-    categoria: "Receita",
-    icone: "⬆️",
-    titulo: () => "Upsell: ofereça o próximo passo natural",
-    descricao: () => `Na entrega do serviço, mencione um complemento relacionado. "Já que você fez X, muitos clientes também aproveitam Y para..." — essa abordagem consultiva aumenta o ticket sem parecer venda.`,
-    dificuldade: "fácil", impacto: "médio", acao: "Treinar abordagem",
-    quando: (ctx) => ctx.servicos.length >= 2,
-  },
-  {
-    id: "rec-antecipacao-demanda",
-    categoria: "Receita",
-    icone: "🗓️",
-    titulo: () => "Crie uma oferta de pré-agendamento com desconto",
-    descricao: () => `Ofereça 10% de desconto para quem agendar com 30+ dias de antecedência. Isso previsibiliza sua receita, ocupa agenda no tempo certo e reduz cancelamentos de última hora.`,
-    dificuldade: "fácil", impacto: "médio", acao: "Criar oferta",
-    quando: () => true,
-  },
-  {
-    id: "rec-produto-fisico",
-    categoria: "Receita",
-    icone: "🖼️",
-    titulo: () => "Produtos físicos como segunda fonte de receita",
-    descricao: () => `Álbuns impressos, quadros e prints têm margem alta e o cliente percebe muito mais valor do que em um arquivo digital. Se ainda não oferece, vale testar com um fornecedor parceiro.`,
-    dificuldade: "médio", impacto: "alto", acao: "Explorar fornecedor",
-    quando: () => true,
-  },
-  {
-    id: "rec-momento-trafego",
-    categoria: "Receita",
-    icone: "📈",
-    titulo: (ctx) => `R$ ${ctx.receitaV30.toLocaleString("pt-BR")} em 30 dias — momento de escalar`,
-    descricao: () => `Com a base aquecida e receita estável, esse é o momento certo para investir em tráfego pago. R$ 300–500 em Meta Ads bem segmentados podem dobrar o volume de leads qualificados.`,
-    dificuldade: "médio", impacto: "alto", acao: "Planejar campanha",
-    quando: (ctx) => ctx.receitaV30 >= 500,
-  },
-
-  // ── DIGITAL ───────────────────────────────────────────────────────────────
-  {
-    id: "dig-instagram-portfolio",
-    categoria: "Digital",
-    icone: "📸",
-    titulo: () => "Portfólio ativo no Instagram como vitrine gratuita",
-    descricao: () => `Postar 3× por semana com resultados reais (antes/depois, bastidores, depoimentos) é a forma mais eficiente de captação orgânica para prestadores de serviço. Consistência supera qualidade de edição.`,
-    dificuldade: "médio", impacto: "alto", acao: "Planejar conteúdo",
-    quando: () => true,
-  },
-  {
-    id: "dig-whatsapp-status",
-    categoria: "Digital",
-    icone: "💚",
-    titulo: () => "WhatsApp Status: canal ignorado com alto alcance",
-    descricao: () => `Status do WhatsApp chega a todos os contatos sem algoritmo. Postar bastidores, resultados e disponibilidade de agenda 2–3× por semana mantém você no radar sem custo.`,
-    dificuldade: "fácil", impacto: "médio", acao: "Começar hoje",
-    quando: () => true,
-  },
-  {
-    id: "dig-landing-page-captura",
-    categoria: "Digital",
-    icone: "🔗",
-    titulo: () => "Uma landing page de captura pode automatizar seus leads",
-    descricao: () => `Com o formulário de captura do CRM, você já tem a infraestrutura. Criar uma página simples com link na bio do Instagram transforma visualizações em leads automáticos — sem precisar responder DMs manualmente.`,
-    dificuldade: "médio", impacto: "alto", acao: "Ativar captura",
-    quando: () => true,
-  },
-  {
-    id: "dig-reels-depoimento",
-    categoria: "Digital",
-    icone: "🎬",
-    titulo: () => "Reels com depoimento de cliente: o conteúdo que mais converte",
-    descricao: () => `Um vídeo de 30s do cliente contando a experiência — filmado com celular, sem edição elaborada — gera mais confiança do que qualquer copy. Peça para 1 cliente fiel essa semana.`,
-    dificuldade: "fácil", impacto: "alto", acao: "Gravar depoimento",
-    quando: (ctx) => ctx.fieis.length >= 1,
-  },
-
-  // ── OPERACIONAL ───────────────────────────────────────────────────────────
-  {
-    id: "op-separar-financas",
-    categoria: "Operacional",
-    icone: "🏦",
-    titulo: () => "Conta PJ separada: proteja seu negócio",
-    descricao: () => `Misturar finanças pessoais e do negócio dificulta saber se você está lucrando de verdade. Uma conta PJ (ou conta digital gratuita como Mercado Pago) separa os fluxos e facilita o controle.`,
-    dificuldade: "fácil", impacto: "médio", acao: "Abrir conta PJ",
-    quando: () => true,
-  },
-  {
-    id: "op-automatizar-confirmacao",
-    categoria: "Operacional",
-    icone: "🤖",
-    titulo: () => "Automatize a confirmação de agendamento",
-    descricao: () => `Uma mensagem automática 24h antes do serviço reduz cancelamentos em até 30%. Use as automações do CRM ou um template salvo no WhatsApp Business para não depender de memória.`,
-    dificuldade: "fácil", impacto: "médio", acao: "Criar automação",
-    quando: () => true,
-  },
-  {
-    id: "op-controle-receita",
-    categoria: "Operacional",
-    icone: "📊",
-    titulo: (ctx) => `Ticket médio de R$ ${ctx.ticketMedio?.toLocaleString("pt-BR") || "—"} — você sabe sua meta mensal?`,
-    descricao: (ctx) => `Com ticket médio de R$ ${ctx.ticketMedio?.toLocaleString("pt-BR") || "—"}, você precisa de ${ctx.ticketMedio ? Math.ceil(3000 / ctx.ticketMedio) : "?"} vendas por mês para atingir R$ 3.000. Definir essa meta torna a prospecção mais objetiva.`,
-    dificuldade: "fácil", impacto: "médio", acao: "Definir meta",
-    quando: (ctx) => ctx.comVendas.length >= 2,
-  },
-  {
-    id: "op-formalizar-negocio",
-    categoria: "Operacional",
-    icone: "📝",
-    titulo: () => "MEI: formalize e abra portas para clientes maiores",
-    descricao: () => `Ser MEI permite emitir nota fiscal, contratar com empresas e ter CNPJ — o que abre portas para clientes corporativos e eventos maiores. O custo mensal é de ~R$ 70 e o processo é online.`,
-    dificuldade: "fácil", impacto: "alto", acao: "Abrir MEI",
-    quando: () => true,
-  },
-];
-
-// ─── Função principal de seleção de dicas ────────────────────────────────────
-export function gerarDicas(clientesComScore, vendas = [], servicos = []) {
-  const hoje    = new Date();
-  const comVendas  = clientesComScore.filter(c => !c._semVendas);
+  const emRisco    = comVendas.filter(c => c.risco === "alto" || c.risco === "medio");
   const fieis      = comVendas.filter(c => c.risco === "baixo" && c.totalCompras >= 2);
   const novos      = comVendas.filter(c => c.totalCompras === 1);
-  const semVendas  = clientesComScore.filter(c => c._semVendas);
-  const dormentes  = comVendas.filter(c => c.diasAusente > 60).length;
-
-  const v7d  = vendas.filter(v => (hoje - toDate(v.data)) < 7  * 86400000);
-  const v30d = vendas.filter(v => (hoje - toDate(v.data)) < 30 * 86400000);
-  const v60d = vendas.filter(v => (hoje - toDate(v.data)) < 60 * 86400000);
+  const dormentes  = comVendas.filter(c => c.diasAusente > 60);
 
   const receitaV30 = v30d.reduce((a, v) => a + (v.total ?? v.custoTotal ?? 0), 0);
-  const receitaV60 = v60d.reduce((a, v) => a + (v.total ?? v.custoTotal ?? 0), 0);
+  const receitaV90 = v90d.reduce((a, v) => a + (v.total ?? v.custoTotal ?? 0), 0);
 
-  // Serviço mais vendido
-  const contagem = {};
+  // Contagem de serviços mais vendidos
+  const contagemServicos = {};
   vendas.forEach(v => (v.itens || []).forEach(i => {
     const nome = i.nome || i.produto;
-    if (nome) contagem[nome] = (contagem[nome] || 0) + 1;
+    if (nome) contagemServicos[nome] = (contagemServicos[nome] || 0) + 1;
   }));
-  const [[topServico, topQtd] = []] = Object.entries(contagem).sort((a, b) => b[1] - a[1]);
+  const [[topServico, topQtd] = []] = Object.entries(contagemServicos).sort((a, b) => b[1] - a[1]);
 
-  // Ticket médio geral
   const ticketMedio = comVendas.length
     ? Math.round(comVendas.reduce((a, c) => a + (c.ticketMedio || 0), 0) / comVendas.length)
     : 0;
 
-  const ctx = {
-    comVendas, fieis, novos, semVendas, dormentes,
-    v7d, v30d, v60d, receitaV30, receitaV60,
-    topServico, topQtd, servicos, vendas, ticketMedio,
-  };
+  // Classificação do momento
+  let fase;
+  if (comVendas.length === 0) {
+    fase = "base_vazia";
+  } else if (comVendas.length < 5) {
+    fase = "construcao";
+  } else if (emRisco.length > comVendas.length * 0.4) {
+    fase = "retencao_critica";
+  } else if (v30d.length === 0 && comVendas.length >= 3) {
+    fase = "estagnado";
+  } else if (comVendas.length >= 10 && receitaV30 >= 1000) {
+    fase = "escalonando";
+  } else {
+    fase = "crescendo";
+  }
 
-  return BANCO_DICAS
-    .filter(d => {
-      try { return d.quando(ctx); }
+  return {
+    fase,
+    // métricas para uso nos insights
+    totalClientes: comVendas.length,
+    semVendas: semVendas.length,
+    emRisco: emRisco.length,
+    fieis: fieis.length,
+    nomePrimeiroFiel: fieis[0]?.nome || null,
+    novos: novos.length,
+    dormentes: dormentes.length,
+    receitaV30,
+    receitaV90,
+    ticketMedio,
+    topServico: topServico || null,
+    topQtd: topQtd || 0,
+    v7dLength: v7d.length,
+    v30dLength: v30d.length,
+    taxaRisco: comVendas.length ? emRisco.length / comVendas.length : 0,
+  };
+}
+
+// ─── Banco de insights de crescimento ────────────────────────────────────────
+// Cada insight tem:
+//   fases[]     — em quais fases do negócio ele é relevante
+//   quando(m)   — condição adicional baseada nas métricas do momento
+//   titulo(m)   — título curto, factual, com dados reais
+//   diagnostico(m) — o problema ou oportunidade em 1 frase
+//   recomendacao(m) — ação concreta em 1-2 frases
+//   metrica(m)  — { valor, label } — o número que ancora o card
+//   categoria   — agrupamento visual
+
+const BANCO_INSIGHTS_CRESCIMENTO = [
+
+  // ── BASE VAZIA / CONSTRUÇÃO ───────────────────────────────────────────────
+  {
+    id: "igr-indicacao-fieis",
+    fases: ["crescendo", "construcao", "escalonando"],
+    categoria: "Captação",
+    quando: (m) => m.fieis >= 2,
+    metrica: (m) => ({ valor: m.fieis, label: "clientes fiéis" }),
+    titulo: (m) => `${m.fieis} clientes prontos para indicar`,
+    diagnostico: (m) => `${m.nomePrimeiroFiel ? m.nomePrimeiroFiel.split(" ")[0] : "Seus clientes"} e outros ${m.fieis - 1} com mais de uma compra são sua fonte mais barata de aquisição.`,
+    recomendacao: () => `Entre em contato direto, mencione o trabalho feito e peça um nome. Um pedido personalizado converte 3× mais que qualquer campanha.`,
+  },
+  {
+    id: "igr-contatos-sem-historico",
+    fases: ["construcao", "crescendo", "estagnado"],
+    categoria: "Captação",
+    quando: (m) => m.semVendas > 0,
+    metrica: (m) => ({ valor: m.semVendas, label: `contato${m.semVendas > 1 ? "s" : ""} sem compra` }),
+    titulo: (m) => `${m.semVendas} contato${m.semVendas > 1 ? "s" : ""} cadastrado${m.semVendas > 1 ? "s" : ""} sem histórico`,
+    diagnostico: () => `Esses leads demonstraram interesse mas não fecharam. O calor da intenção inicial cai rápido — cada semana sem contato reduz a chance de conversão.`,
+    recomendacao: () => `Uma mensagem direta e curta esta semana — sem pitch, apenas verificando se a necessidade ainda existe — costuma converter 10–20%.`,
+  },
+  {
+    id: "igr-base-pequena-parceria",
+    fases: ["construcao", "base_vazia"],
+    categoria: "Captação",
+    quando: (m) => m.totalClientes < 8,
+    metrica: (m) => ({ valor: m.totalClientes, label: "clientes com histórico" }),
+    titulo: () => "Parcerias locais como canal primário",
+    diagnostico: (m) => `Com ${m.totalClientes} cliente${m.totalClientes !== 1 ? "s" : ""}, mídia paga ainda tem ROI incerto. Negócios complementares que atendem o mesmo público são mais eficientes nessa fase.`,
+    recomendacao: () => `Mapeie 3 negócios próximos com o mesmo público (eventos, buffet, decoração) e proponha uma troca de indicação formal — sem custo, resultado imediato.`,
+  },
+  {
+    id: "igr-semana-parada",
+    fases: ["crescendo", "estagnado", "construcao"],
+    categoria: "Ativação",
+    quando: (m) => m.v7dLength === 0 && m.v30dLength > 0,
+    metrica: (m) => ({ valor: m.v30dLength, label: `venda${m.v30dLength > 1 ? "s" : ""} no último mês` }),
+    titulo: () => "Nenhuma venda nos últimos 7 dias",
+    diagnostico: (m) => `Você teve ${m.v30dLength} venda${m.v30dLength > 1 ? "s" : ""} no mês mas a semana está parada. Reativar quem já comprou custa 5× menos do que captar novo cliente.`,
+    recomendacao: () => `Selecione 3 clientes com compra recente e envie uma mensagem hoje. Não precisa de oferta — uma mensagem de acompanhamento já reabre o canal.`,
+  },
+
+  // ── RETENÇÃO CRÍTICA ──────────────────────────────────────────────────────
+  {
+    id: "igr-retencao-critica",
+    fases: ["retencao_critica"],
+    categoria: "Retenção",
+    quando: (m) => m.emRisco >= 2,
+    metrica: (m) => ({ valor: `${Math.round(m.taxaRisco * 100)}%`, label: "da base em risco" }),
+    titulo: (m) => `${m.emRisco} clientes em risco — prioridade máxima`,
+    diagnostico: (m) => `Mais de ${Math.round(m.taxaRisco * 100)}% da sua base está fora do intervalo normal de retorno. Em negócios de serviço, essa taxa acima de 30% sinaliza problema sistêmico.`,
+    recomendacao: () => `Antes de captar novos clientes, recupere quem já conhece seu trabalho. Use o Radar para ver quem contatar hoje — o custo de inatividade é maior que o de qualquer campanha.`,
+  },
+  {
+    id: "igr-dormentes",
+    fases: ["retencao_critica", "crescendo", "estagnado"],
+    categoria: "Retenção",
+    quando: (m) => m.dormentes >= 2,
+    metrica: (m) => ({ valor: m.dormentes, label: `cliente${m.dormentes > 1 ? "s" : ""} +60 dias` }),
+    titulo: (m) => `${m.dormentes} clientes há mais de 60 dias sem comprar`,
+    diagnostico: () => `Clientes dormentes raramente voltam por conta própria — mas respondem bem a contato direto se a mensagem for personalizada e sem pressão de venda.`,
+    recomendacao: () => `Uma campanha de reativação focada em "você sumiu" — com algo de novo para mostrar — costuma trazer 15–25% de volta no primeiro mês.`,
+  },
+
+  // ── CRESCIMENTO / CONSOLIDAÇÃO ────────────────────────────────────────────
+  {
+    id: "igr-segunda-compra",
+    fases: ["construcao", "crescendo"],
+    categoria: "Fidelização",
+    quando: (m) => m.novos >= 2,
+    metrica: (m) => ({ valor: m.novos, label: `cliente${m.novos > 1 ? "s" : ""} com 1 compra` }),
+    titulo: (m) => `${m.novos} clientes fizeram apenas 1 compra`,
+    diagnostico: () => `A segunda compra é o marco de fidelização. Clientes que voltam uma vez têm probabilidade 5× maior de se tornarem recorrentes do que quem comprou uma vez.`,
+    recomendacao: () => `Identifique quem comprou pela primeira vez nos últimos 30 dias e faça uma abordagem personalizada — com algo relacionado ao que já contratou.`,
+  },
+  {
+    id: "igr-pacote-top-servico",
+    fases: ["crescendo", "escalonando", "construcao"],
+    categoria: "Receita",
+    quando: (m) => m.topServico && m.topQtd >= 3,
+    metrica: (m) => ({ valor: `${m.topQtd}×`, label: `"${m.topServico ? m.topServico.slice(0, 20) : ''}" vendido` }),
+    titulo: (m) => `"${m.topServico}" tem demanda comprovada`,
+    diagnostico: (m) => `Vendido ${m.topQtd} vezes, é seu serviço com maior tração. A maioria dos negócios nessa fase deixa receita na mesa por não ter uma oferta de pacote estruturada em torno do que já funciona.`,
+    recomendacao: () => `Monte um pacote combinando esse serviço com um complementar. Aumento de ticket médio sem precisar de novos clientes é a alavanca mais eficiente em qualquer fase.`,
+  },
+  {
+    id: "igr-ticket-reajuste",
+    fases: ["crescendo", "escalonando"],
+    categoria: "Receita",
+    quando: (m) => m.totalClientes >= 4 && m.ticketMedio > 0,
+    metrica: (m) => ({ valor: `R$ ${m.ticketMedio.toLocaleString("pt-BR")}`, label: "ticket médio atual" }),
+    titulo: () => "Margem de reajuste de preço sem perder clientes",
+    diagnostico: (m) => `Com ${m.fieis} clientes fiéis e ticket médio de R$ ${m.ticketMedio.toLocaleString("pt-BR")}, um reajuste de 10–15% bem comunicado raramente gera cancelamentos — e aumenta a receita sem nenhuma captação nova.`,
+    recomendacao: () => `Comunique antes, mostre o valor entregue, aplique para novos contratos primeiro. Clientes fiéis aceitam reajuste quando confiam no serviço.`,
+  },
+  {
+    id: "igr-trafego-pago",
+    fases: ["crescendo", "escalonando"],
+    categoria: "Captação",
+    quando: (m) => m.receitaV30 >= 800 && m.fieis >= 3,
+    metrica: (m) => ({ valor: `R$ ${m.receitaV30.toLocaleString("pt-BR")}`, label: "receita nos últimos 30 dias" }),
+    titulo: () => "Momento favorável para escalar com tráfego pago",
+    diagnostico: (m) => `Com R$ ${m.receitaV30.toLocaleString("pt-BR")} gerados no mês e base fidelizada, você tem dados suficientes para criar um público similar e testar campanhas com baixo risco.`,
+    recomendacao: () => `R$ 300–500 em Meta Ads segmentados por interesses do seu público já geram aprendizado de campanha. Sem base consolidada, o investimento em tráfego é prematuro.`,
+  },
+
+  // ── ESCALONAMENTO ─────────────────────────────────────────────────────────
+  {
+    id: "igr-escala-processos",
+    fases: ["escalonando"],
+    categoria: "Operacional",
+    quando: (m) => m.totalClientes >= 10,
+    metrica: (m) => ({ valor: m.totalClientes, label: "clientes na base" }),
+    titulo: () => "Volume exige processos — antes de crescer mais",
+    diagnostico: (m) => `Com ${m.totalClientes} clientes, o gargalo muda de captação para operação. Negócios que crescem sem estrutura de atendimento perdem qualidade e aumentam o churn sem perceber.`,
+    recomendacao: () => `Documente o fluxo de atendimento, automatize confirmações e padronize a entrega. Processos permitem escalar sem depender da sua memória.`,
+  },
+  {
+    id: "igr-prova-social",
+    fases: ["crescendo", "escalonando"],
+    categoria: "Captação",
+    quando: (m) => m.fieis >= 3,
+    metrica: (m) => ({ valor: m.fieis, label: "clientes fiéis com histórico" }),
+    titulo: () => "Depoimentos como ativo de captação",
+    diagnostico: (m) => `${m.fieis} clientes com histórico de retorno são prova social viva. Esse ativo é subutilizado — raramente documentado e quase nunca usado como material de captação.`,
+    recomendacao: () => `Peça um depoimento em texto ou vídeo de 30s para 2 clientes esta semana. Publicado no Instagram ou Google, aumenta a conversão de novos contatos em até 40%.`,
+  },
+];
+
+// ─── Exporta insights filtrados pelo momento atual ────────────────────────────
+export function gerarInsightsCrescimento(clientesComScore, vendas = [], servicos = []) {
+  const momento = diagnosticarMomento(clientesComScore, vendas);
+
+  const ativos = BANCO_INSIGHTS_CRESCIMENTO
+    .filter(ins => {
+      if (!ins.fases.includes(momento.fase)) return false;
+      try { return ins.quando(momento); }
       catch { return false; }
     })
-    .map(d => ({
-      id: d.id,
-      tipo: "dica",
-      categoria: d.categoria,
-      icone: d.icone,
-      titulo:    typeof d.titulo    === "function" ? d.titulo(ctx)    : d.titulo,
-      descricao: typeof d.descricao === "function" ? d.descricao(ctx) : d.descricao,
-      dificuldade: d.dificuldade,
-      impacto:     d.impacto,
-      acao:        d.acao,
+    .map(ins => ({
+      id:            ins.id,
+      categoria:     ins.categoria,
+      metrica:       ins.metrica(momento),
+      titulo:        ins.titulo(momento),
+      diagnostico:   ins.diagnostico(momento),
+      recomendacao:  ins.recomendacao(momento),
     }));
+
+  return { momento, ativos };
 }
 
 // ─── Métricas do painel ───────────────────────────────────────────────────────
@@ -536,7 +471,7 @@ export function useCRM(empresaId) {
     dadosBrutos: null,
     clientes: [],
     insights: [],
-    dicas: [],
+    crescimento: { momento: null, ativos: [] },
     metricas: null,
     config: null,
     ignorados: [],
@@ -582,8 +517,8 @@ export function useCRM(empresaId) {
         buffer.servicos,
         buffer.ignorados
       );
-      const metricas = calcularMetricas(clientesComScore, buffer.vendas);
-      const dicas    = gerarDicas(clientesComScore, buffer.vendas, buffer.servicos);
+      const metricas    = calcularMetricas(clientesComScore, buffer.vendas);
+      const crescimento  = gerarInsightsCrescimento(clientesComScore, buffer.vendas, buffer.servicos);
 
       setEstado({
         carregando: false,
@@ -591,7 +526,7 @@ export function useCRM(empresaId) {
         dadosBrutos: { ...buffer },
         clientes: clientesComScore,
         insights,
-        dicas,
+        crescimento,
         metricas,
         config: buffer.config,
         ignorados: buffer.ignorados,
