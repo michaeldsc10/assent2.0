@@ -4,7 +4,7 @@
 // Props: tenantUid, plano, theme, onToggleTheme, onVoltar
 
 import { useState, useEffect, useCallback } from "react";
-import { useAuth } from "../context/AuthContext"; // ajuste o caminho conforme seu projeto
+import { useAuth } from "../context/AuthContext.jsx"; // ajuste o caminho conforme seu projeto
 import {
   getFirestore,
   collection,
