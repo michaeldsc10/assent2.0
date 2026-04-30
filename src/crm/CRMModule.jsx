@@ -100,34 +100,20 @@ async function chamarIA(system, user) {
 }
 
 // ─── Lead Scoring automático ──────────────────────────────────────────────────
-// Calcula temperatura com base em sinais objetivos.
-// Exportado para uso em LeadsPage.jsx:
-//   import { calcularTemperaturaLead } from "./CRMModule"
 export function calcularTemperaturaLead(lead) {
-  // Casos determinísticos — status define temperatura diretamente
   if (lead.status === "Convertido") return "quente";
   if (lead.status === "Perdido")    return "frio";
-
-  // 1. Estágio no funil (0–55 pts) — principal sinal
   const pStage = { Novo: 0, Contactado: 25, Qualificado: 55 };
   const stageScore = pStage[lead.status] ?? 0;
-
-  // 2. Recência — dias desde a captura (−20 a +25 pts)
   let recScore = 0;
   if (lead.criadoEm) {
     const dt   = lead.criadoEm?.toDate ? lead.criadoEm.toDate() : new Date(lead.criadoEm);
     const dias = Math.floor((Date.now() - dt.getTime()) / 86400000);
     recScore   = dias <= 2 ? 25 : dias <= 7 ? 15 : dias <= 14 ? 5 : dias <= 30 ? -5 : -20;
   }
-
-  // 3. Engajamento — anotações e atividades registradas (0–20 pts)
-  const engScore = Math.min((lead.atividades?.length || 0) * 7, 20);
-
-  // 4. Score acumulado manual, normalizado para 0–10 pts
+  const engScore    = Math.min((lead.atividades?.length || 0) * 7, 20);
   const manualScore = Math.min(((lead.score || 0) / 100) * 10, 10);
-
   const total = stageScore + recScore + engScore + manualScore;
-
   if (total >= 50) return "quente";
   if (total >= 20) return "morno";
   return "frio";
@@ -193,11 +179,44 @@ function InsightCard({ insight, empresaNome, empresaId, T }) {
     risco_medio:  { borda: T.yellow, badgeBg: T.yellowDim, badgeColor: T.yellow, border: T.yellowBorder, label: "Atenção"        },
     oportunidade: { borda: T.blue,   badgeBg: T.blueDim,   badgeColor: T.blue,   border: T.blueBorder,   label: "Oportunidade"   },
     fidelizacao:  { borda: T.green,  badgeBg: T.greenDim,  badgeColor: T.green,  border: T.greenBorder,  label: "Fidelização"    },
+    dica:         { borda: T.gold,   badgeBg: T.goldGlow,  badgeColor: T.gold,   border: T.goldBorder,   label: "Dica"           },
   };
   const tipoKey = insight.tipo === "risco"
     ? (insight.prioridade === 1 ? "risco_alto" : "risco_medio")
     : insight.tipo;
-  const cor     = cores[tipoKey] || cores.risco_alto;
+  const cor = cores[tipoKey] || cores.risco_alto;
+
+  // Dicas têm layout próprio — mais simples, sem ações de WhatsApp
+  if (insight.tipo === "dica") {
+    return (
+      <div style={{
+        background: T.surface, border: `1px solid ${T.border}`,
+        borderLeft: `3px solid ${T.gold}`,
+        borderRadius: 16, marginBottom: 10, overflow: "hidden",
+      }}>
+        <div style={{ padding: "16px 18px" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+            <span style={{ fontSize: 22, flexShrink: 0, lineHeight: 1.2 }}>{insight.icone || "💡"}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: T.text, fontFamily: FONT }}>
+                  {insight.titulo}
+                </span>
+                <span style={{
+                  fontSize: 9, fontWeight: 700, padding: "2px 8px", borderRadius: 999,
+                  background: T.goldGlow, color: T.gold, border: `1px solid ${T.goldBorder}`,
+                  textTransform: "uppercase", letterSpacing: "0.07em", whiteSpace: "nowrap",
+                }}>Dica</span>
+              </div>
+              <p style={{ fontSize: 12, color: T.textMid, lineHeight: 1.65, margin: 0, fontFamily: FONT, fontWeight: 300 }}>
+                {insight.descricao}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
   const telLimpo = (insight.telefone || "").replace(/\D/g, "");
 
   async function gerarMensagem() {
