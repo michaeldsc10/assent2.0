@@ -21,42 +21,272 @@ import {
 const db = getFirestore();
 const PUBLIC_BASE = "https://flow.assentagencia.com.br";
 
+// ─── Design Tokens (espelha paleta do index.html público) ─────────────────────
+// ink / gold / emerald — dark luxury, glass, aurora
+const T = {
+  ink:        "#040408",
+  ink2:       "#07070D",
+  ink3:       "#0C0C14",
+  ink4:       "#111119",
+  ink5:       "#17171F",
+  gold:       "#C09B52",
+  goldHi:     "#D9B96E",
+  goldLo:     "#856830",
+  goldA06:    "rgba(192,155,82,0.06)",
+  goldA12:    "rgba(192,155,82,0.12)",
+  goldA22:    "rgba(192,155,82,0.22)",
+  goldA38:    "rgba(192,155,82,0.38)",
+  text100:    "#EEEAE2",
+  text65:     "rgba(238,234,226,0.65)",
+  text35:     "rgba(238,234,226,0.35)",
+  text18:     "rgba(238,234,226,0.18)",
+  text08:     "rgba(238,234,226,0.08)",
+  line:       "rgba(238,234,226,0.055)",
+  lineHi:     "rgba(238,234,226,0.09)",
+  emerald:    "#2DD37A",
+  emeraldA10: "rgba(45,211,122,0.10)",
+  emeraldA22: "rgba(45,211,122,0.22)",
+  red:        "rgba(239,68,68,0.85)",
+  redA06:     "rgba(239,68,68,0.06)",
+  redA18:     "rgba(239,68,68,0.18)",
+  blue:       "#60a5fa",
+  blueA10:    "rgba(96,165,250,0.10)",
+  blueA25:    "rgba(96,165,250,0.25)",
+  glass:      "rgba(12,12,20,0.70)",
+  glassHi:    "rgba(17,17,25,0.88)",
+};
+
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 const S = {
-  root: { display:"flex", height:"100vh", background:"var(--bg)", color:"var(--text)", fontFamily:"var(--font,'Montserrat',sans-serif)", overflow:"hidden" },
-  sidebar: { width:220, minWidth:220, background:"var(--s1)", borderRight:"1px solid var(--border)", display:"flex", flexDirection:"column", padding:"0 0 16px 0" },
-  sidebarHeader: { padding:"24px 20px 20px", borderBottom:"1px solid var(--border)", marginBottom:8 },
-  logoRow: { display:"flex", alignItems:"center", gap:10, marginBottom:4 },
-  logoIcon: { width:32, height:32, background:"linear-gradient(135deg,var(--gold) 0%,#1a3a5c 100%)", borderRadius:8, display:"flex", alignItems:"center", justifyContent:"center", fontSize:14, fontWeight:700, color:"#fff" },
-  logoText: { fontSize:13, fontWeight:700, color:"var(--gold)", letterSpacing:2, textTransform:"uppercase" },
-  logoSub: { fontSize:10, color:"var(--text-muted)", letterSpacing:1, textTransform:"uppercase" },
-  navItem: a => ({ display:"flex", alignItems:"center", gap:10, padding:"10px 20px", cursor:"pointer", background:a?"rgba(212,175,55,0.12)":"transparent", borderLeft:a?"3px solid var(--gold)":"3px solid transparent", color:a?"var(--gold)":"var(--text-muted)", fontSize:13, fontWeight:a?600:400, transition:"all 0.15s", userSelect:"none" }),
-  sidebarFooter: { marginTop:"auto", padding:"0 12px", display:"flex", flexDirection:"column", gap:8 },
-  btnSidebarSecondary: { padding:"8px 14px", background:"rgba(255,255,255,0.04)", border:"1px solid var(--border)", borderRadius:8, color:"var(--text-muted)", fontSize:12, cursor:"pointer", display:"flex", alignItems:"center", gap:6, width:"100%" },
+  root: {
+    display:"flex", height:"100vh",
+    background: T.ink,
+    color: T.text100,
+    fontFamily:"'Plus Jakarta Sans', 'Montserrat', system-ui, sans-serif",
+    overflow:"hidden",
+    WebkitFontSmoothing:"antialiased",
+  },
+
+  sidebar: {
+    width:228, minWidth:228,
+    background: T.ink2,
+    borderRight:`1px solid ${T.line}`,
+    display:"flex", flexDirection:"column",
+    padding:"0 0 20px 0",
+    position:"relative",
+  },
+  sidebarHeader: {
+    padding:"28px 22px 24px",
+    borderBottom:`1px solid ${T.line}`,
+    marginBottom:8,
+  },
+  logoRow: { display:"flex", alignItems:"center", gap:12, marginBottom:4 },
+  logoIcon: {
+    width:36, height:36,
+    background:`linear-gradient(140deg, ${T.goldHi} 0%, ${T.goldLo} 100%)`,
+    borderRadius:11, display:"flex", alignItems:"center", justifyContent:"center",
+    fontSize:15, fontWeight:800, color: T.ink,
+    boxShadow:`0 0 0 1px rgba(192,155,82,0.25), 0 6px 20px rgba(192,155,82,0.18)`,
+    letterSpacing:-1,
+  },
+  logoText: {
+    fontSize:11, fontWeight:700, color: T.gold,
+    letterSpacing:"4px", textTransform:"uppercase",
+  },
+  logoSub: {
+    fontSize:9, color: T.text35,
+    letterSpacing:"2px", textTransform:"uppercase", marginTop:2,
+  },
+
+  navItem: a => ({
+    display:"flex", alignItems:"center", gap:10,
+    padding:"11px 22px",
+    cursor:"pointer",
+    background: a ? T.goldA06 : "transparent",
+    borderLeft: a ? `2px solid ${T.gold}` : `2px solid transparent`,
+    color: a ? T.gold : T.text35,
+    fontSize:13, fontWeight: a ? 600 : 400,
+    transition:"all 0.2s cubic-bezier(0.22,1,0.36,1)",
+    userSelect:"none",
+    letterSpacing:"0.1px",
+  }),
+
+  sidebarFooter: {
+    marginTop:"auto", padding:"0 14px",
+    display:"flex", flexDirection:"column", gap:8,
+  },
+  btnSidebarSecondary: {
+    padding:"9px 14px",
+    background: T.text08,
+    border:`1px solid ${T.line}`,
+    borderRadius:10,
+    color: T.text35,
+    fontSize:12, cursor:"pointer",
+    display:"flex", alignItems:"center", gap:7,
+    width:"100%",
+    transition:"all 0.2s",
+  },
+
   main: { flex:1, display:"flex", flexDirection:"column", overflow:"hidden" },
-  topbar: { height:56, borderBottom:"1px solid var(--border)", display:"flex", alignItems:"center", padding:"0 24px", gap:12, background:"var(--s1)", flexShrink:0 },
-  topbarTitle: { fontSize:15, fontWeight:600, color:"var(--text)", flex:1 },
-  content: { flex:1, overflow:"auto", padding:24 },
-  card: { background:"var(--s1)", border:"1px solid var(--border)", borderRadius:12, padding:20 },
-  cardDashed: { background:"rgba(212,175,55,0.03)", border:"1px dashed rgba(212,175,55,0.3)", borderRadius:12, padding:20 },
+
+  topbar: {
+    height:58,
+    borderBottom:`1px solid ${T.line}`,
+    display:"flex", alignItems:"center",
+    padding:"0 28px", gap:12,
+    background: T.ink2,
+    flexShrink:0,
+    backdropFilter:"blur(10px)",
+  },
+  topbarTitle: {
+    fontSize:15, fontWeight:700,
+    color: T.text100, flex:1,
+    letterSpacing:"-0.2px",
+  },
+
+  content: { flex:1, overflow:"auto", padding:28 },
+
+  card: {
+    background: T.glassHi,
+    border:`1px solid ${T.lineHi}`,
+    borderRadius:16, padding:22,
+    backdropFilter:"blur(12px)",
+  },
+  cardDashed: {
+    background: T.goldA06,
+    border:`1px dashed ${T.goldA22}`,
+    borderRadius:16, padding:20,
+  },
   grid2: { display:"grid", gridTemplateColumns:"1fr 1fr", gap:16 },
   grid4: { display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:16 },
-  statCard: { background:"var(--s1)", border:"1px solid var(--border)", borderRadius:12, padding:20 },
-  sectionTitle: { fontSize:11, fontWeight:700, color:"var(--text-muted)", textTransform:"uppercase", letterSpacing:1, marginBottom:14 },
+
+  statCard: {
+    background: T.glassHi,
+    border:`1px solid ${T.lineHi}`,
+    borderRadius:16, padding:22,
+    backdropFilter:"blur(12px)",
+    position:"relative", overflow:"hidden",
+  },
+
+  sectionTitle: {
+    fontSize:9.5, fontWeight:700,
+    color: T.text35,
+    textTransform:"uppercase", letterSpacing:"1.8px",
+    marginBottom:16,
+  },
+
   table: { width:"100%", borderCollapse:"collapse" },
-  th: { textAlign:"left", padding:"8px 12px", fontSize:10, color:"var(--text-muted)", textTransform:"uppercase", letterSpacing:0.5, borderBottom:"1px solid var(--border)", fontWeight:700 },
-  td: { padding:"12px", fontSize:13, borderBottom:"1px solid var(--border)", verticalAlign:"middle" },
-  badge: c => ({ padding:"2px 9px", borderRadius:20, fontSize:11, fontWeight:600, background:c==="green"?"rgba(34,197,94,0.12)":c==="yellow"?"rgba(234,179,8,0.12)":c==="red"?"rgba(239,68,68,0.12)":c==="blue"?"rgba(59,130,246,0.12)":"rgba(156,163,175,0.1)", color:c==="green"?"#22c55e":c==="yellow"?"#eab308":c==="red"?"#ef4444":c==="blue"?"#60a5fa":"#9ca3af", border:`1px solid ${c==="green"?"rgba(34,197,94,0.25)":c==="yellow"?"rgba(234,179,8,0.25)":c==="red"?"rgba(239,68,68,0.25)":c==="blue"?"rgba(59,130,246,0.25)":"rgba(156,163,175,0.2)"}` }),
-  btnPrimary: { padding:"8px 18px", background:"var(--gold)", border:"none", borderRadius:8, color:"#000", fontSize:13, fontWeight:700, cursor:"pointer", display:"flex", alignItems:"center", gap:6 },
-  btnGhost: { padding:"6px 12px", background:"transparent", border:"1px solid var(--border)", borderRadius:6, color:"var(--text-muted)", fontSize:12, cursor:"pointer" },
-  btnDanger: { padding:"6px 12px", background:"rgba(239,68,68,0.1)", border:"1px solid rgba(239,68,68,0.3)", borderRadius:6, color:"#ef4444", fontSize:12, cursor:"pointer" },
-  btnSuccess: { padding:"6px 12px", background:"rgba(34,197,94,0.1)", border:"1px solid rgba(34,197,94,0.3)", borderRadius:6, color:"#22c55e", fontSize:12, cursor:"pointer" },
-  btnBlue: { padding:"6px 12px", background:"rgba(59,130,246,0.1)", border:"1px solid rgba(59,130,246,0.3)", borderRadius:6, color:"#3b82f6", fontSize:12, cursor:"pointer" },
-  input: { width:"100%", padding:"9px 12px", background:"rgba(255,255,255,0.04)", border:"1px solid var(--border)", borderRadius:8, color:"var(--text)", fontSize:13, outline:"none", boxSizing:"border-box" },
-  select: { width:"100%", padding:"9px 12px", background:"rgba(255,255,255,0.04)", border:"1px solid var(--border)", borderRadius:8, color:"var(--text)", fontSize:13, outline:"none", cursor:"pointer", boxSizing:"border-box" },
-  label: { fontSize:12, color:"var(--text-muted)", marginBottom:4, display:"block", fontWeight:500 },
-  emptyState: { textAlign:"center", padding:"48px 24px", color:"var(--text-muted)" },
-  upgradeWall: { display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", height:"100%", gap:12, textAlign:"center", padding:40 },
+  th: {
+    textAlign:"left", padding:"10px 14px",
+    fontSize:9.5, color: T.text18,
+    textTransform:"uppercase", letterSpacing:"1px",
+    borderBottom:`1px solid ${T.line}`,
+    fontWeight:700,
+  },
+  td: {
+    padding:"13px 14px", fontSize:13,
+    borderBottom:`1px solid ${T.line}`,
+    verticalAlign:"middle",
+  },
+
+  badge: c => {
+    const map = {
+      green:  { bg:"rgba(45,211,122,0.10)",  color:"#2DD37A",  bd:"rgba(45,211,122,0.25)" },
+      yellow: { bg:"rgba(192,155,82,0.12)",  color:"#D9B96E",  bd:"rgba(192,155,82,0.30)" },
+      red:    { bg:"rgba(239,68,68,0.10)",   color:"#F87171",  bd:"rgba(239,68,68,0.28)" },
+      blue:   { bg:"rgba(96,165,250,0.10)",  color:"#60a5fa",  bd:"rgba(96,165,250,0.28)" },
+      gray:   { bg:"rgba(238,234,226,0.05)", color:"rgba(238,234,226,0.35)", bd:"rgba(238,234,226,0.10)" },
+    };
+    const m = map[c] || map.gray;
+    return {
+      padding:"3px 10px", borderRadius:20,
+      fontSize:10.5, fontWeight:700,
+      background: m.bg, color: m.color,
+      border:`1px solid ${m.bd}`,
+      letterSpacing:"0.3px",
+    };
+  },
+
+  btnPrimary: {
+    padding:"8px 20px",
+    background:`linear-gradient(135deg, ${T.goldHi} 0%, ${T.goldLo} 100%)`,
+    border:"none", borderRadius:10,
+    color: T.ink, fontSize:13, fontWeight:700,
+    cursor:"pointer", display:"flex", alignItems:"center", gap:7,
+    boxShadow:"0 4px 16px rgba(192,155,82,0.25)",
+    transition:"all 0.2s cubic-bezier(0.22,1,0.36,1)",
+    letterSpacing:"0.1px",
+  },
+  btnGhost: {
+    padding:"7px 14px",
+    background:"transparent",
+    border:`1px solid ${T.lineHi}`,
+    borderRadius:8,
+    color: T.text35, fontSize:12, cursor:"pointer",
+    transition:"all 0.2s",
+    display:"flex", alignItems:"center", gap:6,
+  },
+  btnDanger: {
+    padding:"7px 12px",
+    background:"rgba(239,68,68,0.08)",
+    border:"1px solid rgba(239,68,68,0.25)",
+    borderRadius:8,
+    color:"#F87171", fontSize:12, cursor:"pointer",
+    display:"flex", alignItems:"center", gap:5,
+    transition:"all 0.2s",
+  },
+  btnSuccess: {
+    padding:"7px 12px",
+    background: T.emeraldA10,
+    border:`1px solid ${T.emeraldA22}`,
+    borderRadius:8,
+    color: T.emerald, fontSize:12, cursor:"pointer",
+    display:"flex", alignItems:"center", gap:5,
+    transition:"all 0.2s",
+  },
+  btnBlue: {
+    padding:"7px 12px",
+    background: T.blueA10,
+    border:`1px solid ${T.blueA25}`,
+    borderRadius:8,
+    color: T.blue, fontSize:12, cursor:"pointer",
+    display:"flex", alignItems:"center", gap:5,
+    transition:"all 0.2s",
+  },
+
+  input: {
+    width:"100%", padding:"10px 13px",
+    background: T.text08,
+    border:`1px solid ${T.lineHi}`,
+    borderRadius:10,
+    color: T.text100, fontSize:13, outline:"none",
+    boxSizing:"border-box",
+    transition:"border-color 0.2s",
+  },
+  select: {
+    width:"100%", padding:"10px 13px",
+    background: T.ink3,
+    border:`1px solid ${T.lineHi}`,
+    borderRadius:10,
+    color: T.text100, fontSize:13, outline:"none",
+    cursor:"pointer", boxSizing:"border-box",
+  },
+  label: {
+    fontSize:11.5, color: T.text35,
+    marginBottom:6, display:"block", fontWeight:600,
+    letterSpacing:"0.2px",
+  },
+
+  emptyState: {
+    textAlign:"center", padding:"52px 24px",
+    color: T.text35,
+  },
+  upgradeWall: {
+    display:"flex", flexDirection:"column",
+    alignItems:"center", justifyContent:"center",
+    height:"100%", gap:14,
+    textAlign:"center", padding:40,
+  },
 };
 
 // ─── Ícones ───────────────────────────────────────────────────────────────────
@@ -114,25 +344,68 @@ function useToast(){
 }
 function Toast({t}){
   if(!t?.msg) return null;
-  return <div style={{position:"fixed",bottom:24,right:24,padding:"12px 20px",borderRadius:10,background:t.type==="success"?"rgba(34,197,94,0.15)":"rgba(239,68,68,0.15)",border:`1px solid ${t.type==="success"?"rgba(34,197,94,0.4)":"rgba(239,68,68,0.4)"}`,color:t.type==="success"?"#22c55e":"#ef4444",fontSize:13,fontWeight:600,zIndex:999,backdropFilter:"blur(8px)"}}>{t.msg}</div>;
+  const ok = t.type==="success";
+  return <div style={{
+    position:"fixed", bottom:28, right:28,
+    padding:"13px 22px", borderRadius:14,
+    background: ok ? "rgba(45,211,122,0.10)" : "rgba(239,68,68,0.10)",
+    border:`1px solid ${ok ? "rgba(45,211,122,0.35)" : "rgba(239,68,68,0.35)"}`,
+    color: ok ? "#2DD37A" : "#F87171",
+    fontSize:13, fontWeight:700,
+    zIndex:999, backdropFilter:"blur(16px)",
+    boxShadow: ok ? "0 8px 32px rgba(45,211,122,0.12)" : "0 8px 32px rgba(239,68,68,0.12)",
+    display:"flex", alignItems:"center", gap:8, letterSpacing:"0.2px",
+    animation:"toast-in 0.35s cubic-bezier(0.22,1,0.36,1) both",
+  }}>
+    <style>{`@keyframes toast-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}`}</style>
+    <span style={{fontSize:15}}>{ok ? "✓" : "✕"}</span>{t.msg}
+  </div>;
 }
 function Loading({h=200}){
-  return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:h,gap:10,color:"var(--text-muted)",fontSize:13}}>
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" strokeWidth="2" style={{animation:"spin 0.8s linear infinite"}}>
-      <circle cx="12" cy="12" r="10" strokeOpacity="0.2"/><path d="M12 2a10 10 0 0 1 10 10"/>
+  return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:h,gap:10,color:"rgba(238,234,226,0.35)",fontSize:13,letterSpacing:"0.2px"}}>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C09B52" strokeWidth="2" style={{animation:"spin 0.85s linear infinite",flexShrink:0}}>
+      <circle cx="12" cy="12" r="10" strokeOpacity="0.15"/><path d="M12 2a10 10 0 0 1 10 10"/>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </svg>Carregando…
   </div>;
 }
 function Avatar({nome,size=36}){
-  return <div style={{width:size,height:size,borderRadius:size/3,background:"linear-gradient(135deg,var(--gold) 0%,#1a3a5c 100%)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:size*0.38,fontWeight:700,color:"#fff",flexShrink:0}}>{initials(nome)}</div>;
+  return <div style={{
+    width:size, height:size, borderRadius:Math.round(size*0.32),
+    background:`linear-gradient(140deg, #D9B96E 0%, #856830 100%)`,
+    display:"flex", alignItems:"center", justifyContent:"center",
+    fontSize:size*0.36, fontWeight:800, color:"#040408",
+    flexShrink:0,
+    boxShadow:"0 0 0 1px rgba(192,155,82,0.20), 0 4px 12px rgba(192,155,82,0.14)",
+    letterSpacing:"-0.5px",
+  }}>{initials(nome)}</div>;
 }
 function StatusBar({label,value,total,color}){
   const pct=total>0?Math.round((value/total)*100):0;
-  return <div><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span style={{fontSize:12,color:"var(--text)"}}>{label}</span><span style={{fontSize:12,color:"var(--text-muted)"}}>{value} ({pct}%)</span></div><div style={{height:6,background:"var(--border)",borderRadius:3,overflow:"hidden"}}><div style={{height:"100%",width:`${pct}%`,background:color,borderRadius:3,transition:"width 0.4s"}}/></div></div>;
+  return <div>
+    <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+      <span style={{fontSize:12,color:"rgba(238,234,226,0.65)",fontWeight:500}}>{label}</span>
+      <span style={{fontSize:12,color:"rgba(238,234,226,0.35)",fontWeight:600}}>{value} <span style={{fontSize:10,opacity:0.7}}>({pct}%)</span></span>
+    </div>
+    <div style={{height:5,background:"rgba(238,234,226,0.055)",borderRadius:3,overflow:"hidden"}}>
+      <div style={{height:"100%",width:`${pct}%`,background:color,borderRadius:3,transition:"width 0.5s cubic-bezier(0.22,1,0.36,1)",boxShadow:`0 0 8px ${color}55`}}/>
+    </div>
+  </div>;
 }
 function CheckItem({ok,label}){
-  return <div style={{display:"flex",gap:6,alignItems:"center"}}><div style={{width:18,height:18,borderRadius:"50%",background:ok?"rgba(34,197,94,0.15)":"rgba(156,163,175,0.1)",border:`1px solid ${ok?"rgba(34,197,94,0.4)":"var(--border)"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:ok?"#22c55e":"var(--text-muted)",flexShrink:0}}>{ok?"✓":"○"}</div><span style={{fontSize:12,color:ok?"var(--text)":"var(--text-muted)"}}>{label}</span></div>;
+  return <div style={{display:"flex",gap:7,alignItems:"center"}}>
+    <div style={{
+      width:18, height:18, borderRadius:"50%",
+      background: ok ? "rgba(45,211,122,0.10)" : "rgba(238,234,226,0.04)",
+      border:`1px solid ${ok ? "rgba(45,211,122,0.35)" : "rgba(238,234,226,0.09)"}`,
+      display:"flex", alignItems:"center", justifyContent:"center",
+      fontSize:9, color: ok ? "#2DD37A" : "rgba(238,234,226,0.20)",
+      flexShrink:0, fontWeight:800,
+      boxShadow: ok ? "0 0 8px rgba(45,211,122,0.15)" : "none",
+      transition:"all 0.3s",
+    }}>{ok?"✓":"○"}</div>
+    <span style={{fontSize:12,color:ok?"rgba(238,234,226,0.65)":"rgba(238,234,226,0.25)",fontWeight:ok?500:400}}>{label}</span>
+  </div>;
 }
 
 // ─── Visão Geral ──────────────────────────────────────────────────────────────
@@ -174,10 +447,10 @@ function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
         </div>
       )}
       <div style={S.grid4}>
-        <div style={S.statCard}><p style={{fontSize:20,marginBottom:6}}>📋</p><p style={{fontSize:28,fontWeight:700,color:"var(--gold)"}}>{total}</p><p style={{fontSize:13,color:"var(--text)",fontWeight:600}}>Total de Reservas</p></div>
-        <div style={S.statCard}><p style={{fontSize:20,marginBottom:6}}>📅</p><p style={{fontSize:28,fontWeight:700,color:"var(--gold)"}}>{hojeR.length}</p><p style={{fontSize:13,color:"var(--text)",fontWeight:600}}>Hoje</p></div>
-        <div style={S.statCard}><p style={{fontSize:20,marginBottom:6}}>📆</p><p style={{fontSize:28,fontWeight:700,color:"var(--gold)"}}>{semanaR.length}</p><p style={{fontSize:13,color:"var(--text)",fontWeight:600}}>Esta Semana</p></div>
-        <div style={S.statCard}><p style={{fontSize:20,marginBottom:6}}>⏳</p><p style={{fontSize:28,fontWeight:700,color:"#eab308"}}>{pendentes}</p><p style={{fontSize:13,color:"var(--text)",fontWeight:600}}>Pendentes</p></div>
+        <div style={S.statCard}><p style={{fontSize:22,marginBottom:10}}>📋</p><p style={{fontSize:30,fontWeight:800,color:"#C09B52",letterSpacing:"-1px",lineHeight:1}}>{total}</p><p style={{fontSize:12,color:"rgba(238,234,226,0.50)",fontWeight:600,marginTop:6,textTransform:"uppercase",letterSpacing:"0.8px"}}>Total de Reservas</p></div>
+        <div style={S.statCard}><p style={{fontSize:22,marginBottom:10}}>📅</p><p style={{fontSize:30,fontWeight:800,color:"#C09B52",letterSpacing:"-1px",lineHeight:1}}>{hojeR.length}</p><p style={{fontSize:12,color:"rgba(238,234,226,0.50)",fontWeight:600,marginTop:6,textTransform:"uppercase",letterSpacing:"0.8px"}}>Hoje</p></div>
+        <div style={S.statCard}><p style={{fontSize:22,marginBottom:10}}>📆</p><p style={{fontSize:30,fontWeight:800,color:"#C09B52",letterSpacing:"-1px",lineHeight:1}}>{semanaR.length}</p><p style={{fontSize:12,color:"rgba(238,234,226,0.50)",fontWeight:600,marginTop:6,textTransform:"uppercase",letterSpacing:"0.8px"}}>Esta Semana</p></div>
+        <div style={S.statCard}><p style={{fontSize:22,marginBottom:10}}>⏳</p><p style={{fontSize:30,fontWeight:800,color:"#D9B96E",letterSpacing:"-1px",lineHeight:1}}>{pendentes}</p><p style={{fontSize:12,color:"rgba(238,234,226,0.50)",fontWeight:600,marginTop:6,textTransform:"uppercase",letterSpacing:"0.8px"}}>Pendentes</p></div>
       </div>
       <div style={S.grid2}>
         <div style={S.card}>
@@ -289,8 +562,8 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
 
       {/* Cabeçalho */}
       <div>
-        <p style={{fontSize:15,fontWeight:600,color:"var(--text)",marginBottom:4}}>Equipe no Flow</p>
-        <p style={{fontSize:12,color:"var(--text-muted)"}}>Ative os colaboradores cadastrados no AG para que tenham sua própria agenda pública. Cada um configura seus serviços e horários de forma independente.</p>
+        <p style={{fontSize:15,fontWeight:700,color:"#EEEAE2",marginBottom:6,letterSpacing:"-0.2px"}}>Equipe no Flow</p>
+        <p style={{fontSize:12,color:"rgba(238,234,226,0.35)",lineHeight:1.7}}>Ative os colaboradores cadastrados no AG para que tenham sua própria agenda pública. Cada um configura seus serviços e horários de forma independente.</p>
       </div>
 
       {/* Linha do Admin (sempre ativo, não pode ser desativado) */}
@@ -378,10 +651,10 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
 
       {/* Modal especialidade */}
       {editando&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.65)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200}}>
-          <div style={{background:"var(--s1)",border:"1px solid var(--border)",borderRadius:14,padding:24,width:360,display:"flex",flexDirection:"column",gap:16}}>
-            <p style={{fontSize:14,fontWeight:700,color:"var(--text)"}}>Especialidade / Título</p>
-            <p style={{fontSize:12,color:"var(--text-muted)"}}>Exibido na página pública do agendamento, abaixo do nome.</p>
+        <div style={{position:"fixed",inset:0,background:"rgba(4,4,8,0.80)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,backdropFilter:"blur(6px)"}}>
+          <div style={{background:"rgba(17,17,25,0.96)",border:"1px solid rgba(238,234,226,0.09)",borderRadius:20,padding:28,width:380,display:"flex",flexDirection:"column",gap:18,boxShadow:"0 24px 64px rgba(0,0,0,0.55)"}}>
+            <p style={{fontSize:14,fontWeight:700,color:"#EEEAE2",letterSpacing:"-0.2px"}}>Especialidade / Título</p>
+            <p style={{fontSize:12,color:"rgba(238,234,226,0.35)"}}>Exibido na página pública do agendamento, abaixo do nome.</p>
             <div>
               <label style={S.label}>Especialidade</label>
               <input style={S.input} value={editando.esp} onChange={e=>setEditando(p=>({...p,esp:e.target.value}))} placeholder="Ex: Nail Designer, Cabeleireira..." autoFocus/>
@@ -617,7 +890,7 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
               </select>
             </div>
           </div>
-          <p style={{fontSize:11,color:"var(--text-muted)",marginTop:10}}>💡 Granularidade = passo entre os horários disponíveis. A duração real de cada serviço é respeitada — sem janelas desperdiçadas.</p>
+          <p style={{fontSize:11,color:"rgba(238,234,226,0.30)",marginTop:12,lineHeight:1.65}}>💡 Granularidade = passo entre os horários disponíveis. A duração real de cada serviço é respeitada — sem janelas desperdiçadas.</p>
         </div>
 
         {/* Serviços */}
@@ -683,8 +956,8 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
       {/* Info URL admin */}
       {isAdmin&&(
-        <div style={{padding:"10px 14px",background:"rgba(212,175,55,0.06)",border:"1px solid rgba(212,175,55,0.2)",borderRadius:10,fontSize:12,color:"var(--text-muted)"}}>
-          ℹ️ O link do <strong style={{color:"var(--gold)"}}>Administrador</strong> é o link padrão da empresa — funciona sem o parâmetro <code style={{background:"rgba(255,255,255,0.06)",padding:"1px 5px",borderRadius:4}}>&prestador=</code>. Os links dos colaboradores incluem o parâmetro automaticamente.
+        <div style={{padding:"12px 16px",background:"rgba(192,155,82,0.06)",border:"1px solid rgba(192,155,82,0.18)",borderRadius:12,fontSize:12,color:"rgba(238,234,226,0.40)",lineHeight:1.6}}>
+          ℹ️ O link do <strong style={{color:"#D9B96E"}}>Administrador</strong> é o link padrão da empresa — funciona sem o parâmetro <code style={{background:"rgba(238,234,226,0.06)",padding:"1px 6px",borderRadius:5,fontSize:11,color:"rgba(238,234,226,0.55)"}}>&prestador=</code>. Os links dos colaboradores incluem o parâmetro automaticamente.
         </div>
       )}
 
@@ -717,7 +990,7 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
                   {copied===p.id?<>{Ic.check} Copiado!</>:<>{Ic.copy} Copiar</>}
                 </button>
               </div>
-              {(!temS||!temH)&&<div style={{marginTop:10,padding:"8px 12px",background:"rgba(234,179,8,0.08)",border:"1px solid rgba(234,179,8,0.25)",borderRadius:8,fontSize:12,color:"#eab308"}}>⚠️ Configure serviços e horários antes de compartilhar este link.</div>}
+              {(!temS||!temH)&&<div style={{marginTop:12,padding:"10px 14px",background:"rgba(192,155,82,0.06)",border:"1px solid rgba(192,155,82,0.20)",borderRadius:10,fontSize:12,color:"#D9B96E"}}>⚠️ Configure serviços e horários antes de compartilhar este link.</div>}
             </div>
           );
         })
@@ -730,11 +1003,11 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
 function TelaUpgrade({onVoltar}){
   return (
     <div style={S.upgradeWall}>
-      <div style={{width:64,height:64,borderRadius:16,background:"linear-gradient(135deg,var(--gold) 0%,#1a3a5c 100%)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28}}>{Ic.star}</div>
-      <h2 style={{fontSize:22,fontWeight:700,color:"var(--text)",marginBottom:8}}>Assent Flow</h2>
-      <p style={{fontSize:14,color:"var(--text-muted)",maxWidth:360,lineHeight:1.6,marginBottom:20}}>Disponível no plano <strong style={{color:"var(--gold)"}}>Profissional</strong>.</p>
+      <div style={{width:72,height:72,borderRadius:20,background:"linear-gradient(140deg,#D9B96E 0%,#856830 100%)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,boxShadow:"0 0 0 1px rgba(192,155,82,0.25), 0 12px 40px rgba(192,155,82,0.22)"}}>{Ic.star}</div>
+      <h2 style={{fontSize:24,fontWeight:800,color:"#EEEAE2",marginBottom:4,letterSpacing:"-0.5px"}}>Assent Flow</h2>
+      <p style={{fontSize:14,color:"rgba(238,234,226,0.40)",maxWidth:340,lineHeight:1.7,marginBottom:24}}>Disponível no plano <strong style={{color:"#D9B96E"}}>Profissional</strong>.</p>
       <div style={{display:"flex",gap:12}}>
-        <button style={{...S.btnPrimary,padding:"10px 24px"}} onClick={()=>window.open("mailto:contato@assentagencia.com.br?subject=Upgrade Profissional","_blank")}>⭐ Fazer Upgrade</button>
+        <button style={{...S.btnPrimary,padding:"11px 28px",fontSize:14}} onClick={()=>window.open("mailto:contato@assentagencia.com.br?subject=Upgrade Profissional","_blank")}>⭐ Fazer Upgrade</button>
         <button onClick={onVoltar} style={S.btnGhost}>Voltar</button>
       </div>
     </div>
@@ -836,10 +1109,10 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
   if(plano!=="profissional") return <div style={S.root}><TelaUpgrade onVoltar={onVoltar}/></div>;
   if(!podeVer("agendamento")) return (
     <div style={{...S.root,alignItems:"center",justifyContent:"center"}}>
-      <div style={{textAlign:"center",padding:40}}>
-        <p style={{fontSize:32,marginBottom:12}}>🔒</p>
-        <p style={{fontSize:15,fontWeight:600,color:"var(--text)",marginBottom:8}}>Acesso Restrito</p>
-        <p style={{fontSize:13,color:"var(--text-muted)",marginBottom:20}}>Seu perfil não possui acesso ao módulo de Agendamentos.</p>
+      <div style={{textAlign:"center",padding:40,display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+        <div style={{width:60,height:60,borderRadius:18,background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.20)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>🔒</div>
+        <p style={{fontSize:16,fontWeight:700,color:"#EEEAE2",letterSpacing:"-0.2px"}}>Acesso Restrito</p>
+        <p style={{fontSize:13,color:"rgba(238,234,226,0.35)",marginBottom:8,lineHeight:1.6,maxWidth:300}}>Seu perfil não possui acesso ao módulo de Agendamentos.</p>
         <button onClick={onVoltar} style={S.btnGhost}>← Voltar ao Gestão</button>
       </div>
     </div>
@@ -858,6 +1131,17 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
 
   return (
     <div style={S.root}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        * { box-sizing: border-box; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(192,155,82,0.18); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(192,155,82,0.35); }
+        @keyframes flow-reveal { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.5) sepia(1) saturate(2) hue-rotate(5deg); opacity:0.5; cursor:pointer; }
+        input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.5) sepia(1) saturate(2) hue-rotate(5deg); opacity:0.5; cursor:pointer; }
+      `}</style>
       <aside style={S.sidebar}>
         <div style={S.sidebarHeader}>
           <div style={S.logoRow}>
@@ -876,7 +1160,7 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
       <main style={S.main}>
         <header style={S.topbar}>
           <span style={S.topbarTitle}>{titulos[tela]}</span>
-          <span style={{fontSize:11,padding:"3px 10px",borderRadius:20,border:"1px solid var(--border)",background:"rgba(212,175,55,0.08)",color:"var(--gold)",fontWeight:600,letterSpacing:0.5}}>★ Profissional</span>
+          <span style={{fontSize:10,padding:"4px 12px",borderRadius:20,border:"1px solid rgba(192,155,82,0.25)",background:"rgba(192,155,82,0.08)",color:"#D9B96E",fontWeight:700,letterSpacing:"0.8px",textTransform:"uppercase"}}>★ Profissional</span>
         </header>
         <div style={S.content}>
           {loadingP?<Loading/>:<>
