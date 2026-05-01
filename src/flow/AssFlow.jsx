@@ -21,8 +21,7 @@ import {
 const db = getFirestore();
 const PUBLIC_BASE = "https://flow.assentagencia.com.br";
 
-// ─── Design Tokens (espelha paleta do index.html público) ─────────────────────
-// ink / gold / emerald — dark luxury, glass, aurora
+// ─── Design Tokens ────────────────────────────────────────────────────────────
 const T = {
   ink:        "#040408",
   ink2:       "#07070D",
@@ -59,7 +58,7 @@ const T = {
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 const S = {
   root: {
-    display:"flex", height:"100vh",
+    display:"flex", height:"100vh", height:"100dvh",
     background: T.ink,
     color: T.text100,
     fontFamily:"'Plus Jakarta Sans', 'Montserrat', system-ui, sans-serif",
@@ -74,6 +73,8 @@ const S = {
     display:"flex", flexDirection:"column",
     padding:"0 0 20px 0",
     position:"relative",
+    zIndex:100,
+    transition:"transform 0.28s cubic-bezier(0.22,1,0.36,1)",
   },
   sidebarHeader: {
     padding:"28px 22px 24px",
@@ -133,7 +134,7 @@ const S = {
     height:58,
     borderBottom:`1px solid ${T.line}`,
     display:"flex", alignItems:"center",
-    padding:"0 28px", gap:12,
+    padding:"0 20px", gap:10,
     background: T.ink2,
     flexShrink:0,
     backdropFilter:"blur(10px)",
@@ -296,8 +297,6 @@ const Ic = {
   settings: <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
   link:     <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>,
   users:    <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-  sun:      <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>,
-  moon:     <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>,
   back:     <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>,
   plus:     <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>,
   trash:    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6M9 6V4h6v2"/></svg>,
@@ -305,6 +304,8 @@ const Ic = {
   check:    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="20,6 9,17 4,12"/></svg>,
   star:     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>,
   crown:    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M2 20h20M4 20L2 8l6 4 4-8 4 8 6-4-2 12"/></svg>,
+  menu:     <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>,
+  close:    <svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>,
   toggle_on:  <svg width="32" height="18" viewBox="0 0 32 18" fill="none"><rect width="32" height="18" rx="9" fill="#22c55e"/><circle cx="23" cy="9" r="7" fill="white"/></svg>,
   toggle_off: <svg width="32" height="18" viewBox="0 0 32 18" fill="none"><rect width="32" height="18" rx="9" fill="rgba(156,163,175,0.3)"/><circle cx="9" cy="9" r="7" fill="rgba(156,163,175,0.8)"/></svg>,
 };
@@ -446,7 +447,8 @@ function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
           </select>
         </div>
       )}
-      <div style={S.grid4}>
+      {/* grid responsivo via className */}
+      <div className="flow-grid4">
         {[
           {icon:"📋", value:total,        label:"Total de Reservas", color:T.gold,    glow:"rgba(192,155,82,0.18)"},
           {icon:"📅", value:hojeR.length, label:"Hoje",              color:T.blue,    glow:"rgba(96,165,250,0.14)"},
@@ -471,7 +473,7 @@ function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
           </div>
         ))}
       </div>
-      <div style={S.grid2}>
+      <div className="flow-grid2">
         <div style={S.card}>
           <p style={S.sectionTitle}>Status das Reservas</p>
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
@@ -516,17 +518,14 @@ function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
 }
 
 // ─── Tela Equipe ──────────────────────────────────────────────────────────────
-// Lê usuários do AG + admin → permite ativar/desativar no Flow
-// NÃO cria cadastro paralelo — usa os dados do AG direto
 function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
   const [usuarios,setUsuarios]=useState([]);
   const [loadingU,setLoadingU]=useState(true);
-  const [editando,setEditando]=useState(null);        // { prestadorId, esp } modal de especialidade
+  const [editando,setEditando]=useState(null);
   const [salvando,setSalvando]=useState(null);
   const [copied,setCopied]=useState(null);
   const [t,showT]=useToast();
 
-  // Lê usuarios do AG (mesma coleção que Usuarios.jsx)
   useEffect(()=>{
     if(!tenantUid) return;
     const q=query(collection(db,"users",tenantUid,"usuarios"),orderBy("criadoEm","asc"));
@@ -537,7 +536,6 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
     return()=>u();
   },[tenantUid]);
 
-  // Ativa usuário no Flow → cria/atualiza agendamento_prestadores/{uid}
   const ativar = async(usr)=>{
     setSalvando(usr.uid);
     try {
@@ -554,7 +552,6 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
     setSalvando(null);
   };
 
-  // Desativa → ativo=false, não exclui os dados
   const desativar = async(pid, nome)=>{
     if(!window.confirm(`Desativar ${nome} do Flow? As reservas existentes não serão afetadas.`)) return;
     setSalvando(pid);
@@ -565,7 +562,6 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
     setSalvando(null);
   };
 
-  // Salva especialidade (label exibida na página pública)
   const salvarEsp = async()=>{
     if(!editando) return;
     setSalvando(editando.prestadorId);
@@ -582,7 +578,6 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
     setCopied(pid); setTimeout(()=>setCopied(null),2500);
   };
 
-  // Helper: encontra prestador correspondente ao uid
   const getPrestador = uid => prestadores.find(p=>p.id===uid)||null;
   const adminPrestador = prestadores.find(p=>p.isAdmin)||null;
 
@@ -592,98 +587,89 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
       <Toast t={t}/>
 
-      {/* Cabeçalho */}
       <div>
         <p style={{fontSize:15,fontWeight:700,color:"#EEEAE2",marginBottom:6,letterSpacing:"-0.2px"}}>Equipe no Flow</p>
         <p style={{fontSize:12,color:"rgba(238,234,226,0.35)",lineHeight:1.7}}>Ative os colaboradores cadastrados no AG para que tenham sua própria agenda pública. Cada um configura seus serviços e horários de forma independente.</p>
       </div>
 
-      {/* Linha do Admin (sempre ativo, não pode ser desativado) */}
-      <div style={{
-        ...S.card,
-        borderLeft:`3px solid ${T.gold}`,
-        display:"flex",alignItems:"center",gap:14,
-        position:"relative",overflow:"hidden",
-        transition:"box-shadow 0.25s",
-      }}
-      onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 4px 28px rgba(0,0,0,0.35), 0 0 0 1px rgba(238,234,226,0.09)`;}}
-      onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";}}>
-        <div style={{position:"absolute",top:0,left:0,width:100,height:"100%",background:`linear-gradient(90deg,${T.goldA06} 0%,transparent 100%)`,pointerEvents:"none"}}/>
-        <Avatar nome={user.displayName||user.email}/>
-        <div style={{flex:1}}>
-          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
-            <p style={{fontSize:14,fontWeight:700,color:T.text100}}>{user.displayName||"Administrador"}</p>
-            <span style={{...S.badge("yellow"),display:"flex",alignItems:"center",gap:4,fontSize:10}}>{Ic.crown} Admin</span>
+      {/* Admin sempre primeiro */}
+      {adminPrestador&&(
+        <div style={{
+          background:"rgba(17,17,25,0.92)",
+          border:`1px solid rgba(238,234,226,0.07)`,
+          borderLeft:`3px solid ${T.gold}`,
+          borderRadius:14,
+          padding:"16px 20px",
+          display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",
+          backdropFilter:"blur(12px)",
+          position:"relative",overflow:"hidden",
+        }}>
+          <div style={{position:"absolute",top:0,left:0,width:120,height:"100%",background:`linear-gradient(90deg,rgba(192,155,82,0.08) 0%,transparent 100%)`,pointerEvents:"none"}}/>
+          <Avatar nome={adminPrestador.nome}/>
+          <div style={{flex:1,minWidth:120}}>
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}>
+              <p style={{fontSize:14,fontWeight:700,color:T.text100,letterSpacing:"-0.1px"}}>{adminPrestador.nome}</p>
+              <span style={{...S.badge("yellow"),display:"flex",alignItems:"center",gap:3,fontSize:10}}>{Ic.crown} Admin</span>
+              <span style={S.badge("green")}>Ativo no Flow</span>
+            </div>
+            <p style={{fontSize:12,color:T.text35}}>{adminPrestador.especialidade||"Administrador"}</p>
           </div>
-          <p style={{fontSize:12,color:T.text35}}>{user.email}</p>
-          {adminPrestador?.especialidade&&<p style={{fontSize:11,color:T.gold,marginTop:2}}>{adminPrestador.especialidade}</p>}
+          <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+            <button style={{...S.btnGhost,fontSize:11}} onClick={()=>setEditando({prestadorId:"admin",esp:adminPrestador.especialidade||""})}>✏ Especialidade</button>
+            <button style={{...S.btnGhost,color:copied==="admin"?T.emerald:T.text35,fontSize:11}} onClick={()=>copiar("admin")}>
+              {copied==="admin"?<>{Ic.check} Copiado!</>:<>{Ic.copy} Link</>}
+            </button>
+            <button style={{...S.btnGhost,fontSize:11}} onClick={()=>onConfigurar("admin")}>⚙ Configurar</button>
+          </div>
         </div>
-        {/* Especialidade do admin */}
-        <button style={S.btnBlue} onClick={()=>setEditando({prestadorId:"admin",esp:adminPrestador?.especialidade||""})}>{Ic.settings}</button>
-        {/* Configurar agenda */}
-        <button style={S.btnBlue} title="Configurar agenda" onClick={()=>onConfigurar("admin")}>{Ic.settings} Configurar</button>
-        {/* Copiar link */}
-        <button style={{...S.btnGhost,color:copied==="admin"?T.emerald:T.text35}} onClick={()=>copiar("admin")}>
-          {copied==="admin"?<>{Ic.check} Copiado!</>:<>{Ic.copy} Link</>}
-        </button>
-        <span style={S.badge("green")}>Ativo</span>
-      </div>
+      )}
 
-      {/* Linha dos colaboradores */}
+      {/* Demais usuários do AG */}
       {usuarios.length===0?(
-        <div style={{...S.card,...S.emptyState}}>
-          <p style={{fontSize:24,marginBottom:8}}>👥</p>
-          <p style={{fontSize:13,color:T.text100}}>Nenhum colaborador cadastrado no AG ainda.</p>
-          <p style={{fontSize:12,color:T.text35,marginTop:4}}>Adicione usuários em <strong>Usuários</strong> para ativá-los aqui.</p>
+        <div style={{...S.emptyState}}>
+          <p style={{fontSize:22,marginBottom:8}}>👥</p>
+          <p style={{fontSize:13,fontWeight:600,color:T.text100,marginBottom:4}}>Nenhum colaborador cadastrado</p>
+          <p style={{fontSize:12,color:T.text35}}>Adicione usuários no módulo Usuários do AG para ativá-los aqui.</p>
         </div>
       ):(
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+        <div style={{display:"flex",flexDirection:"column",gap:10}}>
           {usuarios.map(usr=>{
-            const pr=getPrestador(usr.uid);
-            const ativoFlow=pr?.ativo===true;
-            const isAtivo=usr.ativo!==false;
-            const accentColor = !isAtivo ? T.text18 : ativoFlow ? T.emerald : T.goldLo;
-            const accentGlow  = !isAtivo ? "transparent" : ativoFlow ? "rgba(45,211,122,0.08)" : "rgba(192,155,82,0.06)";
-
+            const prestador=getPrestador(usr.uid);
+            const ativoFlow=prestador?.ativo===true;
+            const inativoAG=usr.ativo===false;
             return (
               <div key={usr.uid} style={{
-                ...S.card,
-                display:"flex",alignItems:"center",gap:14,
-                opacity:isAtivo?1:0.5,
-                borderLeft:`3px solid ${accentColor}`,
-                position:"relative",overflow:"hidden",
-                transition:"box-shadow 0.25s",
-              }}
-              onMouseEnter={e=>{if(isAtivo) e.currentTarget.style.boxShadow=`0 4px 28px rgba(0,0,0,0.35), 0 0 0 1px rgba(238,234,226,0.09)`;}}
-              onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";}}>
-                <div style={{position:"absolute",top:0,left:0,width:100,height:"100%",background:`linear-gradient(90deg,${accentGlow} 0%,transparent 100%)`,pointerEvents:"none"}}/>
-                <Avatar nome={usr.nome}/>
-                <div style={{flex:1}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
-                    <p style={{fontSize:14,fontWeight:600,color:T.text100}}>{usr.nome}</p>
-                    <span style={{...S.badge("blue"),fontSize:10}}>{cargoLabel(usr.cargo)}</span>
-                    {!isAtivo&&<span style={{...S.badge("gray"),fontSize:10}}>Inativo no AG</span>}
+                background:"rgba(17,17,25,0.92)",
+                border:`1px solid rgba(238,234,226,0.07)`,
+                borderLeft:`3px solid ${ativoFlow?T.emerald:T.text08}`,
+                borderRadius:14,
+                padding:"14px 18px",
+                display:"flex",alignItems:"center",gap:14,flexWrap:"wrap",
+                backdropFilter:"blur(12px)",
+                opacity:inativoAG?0.55:1,
+                transition:"opacity 0.2s",
+              }}>
+                <Avatar nome={usr.nome} size={32}/>
+                <div style={{flex:1,minWidth:100}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2,flexWrap:"wrap"}}>
+                    <p style={{fontSize:13,fontWeight:600,color:T.text100}}>{usr.nome||"Sem nome"}</p>
+                    <span style={S.badge("gray")}>{cargoLabel(usr.cargo)}</span>
+                    {ativoFlow&&<span style={S.badge("green")}>Flow ativo</span>}
+                    {inativoAG&&<span style={S.badge("red")}>Inativo no AG</span>}
                   </div>
-                  <p style={{fontSize:12,color:T.text35}}>{usr.email}</p>
-                  {pr?.especialidade&&<p style={{fontSize:11,color:T.gold,marginTop:2}}>{pr.especialidade}</p>}
+                  {prestador?.especialidade&&<p style={{fontSize:11,color:T.text35}}>{prestador.especialidade}</p>}
                 </div>
-
-                {/* Toggle + ações (só se ativo no AG) */}
-                {isAtivo?(
-                  <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                {!inativoAG?(
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
                     {ativoFlow&&(
                       <>
-                        {/* Editar especialidade */}
-                        <button style={S.btnBlue} title="Editar especialidade" onClick={()=>setEditando({prestadorId:usr.uid,esp:pr?.especialidade||cargoLabel(usr.cargo)})}>{Ic.settings}</button>
-                        {/* Configurar agenda */}
-                        <button style={S.btnBlue} title="Configurar agenda" onClick={()=>onConfigurar(usr.uid)}>{Ic.settings} Configurar</button>
-                        {/* Copiar link */}
-                        <button style={{...S.btnGhost,color:copied===usr.uid?T.emerald:T.text35}} onClick={()=>copiar(usr.uid)}>
+                        <button style={{...S.btnGhost,fontSize:11}} onClick={()=>setEditando({prestadorId:usr.uid,esp:prestador?.especialidade||""})}>✏ Especialidade</button>
+                        <button style={{...S.btnGhost,fontSize:11}} onClick={()=>onConfigurar(usr.uid)}>⚙ Configurar</button>
+                        <button style={{...S.btnGhost,color:copied===usr.uid?T.emerald:T.text35,fontSize:11}} onClick={()=>copiar(usr.uid)}>
                           {copied===usr.uid?<>{Ic.check} Copiado!</>:<>{Ic.copy} Link</>}
                         </button>
                       </>
                     )}
-                    {/* Toggle Flow */}
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
                       <span style={{fontSize:11,color:ativoFlow?T.emerald:T.text35}}>
                         {ativoFlow?"Ativo no Flow":"Inativo no Flow"}
@@ -704,8 +690,8 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
 
       {/* Modal especialidade */}
       {editando&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(4,4,8,0.80)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,backdropFilter:"blur(6px)"}}>
-          <div style={{background:"rgba(17,17,25,0.96)",border:"1px solid rgba(238,234,226,0.09)",borderRadius:20,padding:28,width:380,display:"flex",flexDirection:"column",gap:18,boxShadow:"0 24px 64px rgba(0,0,0,0.55)"}}>
+        <div style={{position:"fixed",inset:0,background:"rgba(4,4,8,0.80)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,backdropFilter:"blur(6px)",padding:"0 16px"}}>
+          <div style={{background:"rgba(17,17,25,0.96)",border:"1px solid rgba(238,234,226,0.09)",borderRadius:20,padding:28,width:"100%",maxWidth:380,display:"flex",flexDirection:"column",gap:18,boxShadow:"0 24px 64px rgba(0,0,0,0.55)"}}>
             <p style={{fontSize:14,fontWeight:700,color:"#EEEAE2",letterSpacing:"-0.2px"}}>Especialidade / Título</p>
             <p style={{fontSize:12,color:"rgba(238,234,226,0.35)"}}>Exibido na página pública do agendamento, abaixo do nome.</p>
             <div>
@@ -724,7 +710,6 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
 }
 
 // ─── Tela Reservas ────────────────────────────────────────────────────────────
-// Ícones internos da tela reservas
 const IcR = {
   user:    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
   mail:    <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>,
@@ -733,10 +718,9 @@ const IcR = {
   scissor: <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"/></svg>,
   cal:     <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>,
   tag:     <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/></svg>,
-  filter:  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>,
+  search:  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>,
 };
 
-// Linha decorativa de status por lado do card
 const STATUS_ACCENT = {
   confirmado: { color:"#2DD37A", glow:"rgba(45,211,122,0.18)", label:"Confirmado" },
   pendente:   { color:"#D9B96E", glow:"rgba(192,155,82,0.18)",  label:"Pendente"   },
@@ -753,7 +737,7 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
   const fmtCurto = d => d ? d.toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "—";
 
   return (
-    <div style={{
+    <div className="flow-reserva-card" style={{
       background:"rgba(17,17,25,0.92)",
       border:`1px solid rgba(238,234,226,0.07)`,
       borderLeft:`3px solid ${acc.color}`,
@@ -764,7 +748,7 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
       gap:"0 24px",
       alignItems:"center",
       backdropFilter:"blur(12px)",
-      boxShadow:`0 2px 24px rgba(0,0,0,0.28), inset 0 0 0 0 transparent`,
+      boxShadow:`0 2px 24px rgba(0,0,0,0.28)`,
       transition:"box-shadow 0.25s, border-color 0.25s",
       position:"relative",
       overflow:"hidden",
@@ -772,10 +756,9 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
     onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 4px 32px rgba(0,0,0,0.38), 0 0 0 1px rgba(238,234,226,0.09)`;}}
     onMouseLeave={e=>{e.currentTarget.style.boxShadow=`0 2px 24px rgba(0,0,0,0.28)`;}}
     >
-      {/* Glow de status sutil no canto */}
       <div style={{position:"absolute",top:0,left:0,width:120,height:"100%",background:`linear-gradient(90deg, ${acc.glow} 0%, transparent 100%)`,pointerEvents:"none",borderRadius:"14px 0 0 14px"}}/>
 
-      {/* ── Coluna 1: Cliente ── */}
+      {/* Coluna 1: Cliente */}
       <div style={{minWidth:0}}>
         <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}>
           <div style={{width:32,height:32,borderRadius:10,background:"linear-gradient(140deg,#D9B96E 0%,#856830 100%)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"#040408",flexShrink:0,letterSpacing:"-0.5px",boxShadow:"0 0 0 1px rgba(192,155,82,0.20)"}}>
@@ -799,7 +782,7 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
         </div>
       </div>
 
-      {/* ── Coluna 2: Serviço + Data ── */}
+      {/* Coluna 2: Serviço */}
       <div style={{borderLeft:"1px solid rgba(238,234,226,0.06)",paddingLeft:20,display:"flex",flexDirection:"column",gap:10}}>
         <div>
           <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
@@ -822,7 +805,7 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
         )}
       </div>
 
-      {/* ── Coluna 3: Datas ── */}
+      {/* Coluna 3: Datas */}
       <div style={{borderLeft:"1px solid rgba(238,234,226,0.06)",paddingLeft:20,display:"flex",flexDirection:"column",gap:10}}>
         {dtInicio&&(
           <div>
@@ -842,9 +825,8 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
         )}
       </div>
 
-      {/* ── Coluna 4: Status + Ações ── */}
+      {/* Coluna 4: Status + Ações */}
       <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:10,minWidth:120}}>
-        {/* Badge de status */}
         <div style={{
           display:"inline-flex",alignItems:"center",gap:5,
           padding:"5px 12px",borderRadius:20,
@@ -855,41 +837,19 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
           <div style={{width:6,height:6,borderRadius:"50%",background:acc.color,boxShadow:`0 0 6px ${acc.color}`}}/>
           {acc.label}
         </div>
-
-        {/* Ações */}
         {podeEditar&&(
-          <div style={{display:"flex",gap:6}}>
+          <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}>
             {r.status==="pendente"&&(
               <>
-                <button onClick={()=>onAtualizar(r.id,"confirmado")} disabled={atualizando===r.id} style={{
-                  padding:"6px 12px",border:"1px solid rgba(45,211,122,0.30)",borderRadius:8,
-                  background:"rgba(45,211,122,0.08)",color:"#2DD37A",fontSize:11,fontWeight:700,
-                  cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",
-                  opacity:atualizando===r.id?0.5:1,
-                }}>✓ Confirmar</button>
-                <button onClick={()=>onAtualizar(r.id,"cancelado")} disabled={atualizando===r.id} style={{
-                  padding:"6px 12px",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,
-                  background:"rgba(239,68,68,0.06)",color:"#F87171",fontSize:11,fontWeight:700,
-                  cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",
-                  opacity:atualizando===r.id?0.5:1,
-                }}>✕ Cancelar</button>
+                <button onClick={()=>onAtualizar(r.id,"confirmado")} disabled={atualizando===r.id} style={{padding:"6px 12px",border:"1px solid rgba(45,211,122,0.30)",borderRadius:8,background:"rgba(45,211,122,0.08)",color:"#2DD37A",fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",opacity:atualizando===r.id?0.5:1}}>✓ Confirmar</button>
+                <button onClick={()=>onAtualizar(r.id,"cancelado")} disabled={atualizando===r.id} style={{padding:"6px 12px",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,background:"rgba(239,68,68,0.06)",color:"#F87171",fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",opacity:atualizando===r.id?0.5:1}}>✕ Cancelar</button>
               </>
             )}
             {r.status==="confirmado"&&(
-              <button onClick={()=>onAtualizar(r.id,"cancelado")} disabled={atualizando===r.id} style={{
-                padding:"6px 12px",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,
-                background:"rgba(239,68,68,0.06)",color:"#F87171",fontSize:11,fontWeight:700,
-                cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",
-                opacity:atualizando===r.id?0.5:1,
-              }}>✕ Cancelar</button>
+              <button onClick={()=>onAtualizar(r.id,"cancelado")} disabled={atualizando===r.id} style={{padding:"6px 12px",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,background:"rgba(239,68,68,0.06)",color:"#F87171",fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",opacity:atualizando===r.id?0.5:1}}>✕ Cancelar</button>
             )}
             {r.status==="cancelado"&&(
-              <button onClick={()=>onAtualizar(r.id,"pendente")} disabled={atualizando===r.id} style={{
-                padding:"6px 12px",border:"1px solid rgba(238,234,226,0.12)",borderRadius:8,
-                background:"rgba(238,234,226,0.04)",color:"rgba(238,234,226,0.45)",fontSize:11,fontWeight:600,
-                cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",
-                opacity:atualizando===r.id?0.5:1,
-              }}>↺ Reabrir</button>
+              <button onClick={()=>onAtualizar(r.id,"pendente")} disabled={atualizando===r.id} style={{padding:"6px 12px",border:"1px solid rgba(238,234,226,0.12)",borderRadius:8,background:"rgba(238,234,226,0.04)",color:"rgba(238,234,226,0.45)",fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",opacity:atualizando===r.id?0.5:1}}>↺ Reabrir</button>
             )}
           </div>
         )}
@@ -901,20 +861,16 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
 function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar}){
   const [reservas,setReservas]=useState([]);
   const [loading,setLoading]=useState(true);
-  // Aba principal: "ativas" | "canceladas"
   const [aba,setAba]=useState("ativas");
-  // Sub-filtro de status dentro da aba ativas
   const [filtroStatus,setFiltroStatus]=useState("todos");
   const [filtroP,setFiltroP]=useState(isAdmin?"todos":meuPrestadorId);
   const [atualizando,setAtualizando]=useState(null);
   const [t,showT]=useToast();
-  // Busca por nome, data e serviço
+  // Busca unificada: texto (nome + serviço) e data
   const [busca,setBusca]=useState("");
   const [buscarData,setBuscarData]=useState("");
-  const [buscarServico,setBuscarServico]=useState("");
-  // Ordenação: "data" | "nome"
   const [sortBy,setSortBy]=useState("data");
-  const [sortDir,setSortDir]=useState("desc"); // "asc" | "desc"
+  const [sortDir,setSortDir]=useState("desc");
 
   useEffect(()=>{
     if(!tenantUid) return;
@@ -945,21 +901,22 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
   if(loading) return <Loading/>;
   const prestadoresAtivos=prestadores.filter(p=>p.ativo);
 
-  // Separa em ativas (pendente + confirmado) e canceladas
-  const ativas   = reservas.filter(r=>r.status!=="cancelado");
+  const ativas    = reservas.filter(r=>r.status!=="cancelado");
   const canceladas= reservas.filter(r=>r.status==="cancelado");
 
-  // Aplica filtros sobre o conjunto da aba atual
   const aplicarFiltros=(lista)=>{
     let f=lista;
     if(isAdmin&&filtroP!=="todos") f=f.filter(r=>r.prestadorId===filtroP);
     if(aba==="ativas"&&filtroStatus!=="todos") f=f.filter(r=>r.status===filtroStatus);
-    // Busca por nome do cliente
+    // Busca unificada: nome OU serviço
     if(busca.trim()){
       const q=busca.trim().toLowerCase();
-      f=f.filter(r=>(r.cliente_nome||"").toLowerCase().includes(q));
+      f=f.filter(r=>
+        (r.cliente_nome||"").toLowerCase().includes(q)||
+        (r.servico_nome||"").toLowerCase().includes(q)
+      );
     }
-    // Busca por data
+    // Filtro por data
     if(buscarData){
       const d0=new Date(buscarData+"T00:00:00"),d1=new Date(buscarData+"T23:59:59");
       f=f.filter(r=>{
@@ -968,12 +925,6 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
         return d>=d0&&d<=d1;
       });
     }
-    // Busca por serviço
-    if(buscarServico.trim()){
-      const q=buscarServico.trim().toLowerCase();
-      f=f.filter(r=>(r.servico_nome||"").toLowerCase().includes(q));
-    }
-    // Ordenação
     f=[...f].sort((a,b)=>{
       if(sortBy==="nome"){
         const na=(a.cliente_nome||"").toLowerCase(),nb=(b.cliente_nome||"").toLowerCase();
@@ -990,16 +941,15 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
   const listaAtual=aplicarFiltros(aba==="ativas"?ativas:canceladas);
 
   const SUB_FILTROS=[
-    {key:"todos",     label:"Todos",       count:ativas.length},
-    {key:"pendente",  label:"Pendente",    count:ativas.filter(r=>r.status==="pendente").length},
-    {key:"confirmado",label:"Confirmado",  count:ativas.filter(r=>r.status==="confirmado").length},
+    {key:"todos",      label:"Todos",      count:ativas.length},
+    {key:"pendente",   label:"Pendente",   count:ativas.filter(r=>r.status==="pendente").length},
+    {key:"confirmado", label:"Confirmado", count:ativas.filter(r=>r.status==="confirmado").length},
   ];
   const SUB_COLORS={todos:"#C09B52",pendente:"#D9B96E",confirmado:"#2DD37A"};
 
-  const limparBusca=()=>{ setBusca(""); setBuscarData(""); setBuscarServico(""); };
-  const temBusca=busca.trim()||buscarData||buscarServico.trim();
+  const limparBusca=()=>{ setBusca(""); setBuscarData(""); };
+  const temBusca=busca.trim()||buscarData;
 
-  // Estilos de ordenação
   const sortBtnStyle=(campo)=>({
     display:"flex",alignItems:"center",gap:5,
     padding:"6px 13px",borderRadius:8,border:"none",
@@ -1019,8 +969,8 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
       {/* ══ ABAS PRINCIPAIS ══ */}
       <div style={{display:"flex",gap:0,background:"rgba(238,234,226,0.03)",border:"1px solid rgba(238,234,226,0.07)",borderRadius:14,padding:4,alignSelf:"flex-start"}}>
         {[
-          {key:"ativas",   label:"Ativas",    count:ativas.length,    cor:"#2DD37A", icon:"✦"},
-          {key:"canceladas",label:"Canceladas",count:canceladas.length,cor:"#F87171", icon:"✕"},
+          {key:"ativas",    label:"Ativas",     count:ativas.length,    cor:"#2DD37A", icon:"✦"},
+          {key:"canceladas",label:"Canceladas", count:canceladas.length,cor:"#F87171", icon:"✕"},
         ].map(({key,label,count,cor,icon})=>{
           const on=aba===key;
           return (
@@ -1035,56 +985,41 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
             }}>
               <span style={{fontSize:10}}>{icon}</span>
               {label}
-              <span style={{
-                fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:20,
-                background: on ? `${cor}20` : "rgba(238,234,226,0.05)",
-                color: on ? cor : "rgba(238,234,226,0.20)",
-                border: on ? `1px solid ${cor}33` : "1px solid transparent",
-              }}>{count}</span>
+              <span style={{fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:20,background:on?`${cor}20`:"rgba(238,234,226,0.05)",color:on?cor:"rgba(238,234,226,0.20)",border:on?`1px solid ${cor}33`:"1px solid transparent"}}>{count}</span>
             </button>
           );
         })}
       </div>
 
-      {/* ══ BARRA DE PESQUISA ══ */}
+      {/* ══ BARRA DE PESQUISA UNIFICADA ══ */}
       <div style={{
         background:"rgba(17,17,25,0.80)",
         border:"1px solid rgba(238,234,226,0.07)",
-        borderRadius:14,padding:"14px 16px",
-        display:"flex",flexDirection:"column",gap:10,
+        borderRadius:14,padding:"12px 14px",
         backdropFilter:"blur(12px)",
+        display:"flex",flexDirection:"column",gap:10,
       }}>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
-          {/* Busca por nome */}
-          <div style={{position:"relative",flex:"1 1 160px",minWidth:140}}>
-            <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"rgba(238,234,226,0.22)",pointerEvents:"none",fontSize:12}}>👤</span>
+        {/* Linha 1: busca unificada + data + limpar */}
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
+          {/* Input unificado: nome ou serviço */}
+          <div style={{position:"relative",flex:"2 1 200px",minWidth:160,display:"flex",alignItems:"center"}}>
+            <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:"rgba(238,234,226,0.22)",pointerEvents:"none",display:"flex"}}>{IcR.search}</span>
             <input
               type="text"
-              placeholder="Buscar por nome…"
+              placeholder="Buscar por cliente ou serviço…"
               value={busca}
               onChange={e=>setBusca(e.target.value)}
-              style={{...S.input,paddingLeft:30,fontSize:12,height:36,padding:"0 10px 0 30px"}}
+              style={{...S.input,paddingLeft:32,fontSize:12,height:36,padding:"0 10px 0 32px"}}
             />
           </div>
-          {/* Busca por data */}
-          <div style={{position:"relative",flex:"1 1 150px",minWidth:140}}>
+          {/* Data */}
+          <div style={{position:"relative",flex:"1 1 140px",minWidth:130,display:"flex",alignItems:"center"}}>
             <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"rgba(238,234,226,0.22)",pointerEvents:"none",display:"flex"}}>{IcR.cal}</span>
             <input
               type="date"
               value={buscarData}
               onChange={e=>setBuscarData(e.target.value)}
               style={{...S.input,paddingLeft:30,fontSize:12,height:36,padding:"0 10px 0 30px",color:buscarData?"#EEEAE2":"rgba(238,234,226,0.25)"}}
-            />
-          </div>
-          {/* Busca por serviço */}
-          <div style={{position:"relative",flex:"1 1 160px",minWidth:140}}>
-            <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"rgba(238,234,226,0.22)",pointerEvents:"none",display:"flex"}}>{IcR.scissor}</span>
-            <input
-              type="text"
-              placeholder="Buscar por serviço…"
-              value={buscarServico}
-              onChange={e=>setBuscarServico(e.target.value)}
-              style={{...S.input,paddingLeft:30,fontSize:12,height:36,padding:"0 10px 0 30px"}}
             />
           </div>
           {temBusca&&(
@@ -1094,9 +1029,8 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
           )}
         </div>
 
-        {/* ── Linha 2: sort + filtros de status (aba ativas) + prestador ── */}
+        {/* Linha 2: sort + status + prestador + contador */}
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-          {/* Ordenar por */}
           <span style={{fontSize:10.5,fontWeight:700,color:"rgba(238,234,226,0.20)",textTransform:"uppercase",letterSpacing:"1px",whiteSpace:"nowrap"}}>Ordenar:</span>
           <button onClick={()=>toggleSort("data")}  style={sortBtnStyle("data")}>
             {IcR.cal} Data{sortArrow("data")}
@@ -1105,7 +1039,6 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
             {IcR.user} Nome{sortArrow("nome")}
           </button>
 
-          {/* Sub-filtro de status (só na aba ativas) */}
           {aba==="ativas"&&(
             <>
               <div style={{width:1,height:22,background:"rgba(238,234,226,0.07)",margin:"0 4px"}}/>
@@ -1132,18 +1065,16 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
             </>
           )}
 
-          {/* Filtro prestador */}
           {isAdmin&&prestadoresAtivos.length>1&&(
             <>
               <div style={{width:1,height:22,background:"rgba(238,234,226,0.07)",margin:"0 4px"}}/>
-              <select style={{...S.select,width:"auto",minWidth:150,fontSize:11.5,padding:"5px 10px",height:32}} value={filtroP} onChange={e=>setFiltroP(e.target.value)}>
+              <select style={{...S.select,width:"auto",minWidth:140,fontSize:11.5,padding:"5px 10px",height:32}} value={filtroP} onChange={e=>setFiltroP(e.target.value)}>
                 <option value="todos">Toda a equipe</option>
                 {prestadoresAtivos.map(p=><option key={p.id} value={p.id}>{p.nome}{p.isAdmin?" (você)":""}</option>)}
               </select>
             </>
           )}
 
-          {/* Contador */}
           <div style={{marginLeft:"auto"}}>
             <span style={{fontSize:11,color:"rgba(238,234,226,0.18)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.8px"}}>
               {listaAtual.length} reserva{listaAtual.length!==1?"s":""}
@@ -1152,7 +1083,7 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
         </div>
       </div>
 
-      {/* ══ LISTA DE CARDS ══ */}
+      {/* ══ LISTA ══ */}
       {listaAtual.length===0?(
         <div style={{...S.card,textAlign:"center",padding:"60px 24px",display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
           <div style={{width:52,height:52,borderRadius:16,background:"rgba(238,234,226,0.04)",border:"1px solid rgba(238,234,226,0.07)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>
@@ -1190,10 +1121,7 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
 }
 
 // ─── Tela Configurações ───────────────────────────────────────────────────────
-// Admin: dropdown com todos os prestadores ativos
-// Membro: só vê o próprio (prestadorId = user.uid)
 function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestadorFoco}){
-  // prestadorFoco: quando vem de "Configurar" na Equipe, já abre no prestador certo
   const [prestadorId,setPrestadorId]=useState(prestadorFoco||(isAdmin?"admin":meuPrestadorId));
   const [config,setConfig]=useState(CONFIG_DEFAULT);
   const [loading,setLoading]=useState(true);
@@ -1201,7 +1129,6 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
   const [novoS,setNovoS]=useState({nome:"",duracao:60,preco:"",descricao:""});
   const [t,showT]=useToast();
 
-  // Atualiza se prestadorFoco mudar (click em "Configurar" de outro prestador)
   useEffect(()=>{ if(prestadorFoco) setPrestadorId(prestadorFoco); },[prestadorFoco]);
 
   useEffect(()=>{
@@ -1244,7 +1171,6 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
   );
   if(!prestadorId) return <div style={S.emptyState}><p style={{fontSize:13,color:T.text100}}>Nenhum prestador selecionado.</p></div>;
 
-  // Ícones internos Configurações
   const IcCfg = {
     profile: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
     clock2:  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>,
@@ -1266,21 +1192,11 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
       <Toast t={t}/>
 
-      {/* ── Header: seletor de prestador (admin) ou identidade (membro) ── */}
       {isAdmin&&prestadoresAtivos.length>1?(
-        <div style={{
-          background:"rgba(17,17,25,0.92)",
-          border:`1px solid rgba(238,234,226,0.07)`,
-          borderLeft:`3px solid ${T.gold}`,
-          borderRadius:14,
-          padding:"16px 20px",
-          display:"flex",alignItems:"center",gap:14,
-          backdropFilter:"blur(12px)",
-          position:"relative",overflow:"hidden",
-        }}>
+        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderLeft:`3px solid ${T.gold}`,borderRadius:14,padding:"16px 20px",display:"flex",alignItems:"center",gap:14,backdropFilter:"blur(12px)",position:"relative",overflow:"hidden",flexWrap:"wrap"}}>
           <div style={{position:"absolute",top:0,left:0,width:120,height:"100%",background:`linear-gradient(90deg,${T.goldA06} 0%,transparent 100%)`,pointerEvents:"none"}}/>
           <div style={{width:36,height:36,borderRadius:10,background:T.goldA06,border:`1px solid ${T.goldA22}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.gold,flexShrink:0,fontSize:14}}>{IcCfg.profile}</div>
-          <div style={{flex:1}}>
+          <div style={{flex:1,minWidth:160}}>
             <p style={{fontSize:11,color:T.text35,fontWeight:600,textTransform:"uppercase",letterSpacing:"1px",marginBottom:6}}>Configurando agenda de</p>
             <select style={{...S.select,width:"auto",minWidth:240,padding:"8px 12px",fontSize:13}} value={prestadorId||""} onChange={e=>setPrestadorId(e.target.value)}>
               {prestadoresAtivos.map(p=><option key={p.id} value={p.id}>{p.nome}{p.isAdmin?" (Admin)":""}{p.especialidade?` · ${p.especialidade}`:""}</option>)}
@@ -1289,16 +1205,7 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
           {prestadorAtual&&<span style={S.badge(prestadorAtual.ativo?"green":"gray")}>{prestadorAtual.ativo?"Ativo":"Inativo"}</span>}
         </div>
       ):(!isAdmin&&prestadorAtual&&(
-        <div style={{
-          background:"rgba(17,17,25,0.92)",
-          border:`1px solid rgba(238,234,226,0.07)`,
-          borderLeft:`3px solid ${T.gold}`,
-          borderRadius:14,
-          padding:"16px 20px",
-          display:"flex",alignItems:"center",gap:14,
-          backdropFilter:"blur(12px)",
-          position:"relative",overflow:"hidden",
-        }}>
+        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderLeft:`3px solid ${T.gold}`,borderRadius:14,padding:"16px 20px",display:"flex",alignItems:"center",gap:14,backdropFilter:"blur(12px)",position:"relative",overflow:"hidden"}}>
           <div style={{position:"absolute",top:0,left:0,width:120,height:"100%",background:`linear-gradient(90deg,${T.goldA06} 0%,transparent 100%)`,pointerEvents:"none"}}/>
           <Avatar nome={prestadorAtual.nome}/>
           <div style={{flex:1}}>
@@ -1311,16 +1218,10 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
 
       {loading?<Loading/>:<>
 
-        {/* ── Seção 1: Identidade pública ── */}
-        <div style={{
-          background:"rgba(17,17,25,0.92)",
-          border:`1px solid rgba(238,234,226,0.07)`,
-          borderRadius:14,
-          padding:"20px 22px",
-          backdropFilter:"blur(12px)",
-        }}>
+        {/* Seção 1: Identidade */}
+        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderRadius:14,padding:"20px 22px",backdropFilter:"blur(12px)"}}>
           {secaoHeader(IcCfg.pencil,"Identidade Pública","O que o cliente vê ao abrir sua página de agendamento.")}
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
+          <div className="flow-grid2">
             <div>
               <label style={S.label}>Nome exibido na página</label>
               <input style={S.input} value={config.nomeEmpresa||""} onChange={e=>setConfig(p=>({...p,nomeEmpresa:e.target.value}))} placeholder="Ex: Ana · Nail Designer"/>
@@ -1332,16 +1233,9 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
           </div>
         </div>
 
-        {/* ── Seção 2: Horários ── */}
-        <div style={{
-          background:"rgba(17,17,25,0.92)",
-          border:`1px solid rgba(238,234,226,0.07)`,
-          borderRadius:14,
-          padding:"20px 22px",
-          backdropFilter:"blur(12px)",
-        }}>
+        {/* Seção 2: Horários */}
+        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderRadius:14,padding:"20px 22px",backdropFilter:"blur(12px)"}}>
           {secaoHeader(IcCfg.clock2,"Horários de Atendimento","Defina quando você recebe clientes. Os horários disponíveis são gerados automaticamente.")}
-
           <p style={{...S.label,marginBottom:10}}>Dias de Atendimento</p>
           <div style={{display:"flex",gap:6,marginBottom:20,flexWrap:"wrap"}}>
             {DIAS_SEMANA.map(d=>{
@@ -1360,8 +1254,7 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
               );
             })}
           </div>
-
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14}}>
+          <div className="flow-grid3">
             <div>
               <label style={S.label}>Início do expediente</label>
               <input type="time" style={S.input} value={config.horaInicio||"08:00"} onChange={e=>setConfig(p=>({...p,horaInicio:e.target.value}))}/>
@@ -1383,16 +1276,9 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
           </div>
         </div>
 
-        {/* ── Seção 3: Serviços ── */}
-        <div style={{
-          background:"rgba(17,17,25,0.92)",
-          border:`1px solid rgba(238,234,226,0.07)`,
-          borderRadius:14,
-          padding:"20px 22px",
-          backdropFilter:"blur(12px)",
-        }}>
+        {/* Seção 3: Serviços */}
+        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderRadius:14,padding:"20px 22px",backdropFilter:"blur(12px)"}}>
           {secaoHeader(IcCfg.tag2,"Serviços Oferecidos","Os clientes escolhem um serviço antes de selecionar o horário.")}
-
           {(config.serviços||[]).length>0&&(
             <div style={{marginBottom:16,borderRadius:10,overflow:"hidden",border:`1px solid rgba(238,234,226,0.07)`}}>
               {config.serviços.map((s,i)=>(
@@ -1404,7 +1290,6 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
                   padding:"13px 16px",
                   borderBottom:i<config.serviços.length-1?`1px solid rgba(238,234,226,0.05)`:"none",
                   background:i%2===0?"rgba(255,255,255,0.012)":"transparent",
-                  transition:"background 0.2s",
                 }}>
                   <div>
                     <p style={{fontSize:13,fontWeight:600,color:T.text100,marginBottom:2}}>{s.nome}</p>
@@ -1422,18 +1307,15 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
               ))}
             </div>
           )}
-
           {(config.serviços||[]).length===0&&(
             <div style={{textAlign:"center",padding:"28px 16px",marginBottom:16,background:"rgba(255,255,255,0.01)",border:`1px dashed rgba(238,234,226,0.07)`,borderRadius:10}}>
               <p style={{fontSize:13,color:T.text35,marginBottom:4}}>Nenhum serviço cadastrado ainda</p>
               <p style={{fontSize:11.5,color:T.text18}}>Adicione abaixo para que os clientes possam agendar.</p>
             </div>
           )}
-
-          {/* Formulário novo serviço */}
           <div style={{background:"rgba(192,155,82,0.03)",border:`1px dashed ${T.goldA22}`,borderRadius:10,padding:"16px 18px"}}>
             <p style={{fontSize:12,fontWeight:700,color:T.gold,textTransform:"uppercase",letterSpacing:"1px",marginBottom:14}}>+ Novo Serviço</p>
-            <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:12,marginBottom:12}}>
+            <div className="flow-grid3" style={{marginBottom:12}}>
               <div><label style={S.label}>Nome *</label><input style={S.input} value={novoS.nome} onChange={e=>setNovoS(p=>({...p,nome:e.target.value}))} placeholder="Ex: Manicure com Esmaltação"/></div>
               <div><label style={S.label}>Duração</label><select style={S.select} value={novoS.duracao} onChange={e=>setNovoS(p=>({...p,duracao:e.target.value}))}>{[15,20,30,45,60,75,90,120,150,180,240].map(v=><option key={v} value={v}>{formatDuracao(v)}</option>)}</select></div>
               <div><label style={S.label}>Preço (R$)</label><input style={S.input} type="number" min="0" step="0.01" value={novoS.preco} onChange={e=>setNovoS(p=>({...p,preco:e.target.value}))} placeholder="0,00"/></div>
@@ -1445,7 +1327,6 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
           </div>
         </div>
 
-        {/* ── Botão salvar ── */}
         <div style={{display:"flex",justifyContent:"flex-end",paddingBottom:8}}>
           <button onClick={salvar} disabled={salvando} style={{...S.btnPrimary,padding:"11px 32px",fontSize:14,boxShadow:"0 4px 20px rgba(192,155,82,0.30)"}}>
             {salvando?"Salvando…":"Salvar Configurações"}
@@ -1478,25 +1359,12 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
   };
   const lista=isAdmin?prestadores.filter(p=>p.ativo):prestadores.filter(p=>p.id===meuPrestadorId);
 
-  // Ícone de link externo
   const IcExternal = <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>;
-  const IcQR = <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3M17 14h4v4M14 17h3v4M17 21h4"/></svg>;
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
-
-      {/* ── Banner informativo (admin) ── */}
       {isAdmin&&(
-        <div style={{
-          background:"rgba(17,17,25,0.92)",
-          border:`1px solid rgba(238,234,226,0.07)`,
-          borderLeft:`3px solid ${T.gold}`,
-          borderRadius:14,
-          padding:"16px 20px",
-          backdropFilter:"blur(12px)",
-          position:"relative",overflow:"hidden",
-          display:"flex",alignItems:"flex-start",gap:14,
-        }}>
+        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderLeft:`3px solid ${T.gold}`,borderRadius:14,padding:"16px 20px",backdropFilter:"blur(12px)",position:"relative",overflow:"hidden",display:"flex",alignItems:"flex-start",gap:14}}>
           <div style={{position:"absolute",top:0,left:0,width:120,height:"100%",background:`linear-gradient(90deg,${T.goldA06} 0%,transparent 100%)`,pointerEvents:"none"}}/>
           <div style={{width:36,height:36,borderRadius:10,background:T.goldA06,border:`1px solid ${T.goldA22}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.gold,flexShrink:0,fontSize:16}}>🔗</div>
           <div style={{flex:1}}>
@@ -1509,7 +1377,6 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
         </div>
       )}
 
-      {/* ── Lista de prestadores ── */}
       {lista.length===0?(
         <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderRadius:14,padding:"52px 24px",textAlign:"center",backdropFilter:"blur(12px)"}}>
           <p style={{fontSize:22,marginBottom:8}}>📭</p>
@@ -1526,7 +1393,6 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
           const numServicos=(cfg?.serviços||[]).length;
           const diasAtivos=(cfg?.diasAtivos||[]);
           const isExpanded=expanded===p.id;
-
           const statusBorder = prontoParaCompartilhar ? T.emerald : T.goldLo;
           const statusGlow   = prontoParaCompartilhar ? "rgba(45,211,122,0.08)" : "rgba(192,155,82,0.06)";
 
@@ -1543,12 +1409,10 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
             }}
             onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 4px 32px rgba(0,0,0,0.38), 0 0 0 1px rgba(238,234,226,0.07)`;}}
             onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";}}>
-
-              {/* Glow lateral */}
               <div style={{position:"absolute",top:0,left:0,width:120,height:"100%",background:`linear-gradient(90deg,${statusGlow} 0%,transparent 100%)`,pointerEvents:"none"}}/>
 
-              {/* ── Cabeçalho do card ── */}
-              <div style={{padding:"18px 22px",display:"flex",alignItems:"center",gap:14}}>
+              {/* Cabeçalho */}
+              <div style={{padding:"18px 22px",display:"flex",alignItems:"center",gap:14,flexWrap:"wrap"}}>
                 <Avatar nome={p.nome}/>
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}>
@@ -1558,51 +1422,39 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
                   </div>
                   <p style={{fontSize:12,color:T.text35}}>{p.especialidade||"Prestador de serviço"}</p>
                 </div>
-
-                {/* Ações principais */}
-                <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
-                  <button
-                    onClick={()=>setExpanded(isExpanded?null:p.id)}
-                    style={{...S.btnGhost,padding:"7px 12px",fontSize:11,color:isExpanded?T.gold:T.text35,borderColor:isExpanded?T.goldA22:undefined}}
-                  >
+                <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0,flexWrap:"wrap"}}>
+                  <button onClick={()=>setExpanded(isExpanded?null:p.id)} style={{...S.btnGhost,padding:"7px 12px",fontSize:11,color:isExpanded?T.gold:T.text35,borderColor:isExpanded?T.goldA22:undefined}}>
                     {isExpanded?"▲ Menos":"▼ Detalhes"}
                   </button>
-                  <button
-                    onClick={()=>window.open(link,"_blank")}
-                    style={{...S.btnGhost,padding:"7px 12px",fontSize:11}}
-                  >
+                  <button onClick={()=>window.open(link,"_blank")} style={{...S.btnGhost,padding:"7px 12px",fontSize:11}}>
                     {IcExternal} Abrir
                   </button>
-                  <button
-                    onClick={()=>copiar(p.id)}
-                    style={{
-                      ...S.btnPrimary,
-                      background:copied===p.id?T.emeraldA10:`linear-gradient(135deg, ${T.goldHi} 0%, ${T.goldLo} 100%)`,
-                      color:copied===p.id?T.emerald:T.ink,
-                      border:copied===p.id?`1px solid ${T.emeraldA22}`:"none",
-                      padding:"7px 16px",fontSize:12,
-                      boxShadow:copied===p.id?"0 0 12px rgba(45,211,122,0.18)":"0 4px 14px rgba(192,155,82,0.22)",
-                    }}
-                  >
+                  <button onClick={()=>copiar(p.id)} style={{
+                    ...S.btnPrimary,
+                    background:copied===p.id?T.emeraldA10:`linear-gradient(135deg, ${T.goldHi} 0%, ${T.goldLo} 100%)`,
+                    color:copied===p.id?T.emerald:T.ink,
+                    border:copied===p.id?`1px solid ${T.emeraldA22}`:"none",
+                    padding:"7px 16px",fontSize:12,
+                    boxShadow:copied===p.id?"0 0 12px rgba(45,211,122,0.18)":"0 4px 14px rgba(192,155,82,0.22)",
+                  }}>
                     {copied===p.id?<>{Ic.check} Copiado!</>:<>{Ic.copy} Copiar Link</>}
                   </button>
                 </div>
               </div>
 
-              {/* ── URL sempre visível ── */}
+              {/* URL */}
               <div style={{margin:"0 22px 16px",padding:"10px 14px",background:"rgba(255,255,255,0.025)",border:`1px solid rgba(238,234,226,0.06)`,borderRadius:10,display:"flex",alignItems:"center",gap:10}}>
                 <div style={{width:22,height:22,borderRadius:6,background:T.goldA06,border:`1px solid ${T.goldA12}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.gold,flexShrink:0,fontSize:10}}>🔗</div>
                 <span style={{fontSize:11.5,color:T.text35,flex:1,wordBreak:"break-all",fontFamily:"monospace"}}>{link}</span>
               </div>
 
-              {/* ── Checklist de prontidão ── */}
+              {/* Checklist */}
               <div style={{margin:"0 22px",padding:"12px 16px",background:"rgba(255,255,255,0.015)",border:`1px solid rgba(238,234,226,0.05)`,borderRadius:10,display:"flex",gap:24,flexWrap:"wrap",marginBottom:prontoParaCompartilhar&&!isExpanded?16:12}}>
                 <CheckItem ok={temNome} label="Nome preenchido"/>
                 <CheckItem ok={temH} label={temH?`${diasAtivos.length} dias ativos`:"Horários configurados"}/>
                 <CheckItem ok={temS} label={temS?`${numServicos} serviço${numServicos!==1?"s":""}`:"Serviços cadastrados"}/>
               </div>
 
-              {/* ── Aviso se incompleto ── */}
               {!prontoParaCompartilhar&&(
                 <div style={{margin:"0 22px",marginBottom:16,padding:"10px 14px",background:"rgba(192,155,82,0.04)",border:`1px solid rgba(192,155,82,0.18)`,borderRadius:10,fontSize:11.5,color:"#D9B96E",display:"flex",gap:8,alignItems:"flex-start"}}>
                   <span style={{flexShrink:0}}>⚠️</span>
@@ -1613,9 +1465,8 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
                 </div>
               )}
 
-              {/* ── Painel expandido: preview de horários e serviços ── */}
               {isExpanded&&(
-                <div style={{borderTop:`1px solid rgba(238,234,226,0.05)`,margin:"0 0 0 0",padding:"16px 22px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+                <div style={{borderTop:`1px solid rgba(238,234,226,0.05)`,padding:"16px 22px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
                   <div>
                     <p style={{...S.sectionTitle,marginBottom:10}}>Dias Ativos</p>
                     <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
@@ -1658,7 +1509,9 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
 function TelaUpgrade({onVoltar}){
   return (
     <div style={S.upgradeWall}>
-      <div style={{width:72,height:72,borderRadius:20,background:"linear-gradient(140deg,#D9B96E 0%,#856830 100%)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,boxShadow:"0 0 0 1px rgba(192,155,82,0.25), 0 12px 40px rgba(192,155,82,0.22)"}}>{Ic.star}</div>
+      <div style={{width:72,height:72,borderRadius:20,background:"linear-gradient(140deg,#D9B96E 0%,#856830 100%)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,boxShadow:"0 0 0 1px rgba(192,155,82,0.25), 0 12px 40px rgba(192,155,82,0.22)"}}>
+        <svg width="28" height="28" fill="none" stroke="#040408" strokeWidth="2" viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+      </div>
       <h2 style={{fontSize:24,fontWeight:800,color:"#EEEAE2",marginBottom:4,letterSpacing:"-0.5px"}}>Assent Flow</h2>
       <p style={{fontSize:14,color:"rgba(238,234,226,0.40)",maxWidth:340,lineHeight:1.7,marginBottom:24}}>Disponível no plano <strong style={{color:"#D9B96E"}}>Profissional</strong>.</p>
       <div style={{display:"flex",gap:12}}>
@@ -1669,29 +1522,162 @@ function TelaUpgrade({onVoltar}){
   );
 }
 
+// ─── CSS Responsivo ───────────────────────────────────────────────────────────
+const FLOW_RESPONSIVE_CSS = `
+  /* Grids responsivos */
+  .flow-grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .flow-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .flow-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+  @media (max-width: 900px) {
+    .flow-grid4 { grid-template-columns: repeat(2, 1fr) !important; }
+  }
+  @media (max-width: 640px) {
+    .flow-grid4 { grid-template-columns: repeat(2, 1fr) !important; }
+    .flow-grid2 { grid-template-columns: 1fr !important; }
+    .flow-grid3 { grid-template-columns: 1fr 1fr !important; }
+  }
+  @media (max-width: 420px) {
+    .flow-grid4 { grid-template-columns: 1fr 1fr !important; }
+    .flow-grid3 { grid-template-columns: 1fr !important; }
+  }
+
+  /* Sidebar mobile: drawer lateral */
+  @media (max-width: 720px) {
+    .flow-sidebar {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      height: 100% !important;
+      z-index: 200 !important;
+      transform: translateX(-100%) !important;
+      box-shadow: none !important;
+    }
+    .flow-sidebar.open {
+      transform: translateX(0) !important;
+      box-shadow: 8px 0 32px rgba(0,0,0,0.55) !important;
+    }
+    .flow-overlay {
+      display: block !important;
+    }
+    .flow-hamburger {
+      display: flex !important;
+    }
+    .flow-plan-badge {
+      display: none !important;
+    }
+    .flow-content {
+      padding: 16px !important;
+      padding-bottom: 80px !important;
+    }
+    .flow-topbar {
+      padding: 0 14px !important;
+    }
+  }
+
+  /* Overlay escuro atrás do drawer */
+  .flow-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(4,4,8,0.72);
+    z-index: 199;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.22s ease;
+  }
+  @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+
+  /* Hamburger: oculto em desktop */
+  .flow-hamburger {
+    display: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: rgba(238,234,226,0.55);
+    padding: 6px;
+    border-radius: 8px;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, background 0.15s;
+    flex-shrink: 0;
+  }
+  .flow-hamburger:hover { color: #EEEAE2; background: rgba(238,234,226,0.06); }
+
+  /* Bottom nav mobile */
+  .flow-bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 60px;
+    background: rgba(7,7,13,0.96);
+    border-top: 1px solid rgba(238,234,226,0.07);
+    z-index: 150;
+    align-items: center;
+    justify-content: space-around;
+    backdrop-filter: blur(16px);
+    padding: 0 8px;
+  }
+  @media (max-width: 720px) {
+    .flow-bottom-nav { display: flex !important; }
+  }
+  .flow-bnav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 10px;
+    transition: all 0.18s;
+    color: rgba(238,234,226,0.30);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+    user-select: none;
+    border: none;
+    background: transparent;
+    min-width: 52px;
+  }
+  .flow-bnav-item.active {
+    color: #C09B52;
+    background: rgba(192,155,82,0.08);
+  }
+
+  /* ReservaCard: 4 colunas → 2 colunas → 1 coluna */
+  @media (max-width: 900px) {
+    .flow-reserva-card {
+      grid-template-columns: 1fr 1fr !important;
+      gap: 14px !important;
+    }
+  }
+  @media (max-width: 580px) {
+    .flow-reserva-card {
+      grid-template-columns: 1fr !important;
+      gap: 12px !important;
+    }
+    .flow-reserva-card > div {
+      border-left: none !important;
+      padding-left: 0 !important;
+    }
+  }
+`;
+
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
-  // ── HOOKS PRIMEIRO ──────────────────────────────────────────────────────
+  // HOOKS PRIMEIRO
   const {isAdmin,podeVer,podeEditar,user} = useAuth();
   const [tela,setTela]           = useState("overview");
   const [prestadores,setPrestadores] = useState([]);
   const [loadingP,setLoadingP]   = useState(true);
-  const [prestadorFoco,setPrestadorFoco] = useState(null); // para navegação Equipe → Configurações
+  const [prestadorFoco,setPrestadorFoco] = useState(null);
+  const [sidebarOpen,setSidebarOpen] = useState(false);
 
-  // meuPrestadorId: admin="admin", membro=user.uid (se ativo no Flow)
   const meuPrestadorId = isAdmin ? "admin" : (prestadores.find(p=>p.linkedUserId===user?.uid&&p.ativo)?.id || null);
 
-  // ── Auto-init admin: garante prestador + config existem ─────────────────
-  // Executado uma vez por sessão quando admin abre o Flow.
-  // Lógica:
-  //   1. agendamento_prestadores/admin  → cria se não existe
-  //   2. agendamento_configuracoes/admin → migra de /config (formato antigo)
-  //                                        ou cria vazio com defaults
+  // Auto-init admin
   useEffect(()=>{
     if(!tenantUid||!user||!isAdmin) return;
-
     async function initAdmin(){
-      // ── 1. Prestador admin ──────────────────────────────────────────
       const prestRef=doc(db,"users",tenantUid,"agendamento_prestadores","admin");
       const prestSnap=await getDoc(prestRef);
       if(!prestSnap.exists()){
@@ -1704,29 +1690,20 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
           criadoEm:     serverTimestamp(),
         });
       }
-
-      // ── 2. Config admin ─────────────────────────────────────────────
       const cfgAdminRef=doc(db,"users",tenantUid,"agendamento_configuracoes","admin");
       const cfgAdminSnap=await getDoc(cfgAdminRef);
-
       if(!cfgAdminSnap.exists()){
-        // Verifica se existe config no formato antigo (/configuracoes/config)
         const cfgOldRef=doc(db,"users",tenantUid,"agendamento_configuracoes","config");
         const cfgOldSnap=await getDoc(cfgOldRef);
-
         if(cfgOldSnap.exists()){
-          // ► MIGRAÇÃO: copia dados antigos para /admin
           const oldData=cfgOldSnap.data();
           await setDoc(cfgAdminRef,{
             ...oldData,
-            // Garante campo correto (antigo usava "servicos" sem acento)
             serviços: oldData.serviços || oldData.servicos || [],
             migradoEm: serverTimestamp(),
           });
-          // Opcional: marca o doc antigo como migrado (não apaga para segurança)
           await updateDoc(cfgOldRef,{ _migrado:"admin", _migradoEm:serverTimestamp() });
         } else {
-          // ► NOVO: cria config padrão vazia (admin configura depois)
           await setDoc(cfgAdminRef,{
             serviços:            [],
             diasAtivos:          ["seg","ter","qua","qui","sex"],
@@ -1740,16 +1717,14 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
         }
       }
     }
-
     initAdmin().catch(err=>console.error("[Flow] initAdmin error:", err));
   },[tenantUid, user?.uid]);
 
-  // ── Carrega prestadores em tempo real ──────────────────────────────────
+  // Carrega prestadores
   useEffect(()=>{
     if(!tenantUid) return;
     const q=query(collection(db,"users",tenantUid,"agendamento_prestadores"),orderBy("criadoEm","asc"));
     const u=onSnapshot(q,snap=>{
-      // Garante que o admin sempre vem primeiro
       const list=snap.docs.map(d=>({id:d.id,...d.data()}));
       const adminP=list.find(p=>p.id==="admin");
       const rest=list.filter(p=>p.id!=="admin");
@@ -1759,7 +1734,11 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
     return()=>u();
   },[tenantUid]);
 
-  // ── Guards ────────────────────────────────────────────────────────────
+  // Fechar sidebar ao navegar
+  const irPara=(key)=>{ setTela(key); setSidebarOpen(false); };
+  const irParaConfiguracoes=(pid)=>{ setPrestadorFoco(pid); irPara("configuracoes"); };
+
+  // Guards
   if(!tenantUid) return null;
   if(plano!=="profissional") return <div style={S.root}><TelaUpgrade onVoltar={onVoltar}/></div>;
   if(!podeVer("agendamento")) return (
@@ -1773,8 +1752,6 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
     </div>
   );
 
-  const irParaConfiguracoes=(pid)=>{ setPrestadorFoco(pid); setTela("configuracoes"); };
-
   const TELAS=[
     {key:"overview",      label:"Visão Geral",    icon:Ic.calendar},
     ...(isAdmin?[{key:"equipe",label:"Equipe",icon:Ic.users}]:[]),
@@ -1783,6 +1760,9 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
     {key:"link",          label:"Link Público",   icon:Ic.link},
   ];
   const titulos={overview:"Visão Geral",equipe:"Equipe no Flow",reservas:"Reservas",configuracoes:"Configurações",link:"Link Público"};
+
+  // Bottom nav: primeiras 4 telas (mobile)
+  const BOTTOM_TELAS = TELAS.slice(0, 4);
 
   return (
     <div style={S.root}>
@@ -1796,8 +1776,16 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
         @keyframes flow-reveal { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
         input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.5) sepia(1) saturate(2) hue-rotate(5deg); opacity:0.5; cursor:pointer; }
         input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.5) sepia(1) saturate(2) hue-rotate(5deg); opacity:0.5; cursor:pointer; }
+        ${FLOW_RESPONSIVE_CSS}
       `}</style>
-      <aside style={S.sidebar}>
+
+      {/* Overlay mobile */}
+      {sidebarOpen&&(
+        <div className="flow-overlay" onClick={()=>setSidebarOpen(false)}/>
+      )}
+
+      {/* Sidebar */}
+      <aside className={`flow-sidebar${sidebarOpen?" open":""}`} style={S.sidebar}>
         <div style={S.sidebarHeader}>
           <div style={S.logoRow}>
             <div style={S.logoIcon}>F</div>
@@ -1805,18 +1793,29 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
           </div>
         </div>
         <nav style={{flex:1}}>
-          {TELAS.map(t=><div key={t.key} style={S.navItem(tela===t.key)} onClick={()=>setTela(t.key)}>{t.icon}{t.label}</div>)}
+          {TELAS.map(t=>(
+            <div key={t.key} style={S.navItem(tela===t.key)} onClick={()=>irPara(t.key)}>
+              {t.icon}{t.label}
+            </div>
+          ))}
         </nav>
         <div style={S.sidebarFooter}>
           <button style={S.btnSidebarSecondary} onClick={onVoltar}>{Ic.back}Voltar ao Gestão</button>
         </div>
       </aside>
+
+      {/* Main */}
       <main style={S.main}>
-        <header style={S.topbar}>
+        <header className="flow-topbar" style={S.topbar}>
+          {/* Hamburger mobile */}
+          <button className="flow-hamburger" onClick={()=>setSidebarOpen(o=>!o)} aria-label="Menu">
+            {sidebarOpen ? Ic.close : Ic.menu}
+          </button>
           <span style={S.topbarTitle}>{titulos[tela]}</span>
-          <span style={{fontSize:10,padding:"4px 12px",borderRadius:20,border:"1px solid rgba(192,155,82,0.25)",background:"rgba(192,155,82,0.08)",color:"#D9B96E",fontWeight:700,letterSpacing:"0.8px",textTransform:"uppercase"}}>★ Profissional</span>
+          <span className="flow-plan-badge" style={{fontSize:10,padding:"4px 12px",borderRadius:20,border:"1px solid rgba(192,155,82,0.25)",background:"rgba(192,155,82,0.08)",color:"#D9B96E",fontWeight:700,letterSpacing:"0.8px",textTransform:"uppercase",flexShrink:0}}>★ Profissional</span>
         </header>
-        <div style={S.content}>
+
+        <div className="flow-content" style={S.content}>
           {loadingP?<Loading/>:<>
             {tela==="overview"      &&<TelaVisaoGeral    tenantUid={tenantUid} prestadores={prestadores} meuPrestadorId={meuPrestadorId} isAdmin={isAdmin}/>}
             {tela==="equipe"        &&<TelaEquipe        tenantUid={tenantUid} user={user} prestadores={prestadores} onConfigurar={irParaConfiguracoes}/>}
@@ -1826,6 +1825,30 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
           </>}
         </div>
       </main>
+
+      {/* Bottom Nav mobile */}
+      <nav className="flow-bottom-nav">
+        {BOTTOM_TELAS.map(t=>(
+          <button
+            key={t.key}
+            className={`flow-bnav-item${tela===t.key?" active":""}`}
+            onClick={()=>irPara(t.key)}
+          >
+            <span style={{display:"flex",fontSize:16}}>{t.icon}</span>
+            <span>{t.label}</span>
+          </button>
+        ))}
+        {/* Botão "mais" para telas que ficaram de fora */}
+        {TELAS.length > 4 && (
+          <button
+            className={`flow-bnav-item${!BOTTOM_TELAS.find(t=>t.key===tela)&&tela!=="overview"&&tela!=="equipe"&&tela!=="reservas"&&tela!=="configuracoes"?" active":""}`}
+            onClick={()=>irPara(TELAS[4].key)}
+          >
+            <span style={{display:"flex",fontSize:16}}>{TELAS[4].icon}</span>
+            <span>{TELAS[4].label}</span>
+          </button>
+        )}
+      </nav>
     </div>
   );
 }
