@@ -447,10 +447,29 @@ function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
         </div>
       )}
       <div style={S.grid4}>
-        <div style={S.statCard}><p style={{fontSize:22,marginBottom:10}}>📋</p><p style={{fontSize:30,fontWeight:800,color:"#C09B52",letterSpacing:"-1px",lineHeight:1}}>{total}</p><p style={{fontSize:12,color:"rgba(238,234,226,0.50)",fontWeight:600,marginTop:6,textTransform:"uppercase",letterSpacing:"0.8px"}}>Total de Reservas</p></div>
-        <div style={S.statCard}><p style={{fontSize:22,marginBottom:10}}>📅</p><p style={{fontSize:30,fontWeight:800,color:"#C09B52",letterSpacing:"-1px",lineHeight:1}}>{hojeR.length}</p><p style={{fontSize:12,color:"rgba(238,234,226,0.50)",fontWeight:600,marginTop:6,textTransform:"uppercase",letterSpacing:"0.8px"}}>Hoje</p></div>
-        <div style={S.statCard}><p style={{fontSize:22,marginBottom:10}}>📆</p><p style={{fontSize:30,fontWeight:800,color:"#C09B52",letterSpacing:"-1px",lineHeight:1}}>{semanaR.length}</p><p style={{fontSize:12,color:"rgba(238,234,226,0.50)",fontWeight:600,marginTop:6,textTransform:"uppercase",letterSpacing:"0.8px"}}>Esta Semana</p></div>
-        <div style={S.statCard}><p style={{fontSize:22,marginBottom:10}}>⏳</p><p style={{fontSize:30,fontWeight:800,color:"#D9B96E",letterSpacing:"-1px",lineHeight:1}}>{pendentes}</p><p style={{fontSize:12,color:"rgba(238,234,226,0.50)",fontWeight:600,marginTop:6,textTransform:"uppercase",letterSpacing:"0.8px"}}>Pendentes</p></div>
+        {[
+          {icon:"📋", value:total,        label:"Total de Reservas", color:T.gold,    glow:"rgba(192,155,82,0.18)"},
+          {icon:"📅", value:hojeR.length, label:"Hoje",              color:T.blue,    glow:"rgba(96,165,250,0.14)"},
+          {icon:"📆", value:semanaR.length,label:"Esta Semana",      color:T.goldHi,  glow:"rgba(192,155,82,0.12)"},
+          {icon:"⏳", value:pendentes,    label:"Pendentes",         color:T.emerald, glow:"rgba(45,211,122,0.14)"},
+        ].map(({icon,value,label,color,glow})=>(
+          <div key={label} style={{
+            ...S.statCard,
+            borderTop:`2px solid ${color}`,
+            boxShadow:`0 2px 24px rgba(0,0,0,0.28)`,
+            transition:"box-shadow 0.25s, transform 0.25s",
+            cursor:"default",
+            overflow:"hidden",
+          }}
+          onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 8px 32px rgba(0,0,0,0.38), 0 0 0 1px rgba(238,234,226,0.09)`;e.currentTarget.style.transform="translateY(-2px)";}}
+          onMouseLeave={e=>{e.currentTarget.style.boxShadow=`0 2px 24px rgba(0,0,0,0.28)`;e.currentTarget.style.transform="translateY(0)";}}
+          >
+            <div style={{position:"absolute",top:0,left:0,right:0,height:60,background:`radial-gradient(ellipse at 50% 0%, ${glow} 0%, transparent 70%)`,pointerEvents:"none"}}/>
+            <p style={{fontSize:20,marginBottom:12}}>{icon}</p>
+            <p style={{fontSize:32,fontWeight:800,color,letterSpacing:"-1.5px",lineHeight:1}}>{value}</p>
+            <p style={{fontSize:10,color:"rgba(238,234,226,0.40)",fontWeight:700,marginTop:8,textTransform:"uppercase",letterSpacing:"1.2px"}}>{label}</p>
+          </div>
+        ))}
       </div>
       <div style={S.grid2}>
         <div style={S.card}>
@@ -467,7 +486,20 @@ function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {proximas.map(r=>{
                 const pr=prestadores.find(p=>p.id===r.prestadorId);
-                return <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:"rgba(255,255,255,0.02)",borderRadius:8,border:`1px solid ${T.line}`}}>
+                const acc2 = STATUS_ACCENT[r.status] || STATUS_ACCENT.cancelado;
+                return <div key={r.id} style={{
+                  display:"flex",justifyContent:"space-between",alignItems:"center",
+                  padding:"10px 14px",
+                  background:"rgba(17,17,25,0.80)",
+                  borderRadius:10,
+                  border:`1px solid rgba(238,234,226,0.06)`,
+                  borderLeft:`3px solid ${acc2.color}`,
+                  position:"relative",overflow:"hidden",
+                  transition:"box-shadow 0.2s",
+                }}
+                onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 4px 20px rgba(0,0,0,0.35), 0 0 0 1px rgba(238,234,226,0.08)`;}}
+                onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";}}>
+                  <div style={{position:"absolute",top:0,left:0,width:80,height:"100%",background:`linear-gradient(90deg,${acc2.glow} 0%,transparent 100%)`,pointerEvents:"none"}}/>
                   <div>
                     <p style={{fontSize:13,fontWeight:600,color:T.text100,marginBottom:2}}>{r.cliente_nome||"Cliente"}</p>
                     <p style={{fontSize:11,color:T.text35}}>{r.servico_nome} · {formatDateShort(r.data_hora_inicio)}{pr&&<span style={{color:T.gold,marginLeft:4}}>· {pr.nome}</span>}</p>
@@ -562,12 +594,21 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
 
       {/* Cabeçalho */}
       <div>
-        <p style={{fontSize:15,fontWeight:700,color:T.text100,marginBottom:6,letterSpacing:"-0.2px"}}>Equipe no Flow</p>
-        <p style={{fontSize:12,color:T.text35,lineHeight:1.7}}>Ative os colaboradores cadastrados no AG para que tenham sua própria agenda pública. Cada um configura seus serviços e horários de forma independente.</p>
+        <p style={{fontSize:15,fontWeight:700,color:"#EEEAE2",marginBottom:6,letterSpacing:"-0.2px"}}>Equipe no Flow</p>
+        <p style={{fontSize:12,color:"rgba(238,234,226,0.35)",lineHeight:1.7}}>Ative os colaboradores cadastrados no AG para que tenham sua própria agenda pública. Cada um configura seus serviços e horários de forma independente.</p>
       </div>
 
       {/* Linha do Admin (sempre ativo, não pode ser desativado) */}
-      <div style={{...S.card,borderColor:adminPrestador?"rgba(212,175,55,0.3)":T.lineHi,display:"flex",alignItems:"center",gap:14}}>
+      <div style={{
+        ...S.card,
+        borderLeft:`3px solid ${T.gold}`,
+        display:"flex",alignItems:"center",gap:14,
+        position:"relative",overflow:"hidden",
+        transition:"box-shadow 0.25s",
+      }}
+      onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 4px 28px rgba(0,0,0,0.35), 0 0 0 1px rgba(238,234,226,0.09)`;}}
+      onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";}}>
+        <div style={{position:"absolute",top:0,left:0,width:100,height:"100%",background:`linear-gradient(90deg,${T.goldA06} 0%,transparent 100%)`,pointerEvents:"none"}}/>
         <Avatar nome={user.displayName||user.email}/>
         <div style={{flex:1}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
@@ -601,9 +642,21 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
             const pr=getPrestador(usr.uid);
             const ativoFlow=pr?.ativo===true;
             const isAtivo=usr.ativo!==false;
+            const accentColor = !isAtivo ? T.text18 : ativoFlow ? T.emerald : T.goldLo;
+            const accentGlow  = !isAtivo ? "transparent" : ativoFlow ? "rgba(45,211,122,0.08)" : "rgba(192,155,82,0.06)";
 
             return (
-              <div key={usr.uid} style={{...S.card,display:"flex",alignItems:"center",gap:14,opacity:isAtivo?1:0.5}}>
+              <div key={usr.uid} style={{
+                ...S.card,
+                display:"flex",alignItems:"center",gap:14,
+                opacity:isAtivo?1:0.5,
+                borderLeft:`3px solid ${accentColor}`,
+                position:"relative",overflow:"hidden",
+                transition:"box-shadow 0.25s",
+              }}
+              onMouseEnter={e=>{if(isAtivo) e.currentTarget.style.boxShadow=`0 4px 28px rgba(0,0,0,0.35), 0 0 0 1px rgba(238,234,226,0.09)`;}}
+              onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";}}>
+                <div style={{position:"absolute",top:0,left:0,width:100,height:"100%",background:`linear-gradient(90deg,${accentGlow} 0%,transparent 100%)`,pointerEvents:"none"}}/>
                 <Avatar nome={usr.nome}/>
                 <div style={{flex:1}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
@@ -632,7 +685,8 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
                     )}
                     {/* Toggle Flow */}
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontSize:11,color:ativoFlow?T.emerald:T.text35}}>                        {ativoFlow?"Ativo no Flow":"Inativo no Flow"}
+                      <span style={{fontSize:11,color:ativoFlow?T.emerald:T.text35}}>
+                        {ativoFlow?"Ativo no Flow":"Inativo no Flow"}
                       </span>
                       <button onClick={()=>ativoFlow?desativar(usr.uid,usr.nome):ativar(usr)} disabled={salvando===usr.uid} style={{background:"none",border:"none",cursor:"pointer",padding:0,opacity:salvando===usr.uid?0.4:1}}>
                         {ativoFlow?Ic.toggle_on:Ic.toggle_off}
