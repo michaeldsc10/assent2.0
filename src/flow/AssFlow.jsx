@@ -456,9 +456,9 @@ function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
         <div style={S.card}>
           <p style={S.sectionTitle}>Status das Reservas</p>
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            <StatusBar label="Confirmadas" value={confirmadas} total={total} color="#22c55e"/>
-            <StatusBar label="Pendentes" value={pendentes} total={total} color="#eab308"/>
-            <StatusBar label="Canceladas" value={canceladas} total={total} color="#ef4444"/>
+            <StatusBar label="Confirmadas" value={confirmadas} total={total} color={T.emerald}/>
+            <StatusBar label="Pendentes" value={pendentes} total={total} color={T.gold}/>
+            <StatusBar label="Canceladas" value={canceladas} total={total} color={T.red}/>
           </div>
         </div>
         <div style={S.card}>
@@ -467,10 +467,10 @@ function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {proximas.map(r=>{
                 const pr=prestadores.find(p=>p.id===r.prestadorId);
-                return <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:"rgba(255,255,255,0.02)",borderRadius:8,border:"1px solid var(--border)"}}>
+                return <div key={r.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 10px",background:"rgba(255,255,255,0.02)",borderRadius:8,border:`1px solid ${T.line}`}}>
                   <div>
-                    <p style={{fontSize:13,fontWeight:600,color:"var(--text)",marginBottom:2}}>{r.cliente_nome||"Cliente"}</p>
-                    <p style={{fontSize:11,color:"var(--text-muted)"}}>{r.servico_nome} · {formatDateShort(r.data_hora_inicio)}{pr&&<span style={{color:"var(--gold)",marginLeft:4}}>· {pr.nome}</span>}</p>
+                    <p style={{fontSize:13,fontWeight:600,color:T.text100,marginBottom:2}}>{r.cliente_nome||"Cliente"}</p>
+                    <p style={{fontSize:11,color:T.text35}}>{r.servico_nome} · {formatDateShort(r.data_hora_inicio)}{pr&&<span style={{color:T.gold,marginLeft:4}}>· {pr.nome}</span>}</p>
                   </div>
                   <span style={S.badge(statusColor(r.status))}>{statusLabel(r.status)}</span>
                 </div>;
@@ -562,27 +562,27 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
 
       {/* Cabeçalho */}
       <div>
-        <p style={{fontSize:15,fontWeight:700,color:"#EEEAE2",marginBottom:6,letterSpacing:"-0.2px"}}>Equipe no Flow</p>
-        <p style={{fontSize:12,color:"rgba(238,234,226,0.35)",lineHeight:1.7}}>Ative os colaboradores cadastrados no AG para que tenham sua própria agenda pública. Cada um configura seus serviços e horários de forma independente.</p>
+        <p style={{fontSize:15,fontWeight:700,color:T.text100,marginBottom:6,letterSpacing:"-0.2px"}}>Equipe no Flow</p>
+        <p style={{fontSize:12,color:T.text35,lineHeight:1.7}}>Ative os colaboradores cadastrados no AG para que tenham sua própria agenda pública. Cada um configura seus serviços e horários de forma independente.</p>
       </div>
 
       {/* Linha do Admin (sempre ativo, não pode ser desativado) */}
-      <div style={{...S.card,borderColor:adminPrestador?"rgba(212,175,55,0.3)":"var(--border)",display:"flex",alignItems:"center",gap:14}}>
+      <div style={{...S.card,borderColor:adminPrestador?"rgba(212,175,55,0.3)":T.lineHi,display:"flex",alignItems:"center",gap:14}}>
         <Avatar nome={user.displayName||user.email}/>
         <div style={{flex:1}}>
           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
-            <p style={{fontSize:14,fontWeight:700,color:"var(--text)"}}>{user.displayName||"Administrador"}</p>
+            <p style={{fontSize:14,fontWeight:700,color:T.text100}}>{user.displayName||"Administrador"}</p>
             <span style={{...S.badge("yellow"),display:"flex",alignItems:"center",gap:4,fontSize:10}}>{Ic.crown} Admin</span>
           </div>
-          <p style={{fontSize:12,color:"var(--text-muted)"}}>{user.email}</p>
-          {adminPrestador?.especialidade&&<p style={{fontSize:11,color:"var(--gold)",marginTop:2}}>{adminPrestador.especialidade}</p>}
+          <p style={{fontSize:12,color:T.text35}}>{user.email}</p>
+          {adminPrestador?.especialidade&&<p style={{fontSize:11,color:T.gold,marginTop:2}}>{adminPrestador.especialidade}</p>}
         </div>
         {/* Especialidade do admin */}
         <button style={S.btnBlue} onClick={()=>setEditando({prestadorId:"admin",esp:adminPrestador?.especialidade||""})}>{Ic.settings}</button>
         {/* Configurar agenda */}
         <button style={S.btnBlue} title="Configurar agenda" onClick={()=>onConfigurar("admin")}>{Ic.settings} Configurar</button>
         {/* Copiar link */}
-        <button style={{...S.btnGhost,color:copied==="admin"?"#22c55e":"var(--text-muted)"}} onClick={()=>copiar("admin")}>
+        <button style={{...S.btnGhost,color:copied==="admin"?T.emerald:T.text35}} onClick={()=>copiar("admin")}>
           {copied==="admin"?<>{Ic.check} Copiado!</>:<>{Ic.copy} Link</>}
         </button>
         <span style={S.badge("green")}>Ativo</span>
@@ -592,8 +592,8 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
       {usuarios.length===0?(
         <div style={{...S.card,...S.emptyState}}>
           <p style={{fontSize:24,marginBottom:8}}>👥</p>
-          <p style={{fontSize:13,color:"var(--text)"}}>Nenhum colaborador cadastrado no AG ainda.</p>
-          <p style={{fontSize:12,color:"var(--text-muted)",marginTop:4}}>Adicione usuários em <strong>Usuários</strong> para ativá-los aqui.</p>
+          <p style={{fontSize:13,color:T.text100}}>Nenhum colaborador cadastrado no AG ainda.</p>
+          <p style={{fontSize:12,color:T.text35,marginTop:4}}>Adicione usuários em <strong>Usuários</strong> para ativá-los aqui.</p>
         </div>
       ):(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
@@ -607,12 +607,12 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
                 <Avatar nome={usr.nome}/>
                 <div style={{flex:1}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3}}>
-                    <p style={{fontSize:14,fontWeight:600,color:"var(--text)"}}>{usr.nome}</p>
+                    <p style={{fontSize:14,fontWeight:600,color:T.text100}}>{usr.nome}</p>
                     <span style={{...S.badge("blue"),fontSize:10}}>{cargoLabel(usr.cargo)}</span>
                     {!isAtivo&&<span style={{...S.badge("gray"),fontSize:10}}>Inativo no AG</span>}
                   </div>
-                  <p style={{fontSize:12,color:"var(--text-muted)"}}>{usr.email}</p>
-                  {pr?.especialidade&&<p style={{fontSize:11,color:"var(--gold)",marginTop:2}}>{pr.especialidade}</p>}
+                  <p style={{fontSize:12,color:T.text35}}>{usr.email}</p>
+                  {pr?.especialidade&&<p style={{fontSize:11,color:T.gold,marginTop:2}}>{pr.especialidade}</p>}
                 </div>
 
                 {/* Toggle + ações (só se ativo no AG) */}
@@ -625,15 +625,14 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
                         {/* Configurar agenda */}
                         <button style={S.btnBlue} title="Configurar agenda" onClick={()=>onConfigurar(usr.uid)}>{Ic.settings} Configurar</button>
                         {/* Copiar link */}
-                        <button style={{...S.btnGhost,color:copied===usr.uid?"#22c55e":"var(--text-muted)"}} onClick={()=>copiar(usr.uid)}>
+                        <button style={{...S.btnGhost,color:copied===usr.uid?T.emerald:T.text35}} onClick={()=>copiar(usr.uid)}>
                           {copied===usr.uid?<>{Ic.check} Copiado!</>:<>{Ic.copy} Link</>}
                         </button>
                       </>
                     )}
                     {/* Toggle Flow */}
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{fontSize:11,color:ativoFlow?"#22c55e":"var(--text-muted)"}}>
-                        {ativoFlow?"Ativo no Flow":"Inativo no Flow"}
+                      <span style={{fontSize:11,color:ativoFlow?T.emerald:T.text35}}>                        {ativoFlow?"Ativo no Flow":"Inativo no Flow"}
                       </span>
                       <button onClick={()=>ativoFlow?desativar(usr.uid,usr.nome):ativar(usr)} disabled={salvando===usr.uid} style={{background:"none",border:"none",cursor:"pointer",padding:0,opacity:salvando===usr.uid?0.4:1}}>
                         {ativoFlow?Ic.toggle_on:Ic.toggle_off}
@@ -641,7 +640,7 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
                     </div>
                   </div>
                 ):(
-                  <span style={{fontSize:11,color:"var(--text-muted)"}}>Reative no AG para usar no Flow</span>
+                  <span style={{fontSize:11,color:T.text35}}>Reative no AG para usar no Flow</span>
                 )}
               </div>
             );
@@ -1033,11 +1032,11 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
   if(!isAdmin&&!meuPrestadorId) return (
     <div style={S.emptyState}>
       <p style={{fontSize:32,marginBottom:8}}>🔗</p>
-      <p style={{fontSize:13,fontWeight:600,color:"var(--text)",marginBottom:4}}>Conta não vinculada ao Flow</p>
-      <p style={{fontSize:12,color:"var(--text-muted)"}}>Peça ao administrador para ativar você na tela Equipe.</p>
+      <p style={{fontSize:13,fontWeight:600,color:T.text100,marginBottom:4}}>Conta não vinculada ao Flow</p>
+      <p style={{fontSize:12,color:T.text35}}>Peça ao administrador para ativar você na tela Equipe.</p>
     </div>
   );
-  if(!prestadorId) return <div style={S.emptyState}><p style={{fontSize:13,color:"var(--text)"}}>Nenhum prestador selecionado.</p></div>;
+  if(!prestadorId) return <div style={S.emptyState}><p style={{fontSize:13,color:T.text100}}>Nenhum prestador selecionado.</p></div>;
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:20}}>
@@ -1060,7 +1059,7 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
       {!isAdmin&&prestadorAtual&&(
         <div style={{...S.card,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
           <Avatar nome={prestadorAtual.nome}/>
-          <div><p style={{fontSize:14,fontWeight:600,color:"var(--text)"}}>{prestadorAtual.nome}</p><p style={{fontSize:12,color:"var(--text-muted)"}}>{prestadorAtual.especialidade||cargoLabel(prestadorAtual.cargo)}</p></div>
+          <div><p style={{fontSize:14,fontWeight:600,color:T.text100}}>{prestadorAtual.nome}</p><p style={{fontSize:12,color:T.text35}}>{prestadorAtual.especialidade||cargoLabel(prestadorAtual.cargo)}</p></div>
         </div>
       )}
 
@@ -1079,7 +1078,7 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
           <p style={S.sectionTitle}>Horários de Atendimento</p>
           <label style={S.label}>Dias de Atendimento</label>
           <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-            {DIAS_SEMANA.map(d=>{const a=(config.diasAtivos||[]).includes(d.key);return <button key={d.key} onClick={()=>toggleDia(d.key)} style={{width:44,height:44,borderRadius:8,border:a?"1px solid var(--gold)":"1px solid var(--border)",background:a?"rgba(212,175,55,0.15)":"transparent",color:a?"var(--gold)":"var(--text-muted)",fontSize:12,fontWeight:a?700:400,cursor:"pointer"}}>{d.label}</button>;})}
+            {DIAS_SEMANA.map(d=>{const a=(config.diasAtivos||[]).includes(d.key);return <button key={d.key} onClick={()=>toggleDia(d.key)} style={{width:44,height:44,borderRadius:8,border:a?`1px solid ${T.gold}`:`1px solid ${T.line}`,background:a?T.goldA12:"transparent",color:a?T.gold:T.text35,fontSize:12,fontWeight:a?700:400,cursor:"pointer",transition:"all 0.2s"}}>{d.label}</button>;})}
           </div>
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14}}>
             <div><label style={S.label}>Início do Expediente</label><input type="time" style={S.input} value={config.horaInicio||"08:00"} onChange={e=>setConfig(p=>({...p,horaInicio:e.target.value}))}/></div>
@@ -1103,18 +1102,18 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
                 <thead><tr><th style={S.th}>Nome</th><th style={S.th}>Duração</th><th style={S.th}>Preço</th><th style={S.th}>Descrição</th><th style={S.th}></th></tr></thead>
                 <tbody>{config.serviços.map(s=>(
                   <tr key={s.id}>
-                    <td style={S.td}><span style={{fontWeight:600,color:"var(--text)"}}>{s.nome}</span></td>
-                    <td style={S.td}><span style={{color:"var(--text-muted)"}}>{formatDuracao(s.duracao_min)}</span></td>
-                    <td style={S.td}><span style={{color:"var(--gold)"}}>{s.preco>0?`R$ ${Number(s.preco).toLocaleString("pt-BR",{minimumFractionDigits:2})}`:"Gratuito"}</span></td>
-                    <td style={S.td}><span style={{fontSize:12,color:"var(--text-muted)"}}>{s.descricao||"—"}</span></td>
+                    <td style={S.td}><span style={{fontWeight:600,color:T.text100}}>{s.nome}</span></td>
+                    <td style={S.td}><span style={{color:T.text35}}>{formatDuracao(s.duracao_min)}</span></td>
+                    <td style={S.td}><span style={{color:T.gold}}>{s.preco>0?`R$ ${Number(s.preco).toLocaleString("pt-BR",{minimumFractionDigits:2})}`:"Gratuito"}</span></td>
+                    <td style={S.td}><span style={{fontSize:12,color:T.text35}}>{s.descricao||"—"}</span></td>
                     <td style={S.td}><button style={S.btnDanger} onClick={()=>setConfig(p=>({...p,serviços:p.serviços.filter(x=>x.id!==s.id)}))}>{Ic.trash}</button></td>
                   </tr>
                 ))}</tbody>
               </table>
             </div>
           )}
-          <div style={{background:"rgba(255,255,255,0.02)",border:"1px dashed var(--border)",borderRadius:10,padding:16}}>
-            <p style={{...S.label,marginBottom:12,color:"var(--text)",fontSize:13,fontWeight:600}}>+ Novo Serviço</p>
+          <div style={{background:"rgba(255,255,255,0.02)",border:`1px dashed ${T.goldA22}`,borderRadius:10,padding:16}}>
+            <p style={{...S.label,marginBottom:12,color:T.text100,fontSize:13,fontWeight:600}}>+ Novo Serviço</p>
             <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:12,marginBottom:12}}>
               <div><label style={S.label}>Nome *</label><input style={S.input} value={novoS.nome} onChange={e=>setNovoS(p=>({...p,nome:e.target.value}))} placeholder="Ex: Manicure"/></div>
               <div><label style={S.label}>Duração</label><select style={S.select} value={novoS.duracao} onChange={e=>setNovoS(p=>({...p,duracao:e.target.value}))}>{[15,20,30,45,60,75,90,120,150,180,240].map(v=><option key={v} value={v}>{formatDuracao(v)}</option>)}</select></div>
@@ -1173,10 +1172,10 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
                 <Avatar nome={p.nome}/>
                 <div style={{flex:1}}>
                   <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
-                    <p style={{fontSize:14,fontWeight:600,color:"var(--text)"}}>{p.nome}</p>
+                    <p style={{fontSize:14,fontWeight:600,color:T.text100}}>{p.nome}</p>
                     {p.isAdmin&&<span style={{...S.badge("yellow"),display:"flex",alignItems:"center",gap:3,fontSize:10}}>{Ic.crown} Admin</span>}
                   </div>
-                  <p style={{fontSize:12,color:"var(--text-muted)"}}>{p.especialidade||"Prestador de serviço"}</p>
+                  <p style={{fontSize:12,color:T.text35}}>{p.especialidade||"Prestador de serviço"}</p>
                 </div>
                 <span style={S.badge(p.ativo?"green":"gray")}>{p.ativo?"Ativo":"Inativo"}</span>
               </div>
@@ -1185,9 +1184,9 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
                 <CheckItem ok={temS} label="Serviços cadastrados"/>
                 <CheckItem ok={!!cfg?.nomeEmpresa} label="Nome preenchido"/>
               </div>
-              <div style={{display:"flex",gap:10,alignItems:"center",background:"rgba(255,255,255,0.02)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 14px"}}>
-                <span style={{fontSize:12,color:"var(--text)",flex:1,wordBreak:"break-all"}}>{link}</span>
-                <button onClick={()=>copiar(p.id)} style={{...S.btnPrimary,background:copied===p.id?"rgba(34,197,94,0.15)":"var(--gold)",color:copied===p.id?"#22c55e":"#000",border:copied===p.id?"1px solid rgba(34,197,94,0.4)":"none",flexShrink:0,padding:"7px 14px"}}>
+              <div style={{display:"flex",gap:10,alignItems:"center",background:"rgba(255,255,255,0.02)",border:`1px solid ${T.line}`,borderRadius:10,padding:"10px 14px"}}>
+                <span style={{fontSize:12,color:T.text100,flex:1,wordBreak:"break-all"}}>{link}</span>
+                <button onClick={()=>copiar(p.id)} style={{...S.btnPrimary,background:copied===p.id?T.emeraldA10:`linear-gradient(135deg, ${T.goldHi} 0%, ${T.goldLo} 100%)`,color:copied===p.id?T.emerald:T.ink,border:copied===p.id?`1px solid ${T.emeraldA22}`:"none",flexShrink:0,padding:"7px 14px"}}>
                   {copied===p.id?<>{Ic.check} Copiado!</>:<>{Ic.copy} Copiar</>}
                 </button>
               </div>
