@@ -14,8 +14,8 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import {
   getFirestore, collection, doc, onSnapshot,
-  setDoc, updateDoc, deleteDoc, getDoc,
-  serverTimestamp, query, orderBy,
+  setDoc, updateDoc, deleteDoc, getDoc, addDoc,
+  serverTimestamp, query, orderBy, where,
 } from "firebase/firestore";
 
 const db = getFirestore();
@@ -335,6 +335,7 @@ const CONFIG_DEFAULT = {
   serviços:[],diasAtivos:["seg","ter","qua","qui","sex"],
   horaInicio:"08:00",horaFim:"18:00",granularidadeMinutos:30,
   nomeEmpresa:"",descricao:"",
+  bloqueiosRecorrentes:[], // [{id, motivo, inicio, fim}] — pausas fixas diárias (ex: almoço)
 };
 
 // ─── useToast ─────────────────────────────────────────────────────────────────
@@ -1127,6 +1128,10 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
   const [loading,setLoading]=useState(true);
   const [salvando,setSalvando]=useState(false);
   const [novoS,setNovoS]=useState({nome:"",duracao:60,preco:"",descricao:""});
+  const [novaP,setNovaP]=useState({motivo:"Almoço",inicio:"12:00",fim:"13:00"});
+  const [bloqueiosData,setBloqueiosData]=useState([]);
+  const [novoB,setNovoB]=useState({data:"",diaTodo:true,inicio:"08:00",fim:"09:00",motivo:""});
+  const [salvandoB,setSalvandoB]=useState(false);
   const [t,showT]=useToast();
 
   useEffect(()=>{ if(prestadorFoco) setPrestadorId(prestadorFoco); },[prestadorFoco]);
@@ -1138,6 +1143,20 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
       setConfig(snap.exists()?{...CONFIG_DEFAULT,...snap.data()}:{...CONFIG_DEFAULT});
       setLoading(false);
     });
+    return()=>u();
+  },[tenantUid,prestadorId]);
+
+  // Listener de bloqueios por data
+  useEffect(()=>{
+    if(!tenantUid||!prestadorId) return;
+    const q=query(
+      collection(db,"users",tenantUid,"agendamento_bloqueios"),
+      where("prestadorId","==",prestadorId),
+      orderBy("data","asc")
+    );
+    const u=onSnapshot(q,snap=>{
+      setBloqueiosData(snap.docs.map(d=>({id:d.id,...d.data()})));
+    },()=>{});
     return()=>u();
   },[tenantUid,prestadorId]);
 
@@ -1156,6 +1175,39 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
     const s={id:Date.now().toString(),nome:novoS.nome.trim(),duracao_min:parseInt(novoS.duracao)||60,preco:parseFloat(novoS.preco)||0,descricao:novoS.descricao.trim(),ativo:true};
     setConfig(p=>({...p,serviços:[...(p.serviços||[]),s]}));
     setNovoS({nome:"",duracao:60,preco:"",descricao:""});
+  };
+
+  // Pausas recorrentes — salvas dentro do doc de config (salvar geral)
+  const addPausa=()=>{
+    if(!novaP.inicio||!novaP.fim||novaP.inicio>=novaP.fim) return;
+    const p={id:Date.now().toString(),...novaP};
+    setConfig(c=>({...c,bloqueiosRecorrentes:[...(c.bloqueiosRecorrentes||[]),p]}));
+    setNovaP({motivo:"Almoço",inicio:"12:00",fim:"13:00"});
+  };
+  const removerPausa=(id)=>setConfig(c=>({...c,bloqueiosRecorrentes:(c.bloqueiosRecorrentes||[]).filter(p=>p.id!==id)}));
+
+  // Bloqueios por data — coleção separada (operação imediata)
+  const addBloqueioData=async()=>{
+    if(!novoB.data||!novoB.motivo.trim()) return;
+    if(!novoB.diaTodo&&(!novoB.inicio||!novoB.fim||novoB.inicio>=novoB.fim)) return;
+    setSalvandoB(true);
+    try {
+      await addDoc(collection(db,"users",tenantUid,"agendamento_bloqueios"),{
+        prestadorId,
+        data:novoB.data,
+        diaTodo:novoB.diaTodo,
+        ...(novoB.diaTodo?{}:{horaInicio:novoB.inicio,horaFim:novoB.fim}),
+        motivo:novoB.motivo.trim(),
+        criadoEm:serverTimestamp(),
+      });
+      setNovoB({data:"",diaTodo:true,inicio:"08:00",fim:"09:00",motivo:""});
+      showT("Bloqueio adicionado!");
+    } catch { showT("Erro ao salvar bloqueio.","error"); }
+    setSalvandoB(false);
+  };
+  const removerBloqueioData=async(id)=>{
+    try { await deleteDoc(doc(db,"users",tenantUid,"agendamento_bloqueios",id)); showT("Bloqueio removido!"); }
+    catch { showT("Erro ao remover.","error"); }
   };
 
   const toggleDia=k=>setConfig(p=>({...p,diasAtivos:p.diasAtivos.includes(k)?p.diasAtivos.filter(d=>d!==k):[...p.diasAtivos,k]}));
@@ -1273,6 +1325,92 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
           <div style={{marginTop:14,padding:"10px 14px",background:"rgba(192,155,82,0.04)",border:`1px solid ${T.goldA12}`,borderRadius:10,fontSize:11.5,color:T.text35,lineHeight:1.65,display:"flex",gap:8,alignItems:"flex-start"}}>
             <span style={{flexShrink:0,marginTop:1}}>💡</span>
             <span>O intervalo define o passo entre os horários disponíveis para o cliente — a duração real de cada serviço é sempre respeitada.</span>
+          </div>
+        </div>
+
+        {/* Seção 2.5: Pausas Recorrentes (almoço, etc.) */}
+        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderRadius:14,padding:"20px 22px",backdropFilter:"blur(12px)"}}>
+          {secaoHeader(IcCfg.clock2,"Pausas Recorrentes","Horários fixos bloqueados todos os dias — como almoço. Salvo junto com as configurações.")}
+          {(config.bloqueiosRecorrentes||[]).length>0&&(
+            <div style={{marginBottom:14,borderRadius:10,overflow:"hidden",border:`1px solid rgba(238,234,226,0.07)`}}>
+              {(config.bloqueiosRecorrentes||[]).map((p,i)=>(
+                <div key={p.id} style={{display:"flex",alignItems:"center",gap:14,padding:"11px 16px",borderBottom:i<(config.bloqueiosRecorrentes.length-1)?`1px solid rgba(238,234,226,0.05)`:"none",background:i%2===0?"rgba(255,255,255,0.012)":"transparent"}}>
+                  <div style={{flex:1}}>
+                    <span style={{fontSize:13,fontWeight:600,color:T.text100}}>{p.motivo||"Pausa"}</span>
+                    <span style={{fontSize:12,color:T.text35,marginLeft:10}}>{p.inicio} → {p.fim}</span>
+                  </div>
+                  <button style={S.btnDanger} onClick={()=>removerPausa(p.id)}>{Ic.trash}</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{background:"rgba(192,155,82,0.03)",border:`1px dashed ${T.goldA22}`,borderRadius:10,padding:"16px 18px"}}>
+            <p style={{fontSize:12,fontWeight:700,color:T.gold,textTransform:"uppercase",letterSpacing:"1px",marginBottom:14}}>+ Nova Pausa</p>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 110px 110px auto",gap:10,alignItems:"flex-end"}}>
+              <div><label style={S.label}>Descrição</label><input style={S.input} value={novaP.motivo} onChange={e=>setNovaP(p=>({...p,motivo:e.target.value}))} placeholder="Ex: Almoço"/></div>
+              <div><label style={S.label}>Início</label><input type="time" style={S.input} value={novaP.inicio} onChange={e=>setNovaP(p=>({...p,inicio:e.target.value}))}/></div>
+              <div><label style={S.label}>Fim</label><input type="time" style={S.input} value={novaP.fim} onChange={e=>setNovaP(p=>({...p,fim:e.target.value}))}/></div>
+              <button onClick={addPausa} disabled={!novaP.motivo.trim()||novaP.inicio>=novaP.fim} style={{...S.btnPrimary,height:42,paddingLeft:16,paddingRight:16,opacity:(!novaP.motivo.trim()||novaP.inicio>=novaP.fim)?0.4:1}}>{Ic.plus} Add</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Seção 2.6: Bloqueios por Data */}
+        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderRadius:14,padding:"20px 22px",backdropFilter:"blur(12px)"}}>
+          {secaoHeader(
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>,
+            "Bloqueios por Data",
+            "Feche datas específicas ou horários pontuais — feriados, ausências, compromissos."
+          )}
+          {bloqueiosData.length>0&&(
+            <div style={{marginBottom:14,borderRadius:10,overflow:"hidden",border:`1px solid rgba(238,234,226,0.07)`}}>
+              {bloqueiosData.map((b,i)=>{
+                const passado=b.data<new Date().toISOString().slice(0,10);
+                return (
+                  <div key={b.id} style={{display:"flex",alignItems:"center",gap:14,padding:"11px 16px",borderBottom:i<bloqueiosData.length-1?`1px solid rgba(238,234,226,0.05)`:"none",background:i%2===0?"rgba(255,255,255,0.012)":"transparent",opacity:passado?0.45:1}}>
+                    <div style={{flex:1}}>
+                      <span style={{fontSize:13,fontWeight:600,color:T.text100}}>{b.motivo||"Bloqueio"}</span>
+                      <span style={{fontSize:12,color:T.text35,marginLeft:10}}>
+                        {b.data} · {b.diaTodo?"Dia todo":`${b.horaInicio} → ${b.horaFim}`}
+                      </span>
+                      {passado&&<span style={{marginLeft:8,fontSize:10,color:T.text18}}>(passado)</span>}
+                    </div>
+                    <button style={S.btnDanger} onClick={()=>removerBloqueioData(b.id)}>{Ic.trash}</button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {bloqueiosData.length===0&&(
+            <div style={{textAlign:"center",padding:"20px 16px",marginBottom:14,background:"rgba(255,255,255,0.01)",border:`1px dashed rgba(238,234,226,0.07)`,borderRadius:10}}>
+              <p style={{fontSize:13,color:T.text35}}>Nenhum bloqueio cadastrado</p>
+            </div>
+          )}
+          <div style={{background:"rgba(96,165,250,0.03)",border:`1px dashed rgba(96,165,250,0.22)`,borderRadius:10,padding:"16px 18px"}}>
+            <p style={{fontSize:12,fontWeight:700,color:T.blue,textTransform:"uppercase",letterSpacing:"1px",marginBottom:14}}>+ Novo Bloqueio</p>
+            <div style={{display:"grid",gridTemplateColumns:"160px 1fr",gap:12,marginBottom:12}}>
+              <div><label style={S.label}>Data *</label><input type="date" style={S.input} value={novoB.data} min={new Date().toISOString().slice(0,10)} onChange={e=>setNovoB(p=>({...p,data:e.target.value}))}/></div>
+              <div><label style={S.label}>Motivo *</label><input style={S.input} value={novoB.motivo} onChange={e=>setNovoB(p=>({...p,motivo:e.target.value}))} placeholder="Ex: Feriado, Compromisso pessoal…"/></div>
+            </div>
+            <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+              <label style={{display:"flex",alignItems:"center",gap:8,cursor:"pointer",fontSize:12,color:T.text65}}>
+                <input type="checkbox" checked={novoB.diaTodo} onChange={e=>setNovoB(p=>({...p,diaTodo:e.target.checked}))}
+                  style={{width:16,height:16,accentColor:T.gold,cursor:"pointer"}}/>
+                Fechar o dia todo
+              </label>
+            </div>
+            {!novoB.diaTodo&&(
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:12}}>
+                <div><label style={S.label}>Horário início</label><input type="time" style={S.input} value={novoB.inicio} onChange={e=>setNovoB(p=>({...p,inicio:e.target.value}))}/></div>
+                <div><label style={S.label}>Horário fim</label><input type="time" style={S.input} value={novoB.fim} onChange={e=>setNovoB(p=>({...p,fim:e.target.value}))}/></div>
+              </div>
+            )}
+            <div style={{display:"flex",justifyContent:"flex-end"}}>
+              <button onClick={addBloqueioData} disabled={salvandoB||!novoB.data||!novoB.motivo.trim()||(!novoB.diaTodo&&novoB.inicio>=novoB.fim)}
+                style={{...S.btnPrimary,height:40,paddingLeft:20,paddingRight:20,opacity:(salvandoB||!novoB.data||!novoB.motivo.trim())?0.4:1}}>
+                {salvandoB?"Salvando…":"Bloquear Data"}
+              </button>
+            </div>
           </div>
         </div>
 
