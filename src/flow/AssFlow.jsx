@@ -1092,96 +1092,212 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
   );
   if(!prestadorId) return <div style={S.emptyState}><p style={{fontSize:13,color:T.text100}}>Nenhum prestador selecionado.</p></div>;
 
+  // Ícones internos Configurações
+  const IcCfg = {
+    profile: <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+    clock2:  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>,
+    tag2:    <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/></svg>,
+    pencil:  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+  };
+
+  const secaoHeader = (icon, title, subtitle) => (
+    <div style={{display:"flex",alignItems:"flex-start",gap:12,marginBottom:20}}>
+      <div style={{width:36,height:36,borderRadius:10,background:T.goldA06,border:`1px solid ${T.goldA22}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.gold,flexShrink:0}}>{icon}</div>
+      <div>
+        <p style={{fontSize:13,fontWeight:700,color:T.text100,letterSpacing:"-0.1px",marginBottom:2}}>{title}</p>
+        <p style={{fontSize:11.5,color:T.text35,lineHeight:1.5}}>{subtitle}</p>
+      </div>
+    </div>
+  );
+
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:20}}>
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
       <Toast t={t}/>
 
-      {/* Seletor (admin) */}
-      {isAdmin&&prestadoresAtivos.length>1&&(
-        <div style={{...S.card,padding:"14px 16px"}}>
-          <div style={{display:"flex",alignItems:"center",gap:12}}>
-            <label style={{...S.label,marginBottom:0,whiteSpace:"nowrap"}}>Configurando:</label>
-            <select style={{...S.select,width:"auto",minWidth:220}} value={prestadorId||""} onChange={e=>setPrestadorId(e.target.value)}>
-              {prestadoresAtivos.map(p=><option key={p.id} value={p.id}>{p.nome}{p.isAdmin?" (você)":""}{p.especialidade?` · ${p.especialidade}`:""}</option>)}
+      {/* ── Header: seletor de prestador (admin) ou identidade (membro) ── */}
+      {isAdmin&&prestadoresAtivos.length>1?(
+        <div style={{
+          background:"rgba(17,17,25,0.92)",
+          border:`1px solid rgba(238,234,226,0.07)`,
+          borderLeft:`3px solid ${T.gold}`,
+          borderRadius:14,
+          padding:"16px 20px",
+          display:"flex",alignItems:"center",gap:14,
+          backdropFilter:"blur(12px)",
+          position:"relative",overflow:"hidden",
+        }}>
+          <div style={{position:"absolute",top:0,left:0,width:120,height:"100%",background:`linear-gradient(90deg,${T.goldA06} 0%,transparent 100%)`,pointerEvents:"none"}}/>
+          <div style={{width:36,height:36,borderRadius:10,background:T.goldA06,border:`1px solid ${T.goldA22}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.gold,flexShrink:0,fontSize:14}}>{IcCfg.profile}</div>
+          <div style={{flex:1}}>
+            <p style={{fontSize:11,color:T.text35,fontWeight:600,textTransform:"uppercase",letterSpacing:"1px",marginBottom:6}}>Configurando agenda de</p>
+            <select style={{...S.select,width:"auto",minWidth:240,padding:"8px 12px",fontSize:13}} value={prestadorId||""} onChange={e=>setPrestadorId(e.target.value)}>
+              {prestadoresAtivos.map(p=><option key={p.id} value={p.id}>{p.nome}{p.isAdmin?" (Admin)":""}{p.especialidade?` · ${p.especialidade}`:""}</option>)}
             </select>
-            {prestadorAtual&&<span style={S.badge(prestadorAtual.ativo?"green":"gray")}>{prestadorAtual.ativo?"Ativo":"Inativo"}</span>}
           </div>
+          {prestadorAtual&&<span style={S.badge(prestadorAtual.ativo?"green":"gray")}>{prestadorAtual.ativo?"Ativo":"Inativo"}</span>}
         </div>
-      )}
-
-      {/* Header membro */}
-      {!isAdmin&&prestadorAtual&&(
-        <div style={{...S.card,padding:"12px 16px",display:"flex",alignItems:"center",gap:12}}>
+      ):(!isAdmin&&prestadorAtual&&(
+        <div style={{
+          background:"rgba(17,17,25,0.92)",
+          border:`1px solid rgba(238,234,226,0.07)`,
+          borderLeft:`3px solid ${T.gold}`,
+          borderRadius:14,
+          padding:"16px 20px",
+          display:"flex",alignItems:"center",gap:14,
+          backdropFilter:"blur(12px)",
+          position:"relative",overflow:"hidden",
+        }}>
+          <div style={{position:"absolute",top:0,left:0,width:120,height:"100%",background:`linear-gradient(90deg,${T.goldA06} 0%,transparent 100%)`,pointerEvents:"none"}}/>
           <Avatar nome={prestadorAtual.nome}/>
-          <div><p style={{fontSize:14,fontWeight:600,color:T.text100}}>{prestadorAtual.nome}</p><p style={{fontSize:12,color:T.text35}}>{prestadorAtual.especialidade||cargoLabel(prestadorAtual.cargo)}</p></div>
+          <div style={{flex:1}}>
+            <p style={{fontSize:14,fontWeight:700,color:T.text100,letterSpacing:"-0.1px"}}>{prestadorAtual.nome}</p>
+            <p style={{fontSize:12,color:T.text35,marginTop:2}}>{prestadorAtual.especialidade||cargoLabel(prestadorAtual.cargo)}</p>
+          </div>
+          <span style={S.badge("green")}>Minha Agenda</span>
         </div>
-      )}
+      ))}
 
       {loading?<Loading/>:<>
-        {/* Dados */}
-        <div style={S.card}>
-          <p style={S.sectionTitle}>Dados exibidos na página pública</p>
+
+        {/* ── Seção 1: Identidade pública ── */}
+        <div style={{
+          background:"rgba(17,17,25,0.92)",
+          border:`1px solid rgba(238,234,226,0.07)`,
+          borderRadius:14,
+          padding:"20px 22px",
+          backdropFilter:"blur(12px)",
+        }}>
+          {secaoHeader(IcCfg.pencil,"Identidade Pública","O que o cliente vê ao abrir sua página de agendamento.")}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:14}}>
-            <div><label style={S.label}>Nome na página pública</label><input style={S.input} value={config.nomeEmpresa||""} onChange={e=>setConfig(p=>({...p,nomeEmpresa:e.target.value}))} placeholder="Ex: Ana – Nail Designer"/></div>
-            <div><label style={S.label}>Descrição curta</label><input style={S.input} value={config.descricao||""} onChange={e=>setConfig(p=>({...p,descricao:e.target.value}))} placeholder="Ex: Especialista em unhas de gel"/></div>
+            <div>
+              <label style={S.label}>Nome exibido na página</label>
+              <input style={S.input} value={config.nomeEmpresa||""} onChange={e=>setConfig(p=>({...p,nomeEmpresa:e.target.value}))} placeholder="Ex: Ana · Nail Designer"/>
+            </div>
+            <div>
+              <label style={S.label}>Descrição curta</label>
+              <input style={S.input} value={config.descricao||""} onChange={e=>setConfig(p=>({...p,descricao:e.target.value}))} placeholder="Ex: Especialista em unhas de gel"/>
+            </div>
           </div>
         </div>
 
-        {/* Horários */}
-        <div style={S.card}>
-          <p style={S.sectionTitle}>Horários de Atendimento</p>
-          <label style={S.label}>Dias de Atendimento</label>
-          <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-            {DIAS_SEMANA.map(d=>{const a=(config.diasAtivos||[]).includes(d.key);return <button key={d.key} onClick={()=>toggleDia(d.key)} style={{width:44,height:44,borderRadius:8,border:a?`1px solid ${T.gold}`:`1px solid ${T.line}`,background:a?T.goldA12:"transparent",color:a?T.gold:T.text35,fontSize:12,fontWeight:a?700:400,cursor:"pointer",transition:"all 0.2s"}}>{d.label}</button>;})}
+        {/* ── Seção 2: Horários ── */}
+        <div style={{
+          background:"rgba(17,17,25,0.92)",
+          border:`1px solid rgba(238,234,226,0.07)`,
+          borderRadius:14,
+          padding:"20px 22px",
+          backdropFilter:"blur(12px)",
+        }}>
+          {secaoHeader(IcCfg.clock2,"Horários de Atendimento","Defina quando você recebe clientes. Os horários disponíveis são gerados automaticamente.")}
+
+          <p style={{...S.label,marginBottom:10}}>Dias de Atendimento</p>
+          <div style={{display:"flex",gap:6,marginBottom:20,flexWrap:"wrap"}}>
+            {DIAS_SEMANA.map(d=>{
+              const a=(config.diasAtivos||[]).includes(d.key);
+              return (
+                <button key={d.key} onClick={()=>toggleDia(d.key)} style={{
+                  width:46,height:46,borderRadius:10,
+                  border:a?`1px solid ${T.gold}`:`1px solid rgba(238,234,226,0.07)`,
+                  background:a?T.goldA12:"rgba(255,255,255,0.02)",
+                  color:a?T.gold:T.text35,
+                  fontSize:11.5,fontWeight:a?700:400,
+                  cursor:"pointer",transition:"all 0.2s",
+                  display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,
+                  boxShadow:a?`0 0 12px ${T.goldA12}`:"none",
+                }}>{d.label}</button>
+              );
+            })}
           </div>
+
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:14}}>
-            <div><label style={S.label}>Início do Expediente</label><input type="time" style={S.input} value={config.horaInicio||"08:00"} onChange={e=>setConfig(p=>({...p,horaInicio:e.target.value}))}/></div>
-            <div><label style={S.label}>Fim do Expediente</label><input type="time" style={S.input} value={config.horaFim||"18:00"} onChange={e=>setConfig(p=>({...p,horaFim:e.target.value}))}/></div>
             <div>
-              <label style={S.label}>Granularidade dos horários</label>
+              <label style={S.label}>Início do expediente</label>
+              <input type="time" style={S.input} value={config.horaInicio||"08:00"} onChange={e=>setConfig(p=>({...p,horaInicio:e.target.value}))}/>
+            </div>
+            <div>
+              <label style={S.label}>Fim do expediente</label>
+              <input type="time" style={S.input} value={config.horaFim||"18:00"} onChange={e=>setConfig(p=>({...p,horaFim:e.target.value}))}/>
+            </div>
+            <div>
+              <label style={S.label}>Intervalo entre horários</label>
               <select style={S.select} value={config.granularidadeMinutos||30} onChange={e=>setConfig(p=>({...p,granularidadeMinutos:parseInt(e.target.value)}))}>
                 {[5,10,15,20,30,45,60].map(v=><option key={v} value={v}>{v<60?`${v} min`:"1h"}</option>)}
               </select>
             </div>
           </div>
-          <p style={{fontSize:11,color:"rgba(238,234,226,0.30)",marginTop:12,lineHeight:1.65}}>💡 Granularidade = passo entre os horários disponíveis. A duração real de cada serviço é respeitada — sem janelas desperdiçadas.</p>
+          <div style={{marginTop:14,padding:"10px 14px",background:"rgba(192,155,82,0.04)",border:`1px solid ${T.goldA12}`,borderRadius:10,fontSize:11.5,color:T.text35,lineHeight:1.65,display:"flex",gap:8,alignItems:"flex-start"}}>
+            <span style={{flexShrink:0,marginTop:1}}>💡</span>
+            <span>O intervalo define o passo entre os horários disponíveis para o cliente — a duração real de cada serviço é sempre respeitada.</span>
+          </div>
         </div>
 
-        {/* Serviços */}
-        <div style={S.card}>
-          <p style={S.sectionTitle}>Serviços Oferecidos</p>
+        {/* ── Seção 3: Serviços ── */}
+        <div style={{
+          background:"rgba(17,17,25,0.92)",
+          border:`1px solid rgba(238,234,226,0.07)`,
+          borderRadius:14,
+          padding:"20px 22px",
+          backdropFilter:"blur(12px)",
+        }}>
+          {secaoHeader(IcCfg.tag2,"Serviços Oferecidos","Os clientes escolhem um serviço antes de selecionar o horário.")}
+
           {(config.serviços||[]).length>0&&(
-            <div style={{marginBottom:16}}>
-              <table style={S.table}>
-                <thead><tr><th style={S.th}>Nome</th><th style={S.th}>Duração</th><th style={S.th}>Preço</th><th style={S.th}>Descrição</th><th style={S.th}></th></tr></thead>
-                <tbody>{config.serviços.map(s=>(
-                  <tr key={s.id}>
-                    <td style={S.td}><span style={{fontWeight:600,color:T.text100}}>{s.nome}</span></td>
-                    <td style={S.td}><span style={{color:T.text35}}>{formatDuracao(s.duracao_min)}</span></td>
-                    <td style={S.td}><span style={{color:T.gold}}>{s.preco>0?`R$ ${Number(s.preco).toLocaleString("pt-BR",{minimumFractionDigits:2})}`:"Gratuito"}</span></td>
-                    <td style={S.td}><span style={{fontSize:12,color:T.text35}}>{s.descricao||"—"}</span></td>
-                    <td style={S.td}><button style={S.btnDanger} onClick={()=>setConfig(p=>({...p,serviços:p.serviços.filter(x=>x.id!==s.id)}))}>{Ic.trash}</button></td>
-                  </tr>
-                ))}</tbody>
-              </table>
+            <div style={{marginBottom:16,borderRadius:10,overflow:"hidden",border:`1px solid rgba(238,234,226,0.07)`}}>
+              {config.serviços.map((s,i)=>(
+                <div key={s.id} style={{
+                  display:"grid",
+                  gridTemplateColumns:"1fr auto auto auto auto",
+                  gap:"0 20px",
+                  alignItems:"center",
+                  padding:"13px 16px",
+                  borderBottom:i<config.serviços.length-1?`1px solid rgba(238,234,226,0.05)`:"none",
+                  background:i%2===0?"rgba(255,255,255,0.012)":"transparent",
+                  transition:"background 0.2s",
+                }}>
+                  <div>
+                    <p style={{fontSize:13,fontWeight:600,color:T.text100,marginBottom:2}}>{s.nome}</p>
+                    {s.descricao&&<p style={{fontSize:11,color:T.text35}}>{s.descricao}</p>}
+                  </div>
+                  <div style={{display:"flex",alignItems:"center",gap:5,color:T.text35,fontSize:12,whiteSpace:"nowrap"}}>
+                    <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    {formatDuracao(s.duracao_min)}
+                  </div>
+                  <span style={{...S.badge(s.preco>0?"yellow":"gray"),whiteSpace:"nowrap"}}>
+                    {s.preco>0?`R$ ${Number(s.preco).toLocaleString("pt-BR",{minimumFractionDigits:2})}`:"Gratuito"}
+                  </span>
+                  <button style={S.btnDanger} onClick={()=>setConfig(p=>({...p,serviços:p.serviços.filter(x=>x.id!==s.id)}))}>{Ic.trash}</button>
+                </div>
+              ))}
             </div>
           )}
-          <div style={{background:"rgba(255,255,255,0.02)",border:`1px dashed ${T.goldA22}`,borderRadius:10,padding:16}}>
-            <p style={{...S.label,marginBottom:12,color:T.text100,fontSize:13,fontWeight:600}}>+ Novo Serviço</p>
+
+          {(config.serviços||[]).length===0&&(
+            <div style={{textAlign:"center",padding:"28px 16px",marginBottom:16,background:"rgba(255,255,255,0.01)",border:`1px dashed rgba(238,234,226,0.07)`,borderRadius:10}}>
+              <p style={{fontSize:13,color:T.text35,marginBottom:4}}>Nenhum serviço cadastrado ainda</p>
+              <p style={{fontSize:11.5,color:T.text18}}>Adicione abaixo para que os clientes possam agendar.</p>
+            </div>
+          )}
+
+          {/* Formulário novo serviço */}
+          <div style={{background:"rgba(192,155,82,0.03)",border:`1px dashed ${T.goldA22}`,borderRadius:10,padding:"16px 18px"}}>
+            <p style={{fontSize:12,fontWeight:700,color:T.gold,textTransform:"uppercase",letterSpacing:"1px",marginBottom:14}}>+ Novo Serviço</p>
             <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr",gap:12,marginBottom:12}}>
-              <div><label style={S.label}>Nome *</label><input style={S.input} value={novoS.nome} onChange={e=>setNovoS(p=>({...p,nome:e.target.value}))} placeholder="Ex: Manicure"/></div>
+              <div><label style={S.label}>Nome *</label><input style={S.input} value={novoS.nome} onChange={e=>setNovoS(p=>({...p,nome:e.target.value}))} placeholder="Ex: Manicure com Esmaltação"/></div>
               <div><label style={S.label}>Duração</label><select style={S.select} value={novoS.duracao} onChange={e=>setNovoS(p=>({...p,duracao:e.target.value}))}>{[15,20,30,45,60,75,90,120,150,180,240].map(v=><option key={v} value={v}>{formatDuracao(v)}</option>)}</select></div>
               <div><label style={S.label}>Preço (R$)</label><input style={S.input} type="number" min="0" step="0.01" value={novoS.preco} onChange={e=>setNovoS(p=>({...p,preco:e.target.value}))} placeholder="0,00"/></div>
             </div>
             <div style={{display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"flex-end"}}>
-              <div><label style={S.label}>Descrição (opcional)</label><input style={S.input} value={novoS.descricao} onChange={e=>setNovoS(p=>({...p,descricao:e.target.value}))} placeholder="Breve descrição"/></div>
-              <button onClick={addServico} disabled={!novoS.nome.trim()} style={{...S.btnPrimary,height:38,opacity:novoS.nome.trim()?1:0.4}}>{Ic.plus} Adicionar</button>
+              <div><label style={S.label}>Descrição curta (opcional)</label><input style={S.input} value={novoS.descricao} onChange={e=>setNovoS(p=>({...p,descricao:e.target.value}))} placeholder="Breve descrição exibida para o cliente"/></div>
+              <button onClick={addServico} disabled={!novoS.nome.trim()} style={{...S.btnPrimary,height:42,paddingLeft:18,paddingRight:18,opacity:novoS.nome.trim()?1:0.4}}>{Ic.plus} Adicionar</button>
             </div>
           </div>
         </div>
 
-        <div style={{display:"flex",justifyContent:"flex-end"}}>
-          <button onClick={salvar} disabled={salvando} style={{...S.btnPrimary,padding:"10px 28px",fontSize:14}}>{salvando?"Salvando…":"💾 Salvar Configurações"}</button>
+        {/* ── Botão salvar ── */}
+        <div style={{display:"flex",justifyContent:"flex-end",paddingBottom:8}}>
+          <button onClick={salvar} disabled={salvando} style={{...S.btnPrimary,padding:"11px 32px",fontSize:14,boxShadow:"0 4px 20px rgba(192,155,82,0.30)"}}>
+            {salvando?"Salvando…":"Salvar Configurações"}
+          </button>
         </div>
       </>}
     </div>
@@ -1192,6 +1308,7 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
 function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
   const [configs,setConfigs]=useState({});
   const [copied,setCopied]=useState(null);
+  const [expanded,setExpanded]=useState(null);
 
   useEffect(()=>{
     if(!tenantUid||!prestadores.length) return;
@@ -1203,52 +1320,184 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
     return()=>unsubs.forEach(u=>u());
   },[tenantUid,prestadores.length]);
 
-  const copiar=id=>{ navigator.clipboard.writeText(id==="admin"?`${PUBLIC_BASE}?tenant=${tenantUid}`:`${PUBLIC_BASE}?tenant=${tenantUid}&prestador=${id}`); setCopied(id); setTimeout(()=>setCopied(null),2500); };
+  const copiar=id=>{
+    navigator.clipboard.writeText(id==="admin"?`${PUBLIC_BASE}?tenant=${tenantUid}`:`${PUBLIC_BASE}?tenant=${tenantUid}&prestador=${id}`);
+    setCopied(id); setTimeout(()=>setCopied(null),2500);
+  };
   const lista=isAdmin?prestadores.filter(p=>p.ativo):prestadores.filter(p=>p.id===meuPrestadorId);
+
+  // Ícone de link externo
+  const IcExternal = <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>;
+  const IcQR = <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3M17 14h4v4M14 17h3v4M17 21h4"/></svg>;
 
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
-      {/* Info URL admin */}
+
+      {/* ── Banner informativo (admin) ── */}
       {isAdmin&&(
-        <div style={{padding:"12px 16px",background:"rgba(192,155,82,0.06)",border:"1px solid rgba(192,155,82,0.18)",borderRadius:12,fontSize:12,color:"rgba(238,234,226,0.40)",lineHeight:1.6}}>
-          ℹ️ O link do <strong style={{color:"#D9B96E"}}>Administrador</strong> é o link padrão da empresa — funciona sem o parâmetro <code style={{background:"rgba(238,234,226,0.06)",padding:"1px 6px",borderRadius:5,fontSize:11,color:"rgba(238,234,226,0.55)"}}>&prestador=</code>. Os links dos colaboradores incluem o parâmetro automaticamente.
+        <div style={{
+          background:"rgba(17,17,25,0.92)",
+          border:`1px solid rgba(238,234,226,0.07)`,
+          borderLeft:`3px solid ${T.gold}`,
+          borderRadius:14,
+          padding:"16px 20px",
+          backdropFilter:"blur(12px)",
+          position:"relative",overflow:"hidden",
+          display:"flex",alignItems:"flex-start",gap:14,
+        }}>
+          <div style={{position:"absolute",top:0,left:0,width:120,height:"100%",background:`linear-gradient(90deg,${T.goldA06} 0%,transparent 100%)`,pointerEvents:"none"}}/>
+          <div style={{width:36,height:36,borderRadius:10,background:T.goldA06,border:`1px solid ${T.goldA22}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.gold,flexShrink:0,fontSize:16}}>🔗</div>
+          <div style={{flex:1}}>
+            <p style={{fontSize:13,fontWeight:700,color:T.text100,marginBottom:4}}>Links de Agendamento Público</p>
+            <p style={{fontSize:12,color:T.text35,lineHeight:1.65}}>
+              O link do <strong style={{color:T.gold}}>Administrador</strong> é o endereço principal da empresa — funciona sem parâmetros adicionais.
+              Os links de colaboradores incluem o identificador único de cada prestador automaticamente.
+            </p>
+          </div>
         </div>
       )}
 
-      {lista.length===0?<div style={{...S.card,...S.emptyState}}><p style={{fontSize:13}}>Nenhum prestador ativo.</p></div>:
+      {/* ── Lista de prestadores ── */}
+      {lista.length===0?(
+        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderRadius:14,padding:"52px 24px",textAlign:"center",backdropFilter:"blur(12px)"}}>
+          <p style={{fontSize:22,marginBottom:8}}>📭</p>
+          <p style={{fontSize:13,fontWeight:700,color:T.text35}}>Nenhum prestador ativo no momento.</p>
+        </div>
+      ):(
         lista.map(p=>{
           const cfg=configs[p.id];
           const link=p.id==="admin"?`${PUBLIC_BASE}?tenant=${tenantUid}`:`${PUBLIC_BASE}?tenant=${tenantUid}&prestador=${p.id}`;
-          const temS=cfg?.serviços?.length>0, temH=cfg?.diasAtivos?.length>0;
+          const temS=cfg?.serviços?.length>0;
+          const temH=cfg?.diasAtivos?.length>0;
+          const temNome=!!cfg?.nomeEmpresa;
+          const prontoParaCompartilhar=temS&&temH&&temNome;
+          const numServicos=(cfg?.serviços||[]).length;
+          const diasAtivos=(cfg?.diasAtivos||[]);
+          const isExpanded=expanded===p.id;
+
+          const statusBorder = prontoParaCompartilhar ? T.emerald : T.goldLo;
+          const statusGlow   = prontoParaCompartilhar ? "rgba(45,211,122,0.08)" : "rgba(192,155,82,0.06)";
+
           return (
-            <div key={p.id} style={S.card}>
-              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:14}}>
+            <div key={p.id} style={{
+              background:"rgba(17,17,25,0.92)",
+              border:`1px solid rgba(238,234,226,0.07)`,
+              borderLeft:`3px solid ${statusBorder}`,
+              borderRadius:14,
+              backdropFilter:"blur(12px)",
+              overflow:"hidden",
+              transition:"box-shadow 0.25s",
+              position:"relative",
+            }}
+            onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 4px 32px rgba(0,0,0,0.38), 0 0 0 1px rgba(238,234,226,0.07)`;}}
+            onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";}}>
+
+              {/* Glow lateral */}
+              <div style={{position:"absolute",top:0,left:0,width:120,height:"100%",background:`linear-gradient(90deg,${statusGlow} 0%,transparent 100%)`,pointerEvents:"none"}}/>
+
+              {/* ── Cabeçalho do card ── */}
+              <div style={{padding:"18px 22px",display:"flex",alignItems:"center",gap:14}}>
                 <Avatar nome={p.nome}/>
-                <div style={{flex:1}}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2}}>
-                    <p style={{fontSize:14,fontWeight:600,color:T.text100}}>{p.nome}</p>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:3,flexWrap:"wrap"}}>
+                    <p style={{fontSize:14,fontWeight:700,color:T.text100,letterSpacing:"-0.1px"}}>{p.nome}</p>
                     {p.isAdmin&&<span style={{...S.badge("yellow"),display:"flex",alignItems:"center",gap:3,fontSize:10}}>{Ic.crown} Admin</span>}
+                    <span style={S.badge(prontoParaCompartilhar?"green":"yellow")}>{prontoParaCompartilhar?"Pronto":"Incompleto"}</span>
                   </div>
                   <p style={{fontSize:12,color:T.text35}}>{p.especialidade||"Prestador de serviço"}</p>
                 </div>
-                <span style={S.badge(p.ativo?"green":"gray")}>{p.ativo?"Ativo":"Inativo"}</span>
+
+                {/* Ações principais */}
+                <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
+                  <button
+                    onClick={()=>setExpanded(isExpanded?null:p.id)}
+                    style={{...S.btnGhost,padding:"7px 12px",fontSize:11,color:isExpanded?T.gold:T.text35,borderColor:isExpanded?T.goldA22:undefined}}
+                  >
+                    {isExpanded?"▲ Menos":"▼ Detalhes"}
+                  </button>
+                  <button
+                    onClick={()=>window.open(link,"_blank")}
+                    style={{...S.btnGhost,padding:"7px 12px",fontSize:11}}
+                  >
+                    {IcExternal} Abrir
+                  </button>
+                  <button
+                    onClick={()=>copiar(p.id)}
+                    style={{
+                      ...S.btnPrimary,
+                      background:copied===p.id?T.emeraldA10:`linear-gradient(135deg, ${T.goldHi} 0%, ${T.goldLo} 100%)`,
+                      color:copied===p.id?T.emerald:T.ink,
+                      border:copied===p.id?`1px solid ${T.emeraldA22}`:"none",
+                      padding:"7px 16px",fontSize:12,
+                      boxShadow:copied===p.id?"0 0 12px rgba(45,211,122,0.18)":"0 4px 14px rgba(192,155,82,0.22)",
+                    }}
+                  >
+                    {copied===p.id?<>{Ic.check} Copiado!</>:<>{Ic.copy} Copiar Link</>}
+                  </button>
+                </div>
               </div>
-              <div style={{display:"flex",gap:16,marginBottom:12}}>
-                <CheckItem ok={temH} label="Horários configurados"/>
-                <CheckItem ok={temS} label="Serviços cadastrados"/>
-                <CheckItem ok={!!cfg?.nomeEmpresa} label="Nome preenchido"/>
+
+              {/* ── URL sempre visível ── */}
+              <div style={{margin:"0 22px 16px",padding:"10px 14px",background:"rgba(255,255,255,0.025)",border:`1px solid rgba(238,234,226,0.06)`,borderRadius:10,display:"flex",alignItems:"center",gap:10}}>
+                <div style={{width:22,height:22,borderRadius:6,background:T.goldA06,border:`1px solid ${T.goldA12}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.gold,flexShrink:0,fontSize:10}}>🔗</div>
+                <span style={{fontSize:11.5,color:T.text35,flex:1,wordBreak:"break-all",fontFamily:"monospace"}}>{link}</span>
               </div>
-              <div style={{display:"flex",gap:10,alignItems:"center",background:"rgba(255,255,255,0.02)",border:`1px solid ${T.line}`,borderRadius:10,padding:"10px 14px"}}>
-                <span style={{fontSize:12,color:T.text100,flex:1,wordBreak:"break-all"}}>{link}</span>
-                <button onClick={()=>copiar(p.id)} style={{...S.btnPrimary,background:copied===p.id?T.emeraldA10:`linear-gradient(135deg, ${T.goldHi} 0%, ${T.goldLo} 100%)`,color:copied===p.id?T.emerald:T.ink,border:copied===p.id?`1px solid ${T.emeraldA22}`:"none",flexShrink:0,padding:"7px 14px"}}>
-                  {copied===p.id?<>{Ic.check} Copiado!</>:<>{Ic.copy} Copiar</>}
-                </button>
+
+              {/* ── Checklist de prontidão ── */}
+              <div style={{margin:"0 22px",padding:"12px 16px",background:"rgba(255,255,255,0.015)",border:`1px solid rgba(238,234,226,0.05)`,borderRadius:10,display:"flex",gap:24,flexWrap:"wrap",marginBottom:prontoParaCompartilhar&&!isExpanded?16:12}}>
+                <CheckItem ok={temNome} label="Nome preenchido"/>
+                <CheckItem ok={temH} label={temH?`${diasAtivos.length} dias ativos`:"Horários configurados"}/>
+                <CheckItem ok={temS} label={temS?`${numServicos} serviço${numServicos!==1?"s":""}`:"Serviços cadastrados"}/>
               </div>
-              {(!temS||!temH)&&<div style={{marginTop:12,padding:"10px 14px",background:"rgba(192,155,82,0.06)",border:"1px solid rgba(192,155,82,0.20)",borderRadius:10,fontSize:12,color:"#D9B96E"}}>⚠️ Configure serviços e horários antes de compartilhar este link.</div>}
+
+              {/* ── Aviso se incompleto ── */}
+              {!prontoParaCompartilhar&&(
+                <div style={{margin:"0 22px",marginBottom:16,padding:"10px 14px",background:"rgba(192,155,82,0.04)",border:`1px solid rgba(192,155,82,0.18)`,borderRadius:10,fontSize:11.5,color:"#D9B96E",display:"flex",gap:8,alignItems:"flex-start"}}>
+                  <span style={{flexShrink:0}}>⚠️</span>
+                  <span>
+                    {[!temNome&&"preencha o nome público",!temH&&"configure dias e horários",!temS&&"adicione pelo menos um serviço"].filter(Boolean).join(", ")}
+                    {" "}antes de compartilhar este link.
+                  </span>
+                </div>
+              )}
+
+              {/* ── Painel expandido: preview de horários e serviços ── */}
+              {isExpanded&&(
+                <div style={{borderTop:`1px solid rgba(238,234,226,0.05)`,margin:"0 0 0 0",padding:"16px 22px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+                  <div>
+                    <p style={{...S.sectionTitle,marginBottom:10}}>Dias Ativos</p>
+                    <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
+                      {["dom","seg","ter","qua","qui","sex","sab"].map(k=>{
+                        const ativo=diasAtivos.includes(k);
+                        const label={dom:"Dom",seg:"Seg",ter:"Ter",qua:"Qua",qui:"Qui",sex:"Sex",sab:"Sáb"}[k];
+                        return <div key={k} style={{padding:"5px 10px",borderRadius:7,fontSize:11,fontWeight:ativo?700:400,background:ativo?T.goldA12:"rgba(255,255,255,0.02)",border:ativo?`1px solid ${T.goldA22}`:`1px solid rgba(238,234,226,0.05)`,color:ativo?T.gold:T.text18}}>{label}</div>;
+                      })}
+                    </div>
+                    {cfg?.horaInicio&&cfg?.horaFim&&(
+                      <p style={{fontSize:11.5,color:T.text35,marginTop:10}}>{cfg.horaInicio} – {cfg.horaFim} · intervalo de {cfg.granularidadeMinutos||30} min</p>
+                    )}
+                  </div>
+                  <div>
+                    <p style={{...S.sectionTitle,marginBottom:10}}>Serviços ({numServicos})</p>
+                    {numServicos===0?<p style={{fontSize:12,color:T.text18}}>Nenhum serviço cadastrado.</p>:(
+                      <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                        {(cfg?.serviços||[]).slice(0,4).map(s=>(
+                          <div key={s.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"rgba(255,255,255,0.02)",borderRadius:8,border:`1px solid rgba(238,234,226,0.05)`}}>
+                            <span style={{fontSize:12,color:T.text100,fontWeight:600,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.nome}</span>
+                            <span style={{fontSize:11,color:T.text35,whiteSpace:"nowrap"}}>{formatDuracao(s.duracao_min)}</span>
+                            <span style={{...S.badge(s.preco>0?"yellow":"gray"),fontSize:10}}>{s.preco>0?`R$${Number(s.preco).toLocaleString("pt-BR",{minimumFractionDigits:2})}`:"Free"}</span>
+                          </div>
+                        ))}
+                        {numServicos>4&&<p style={{fontSize:11,color:T.text18,marginTop:2}}>+{numServicos-4} serviço{numServicos-4!==1?"s":""} adicionais</p>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           );
         })
-      }
+      )}
     </div>
   );
 }
@@ -1407,7 +1656,6 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
           {TELAS.map(t=><div key={t.key} style={S.navItem(tela===t.key)} onClick={()=>setTela(t.key)}>{t.icon}{t.label}</div>)}
         </nav>
         <div style={S.sidebarFooter}>
-          <button style={S.btnSidebarSecondary} onClick={onToggleTheme}>{theme==="dark"?Ic.sun:Ic.moon}{theme==="dark"?"Modo Claro":"Modo Escuro"}</button>
           <button style={S.btnSidebarSecondary} onClick={onVoltar}>{Ic.back}Voltar ao Gestão</button>
         </div>
       </aside>
