@@ -42,19 +42,35 @@ function tocarSomNotificacao() {
   if (!ctx) return;
 
   try {
-    const osc  = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+    // Compressor maximiza volume sem distorcao
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -6;
+    comp.knee.value      = 0;
+    comp.ratio.value     = 20;
+    comp.attack.value    = 0.001;
+    comp.release.value   = 0.1;
+    comp.connect(ctx.destination);
 
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.15);
+    // Dois beeps descendentes (1200 Hz -> 960 Hz), cada um com harmonico
+    const playBeep = (t, freq) => {
+      [freq, freq * 1.5].forEach((f, i) => {
+        const osc  = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type            = "sine";
+        osc.frequency.value = f;
+        osc.connect(gain);
+        gain.connect(comp);
+        const vol = i === 0 ? 0.85 : 0.35;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(vol, t + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+        osc.start(t);
+        osc.stop(t + 0.32);
+      });
+    };
 
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-
-    osc.start();
-    osc.stop(ctx.currentTime + 0.4);
+    playBeep(ctx.currentTime,        1200); // primeiro beep
+    playBeep(ctx.currentTime + 0.22,  960); // segundo beep
   } catch {
     // Silencia erros de AudioContext suspendido — sem impacto na UX
   }
