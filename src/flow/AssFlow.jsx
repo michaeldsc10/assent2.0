@@ -11,7 +11,7 @@
 //   ?tenant=X&prestador=Y  → prestador específico
 
 import { useState, useEffect } from "react";
-import { useAuth } from "../contexts/AuthContextjsx";
+import { useAuth } from "../contexts/AuthContext.jsx";
 import {
   getFirestore, collection, doc, onSnapshot,
   setDoc, updateDoc, deleteDoc, getDoc,
