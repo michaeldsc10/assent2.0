@@ -11,7 +11,7 @@
 //   ?tenant=X&prestador=Y  → prestador específico
 
 import { useState, useEffect } from "react";
-import { useAuth } from "../contexts/AuthContext.jsx";
+import { useAuth } from "../contexts/AuthContextjsx";
 import {
   getFirestore, collection, doc, onSnapshot,
   setDoc, updateDoc, deleteDoc, getDoc,
@@ -671,6 +671,180 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
 }
 
 // ─── Tela Reservas ────────────────────────────────────────────────────────────
+// Ícones internos da tela reservas
+const IcR = {
+  user:    <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  mail:    <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>,
+  phone:   <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.15 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.06 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 8.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>,
+  clock:   <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>,
+  scissor: <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.12 15.88M14.47 14.48 20 20M8.12 8.12 12 12"/></svg>,
+  cal:     <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>,
+  tag:     <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/></svg>,
+  filter:  <svg width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>,
+};
+
+// Linha decorativa de status por lado do card
+const STATUS_ACCENT = {
+  confirmado: { color:"#2DD37A", glow:"rgba(45,211,122,0.18)", label:"Confirmado" },
+  pendente:   { color:"#D9B96E", glow:"rgba(192,155,82,0.18)",  label:"Pendente"   },
+  cancelado:  { color:"rgba(239,68,68,0.75)", glow:"rgba(239,68,68,0.10)", label:"Cancelado" },
+};
+
+function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando, onAtualizar}){
+  const acc = STATUS_ACCENT[r.status] || STATUS_ACCENT.cancelado;
+  const dtInicio = r.data_hora_inicio ? (r.data_hora_inicio.toDate ? r.data_hora_inicio.toDate() : new Date(r.data_hora_inicio)) : null;
+  const dtCriado = r.criadoEm ? (r.criadoEm.toDate ? r.criadoEm.toDate() : new Date(r.criadoEm)) : null;
+
+  const fmtData = d => d ? d.toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"}) : "—";
+  const fmtHora = d => d ? d.toLocaleString("pt-BR",{hour:"2-digit",minute:"2-digit"}) : "—";
+  const fmtCurto = d => d ? d.toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}) : "—";
+
+  return (
+    <div style={{
+      background:"rgba(17,17,25,0.92)",
+      border:`1px solid rgba(238,234,226,0.07)`,
+      borderLeft:`3px solid ${acc.color}`,
+      borderRadius:14,
+      padding:"18px 22px",
+      display:"grid",
+      gridTemplateColumns:"1fr 1fr 1fr auto",
+      gap:"0 24px",
+      alignItems:"center",
+      backdropFilter:"blur(12px)",
+      boxShadow:`0 2px 24px rgba(0,0,0,0.28), inset 0 0 0 0 transparent`,
+      transition:"box-shadow 0.25s, border-color 0.25s",
+      position:"relative",
+      overflow:"hidden",
+    }}
+    onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 4px 32px rgba(0,0,0,0.38), 0 0 0 1px rgba(238,234,226,0.09)`;}}
+    onMouseLeave={e=>{e.currentTarget.style.boxShadow=`0 2px 24px rgba(0,0,0,0.28)`;}}
+    >
+      {/* Glow de status sutil no canto */}
+      <div style={{position:"absolute",top:0,left:0,width:120,height:"100%",background:`linear-gradient(90deg, ${acc.glow} 0%, transparent 100%)`,pointerEvents:"none",borderRadius:"14px 0 0 14px"}}/>
+
+      {/* ── Coluna 1: Cliente ── */}
+      <div style={{minWidth:0}}>
+        <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}>
+          <div style={{width:32,height:32,borderRadius:10,background:"linear-gradient(140deg,#D9B96E 0%,#856830 100%)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"#040408",flexShrink:0,letterSpacing:"-0.5px",boxShadow:"0 0 0 1px rgba(192,155,82,0.20)"}}>
+            {initials(r.cliente_nome)}
+          </div>
+          <span style={{fontSize:13,fontWeight:700,color:"#EEEAE2",letterSpacing:"-0.1px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.cliente_nome||"—"}</span>
+        </div>
+        <div style={{display:"flex",flexDirection:"column",gap:4,paddingLeft:2}}>
+          {r.cliente_email&&(
+            <div style={{display:"flex",alignItems:"center",gap:5}}>
+              <span style={{color:"rgba(238,234,226,0.25)",flexShrink:0}}>{IcR.mail}</span>
+              <span style={{fontSize:11,color:"rgba(238,234,226,0.38)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.cliente_email}</span>
+            </div>
+          )}
+          {r.cliente_telefone&&(
+            <div style={{display:"flex",alignItems:"center",gap:5}}>
+              <span style={{color:"rgba(238,234,226,0.25)",flexShrink:0}}>{IcR.phone}</span>
+              <span style={{fontSize:11,color:"rgba(238,234,226,0.38)"}}>{r.cliente_telefone}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Coluna 2: Serviço + Data ── */}
+      <div style={{borderLeft:"1px solid rgba(238,234,226,0.06)",paddingLeft:20,display:"flex",flexDirection:"column",gap:10}}>
+        <div>
+          <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
+            <span style={{color:"rgba(192,155,82,0.50)",flexShrink:0}}>{IcR.scissor}</span>
+            <span style={{fontSize:9.5,fontWeight:700,color:"rgba(238,234,226,0.22)",textTransform:"uppercase",letterSpacing:"1.2px"}}>Serviço</span>
+          </div>
+          <p style={{fontSize:13,fontWeight:600,color:"rgba(238,234,226,0.85)",lineHeight:1.3}}>{r.servico_nome||"—"}</p>
+          {r.servico_duracao_min&&(
+            <div style={{display:"flex",alignItems:"center",gap:4,marginTop:3}}>
+              <span style={{color:"rgba(192,155,82,0.35)"}}>{IcR.clock}</span>
+              <span style={{fontSize:11,color:"rgba(192,155,82,0.55)",fontWeight:500}}>{formatDuracao(r.servico_duracao_min)}</span>
+            </div>
+          )}
+        </div>
+        {isAdmin&&prestadoresAtivos.length>1&&pr&&(
+          <div style={{display:"flex",alignItems:"center",gap:6}}>
+            <div style={{width:20,height:20,borderRadius:6,background:"linear-gradient(140deg,#D9B96E 0%,#856830 100%)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:800,color:"#040408",flexShrink:0}}>{initials(pr.nome)}</div>
+            <span style={{fontSize:11,color:"rgba(192,155,82,0.65)",fontWeight:500}}>{pr.nome}</span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Coluna 3: Datas ── */}
+      <div style={{borderLeft:"1px solid rgba(238,234,226,0.06)",paddingLeft:20,display:"flex",flexDirection:"column",gap:10}}>
+        {dtInicio&&(
+          <div>
+            <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
+              <span style={{color:"rgba(192,155,82,0.50)",flexShrink:0}}>{IcR.cal}</span>
+              <span style={{fontSize:9.5,fontWeight:700,color:"rgba(238,234,226,0.22)",textTransform:"uppercase",letterSpacing:"1.2px"}}>Agendado para</span>
+            </div>
+            <p style={{fontSize:14,fontWeight:700,color:"#EEEAE2",letterSpacing:"-0.3px",lineHeight:1}}>{fmtData(dtInicio)}</p>
+            <p style={{fontSize:12,color:"rgba(192,155,82,0.75)",fontWeight:600,marginTop:2}}>{fmtHora(dtInicio)}</p>
+          </div>
+        )}
+        {dtCriado&&(
+          <div>
+            <span style={{fontSize:9.5,fontWeight:600,color:"rgba(238,234,226,0.18)",textTransform:"uppercase",letterSpacing:"1px"}}>Criado em</span>
+            <p style={{fontSize:11,color:"rgba(238,234,226,0.28)",marginTop:2}}>{fmtCurto(dtCriado)}</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Coluna 4: Status + Ações ── */}
+      <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:10,minWidth:120}}>
+        {/* Badge de status */}
+        <div style={{
+          display:"inline-flex",alignItems:"center",gap:5,
+          padding:"5px 12px",borderRadius:20,
+          background:`${acc.glow}`,
+          border:`1px solid ${acc.color}44`,
+          color:acc.color,fontSize:11,fontWeight:700,letterSpacing:"0.3px",
+        }}>
+          <div style={{width:6,height:6,borderRadius:"50%",background:acc.color,boxShadow:`0 0 6px ${acc.color}`}}/>
+          {acc.label}
+        </div>
+
+        {/* Ações */}
+        {podeEditar&&(
+          <div style={{display:"flex",gap:6}}>
+            {r.status==="pendente"&&(
+              <>
+                <button onClick={()=>onAtualizar(r.id,"confirmado")} disabled={atualizando===r.id} style={{
+                  padding:"6px 12px",border:"1px solid rgba(45,211,122,0.30)",borderRadius:8,
+                  background:"rgba(45,211,122,0.08)",color:"#2DD37A",fontSize:11,fontWeight:700,
+                  cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",
+                  opacity:atualizando===r.id?0.5:1,
+                }}>✓ Confirmar</button>
+                <button onClick={()=>onAtualizar(r.id,"cancelado")} disabled={atualizando===r.id} style={{
+                  padding:"6px 12px",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,
+                  background:"rgba(239,68,68,0.06)",color:"#F87171",fontSize:11,fontWeight:700,
+                  cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",
+                  opacity:atualizando===r.id?0.5:1,
+                }}>✕ Cancelar</button>
+              </>
+            )}
+            {r.status==="confirmado"&&(
+              <button onClick={()=>onAtualizar(r.id,"cancelado")} disabled={atualizando===r.id} style={{
+                padding:"6px 12px",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,
+                background:"rgba(239,68,68,0.06)",color:"#F87171",fontSize:11,fontWeight:700,
+                cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",
+                opacity:atualizando===r.id?0.5:1,
+              }}>✕ Cancelar</button>
+            )}
+            {r.status==="cancelado"&&(
+              <button onClick={()=>onAtualizar(r.id,"pendente")} disabled={atualizando===r.id} style={{
+                padding:"6px 12px",border:"1px solid rgba(238,234,226,0.12)",borderRadius:8,
+                background:"rgba(238,234,226,0.04)",color:"rgba(238,234,226,0.45)",fontSize:11,fontWeight:600,
+                cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",
+                opacity:atualizando===r.id?0.5:1,
+              }}>↺ Reabrir</button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar}){
   const [reservas,setReservas]=useState([]);
   const [loading,setLoading]=useState(true);
@@ -708,77 +882,104 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
 
   if(loading) return <Loading/>;
   const prestadoresAtivos=prestadores.filter(p=>p.ativo);
+
+  const FILTROS = [
+    {key:"todos",    label:"Todos",      count: reservas.length},
+    {key:"pendente", label:"Pendente",   count: reservas.filter(r=>r.status==="pendente").length},
+    {key:"confirmado",label:"Confirmado",count: reservas.filter(r=>r.status==="confirmado").length},
+    {key:"cancelado",label:"Cancelado",  count: reservas.filter(r=>r.status==="cancelado").length},
+  ];
+  const FILTRO_COLORS = {todos:"#C09B52", pendente:"#D9B96E", confirmado:"#2DD37A", cancelado:"#F87171"};
+
   return (
-    <div style={{position:"relative"}}>
+    <div style={{position:"relative",display:"flex",flexDirection:"column",gap:20}}>
       <Toast t={t}/>
-      <div style={{display:"flex",gap:10,marginBottom:16,alignItems:"center",flexWrap:"wrap"}}>
+
+      {/* ── Toolbar ── */}
+      <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+
+        {/* Pills de status */}
+        <div style={{display:"flex",gap:4,background:"rgba(238,234,226,0.03)",border:"1px solid rgba(238,234,226,0.07)",borderRadius:12,padding:"4px"}}>
+          {FILTROS.map(({key,label,count})=>{
+            const ativo = filtroStatus===key;
+            const cor = FILTRO_COLORS[key];
+            return (
+              <button key={key} onClick={()=>setFiltroStatus(key)} style={{
+                padding:"6px 14px",borderRadius:9,border:"none",
+                background: ativo ? "rgba(238,234,226,0.07)" : "transparent",
+                color: ativo ? cor : "rgba(238,234,226,0.30)",
+                fontSize:12,fontWeight:ativo?700:500,
+                cursor:"pointer",transition:"all 0.2s",
+                display:"flex",alignItems:"center",gap:6,
+              }}>
+                {label}
+                <span style={{
+                  fontSize:10,fontWeight:700,
+                  padding:"1px 7px",borderRadius:20,
+                  background: ativo ? `${cor}22` : "rgba(238,234,226,0.05)",
+                  color: ativo ? cor : "rgba(238,234,226,0.20)",
+                  border: ativo ? `1px solid ${cor}33` : "1px solid transparent",
+                  transition:"all 0.2s",
+                }}>{count}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Filtro por prestador */}
         {isAdmin&&prestadoresAtivos.length>1&&(
-          <select style={{...S.select,width:"auto",minWidth:180}} value={filtroP} onChange={e=>setFiltroP(e.target.value)}>
+          <select style={{...S.select,width:"auto",minWidth:170,fontSize:12,padding:"7px 12px"}} value={filtroP} onChange={e=>setFiltroP(e.target.value)}>
             <option value="todos">Toda a equipe</option>
             {prestadoresAtivos.map(p=><option key={p.id} value={p.id}>{p.nome}{p.isAdmin?" (você)":""}</option>)}
           </select>
         )}
-        <div style={{display:"flex",gap:6}}>
-          {["todos","pendente","confirmado","cancelado"].map(s=>(
-            <button key={s} onClick={()=>setFiltroStatus(s)} style={{padding:"6px 14px",borderRadius:20,border:filtroStatus===s?"1px solid var(--gold)":"1px solid var(--border)",background:filtroStatus===s?"rgba(212,175,55,0.12)":"transparent",color:filtroStatus===s?"var(--gold)":"var(--text-muted)",fontSize:12,fontWeight:filtroStatus===s?600:400,cursor:"pointer"}}>
-              {s==="todos"?"Todos":statusLabel(s)}
-            </button>
-          ))}
+
+        {/* Input de data */}
+        <div style={{position:"relative",display:"flex",alignItems:"center"}}>
+          <span style={{position:"absolute",left:11,color:"rgba(238,234,226,0.25)",pointerEvents:"none",display:"flex"}}>{IcR.cal}</span>
+          <input type="date" value={filtroData} onChange={e=>setFiltroData(e.target.value)} style={{
+            ...S.input,width:170,paddingLeft:30,fontSize:12,
+            color: filtroData ? "#EEEAE2" : "rgba(238,234,226,0.25)",
+          }}/>
         </div>
-        <input type="date" value={filtroData} onChange={e=>setFiltroData(e.target.value)} style={{...S.input,width:160}}/>
-        {filtroData&&<button onClick={()=>setFiltroData("")} style={S.btnGhost}>Limpar</button>}
-        <span style={{marginLeft:"auto",fontSize:12,color:"var(--text-muted)"}}>{f.length} reserva{f.length!==1?"s":""}</span>
-      </div>
-      <div style={{...S.card,padding:0,overflow:"hidden"}}>
-        {f.length===0?(
-          <div style={S.emptyState}><p style={{fontSize:24,marginBottom:8}}>📭</p><p style={{fontSize:13,fontWeight:600,color:"var(--text)"}}>Nenhuma reserva encontrada</p></div>
-        ):(
-          <table style={S.table}>
-            <thead><tr>
-              <th style={S.th}>Cliente</th>
-              {isAdmin&&prestadoresAtivos.length>1&&<th style={S.th}>Prestador</th>}
-              <th style={S.th}>Serviço</th><th style={S.th}>Data/Hora</th>
-              <th style={S.th}>Status</th><th style={S.th}>Criado em</th>
-              {podeEditar&&<th style={S.th}>Ações</th>}
-            </tr></thead>
-            <tbody>
-              {f.map(r=>{
-                const pr=prestadores.find(p=>p.id===r.prestadorId);
-                return (
-                  <tr key={r.id}>
-                    <td style={S.td}>
-                      <span style={{fontWeight:600,color:"var(--text)",display:"block"}}>{r.cliente_nome||"—"}</span>
-                      {r.cliente_email&&<span style={{fontSize:11,color:"var(--text-muted)",display:"block"}}>{r.cliente_email}</span>}
-                      {r.cliente_telefone&&<span style={{fontSize:11,color:"var(--text-muted)",display:"block"}}>{r.cliente_telefone}</span>}
-                    </td>
-                    {isAdmin&&prestadoresAtivos.length>1&&(
-                      <td style={S.td}>
-                        <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          <Avatar nome={pr?.nome||"?"} size={26}/>
-                          <span style={{fontSize:12,color:"var(--text-muted)"}}>{pr?.nome||"—"}</span>
-                        </div>
-                      </td>
-                    )}
-                    <td style={S.td}><span style={{display:"block"}}>{r.servico_nome||"—"}</span>{r.servico_duracao_min&&<span style={{fontSize:11,color:"var(--text-muted)"}}>{formatDuracao(r.servico_duracao_min)}</span>}</td>
-                    <td style={S.td}><span style={{fontSize:13}}>{formatDate(r.data_hora_inicio)}</span></td>
-                    <td style={S.td}><span style={S.badge(statusColor(r.status))}>{statusLabel(r.status)}</span></td>
-                    <td style={S.td}><span style={{fontSize:12,color:"var(--text-muted)"}}>{formatDate(r.criadoEm)}</span></td>
-                    {podeEditar&&(
-                      <td style={S.td}>
-                        <div style={{display:"flex",gap:6}}>
-                          {r.status==="pendente"&&<><button onClick={()=>atualizarStatus(r.id,"confirmado")} disabled={atualizando===r.id} style={S.btnSuccess}>✓ Confirmar</button><button onClick={()=>atualizarStatus(r.id,"cancelado")} disabled={atualizando===r.id} style={S.btnDanger}>✕ Cancelar</button></>}
-                          {r.status==="confirmado"&&<button onClick={()=>atualizarStatus(r.id,"cancelado")} disabled={atualizando===r.id} style={S.btnDanger}>✕ Cancelar</button>}
-                          {r.status==="cancelado"&&<button onClick={()=>atualizarStatus(r.id,"pendente")} disabled={atualizando===r.id} style={S.btnGhost}>↺ Reabrir</button>}
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        {filtroData&&(
+          <button onClick={()=>setFiltroData("")} style={{...S.btnGhost,fontSize:11,padding:"6px 10px",gap:4}}>
+            ✕ Limpar data
+          </button>
         )}
+
+        {/* Contador */}
+        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:6}}>
+          <span style={{fontSize:11,color:"rgba(238,234,226,0.20)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.8px"}}>{f.length} reserva{f.length!==1?"s":""}</span>
+        </div>
       </div>
+
+      {/* ── Lista de cards ── */}
+      {f.length===0?(
+        <div style={{...S.card,textAlign:"center",padding:"60px 24px",display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+          <div style={{width:52,height:52,borderRadius:16,background:"rgba(238,234,226,0.04)",border:"1px solid rgba(238,234,226,0.07)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📭</div>
+          <p style={{fontSize:14,fontWeight:700,color:"rgba(238,234,226,0.50)",letterSpacing:"-0.1px"}}>Nenhuma reserva encontrada</p>
+          <p style={{fontSize:12,color:"rgba(238,234,226,0.22)"}}>Tente ajustar os filtros acima</p>
+        </div>
+      ):(
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          {f.map((r,i)=>{
+            const pr=prestadores.find(p=>p.id===r.prestadorId);
+            return (
+              <div key={r.id} style={{animation:`flow-reveal 0.35s cubic-bezier(0.22,1,0.36,1) ${i*0.04}s both`}}>
+                <ReservaCard
+                  r={r} pr={pr}
+                  isAdmin={isAdmin}
+                  prestadoresAtivos={prestadoresAtivos}
+                  podeEditar={podeEditar}
+                  atualizando={atualizando}
+                  onAtualizar={atualizarStatus}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
