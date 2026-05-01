@@ -63,6 +63,7 @@ import { fsError, fsSnapshotError } from "./utils/firestoreError";
 import { useDashboardData, fmtR$, fmtData } from "./hooks/useDashboardData";
 import { useEmpresa }                        from "./hooks/useEmpresa";
 import { useLicenca }                        from "./hooks/useLicenca";
+import { useNotificacoes }                   from "./hooks/useNotificacoes";
 
 /* ═══════════════════════════════════════════════
    CONSTANTES
@@ -1208,6 +1209,20 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   /* ── Hooks de dados — declarados aqui para isPro estar disponível nos useEffects abaixo ── */
   const empresa = useEmpresa(uid);
   const { isPro, plano: licencaSlug } = useLicenca(tenantUid);
+
+  /* ── Notificações de reserva — AssFlow (tempo real, por usuário) ── */
+  const {
+    notificacoes: notifReservas,
+    naoLidas:     notifReservasNaoLidas,
+    marcarLida:   marcarReservaLida,
+    initAudio,
+  } = useNotificacoes(tenantUid, authUser);
+
+  /* Inicializa AudioContext no primeiro clique do usuário */
+  useEffect(() => {
+    window.addEventListener("click", initAudio, { once: true });
+    return () => window.removeEventListener("click", initAudio);
+  }, [initAudio]);
   const dash    = useDashboardData(
     uid, period,
     period === "Personalizado" && customRange.from && customRange.to ? customRange : null
@@ -1426,8 +1441,15 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     _ts: n.criadoEm?.toDate ? n.criadoEm.toDate().getTime() : 0,
   }));
 
+  /* Normaliza notificações de reserva do AssFlow */
+  const notifReservasNorm = notifReservas.map((n) => ({
+    ...n,
+    tipo: "nova_reserva",
+    _ts:  n.criadoEm?.toDate ? n.criadoEm.toDate().getTime() : Date.now(),
+  }));
+
   /* Merge cronológico: mais recente/urgente primeiro */
-  const todasNotif = [...notifDespesasNorm, ...notifSistemaNorm, ...notifInsightsNorm]
+  const todasNotif = [...notifDespesasNorm, ...notifSistemaNorm, ...notifInsightsNorm, ...notifReservasNorm]
     .sort((a, b) => b._ts - a._ts);
 
   const notifNaoLidas = todasNotif.filter((n) => !notifLidas.includes(n.id)).length;
@@ -2857,6 +2879,52 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                             </div>
                             <div style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'IBM Plex Mono', monospace" }}>
                               Despesa {n.titulo.split("—")[1]?.trim() || ""} · Ir para Despesas →
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      /* ── Nova reserva AssFlow ── */
+                      if (n.tipo === "nova_reserva") {
+                        return (
+                          <div
+                            key={n.id}
+                            className="ag-notif-item"
+                            style={{
+                              cursor: "pointer",
+                              background: "rgba(192,155,82,0.05)",
+                              borderLeft: "2px solid var(--gold)",
+                              paddingLeft: 14,
+                            }}
+                            onClick={() => {
+                              marcarReservaLida(n.id);
+                              setModule("AssFlow");
+                              setNotifOpen(false);
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
+                              <span style={{
+                                fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
+                                textTransform: "uppercase", color: "var(--ink, #040408)",
+                                background: "var(--gold)", borderRadius: 20,
+                                padding: "2px 8px", flexShrink: 0,
+                              }}>Reserva</span>
+                              <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'IBM Plex Mono', monospace" }}>
+                                {n.criadoEm?.toDate
+                                  ? n.criadoEm.toDate().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+                                  : "—"}
+                              </span>
+                            </div>
+                            <div className="ag-notif-item-title" style={{ fontSize: 12, marginBottom: 4 }}>
+                              Nova reserva recebida
+                            </div>
+                            <div className="ag-notif-item-body" style={{ fontSize: 11, lineHeight: 1.55 }}>
+                              <span style={{ color: "var(--text-2)" }}>Cliente:</span> {n.payload?.cliente || "—"}<br />
+                              <span style={{ color: "var(--text-2)" }}>Serviço:</span> {n.payload?.servico || "—"}<br />
+                              <span style={{ color: "var(--text-2)" }}>Data:</span> {n.payload?.data || "—"} às {n.payload?.hora || "—"}
+                            </div>
+                            <div style={{ fontSize: 10, color: "var(--gold)", marginTop: 5, fontFamily: "'IBM Plex Mono', monospace" }}>
+                              Ir para Reservas →
                             </div>
                           </div>
                         );
