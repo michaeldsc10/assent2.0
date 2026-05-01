@@ -901,11 +901,20 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
 function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar}){
   const [reservas,setReservas]=useState([]);
   const [loading,setLoading]=useState(true);
+  // Aba principal: "ativas" | "canceladas"
+  const [aba,setAba]=useState("ativas");
+  // Sub-filtro de status dentro da aba ativas
   const [filtroStatus,setFiltroStatus]=useState("todos");
-  const [filtroData,setFiltroData]=useState("");
   const [filtroP,setFiltroP]=useState(isAdmin?"todos":meuPrestadorId);
   const [atualizando,setAtualizando]=useState(null);
   const [t,showT]=useToast();
+  // Busca por nome, data e serviço
+  const [busca,setBusca]=useState("");
+  const [buscarData,setBuscarData]=useState("");
+  const [buscarServico,setBuscarServico]=useState("");
+  // Ordenação: "data" | "nome"
+  const [sortBy,setSortBy]=useState("data");
+  const [sortDir,setSortDir]=useState("desc"); // "asc" | "desc"
 
   useEffect(()=>{
     if(!tenantUid) return;
@@ -923,100 +932,243 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
     setAtualizando(id);
     try {
       await updateDoc(doc(db,"users",tenantUid,"agendamento_reservas",id),{status:novoStatus,atualizadoEm:serverTimestamp()});
-      showT(novoStatus==="confirmado"?"Confirmada!":"Cancelada.",novoStatus==="confirmado"?"success":"error");
+      showT(novoStatus==="confirmado"?"Confirmada!":novoStatus==="cancelado"?"Cancelada.":"Reaberta.",novoStatus==="confirmado"?"success":"error");
     } catch { showT("Erro.","error"); }
     setAtualizando(null);
   };
 
-  let f=reservas;
-  if(isAdmin&&filtroP!=="todos") f=f.filter(r=>r.prestadorId===filtroP);
-  if(filtroStatus!=="todos") f=f.filter(r=>r.status===filtroStatus);
-  if(filtroData){ const d0=new Date(filtroData+"T00:00:00"),d1=new Date(filtroData+"T23:59:59"); f=f.filter(r=>{if(!r.data_hora_inicio)return false;const d=r.data_hora_inicio.toDate?r.data_hora_inicio.toDate():new Date(r.data_hora_inicio);return d>=d0&&d<=d1;}); }
+  const toggleSort=(campo)=>{
+    if(sortBy===campo){ setSortDir(d=>d==="desc"?"asc":"desc"); }
+    else { setSortBy(campo); setSortDir("desc"); }
+  };
 
   if(loading) return <Loading/>;
   const prestadoresAtivos=prestadores.filter(p=>p.ativo);
 
-  const FILTROS = [
-    {key:"todos",    label:"Todos",      count: reservas.length},
-    {key:"pendente", label:"Pendente",   count: reservas.filter(r=>r.status==="pendente").length},
-    {key:"confirmado",label:"Confirmado",count: reservas.filter(r=>r.status==="confirmado").length},
-    {key:"cancelado",label:"Cancelado",  count: reservas.filter(r=>r.status==="cancelado").length},
+  // Separa em ativas (pendente + confirmado) e canceladas
+  const ativas   = reservas.filter(r=>r.status!=="cancelado");
+  const canceladas= reservas.filter(r=>r.status==="cancelado");
+
+  // Aplica filtros sobre o conjunto da aba atual
+  const aplicarFiltros=(lista)=>{
+    let f=lista;
+    if(isAdmin&&filtroP!=="todos") f=f.filter(r=>r.prestadorId===filtroP);
+    if(aba==="ativas"&&filtroStatus!=="todos") f=f.filter(r=>r.status===filtroStatus);
+    // Busca por nome do cliente
+    if(busca.trim()){
+      const q=busca.trim().toLowerCase();
+      f=f.filter(r=>(r.cliente_nome||"").toLowerCase().includes(q));
+    }
+    // Busca por data
+    if(buscarData){
+      const d0=new Date(buscarData+"T00:00:00"),d1=new Date(buscarData+"T23:59:59");
+      f=f.filter(r=>{
+        if(!r.data_hora_inicio) return false;
+        const d=r.data_hora_inicio.toDate?r.data_hora_inicio.toDate():new Date(r.data_hora_inicio);
+        return d>=d0&&d<=d1;
+      });
+    }
+    // Busca por serviço
+    if(buscarServico.trim()){
+      const q=buscarServico.trim().toLowerCase();
+      f=f.filter(r=>(r.servico_nome||"").toLowerCase().includes(q));
+    }
+    // Ordenação
+    f=[...f].sort((a,b)=>{
+      if(sortBy==="nome"){
+        const na=(a.cliente_nome||"").toLowerCase(),nb=(b.cliente_nome||"").toLowerCase();
+        return sortDir==="asc"?na.localeCompare(nb,"pt-BR"):nb.localeCompare(na,"pt-BR");
+      } else {
+        const da=a.data_hora_inicio?(a.data_hora_inicio.toDate?a.data_hora_inicio.toDate():new Date(a.data_hora_inicio)):new Date(0);
+        const db2=b.data_hora_inicio?(b.data_hora_inicio.toDate?b.data_hora_inicio.toDate():new Date(b.data_hora_inicio)):new Date(0);
+        return sortDir==="asc"?da-db2:db2-da;
+      }
+    });
+    return f;
+  };
+
+  const listaAtual=aplicarFiltros(aba==="ativas"?ativas:canceladas);
+
+  const SUB_FILTROS=[
+    {key:"todos",     label:"Todos",       count:ativas.length},
+    {key:"pendente",  label:"Pendente",    count:ativas.filter(r=>r.status==="pendente").length},
+    {key:"confirmado",label:"Confirmado",  count:ativas.filter(r=>r.status==="confirmado").length},
   ];
-  const FILTRO_COLORS = {todos:"#C09B52", pendente:"#D9B96E", confirmado:"#2DD37A", cancelado:"#F87171"};
+  const SUB_COLORS={todos:"#C09B52",pendente:"#D9B96E",confirmado:"#2DD37A"};
+
+  const limparBusca=()=>{ setBusca(""); setBuscarData(""); setBuscarServico(""); };
+  const temBusca=busca.trim()||buscarData||buscarServico.trim();
+
+  // Estilos de ordenação
+  const sortBtnStyle=(campo)=>({
+    display:"flex",alignItems:"center",gap:5,
+    padding:"6px 13px",borderRadius:8,border:"none",
+    background: sortBy===campo ? "rgba(192,155,82,0.12)" : "rgba(238,234,226,0.04)",
+    color: sortBy===campo ? "#D9B96E" : "rgba(238,234,226,0.35)",
+    fontSize:11.5,fontWeight:sortBy===campo?700:500,
+    cursor:"pointer",transition:"all 0.2s",
+    borderWidth:1,borderStyle:"solid",
+    borderColor: sortBy===campo ? "rgba(192,155,82,0.28)" : "rgba(238,234,226,0.07)",
+  });
+  const sortArrow=(campo)=>sortBy===campo?(sortDir==="desc"?" ↓":" ↑"):" ↕";
 
   return (
-    <div style={{position:"relative",display:"flex",flexDirection:"column",gap:20}}>
+    <div style={{position:"relative",display:"flex",flexDirection:"column",gap:16}}>
       <Toast t={t}/>
 
-      {/* ── Toolbar ── */}
-      <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+      {/* ══ ABAS PRINCIPAIS ══ */}
+      <div style={{display:"flex",gap:0,background:"rgba(238,234,226,0.03)",border:"1px solid rgba(238,234,226,0.07)",borderRadius:14,padding:4,alignSelf:"flex-start"}}>
+        {[
+          {key:"ativas",   label:"Ativas",    count:ativas.length,    cor:"#2DD37A", icon:"✦"},
+          {key:"canceladas",label:"Canceladas",count:canceladas.length,cor:"#F87171", icon:"✕"},
+        ].map(({key,label,count,cor,icon})=>{
+          const on=aba===key;
+          return (
+            <button key={key} onClick={()=>{setAba(key);setFiltroStatus("todos");limparBusca();}} style={{
+              display:"flex",alignItems:"center",gap:7,
+              padding:"8px 18px",borderRadius:10,border:"none",
+              background: on ? (key==="ativas"?"rgba(45,211,122,0.10)":"rgba(239,68,68,0.09)") : "transparent",
+              color: on ? cor : "rgba(238,234,226,0.30)",
+              fontSize:13,fontWeight:on?700:500,
+              cursor:"pointer",transition:"all 0.2s",
+              boxShadow: on ? `0 0 0 1px ${cor}30` : "none",
+            }}>
+              <span style={{fontSize:10}}>{icon}</span>
+              {label}
+              <span style={{
+                fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:20,
+                background: on ? `${cor}20` : "rgba(238,234,226,0.05)",
+                color: on ? cor : "rgba(238,234,226,0.20)",
+                border: on ? `1px solid ${cor}33` : "1px solid transparent",
+              }}>{count}</span>
+            </button>
+          );
+        })}
+      </div>
 
-        {/* Pills de status */}
-        <div style={{display:"flex",gap:4,background:"rgba(238,234,226,0.03)",border:"1px solid rgba(238,234,226,0.07)",borderRadius:12,padding:"4px"}}>
-          {FILTROS.map(({key,label,count})=>{
-            const ativo = filtroStatus===key;
-            const cor = FILTRO_COLORS[key];
-            return (
-              <button key={key} onClick={()=>setFiltroStatus(key)} style={{
-                padding:"6px 14px",borderRadius:9,border:"none",
-                background: ativo ? "rgba(238,234,226,0.07)" : "transparent",
-                color: ativo ? cor : "rgba(238,234,226,0.30)",
-                fontSize:12,fontWeight:ativo?700:500,
-                cursor:"pointer",transition:"all 0.2s",
-                display:"flex",alignItems:"center",gap:6,
-              }}>
-                {label}
-                <span style={{
-                  fontSize:10,fontWeight:700,
-                  padding:"1px 7px",borderRadius:20,
-                  background: ativo ? `${cor}22` : "rgba(238,234,226,0.05)",
-                  color: ativo ? cor : "rgba(238,234,226,0.20)",
-                  border: ativo ? `1px solid ${cor}33` : "1px solid transparent",
-                  transition:"all 0.2s",
-                }}>{count}</span>
-              </button>
-            );
-          })}
+      {/* ══ BARRA DE PESQUISA ══ */}
+      <div style={{
+        background:"rgba(17,17,25,0.80)",
+        border:"1px solid rgba(238,234,226,0.07)",
+        borderRadius:14,padding:"14px 16px",
+        display:"flex",flexDirection:"column",gap:10,
+        backdropFilter:"blur(12px)",
+      }}>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap",alignItems:"center"}}>
+          {/* Busca por nome */}
+          <div style={{position:"relative",flex:"1 1 160px",minWidth:140}}>
+            <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"rgba(238,234,226,0.22)",pointerEvents:"none",fontSize:12}}>👤</span>
+            <input
+              type="text"
+              placeholder="Buscar por nome…"
+              value={busca}
+              onChange={e=>setBusca(e.target.value)}
+              style={{...S.input,paddingLeft:30,fontSize:12,height:36,padding:"0 10px 0 30px"}}
+            />
+          </div>
+          {/* Busca por data */}
+          <div style={{position:"relative",flex:"1 1 150px",minWidth:140}}>
+            <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"rgba(238,234,226,0.22)",pointerEvents:"none",display:"flex"}}>{IcR.cal}</span>
+            <input
+              type="date"
+              value={buscarData}
+              onChange={e=>setBuscarData(e.target.value)}
+              style={{...S.input,paddingLeft:30,fontSize:12,height:36,padding:"0 10px 0 30px",color:buscarData?"#EEEAE2":"rgba(238,234,226,0.25)"}}
+            />
+          </div>
+          {/* Busca por serviço */}
+          <div style={{position:"relative",flex:"1 1 160px",minWidth:140}}>
+            <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"rgba(238,234,226,0.22)",pointerEvents:"none",display:"flex"}}>{IcR.scissor}</span>
+            <input
+              type="text"
+              placeholder="Buscar por serviço…"
+              value={buscarServico}
+              onChange={e=>setBuscarServico(e.target.value)}
+              style={{...S.input,paddingLeft:30,fontSize:12,height:36,padding:"0 10px 0 30px"}}
+            />
+          </div>
+          {temBusca&&(
+            <button onClick={limparBusca} style={{...S.btnGhost,fontSize:11,padding:"0 12px",height:36,gap:4,whiteSpace:"nowrap"}}>
+              ✕ Limpar
+            </button>
+          )}
         </div>
 
-        {/* Filtro por prestador */}
-        {isAdmin&&prestadoresAtivos.length>1&&(
-          <select style={{...S.select,width:"auto",minWidth:170,fontSize:12,padding:"7px 12px"}} value={filtroP} onChange={e=>setFiltroP(e.target.value)}>
-            <option value="todos">Toda a equipe</option>
-            {prestadoresAtivos.map(p=><option key={p.id} value={p.id}>{p.nome}{p.isAdmin?" (você)":""}</option>)}
-          </select>
-        )}
-
-        {/* Input de data */}
-        <div style={{position:"relative",display:"flex",alignItems:"center"}}>
-          <span style={{position:"absolute",left:11,color:"rgba(238,234,226,0.25)",pointerEvents:"none",display:"flex"}}>{IcR.cal}</span>
-          <input type="date" value={filtroData} onChange={e=>setFiltroData(e.target.value)} style={{
-            ...S.input,width:170,paddingLeft:30,fontSize:12,
-            color: filtroData ? "#EEEAE2" : "rgba(238,234,226,0.25)",
-          }}/>
-        </div>
-        {filtroData&&(
-          <button onClick={()=>setFiltroData("")} style={{...S.btnGhost,fontSize:11,padding:"6px 10px",gap:4}}>
-            ✕ Limpar data
+        {/* ── Linha 2: sort + filtros de status (aba ativas) + prestador ── */}
+        <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+          {/* Ordenar por */}
+          <span style={{fontSize:10.5,fontWeight:700,color:"rgba(238,234,226,0.20)",textTransform:"uppercase",letterSpacing:"1px",whiteSpace:"nowrap"}}>Ordenar:</span>
+          <button onClick={()=>toggleSort("data")}  style={sortBtnStyle("data")}>
+            {IcR.cal} Data{sortArrow("data")}
           </button>
-        )}
+          <button onClick={()=>toggleSort("nome")} style={sortBtnStyle("nome")}>
+            {IcR.user} Nome{sortArrow("nome")}
+          </button>
 
-        {/* Contador */}
-        <div style={{marginLeft:"auto",display:"flex",alignItems:"center",gap:6}}>
-          <span style={{fontSize:11,color:"rgba(238,234,226,0.20)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.8px"}}>{f.length} reserva{f.length!==1?"s":""}</span>
+          {/* Sub-filtro de status (só na aba ativas) */}
+          {aba==="ativas"&&(
+            <>
+              <div style={{width:1,height:22,background:"rgba(238,234,226,0.07)",margin:"0 4px"}}/>
+              <span style={{fontSize:10.5,fontWeight:700,color:"rgba(238,234,226,0.20)",textTransform:"uppercase",letterSpacing:"1px",whiteSpace:"nowrap"}}>Status:</span>
+              <div style={{display:"flex",gap:3,background:"rgba(238,234,226,0.03)",border:"1px solid rgba(238,234,226,0.06)",borderRadius:9,padding:"3px"}}>
+                {SUB_FILTROS.map(({key,label,count})=>{
+                  const on=filtroStatus===key;
+                  const cor=SUB_COLORS[key];
+                  return (
+                    <button key={key} onClick={()=>setFiltroStatus(key)} style={{
+                      padding:"4px 11px",borderRadius:7,border:"none",
+                      background: on ? "rgba(238,234,226,0.07)" : "transparent",
+                      color: on ? cor : "rgba(238,234,226,0.28)",
+                      fontSize:11.5,fontWeight:on?700:500,
+                      cursor:"pointer",transition:"all 0.2s",
+                      display:"flex",alignItems:"center",gap:5,
+                    }}>
+                      {label}
+                      <span style={{fontSize:10,fontWeight:700,padding:"1px 6px",borderRadius:20,background:on?`${cor}22`:"rgba(238,234,226,0.05)",color:on?cor:"rgba(238,234,226,0.18)",border:on?`1px solid ${cor}33`:"1px solid transparent"}}>{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Filtro prestador */}
+          {isAdmin&&prestadoresAtivos.length>1&&(
+            <>
+              <div style={{width:1,height:22,background:"rgba(238,234,226,0.07)",margin:"0 4px"}}/>
+              <select style={{...S.select,width:"auto",minWidth:150,fontSize:11.5,padding:"5px 10px",height:32}} value={filtroP} onChange={e=>setFiltroP(e.target.value)}>
+                <option value="todos">Toda a equipe</option>
+                {prestadoresAtivos.map(p=><option key={p.id} value={p.id}>{p.nome}{p.isAdmin?" (você)":""}</option>)}
+              </select>
+            </>
+          )}
+
+          {/* Contador */}
+          <div style={{marginLeft:"auto"}}>
+            <span style={{fontSize:11,color:"rgba(238,234,226,0.18)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.8px"}}>
+              {listaAtual.length} reserva{listaAtual.length!==1?"s":""}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* ── Lista de cards ── */}
-      {f.length===0?(
+      {/* ══ LISTA DE CARDS ══ */}
+      {listaAtual.length===0?(
         <div style={{...S.card,textAlign:"center",padding:"60px 24px",display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
-          <div style={{width:52,height:52,borderRadius:16,background:"rgba(238,234,226,0.04)",border:"1px solid rgba(238,234,226,0.07)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>📭</div>
-          <p style={{fontSize:14,fontWeight:700,color:"rgba(238,234,226,0.50)",letterSpacing:"-0.1px"}}>Nenhuma reserva encontrada</p>
-          <p style={{fontSize:12,color:"rgba(238,234,226,0.22)"}}>Tente ajustar os filtros acima</p>
+          <div style={{width:52,height:52,borderRadius:16,background:"rgba(238,234,226,0.04)",border:"1px solid rgba(238,234,226,0.07)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>
+            {aba==="canceladas"?"🚫":"📭"}
+          </div>
+          <p style={{fontSize:14,fontWeight:700,color:"rgba(238,234,226,0.50)",letterSpacing:"-0.1px"}}>
+            {temBusca?"Nenhum resultado encontrado":"Nenhuma reserva aqui"}
+          </p>
+          <p style={{fontSize:12,color:"rgba(238,234,226,0.22)"}}>
+            {temBusca?"Tente outros termos de busca":aba==="canceladas"?"Nenhuma reserva foi cancelada ainda":"Sem reservas ativas no momento"}
+          </p>
+          {temBusca&&<button onClick={limparBusca} style={{...S.btnGhost,fontSize:12,marginTop:4}}>Limpar busca</button>}
         </div>
       ):(
         <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          {f.map((r,i)=>{
+          {listaAtual.map((r,i)=>{
             const pr=prestadores.find(p=>p.id===r.prestadorId);
             return (
               <div key={r.id} style={{animation:`flow-reveal 0.35s cubic-bezier(0.22,1,0.36,1) ${i*0.04}s both`}}>
