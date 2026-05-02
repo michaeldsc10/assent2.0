@@ -378,7 +378,7 @@ const CSS = `
     .coz-nome { flex: 1; }
   }
 
-  #mesas-recibo-root { display: none; }
+  #recibo-print-root { display: none; }
   #coz-ticket-root   { display: none; }
 
   /* ── Layout geral ── */
