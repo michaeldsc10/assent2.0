@@ -1,7 +1,6 @@
 /* ═══════════════════════════════════════════════════
    firebase-messaging-sw.js
    Service Worker — Recebe notificações Web Push
-   Config injetada via postMessage do main thread
    ═══════════════════════════════════════════════════ */
 
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
@@ -9,37 +8,7 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-com
 
 let messaging = null;
 
-// Recebe config do main thread via postMessage
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'INIT_FIREBASE') {
-    const config = event.data.config;
-    
-    try {
-      firebase.initializeApp(config);
-      messaging = firebase.messaging();
-      console.log('[SW] Firebase inicializado');
-    } catch (err) {
-      console.error('[SW] Erro ao inicializar Firebase:', err);
-    }
-  }
-});
-
-// ── Handler: Notificação recebida em background ──
-messaging?.onBackgroundMessage?.((payload) => {
-  const title = payload.notification?.title || 'Nova Notificação';
-  const options = {
-    body: payload.notification?.body || '',
-    icon: payload.notification?.icon || '/favicon.ico',
-    badge: '/favicon.ico',
-    tag: 'notificacao-assent',
-    requireInteraction: false,
-    data: payload.data || {},
-  };
-
-  self.registration.showNotification(title, options);
-});
-
-// ── Handler: Click na notificação ──
+// ── Registra listeners ANTES de inicializar ──
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
@@ -55,6 +24,16 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
+self.addEventListener('push', (event) => {
+  // Handler padrão para push events (se não vier via FCM)
+  console.log('[SW] Push event:', event);
+});
+
+self.addEventListener('pushsubscriptionchange', (event) => {
+  // Handler para quando subscription expira
+  console.log('[SW] Subscription changed:', event);
+});
+
 // ── Lifecycle ──
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -62,4 +41,35 @@ self.addEventListener('install', () => {
 
 self.addEventListener('activate', () => {
   self.clients.claim();
+});
+
+// ── Recebe config do main thread via postMessage ──
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'INIT_FIREBASE') {
+    const config = event.data.config;
+
+    try {
+      firebase.initializeApp(config);
+      messaging = firebase.messaging();
+
+      // ── Handler FCM: Notificação em background ──
+      messaging.onBackgroundMessage((payload) => {
+        const title = payload.notification?.title || 'Nova Notificação';
+        const options = {
+          body: payload.notification?.body || '',
+          icon: payload.notification?.icon || '/favicon.ico',
+          badge: '/favicon.ico',
+          tag: 'notificacao-assent',
+          requireInteraction: false,
+          data: payload.data || {},
+        };
+
+        self.registration.showNotification(title, options);
+      });
+
+      console.log('[SW] Firebase inicializado com sucesso');
+    } catch (err) {
+      console.error('[SW] Erro ao inicializar Firebase:', err);
+    }
+  }
 });
