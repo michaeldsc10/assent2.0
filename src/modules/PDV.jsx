@@ -1082,6 +1082,13 @@ export default function PDV({ onVoltar }) {
   /* ── Mobile: aba ativa ── */
   const [mobileTab, setMobileTab] = useState("produtos"); // "produtos" | "carrinho"
 
+  /* ── Modal busca de produto (F8) ── */
+  const [showBuscaModal, setShowBuscaModal] = useState(false);
+  const [buscaModalQuery, setBuscaModalQuery] = useState("");
+  const [buscaModalResultados, setBuscaModalResultados] = useState([]);
+  const [buscaModalLoading, setBuscaModalLoading] = useState(false);
+  const buscaModalInputRef = useRef(null);
+
   const buscaRef = useRef(null);
 
   /* ─── Busca nome do operador em licencas/{tenantUid} ─── */
@@ -1099,6 +1106,69 @@ export default function PDV({ onVoltar }) {
   }, [tenantUid]);
 
   const operadorDisplay = nomeOperador || vendedorNome || user?.displayName || user?.email?.split("@")[0] || "Operador";
+
+  /* ── Busca no modal F8 ── */
+  useEffect(() => {
+    const buscar = async () => {
+      if (!tenantUid || buscaModalQuery.trim().length < 2) {
+        setBuscaModalResultados([]);
+        return;
+      }
+      setBuscaModalLoading(true);
+      try {
+        const ref = collection(db, "users", tenantUid, "produtos");
+        const q = query(ref, orderBy("nome"), limit(30));
+        const snap = await getDocs(q);
+        const termo = buscaModalQuery.toLowerCase();
+        setBuscaModalResultados(
+          snap.docs
+            .map(d => sanitizarProduto({ id: d.id, ...d.data() }))
+            .filter(p => p.nome.toLowerCase().includes(termo) || p.codigoBarras.includes(termo))
+            .slice(0, 12)
+        );
+      } catch { setBuscaModalResultados([]); }
+      finally { setBuscaModalLoading(false); }
+    };
+    const timer = setTimeout(buscar, 280);
+    return () => clearTimeout(timer);
+  }, [buscaModalQuery, tenantUid]);
+
+  /* ── Foco no input do modal ao abrir ── */
+  useEffect(() => {
+    if (showBuscaModal) {
+      setTimeout(() => buscaModalInputRef.current?.focus(), 60);
+    } else {
+      setBuscaModalQuery("");
+      setBuscaModalResultados([]);
+    }
+  }, [showBuscaModal]);
+
+  /* ── Atalhos de teclado globais ── */
+  useEffect(() => {
+    const handleKey = (e) => {
+      // Não dispara atalhos se estiver digitando em inputs (exceto os próprios modais)
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      const isInput = tag === "input" || tag === "textarea" || tag === "select";
+
+      if (e.key === "F8") {
+        e.preventDefault();
+        setShowBuscaModal(s => !s);
+        return;
+      }
+      if (e.key === "F9") {
+        e.preventDefault();
+        if (!finalizando && vencido && carrinho.length > 0) finalizarVenda();
+        return;
+      }
+      if (e.key === "Escape") {
+        if (showBuscaModal) { setShowBuscaModal(false); return; }
+        if (showPagModal)   { setShowPagModal(false);   return; }
+        if (showQrPix)      { setShowQrPix(false);      return; }
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [finalizando, vencido, carrinho, showBuscaModal, showPagModal, showQrPix]);
 
   /* ─── Mapeamento forma → label ─── */
   const FORMA_LABEL = {
@@ -1428,10 +1498,148 @@ export default function PDV({ onVoltar }) {
   /* ══════════════════════════════════
      RENDER PRINCIPAL
      ══════════════════════════════════ */
+  /* ── Estilo reutilizável para <kbd> ── */
+  const kbdStyle = {
+    display:"inline-flex", alignItems:"center", justifyContent:"center",
+    background:"rgba(255,255,255,0.08)", border:"1px solid rgba(255,255,255,0.18)",
+    borderRadius:5, padding:"2px 6px", fontSize:10, fontFamily:"monospace",
+    color:"#9193a5", lineHeight:1.4, letterSpacing:".04em",
+  };
+
   return (
     <>
       <style>{CSS}</style>
       <div id="recibo-print-root" />
+
+      {/* ── MODAL BUSCA DE PRODUTO (F8) ── */}
+      {showBuscaModal && (
+        <div
+          style={{
+            position:"fixed", inset:0, zIndex:10001,
+            background:"rgba(0,0,0,0.72)", backdropFilter:"blur(6px)",
+            display:"flex", alignItems:"flex-start", justifyContent:"center",
+            paddingTop:"8vh",
+            fontFamily:"'DM Sans','Segoe UI',sans-serif",
+            animation:"fadeIn .15s ease",
+          }}
+          onClick={() => setShowBuscaModal(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background:"#16181f",
+              border:"1px solid rgba(200,165,94,0.3)",
+              borderRadius:16, width:"min(580px, 95vw)",
+              boxShadow:"0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(200,165,94,0.08)",
+              overflow:"hidden",
+              animation:"slideUp .18s ease",
+            }}
+          >
+            {/* Search input */}
+            <div style={{
+              display:"flex", alignItems:"center", gap:12,
+              padding:"16px 20px",
+              borderBottom:"1px solid rgba(255,255,255,0.07)",
+            }}>
+              <Search size={18} color="#c8a55e" style={{ flexShrink:0 }} />
+              <input
+                ref={buscaModalInputRef}
+                type="text"
+                value={buscaModalQuery}
+                onChange={e => setBuscaModalQuery(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Escape") setShowBuscaModal(false);
+                  if (e.key === "Enter" && buscaModalResultados.length === 1) {
+                    adicionarAoCarrinho(buscaModalResultados[0]);
+                    setShowBuscaModal(false);
+                  }
+                }}
+                placeholder="Digite o nome ou código do produto..."
+                autoComplete="off"
+                style={{
+                  flex:1, background:"transparent", border:"none", outline:"none",
+                  color:"#e8e8f0", fontSize:16, fontWeight:500,
+                }}
+              />
+              {buscaModalLoading && <Loader2 size={15} color="#c8a55e" style={{ animation:"spin .7s linear infinite", flexShrink:0 }} />}
+              <span
+                role="button"
+                onClick={() => setShowBuscaModal(false)}
+                style={{
+                  background:"rgba(255,255,255,0.07)", border:"1px solid rgba(255,255,255,0.12)",
+                  borderRadius:6, padding:"3px 8px", fontSize:11, color:"#5c5e72",
+                  cursor:"pointer", flexShrink:0, userSelect:"none",
+                }}
+              >ESC</span>
+            </div>
+
+            {/* Resultados */}
+            <div style={{ maxHeight:380, overflowY:"auto" }}>
+              {buscaModalResultados.length === 0 && buscaModalQuery.length >= 2 && !buscaModalLoading && (
+                <div style={{ padding:"28px 20px", textAlign:"center", color:"#5c5e72", fontSize:13 }}>
+                  Nenhum produto encontrado para &ldquo;{buscaModalQuery}&rdquo;
+                </div>
+              )}
+              {buscaModalResultados.length === 0 && buscaModalQuery.length < 2 && (
+                <div style={{ padding:"28px 20px", textAlign:"center", color:"#5c5e72", fontSize:13 }}>
+                  Digite pelo menos 2 caracteres para buscar
+                </div>
+              )}
+              {buscaModalResultados.map((p, idx) => (
+                <button
+                  key={p.id}
+                  onClick={() => { adicionarAoCarrinho(p); setShowBuscaModal(false); }}
+                  style={{
+                    width:"100%", display:"flex", alignItems:"center", gap:14,
+                    padding:"12px 20px", background:"transparent",
+                    border:"none", borderBottom:"1px solid rgba(255,255,255,0.05)",
+                    cursor:"pointer", textAlign:"left",
+                    transition:"background .12s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background="rgba(200,165,94,0.08)"}
+                  onMouseLeave={e => e.currentTarget.style.background="transparent"}
+                >
+                  <div style={{
+                    width:36, height:36, borderRadius:8, flexShrink:0,
+                    background:"rgba(200,165,94,0.1)", border:"1px solid rgba(200,165,94,0.2)",
+                    display:"flex", alignItems:"center", justifyContent:"center",
+                    overflow:"hidden",
+                  }}>
+                    {p.foto
+                      ? <img src={p.foto} alt={p.nome} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                      : <Package size={16} color="#c8a55e" />
+                    }
+                  </div>
+                  <div style={{ flex:1, minWidth:0 }}>
+                    <div style={{ fontSize:14, fontWeight:600, color:"#e8e8f0", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                      {p.nome}
+                    </div>
+                    {p.codigoBarras && (
+                      <div style={{ fontSize:11, color:"#5c5e72", fontFamily:"monospace" }}>{p.codigoBarras}</div>
+                    )}
+                  </div>
+                  <div style={{ fontSize:14, fontWeight:700, color:"#c8a55e", flexShrink:0 }}>
+                    {fmt(p.precoVenda || p.preco || 0)}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {/* Footer hint */}
+            <div style={{
+              padding:"10px 20px",
+              borderTop:"1px solid rgba(255,255,255,0.06)",
+              display:"flex", gap:16, alignItems:"center",
+              fontSize:11, color:"#5c5e72",
+            }}>
+              <span><kbd style={kbdStyle}>↵ Enter</kbd> adicionar único resultado</span>
+              <span><kbd style={kbdStyle}>Esc</kbd> fechar</span>
+              <span style={{ marginLeft:"auto" }}>{buscaModalResultados.length > 0 ? `${buscaModalResultados.length} produto(s)` : ""}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showPagModal && (
         <ModalPagamento
           restante={restante}
@@ -1473,6 +1681,37 @@ export default function PDV({ onVoltar }) {
         />
       )}
       <div className="pdv-root">
+        {/* ── BARRA DE ATALHOS ── */}
+        <div className="pdv-shortcut-bar">
+          <button
+            className="pdv-shortcut-btn"
+            onClick={() => setShowBuscaModal(true)}
+            title="Pesquisar produtos (F8)"
+          >
+            <kbd className="pdv-shortcut-key">F8</kbd>
+            <Search size={12} />
+            <span>Pesquisar Produto</span>
+          </button>
+          <div className="pdv-shortcut-divider" />
+          <button
+            className={"pdv-shortcut-btn pdv-shortcut-btn--finalizar" + (!vencido || carrinho.length === 0 ? " pdv-shortcut-btn--disabled" : "")}
+            onClick={!finalizando && vencido && carrinho.length > 0 ? finalizarVenda : undefined}
+            title={vencido && carrinho.length > 0 ? "Finalizar venda (F9)" : "Adicione pagamento antes de finalizar"}
+          >
+            <kbd className="pdv-shortcut-key pdv-shortcut-key--gold">F9</kbd>
+            <Receipt size={12} />
+            <span>Finalizar Venda</span>
+            {vencido && carrinho.length > 0 && (
+              <span className="pdv-shortcut-badge">{fmt(total)}</span>
+            )}
+          </button>
+          <div className="pdv-shortcut-divider" />
+          <div className="pdv-shortcut-hint">
+            <kbd className="pdv-shortcut-key">Esc</kbd>
+            <span>Fechar modal</span>
+          </div>
+        </div>
+
         {/* ── HEADER ── */}
         <header className="pdv-header">
           <div className="pdv-header-brand">
@@ -1961,12 +2200,91 @@ const CSS = `
   --pdv-error:     #e05555;
   --pdv-radius:    10px;
   --pdv-header-h:  62px;
+  --pdv-shortcut-h: 32px;
   font-family: 'DM Sans', 'Segoe UI', sans-serif;
   background: var(--pdv-bg);
   color: var(--pdv-text);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* ── BARRA DE ATALHOS ── */
+.pdv-shortcut-bar {
+  height: var(--pdv-shortcut-h);
+  background: rgba(10,10,16,0.95);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 2px;
+  position: sticky;
+  top: 0;
+  z-index: 11;
+  backdrop-filter: blur(8px);
+}
+.pdv-shortcut-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: 5px;
+  background: none; border: none; cursor: pointer;
+  color: var(--pdv-text-3); font-size: 11px; font-weight: 500;
+  font-family: 'DM Sans', 'Segoe UI', sans-serif;
+  transition: color .15s, background .15s;
+  white-space: nowrap;
+  user-select: none;
+}
+.pdv-shortcut-btn:hover {
+  color: var(--pdv-text-2);
+  background: rgba(255,255,255,0.05);
+}
+.pdv-shortcut-btn--finalizar:not(.pdv-shortcut-btn--disabled):hover {
+  color: var(--pdv-gold);
+  background: var(--pdv-gold-dim);
+}
+.pdv-shortcut-btn--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.pdv-shortcut-key {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14);
+  border-bottom: 2px solid rgba(255,255,255,0.18);
+  border-radius: 4px; padding: 1px 5px;
+  font-size: 10px; font-family: monospace;
+  color: var(--pdv-text-3); line-height: 1.5;
+  letter-spacing: .04em; font-weight: 700;
+  transition: color .15s, border-color .15s;
+}
+.pdv-shortcut-key--gold {
+  color: var(--pdv-gold);
+  border-color: rgba(200,165,94,0.3);
+  border-bottom-color: rgba(200,165,94,0.5);
+  background: rgba(200,165,94,0.08);
+}
+.pdv-shortcut-badge {
+  background: var(--pdv-gold);
+  color: #0a0a0a;
+  font-size: 10px; font-weight: 800;
+  border-radius: 4px; padding: 1px 6px;
+  letter-spacing: .02em;
+  animation: fadeIn .2s ease;
+}
+.pdv-shortcut-divider {
+  width: 1px; height: 14px;
+  background: rgba(255,255,255,0.08);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+.pdv-shortcut-hint {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 10px;
+  color: var(--pdv-text-3); font-size: 11px;
+  opacity: 0.6;
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .pdv-shortcut-bar { display: none; }
+  .pdv-root { --pdv-shortcut-h: 0px; }
 }
 
 /* ── HEADER ── */
@@ -1979,7 +2297,7 @@ const CSS = `
   padding: 0 20px;
   gap: 20px;
   position: sticky;
-  top: 0;
+  top: var(--pdv-shortcut-h);
   z-index: 10;
 }
 .pdv-header-brand { display: flex; align-items: center; gap: 10px; min-width: 200px; }
@@ -2033,7 +2351,7 @@ const CSS = `
   flex: 1; display: flex;
   gap: 0;
   overflow: hidden;
-  height: calc(100vh - var(--pdv-header-h));
+  height: calc(100vh - var(--pdv-header-h) - var(--pdv-shortcut-h));
 }
 
 /* ── COL ESQUERDA ── */
