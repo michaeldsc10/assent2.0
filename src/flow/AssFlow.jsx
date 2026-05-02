@@ -61,7 +61,7 @@ const S = {
     display:"flex", height:"100vh", height:"100dvh",
     background: T.ink,
     color: T.text100,
-    fontFamily:"'Plus Jakarta Sans', 'Montserrat', system-ui, sans-serif",
+    fontFamily:"'Inter', system-ui, sans-serif",
     overflow:"hidden",
     WebkitFontSmoothing:"antialiased",
   },
@@ -1583,7 +1583,7 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
               {/* URL */}
               <div style={{margin:"0 22px 16px",padding:"10px 14px",background:"rgba(255,255,255,0.025)",border:`1px solid rgba(238,234,226,0.06)`,borderRadius:10,display:"flex",alignItems:"center",gap:10}}>
                 <div style={{width:22,height:22,borderRadius:6,background:T.goldA06,border:`1px solid ${T.goldA12}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.gold,flexShrink:0,fontSize:10}}>🔗</div>
-                <span style={{fontSize:11.5,color:T.text35,flex:1,wordBreak:"break-all",fontFamily:"monospace"}}>{link}</span>
+                <span style={{fontSize:11.5,color:T.text35,flex:1,wordBreak:"break-all",fontFamily:"'JetBrains Mono', monospace"}}>{link}</span>
               </div>
 
               {/* Checklist */}
@@ -1905,7 +1905,7 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
   return (
     <div style={S.root}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
