@@ -55,8 +55,9 @@ import { usePermissao } from "./hooks/usePermissao";
 
 /* ── Firebase ──────────────────────────────────── */
 import { db, logout } from "./lib/firebase";
+import { initFCM, obterTokenPush } from "./lib/fcm";
 import { useAuth } from "./contexts/AuthContext";
-import { doc, onSnapshot, collection, query, orderBy, limit, where, getDocs } from "firebase/firestore";
+import { doc, onSnapshot, collection, query, orderBy, limit, where, getDocs, updateDoc } from "firebase/firestore";
 import { fsError, fsSnapshotError } from "./utils/firestoreError";
 
 /* ── Hooks de dados ────────────────────────────── */
@@ -1223,6 +1224,37 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     window.addEventListener("click", initAudio, { once: true });
     return () => window.removeEventListener("click", initAudio);
   }, [initAudio]);
+
+  /* ── Inicializa FCM e salva token quando usuário faz login ── */
+  useEffect(() => {
+    if (!authUser?.uid) return;
+
+    // Inicializa FCM
+    initFCM();
+
+    // Pede permissão de notificação
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(async (permission) => {
+        if (permission === 'granted') {
+          const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
+          const token = await obterTokenPush(vapidKey);
+
+          if (token) {
+            // Salva token em usuarios/{userId}
+            try {
+              await updateDoc(doc(db, 'usuarios', authUser.uid), {
+                fcmToken: token,
+                fcmTokenAtualizado: new Date(),
+              });
+              console.log('[FCM] Token salvo com sucesso');
+            } catch (err) {
+              console.error('[FCM] Erro ao salvar token:', err);
+            }
+          }
+        }
+      });
+    }
+  }, [authUser?.uid]);
   const dash    = useDashboardData(
     uid, period,
     period === "Personalizado" && customRange.from && customRange.to ? customRange : null
