@@ -1,16 +1,9 @@
-// hooks/useNotificacoes.js
-// ASSENT v2.0 — Hook de notificações em tempo real
-//
-// Responsabilidade:
-//   - Escuta `users/{tenantUid}/notificacoes` onde destinatarioUid === user.uid
-//   - Filtra somente lida === false
-//   - Toca som via Web Audio API apenas em chegadas novas (não no boot)
-//   - Expõe lista de notificações, contagem de não-lidas e helper para marcar como lida
-//
-// Uso:
-//   const { notificacoes, naoLidas, marcarLida } = useNotificacoes(tenantUid, user);
+/* ═══════════════════════════════════════════════════
+   hooks/useNotificacoes.js
+   Notificações Firestore + Web Push (FCM)
+   ═══════════════════════════════════════════════════ */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   collection,
   query,
@@ -19,12 +12,10 @@ import {
   onSnapshot,
   doc,
   updateDoc,
-} from "firebase/firestore";
-import { db } from "../lib/firebase";
+} from 'firebase/firestore';
+import { db } from '../lib/firebase';
+import { initFCM, obterTokenPush, escutarNotificacoesAbertas } from '../lib/fcm';
 
-// ─── Web Audio API ─────────────────────────────────────────────────────────────
-// AudioContext é compartilhado via módulo — uma única instância por aba.
-// Inicializado no primeiro clique do usuário (ver useNotificacoes → initAudio).
 let sharedAudioCtx = null;
 
 function initAudioContext() {
@@ -32,7 +23,7 @@ function initAudioContext() {
   try {
     sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
   } catch {
-    // Browser não suporta Web Audio (improvável mas defensivo)
+    // não suporta
   }
   return sharedAudioCtx;
 }
@@ -42,21 +33,19 @@ function tocarSomNotificacao() {
   if (!ctx) return;
 
   try {
-    // Compressor maximiza volume sem distorcao
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -6;
-    comp.knee.value      = 0;
-    comp.ratio.value     = 20;
-    comp.attack.value    = 0.001;
-    comp.release.value   = 0.1;
+    comp.knee.value = 0;
+    comp.ratio.value = 20;
+    comp.attack.value = 0.001;
+    comp.release.value = 0.1;
     comp.connect(ctx.destination);
 
-    // Dois beeps descendentes (1200 Hz -> 960 Hz), cada um com harmonico
     const playBeep = (t, freq) => {
       [freq, freq * 1.5].forEach((f, i) => {
-        const osc  = ctx.createOscillator();
+        const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type            = "sine";
+        osc.type = 'sine';
         osc.frequency.value = f;
         osc.connect(gain);
         gain.connect(comp);
@@ -69,42 +58,63 @@ function tocarSomNotificacao() {
       });
     };
 
-    playBeep(ctx.currentTime,        1200); // primeiro beep
-    playBeep(ctx.currentTime + 0.22,  960); // segundo beep
+    playBeep(ctx.currentTime, 1200);
+    playBeep(ctx.currentTime + 0.22, 960);
   } catch {
-    // Silencia erros de AudioContext suspendido — sem impacto na UX
+    // silencia
   }
 }
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
-
-/**
- * useNotificacoes(tenantUid, user)
- *
- * @param {string|null} tenantUid  — UID do tenant (empresa)
- * @param {object|null} user       — Objeto do Firebase Auth ({ uid, ... })
- * @returns {{
- *   notificacoes: Array,
- *   naoLidas: number,
- *   marcarLida: (notifId: string) => Promise<void>,
- *   initAudio: () => void,
- * }}
- */
 export function useNotificacoes(tenantUid, user) {
   const [notificacoes, setNotificacoes] = useState([]);
+  const idsConhecidosRef = useRef(null);
+  const unsubFcmRef = useRef(null);
 
-  // Ids já conhecidos no snapshot anterior — detecta chegadas novas vs. carga inicial
-  const idsConhecidosRef = useRef(null); // null = ainda não inicializado (primeira carga)
-
-  // Garante que initAudio pode ser chamado em qualquer clique no AG
   const initAudio = useCallback(() => {
     initAudioContext();
-    // Resume o contexto caso o browser o tenha suspendido por inatividade
-    if (sharedAudioCtx?.state === "suspended") {
+    if (sharedAudioCtx?.state === 'suspended') {
       sharedAudioCtx.resume().catch(() => {});
     }
   }, []);
 
+  // Setup FCM + pedir permissão na primeira vez
+  useEffect(() => {
+    if (!tenantUid || !user?.uid) return;
+
+    // Inicializa FCM
+    initFCM();
+
+    // Pede permissão de notificação
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then((permission) => {
+        if (permission === 'granted') {
+          // Obtém e salva token de push
+          const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
+          obterTokenPush(vapidKey).then((token) => {
+            if (token) {
+              // Salva token no Firestore (para backend enviar push)
+              updateDoc(doc(db, 'usuarios', user.uid), {
+                fcmToken: token,
+                fcmTokenAtualizado: new Date(),
+              }).catch(console.error);
+            }
+          });
+        }
+      });
+    }
+
+    // Listener FCM quando app está aberta
+    unsubFcmRef.current = escutarNotificacoesAbertas((payload) => {
+      // Toca som se recebeu notificação com app aberta
+      tocarSomNotificacao();
+    });
+
+    return () => {
+      if (unsubFcmRef.current) unsubFcmRef.current();
+    };
+  }, [tenantUid, user?.uid]);
+
+  // Listener Firestore (mesmo de antes)
   useEffect(() => {
     if (!tenantUid || !user?.uid) {
       setNotificacoes([]);
@@ -113,10 +123,10 @@ export function useNotificacoes(tenantUid, user) {
     }
 
     const q = query(
-      collection(db, "users", tenantUid, "notificacoes"),
-      where("destinatarioUid", "==", user.uid),
-      where("lida", "==", false),
-      orderBy("criadoEm", "desc")
+      collection(db, 'users', tenantUid, 'notificacoes'),
+      where('destinatarioUid', '==', user.uid),
+      where('lida', '==', false),
+      orderBy('criadoEm', 'desc')
     );
 
     const unsub = onSnapshot(
@@ -126,10 +136,8 @@ export function useNotificacoes(tenantUid, user) {
         const idsAtuais = new Set(docs.map((d) => d.id));
 
         if (idsConhecidosRef.current === null) {
-          // Primeira carga: registra ids sem tocar som
           idsConhecidosRef.current = idsAtuais;
         } else {
-          // Verifica se chegaram ids novos desde o último snapshot
           const novos = docs.filter((d) => !idsConhecidosRef.current.has(d.id));
           if (novos.length > 0) {
             tocarSomNotificacao();
@@ -140,32 +148,26 @@ export function useNotificacoes(tenantUid, user) {
         setNotificacoes(docs);
       },
       (err) => {
-        // Não expõe erros internos ao usuário — apenas loga para diagnóstico
-        console.error("[useNotificacoes] onSnapshot erro:", err.code, err.message);
+        console.error('[useNotificacoes] erro:', err.code, err.message);
       }
     );
 
     return () => {
       unsub();
-      // Reseta rastreador ao desmontar — evita falso-positivo na remontagem
       idsConhecidosRef.current = null;
     };
   }, [tenantUid, user?.uid]);
 
-  /**
-   * Marca uma notificação como lida no Firestore.
-   * Seguro chamar múltiplas vezes — updateDoc é idempotente aqui.
-   */
   const marcarLida = useCallback(
     async (notifId) => {
       if (!tenantUid || !notifId) return;
       try {
         await updateDoc(
-          doc(db, "users", tenantUid, "notificacoes", notifId),
+          doc(db, 'users', tenantUid, 'notificacoes', notifId),
           { lida: true }
         );
       } catch (err) {
-        console.error("[useNotificacoes] marcarLida erro:", err.code, err.message);
+        console.error('[useNotificacoes] marcarLida erro:', err.code, err.message);
       }
     },
     [tenantUid]
