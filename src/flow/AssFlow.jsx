@@ -10,7 +10,7 @@
 //   ?tenant=X              → usa admin ("admin") — compatível com URL antiga
 //   ?tenant=X&prestador=Y  → prestador específico
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, createContext, useContext } from "react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import {
   getFirestore, collection, doc, onSnapshot,
@@ -22,41 +22,97 @@ const db = getFirestore();
 const PUBLIC_BASE = "https://flow.assentagencia.com.br";
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
-const T = {
-  ink:        "#040408",
-  ink2:       "#07070D",
-  ink3:       "#0C0C14",
-  ink4:       "#111119",
-  ink5:       "#17171F",
-  gold:       "#C09B52",
-  goldHi:     "#D9B96E",
-  goldLo:     "#856830",
-  goldA06:    "rgba(192,155,82,0.06)",
-  goldA12:    "rgba(192,155,82,0.12)",
-  goldA22:    "rgba(192,155,82,0.22)",
-  goldA38:    "rgba(192,155,82,0.38)",
-  text100:    "#EEEAE2",
-  text65:     "rgba(238,234,226,0.65)",
-  text35:     "rgba(238,234,226,0.35)",
-  text18:     "rgba(238,234,226,0.18)",
-  text08:     "rgba(238,234,226,0.08)",
-  line:       "rgba(238,234,226,0.055)",
-  lineHi:     "rgba(238,234,226,0.09)",
-  emerald:    "#2DD37A",
-  emeraldA10: "rgba(45,211,122,0.10)",
-  emeraldA22: "rgba(45,211,122,0.22)",
-  red:        "rgba(239,68,68,0.85)",
-  redA06:     "rgba(239,68,68,0.06)",
-  redA18:     "rgba(239,68,68,0.18)",
-  blue:       "#60a5fa",
-  blueA10:    "rgba(96,165,250,0.10)",
-  blueA25:    "rgba(96,165,250,0.25)",
-  glass:      "rgba(12,12,20,0.70)",
-  glassHi:    "rgba(17,17,25,0.88)",
-};
+function getT(isDark) {
+  if (isDark) return {
+    ink:        "#040408",
+    ink2:       "#07070D",
+    ink3:       "#0C0C14",
+    ink4:       "#111119",
+    ink5:       "#17171F",
+    gold:       "#C09B52",
+    goldHi:     "#D9B96E",
+    goldLo:     "#856830",
+    goldA06:    "rgba(192,155,82,0.06)",
+    goldA12:    "rgba(192,155,82,0.12)",
+    goldA22:    "rgba(192,155,82,0.22)",
+    goldA38:    "rgba(192,155,82,0.38)",
+    text100:    "#EEEAE2",
+    text65:     "rgba(238,234,226,0.65)",
+    text35:     "rgba(238,234,226,0.35)",
+    text18:     "rgba(238,234,226,0.18)",
+    text08:     "rgba(238,234,226,0.08)",
+    line:       "rgba(238,234,226,0.055)",
+    lineHi:     "rgba(238,234,226,0.09)",
+    emerald:    "#2DD37A",
+    emeraldA10: "rgba(45,211,122,0.10)",
+    emeraldA22: "rgba(45,211,122,0.22)",
+    red:        "rgba(239,68,68,0.85)",
+    redA06:     "rgba(239,68,68,0.06)",
+    redA18:     "rgba(239,68,68,0.18)",
+    blue:       "#60a5fa",
+    blueA10:    "rgba(96,165,250,0.10)",
+    blueA25:    "rgba(96,165,250,0.25)",
+    glass:      "rgba(12,12,20,0.70)",
+    glassHi:    "rgba(17,17,25,0.88)",
+    cardBg:     "rgba(17,17,25,0.92)",
+    cardBgLo:   "rgba(17,17,25,0.80)",
+    rowAlt:     "rgba(255,255,255,0.012)",
+    rowAlt0:    "transparent",
+    overlay:    "rgba(4,4,8,0.80)",
+    overlayMd:  "rgba(4,4,8,0.72)",
+    avatarText: "#040408",
+    scrollThumb:"rgba(192,155,82,0.18)",
+    scrollHover:"rgba(192,155,82,0.35)",
+  };
+  // ── Light tokens ──
+  return {
+    ink:        "#F5F3EE",
+    ink2:       "#EDEAE3",
+    ink3:       "#E4E0D8",
+    ink4:       "#D9D4CA",
+    ink5:       "#CFC9BE",
+    gold:       "#8A6A2A",
+    goldHi:     "#A07830",
+    goldLo:     "#C09B52",
+    goldA06:    "rgba(138,106,42,0.06)",
+    goldA12:    "rgba(138,106,42,0.12)",
+    goldA22:    "rgba(138,106,42,0.22)",
+    goldA38:    "rgba(138,106,42,0.38)",
+    text100:    "#1A1714",
+    text65:     "rgba(26,23,20,0.65)",
+    text35:     "rgba(26,23,20,0.45)",
+    text18:     "rgba(26,23,20,0.28)",
+    text08:     "rgba(26,23,20,0.06)",
+    line:       "rgba(26,23,20,0.08)",
+    lineHi:     "rgba(26,23,20,0.12)",
+    emerald:    "#1A9955",
+    emeraldA10: "rgba(26,153,85,0.10)",
+    emeraldA22: "rgba(26,153,85,0.22)",
+    red:        "rgba(220,38,38,0.85)",
+    redA06:     "rgba(220,38,38,0.06)",
+    redA18:     "rgba(220,38,38,0.18)",
+    blue:       "#2563eb",
+    blueA10:    "rgba(37,99,235,0.10)",
+    blueA25:    "rgba(37,99,235,0.25)",
+    glass:      "rgba(240,238,233,0.70)",
+    glassHi:    "rgba(255,253,248,0.88)",
+    cardBg:     "rgba(255,253,248,0.95)",
+    cardBgLo:   "rgba(255,253,248,0.80)",
+    rowAlt:     "rgba(0,0,0,0.015)",
+    rowAlt0:    "transparent",
+    overlay:    "rgba(200,195,185,0.80)",
+    overlayMd:  "rgba(200,195,185,0.72)",
+    avatarText: "#F5F3EE",
+    scrollThumb:"rgba(138,106,42,0.20)",
+    scrollHover:"rgba(138,106,42,0.38)",
+  };
+}
+
+// ─── Theme Context ─────────────────────────────────────────────────────────────
+const FlowThemeCtx = createContext({ T: getT(true), S: null });
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
-const S = {
+function getS(T) { return {
   root: {
     display:"flex", height:"100vh", height:"100dvh",
     background: T.ink,
@@ -192,11 +248,11 @@ const S = {
 
   badge: c => {
     const map = {
-      green:  { bg:"rgba(45,211,122,0.10)",  color:"#2DD37A",  bd:"rgba(45,211,122,0.25)" },
-      yellow: { bg:"rgba(192,155,82,0.12)",  color:"#D9B96E",  bd:"rgba(192,155,82,0.30)" },
-      red:    { bg:"rgba(239,68,68,0.10)",   color:"#F87171",  bd:"rgba(239,68,68,0.28)" },
-      blue:   { bg:"rgba(96,165,250,0.10)",  color:"#60a5fa",  bd:"rgba(96,165,250,0.28)" },
-      gray:   { bg:"rgba(238,234,226,0.05)", color:"rgba(238,234,226,0.35)", bd:"rgba(238,234,226,0.10)" },
+      green:  { bg:T.emeraldA10,  color:T.emerald,  bd:T.emeraldA22 },
+      yellow: { bg:T.goldA12,     color:T.goldHi,   bd:T.goldA22 },
+      red:    { bg:T.redA06,      color:"#F87171",   bd:T.redA18 },
+      blue:   { bg:T.blueA10,     color:T.blue,      bd:T.blueA25 },
+      gray:   { bg:T.text08,      color:T.text35,    bd:T.lineHi },
     };
     const m = map[c] || map.gray;
     return {
@@ -288,7 +344,9 @@ const S = {
     height:"100%", gap:14,
     textAlign:"center", padding:40,
   },
-};
+}; }
+
+function useFlowTheme() { return useContext(FlowThemeCtx); }
 
 // ─── Ícones ───────────────────────────────────────────────────────────────────
 const Ic = {
@@ -345,14 +403,15 @@ function useToast(){
   return [t,show];
 }
 function Toast({t}){
+  const {T, S} = useFlowTheme();
   if(!t?.msg) return null;
   const ok = t.type==="success";
   return <div style={{
     position:"fixed", bottom:28, right:28,
     padding:"13px 22px", borderRadius:14,
-    background: ok ? "rgba(45,211,122,0.10)" : "rgba(239,68,68,0.10)",
+    background: ok ? T.emeraldA10 : "rgba(239,68,68,0.10)",
     border:`1px solid ${ok ? "rgba(45,211,122,0.35)" : "rgba(239,68,68,0.35)"}`,
-    color: ok ? "#2DD37A" : "#F87171",
+    color: ok ? T.emerald : "#F87171",
     fontSize:13, fontWeight:700,
     zIndex:999, backdropFilter:"blur(16px)",
     boxShadow: ok ? "0 8px 32px rgba(45,211,122,0.12)" : "0 8px 32px rgba(239,68,68,0.12)",
@@ -364,54 +423,59 @@ function Toast({t}){
   </div>;
 }
 function Loading({h=200}){
-  return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:h,gap:10,color:"rgba(238,234,226,0.35)",fontSize:13,letterSpacing:"0.2px"}}>
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#C09B52" strokeWidth="2" style={{animation:"spin 0.85s linear infinite",flexShrink:0}}>
+  const {T, S} = useFlowTheme();
+  return <div style={{display:"flex",alignItems:"center",justifyContent:"center",height:h,gap:10,color:T.text35,fontSize:13,letterSpacing:"0.2px"}}>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={T.gold} strokeWidth="2" style={{animation:"spin 0.85s linear infinite",flexShrink:0}}>
       <circle cx="12" cy="12" r="10" strokeOpacity="0.15"/><path d="M12 2a10 10 0 0 1 10 10"/>
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </svg>Carregando…
   </div>;
 }
 function Avatar({nome,size=36}){
+  const {T, S} = useFlowTheme();
   return <div style={{
     width:size, height:size, borderRadius:Math.round(size*0.32),
-    background:`linear-gradient(140deg, #D9B96E 0%, #856830 100%)`,
+    background:`linear-gradient(140deg, ${T.goldHi} 0%, ${T.goldLo} 100%)`,
     display:"flex", alignItems:"center", justifyContent:"center",
-    fontSize:size*0.36, fontWeight:800, color:"#040408",
+    fontSize:size*0.36, fontWeight:800, color:T.avatarText,
     flexShrink:0,
-    boxShadow:"0 0 0 1px rgba(192,155,82,0.20), 0 4px 12px rgba(192,155,82,0.14)",
+    boxShadow:`0 0 0 1px ${T.goldA22}, 0 4px 12px ${T.goldA12}`,
     letterSpacing:"-0.5px",
   }}>{initials(nome)}</div>;
 }
 function StatusBar({label,value,total,color}){
+  const {T, S} = useFlowTheme();
   const pct=total>0?Math.round((value/total)*100):0;
   return <div>
     <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
-      <span style={{fontSize:12,color:"rgba(238,234,226,0.65)",fontWeight:500}}>{label}</span>
-      <span style={{fontSize:12,color:"rgba(238,234,226,0.35)",fontWeight:600}}>{value} <span style={{fontSize:10,opacity:0.7}}>({pct}%)</span></span>
+      <span style={{fontSize:12,color:T.text65,fontWeight:500}}>{label}</span>
+      <span style={{fontSize:12,color:T.text35,fontWeight:600}}>{value} <span style={{fontSize:10,opacity:0.7}}>({pct}%)</span></span>
     </div>
-    <div style={{height:5,background:"rgba(238,234,226,0.055)",borderRadius:3,overflow:"hidden"}}>
+    <div style={{height:5,background:T.line,borderRadius:3,overflow:"hidden"}}>
       <div style={{height:"100%",width:`${pct}%`,background:color,borderRadius:3,transition:"width 0.5s cubic-bezier(0.22,1,0.36,1)",boxShadow:`0 0 8px ${color}55`}}/>
     </div>
   </div>;
 }
 function CheckItem({ok,label}){
+  const {T, S} = useFlowTheme();
   return <div style={{display:"flex",gap:7,alignItems:"center"}}>
     <div style={{
       width:18, height:18, borderRadius:"50%",
-      background: ok ? "rgba(45,211,122,0.10)" : "rgba(238,234,226,0.04)",
-      border:`1px solid ${ok ? "rgba(45,211,122,0.35)" : "rgba(238,234,226,0.09)"}`,
+      background: ok ? T.emeraldA10 : T.text08,
+      border:`1px solid ${ok ? T.emeraldA22 : T.lineHi}`,
       display:"flex", alignItems:"center", justifyContent:"center",
-      fontSize:9, color: ok ? "#2DD37A" : "rgba(238,234,226,0.20)",
+      fontSize:9, color: ok ? T.emerald : T.text18,
       flexShrink:0, fontWeight:800,
       boxShadow: ok ? "0 0 8px rgba(45,211,122,0.15)" : "none",
       transition:"all 0.3s",
     }}>{ok?"✓":"○"}</div>
-    <span style={{fontSize:12,color:ok?"rgba(238,234,226,0.65)":"rgba(238,234,226,0.25)",fontWeight:ok?500:400}}>{label}</span>
+    <span style={{fontSize:12,color:ok?T.text65:T.text35,fontWeight:ok?500:400}}>{label}</span>
   </div>;
 }
 
 // ─── Visão Geral ──────────────────────────────────────────────────────────────
 function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
+  const {T, S} = useFlowTheme();
   const [reservas,setReservas]=useState([]);
   const [loading,setLoading]=useState(true);
   const [filtroP,setFiltroP]=useState(isAdmin?"todos":meuPrestadorId);
@@ -451,10 +515,10 @@ function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
       {/* grid responsivo via className */}
       <div className="flow-grid4">
         {[
-          {icon:"📋", value:total,        label:"Total de Reservas", color:T.gold,    glow:"rgba(192,155,82,0.18)"},
-          {icon:"📅", value:hojeR.length, label:"Hoje",              color:T.blue,    glow:"rgba(96,165,250,0.14)"},
-          {icon:"📆", value:semanaR.length,label:"Esta Semana",      color:T.goldHi,  glow:"rgba(192,155,82,0.12)"},
-          {icon:"⏳", value:pendentes,    label:"Pendentes",         color:T.emerald, glow:"rgba(45,211,122,0.14)"},
+          {icon:"📋", value:total,        label:"Total de Reservas", color:T.gold,    glow:T.goldA12},
+          {icon:"📅", value:hojeR.length, label:"Hoje",              color:T.blue,    glow:T.blueA10},
+          {icon:"📆", value:semanaR.length,label:"Esta Semana",      color:T.goldHi,  glow:T.goldA12},
+          {icon:"⏳", value:pendentes,    label:"Pendentes",         color:T.emerald, glow:T.emeraldA10},
         ].map(({icon,value,label,color,glow})=>(
           <div key={label} style={{
             ...S.statCard,
@@ -464,13 +528,13 @@ function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
             cursor:"default",
             overflow:"hidden",
           }}
-          onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 8px 32px rgba(0,0,0,0.38), 0 0 0 1px rgba(238,234,226,0.09)`;e.currentTarget.style.transform="translateY(-2px)";}}
+          onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 8px 32px rgba(0,0,0,0.38), 0 0 0 1px ${T.lineHi}`;e.currentTarget.style.transform="translateY(-2px)";}}
           onMouseLeave={e=>{e.currentTarget.style.boxShadow=`0 2px 24px rgba(0,0,0,0.28)`;e.currentTarget.style.transform="translateY(0)";}}
           >
             <div style={{position:"absolute",top:0,left:0,right:0,height:60,background:`radial-gradient(ellipse at 50% 0%, ${glow} 0%, transparent 70%)`,pointerEvents:"none"}}/>
             <p style={{fontSize:20,marginBottom:12}}>{icon}</p>
             <p style={{fontSize:32,fontWeight:800,color,letterSpacing:"-1.5px",lineHeight:1}}>{value}</p>
-            <p style={{fontSize:10,color:"rgba(238,234,226,0.40)",fontWeight:700,marginTop:8,textTransform:"uppercase",letterSpacing:"1.2px"}}>{label}</p>
+            <p style={{fontSize:10,color:T.text35,fontWeight:700,marginTop:8,textTransform:"uppercase",letterSpacing:"1.2px"}}>{label}</p>
           </div>
         ))}
       </div>
@@ -493,14 +557,14 @@ function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
                 return <div key={r.id} style={{
                   display:"flex",justifyContent:"space-between",alignItems:"center",
                   padding:"10px 14px",
-                  background:"rgba(17,17,25,0.80)",
+                  background:T.cardBgLo,
                   borderRadius:10,
-                  border:`1px solid rgba(238,234,226,0.06)`,
+                  border:`1px solid ${T.line}`,
                   borderLeft:`3px solid ${acc2.color}`,
                   position:"relative",overflow:"hidden",
                   transition:"box-shadow 0.2s",
                 }}
-                onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 4px 20px rgba(0,0,0,0.35), 0 0 0 1px rgba(238,234,226,0.08)`;}}
+                onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 4px 20px rgba(0,0,0,0.35), 0 0 0 1px ${T.text08}`;}}
                 onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";}}>
                   <div style={{position:"absolute",top:0,left:0,width:80,height:"100%",background:`linear-gradient(90deg,${acc2.glow} 0%,transparent 100%)`,pointerEvents:"none"}}/>
                   <div>
@@ -520,6 +584,7 @@ function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
 
 // ─── Tela Equipe ──────────────────────────────────────────────────────────────
 function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
+  const {T, S} = useFlowTheme();
   const [usuarios,setUsuarios]=useState([]);
   const [loadingU,setLoadingU]=useState(true);
   const [editando,setEditando]=useState(null);
@@ -589,15 +654,15 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
       <Toast t={t}/>
 
       <div>
-        <p style={{fontSize:15,fontWeight:700,color:"#EEEAE2",marginBottom:6,letterSpacing:"-0.2px"}}>Equipe no Flow</p>
-        <p style={{fontSize:12,color:"rgba(238,234,226,0.35)",lineHeight:1.7}}>Ative os colaboradores cadastrados no AG para que tenham sua própria agenda pública. Cada um configura seus serviços e horários de forma independente.</p>
+        <p style={{fontSize:15,fontWeight:700,color:T.text100,marginBottom:6,letterSpacing:"-0.2px"}}>Equipe no Flow</p>
+        <p style={{fontSize:12,color:T.text35,lineHeight:1.7}}>Ative os colaboradores cadastrados no AG para que tenham sua própria agenda pública. Cada um configura seus serviços e horários de forma independente.</p>
       </div>
 
       {/* Admin sempre primeiro */}
       {adminPrestador&&(
         <div style={{
-          background:"rgba(17,17,25,0.92)",
-          border:`1px solid rgba(238,234,226,0.07)`,
+          background:T.cardBg,
+          border:`1px solid ${T.line}`,
           borderLeft:`3px solid ${T.gold}`,
           borderRadius:14,
           padding:"16px 20px",
@@ -640,8 +705,8 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
             const inativoAG=usr.ativo===false;
             return (
               <div key={usr.uid} style={{
-                background:"rgba(17,17,25,0.92)",
-                border:`1px solid rgba(238,234,226,0.07)`,
+                background:T.cardBg,
+                border:`1px solid ${T.line}`,
                 borderLeft:`3px solid ${ativoFlow?T.emerald:T.text08}`,
                 borderRadius:14,
                 padding:"14px 18px",
@@ -691,10 +756,10 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
 
       {/* Modal especialidade */}
       {editando&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(4,4,8,0.80)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,backdropFilter:"blur(6px)",padding:"0 16px"}}>
-          <div style={{background:"rgba(17,17,25,0.96)",border:"1px solid rgba(238,234,226,0.09)",borderRadius:20,padding:28,width:"100%",maxWidth:380,display:"flex",flexDirection:"column",gap:18,boxShadow:"0 24px 64px rgba(0,0,0,0.55)"}}>
-            <p style={{fontSize:14,fontWeight:700,color:"#EEEAE2",letterSpacing:"-0.2px"}}>Especialidade / Título</p>
-            <p style={{fontSize:12,color:"rgba(238,234,226,0.35)"}}>Exibido na página pública do agendamento, abaixo do nome.</p>
+        <div style={{position:"fixed",inset:0,background:T.overlay,display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,backdropFilter:"blur(6px)",padding:"0 16px"}}>
+          <div style={{background:T.cardBg,border:"1px solid ${T.lineHi}",borderRadius:20,padding:28,width:"100%",maxWidth:380,display:"flex",flexDirection:"column",gap:18,boxShadow:"0 24px 64px rgba(0,0,0,0.55)"}}>
+            <p style={{fontSize:14,fontWeight:700,color:T.text100,letterSpacing:"-0.2px"}}>Especialidade / Título</p>
+            <p style={{fontSize:12,color:T.text35}}>Exibido na página pública do agendamento, abaixo do nome.</p>
             <div>
               <label style={S.label}>Especialidade</label>
               <input style={S.input} value={editando.esp} onChange={e=>setEditando(p=>({...p,esp:e.target.value}))} placeholder="Ex: Nail Designer, Cabeleireira..." autoFocus/>
@@ -723,12 +788,13 @@ const IcR = {
 };
 
 const STATUS_ACCENT = {
-  confirmado: { color:"#2DD37A", glow:"rgba(45,211,122,0.18)", label:"Confirmado" },
-  pendente:   { color:"#D9B96E", glow:"rgba(192,155,82,0.18)",  label:"Pendente"   },
+  confirmado: { color:T.emerald, glow:T.emeraldA10, label:"Confirmado" },
+  pendente:   { color:T.goldHi, glow:T.goldA12,  label:"Pendente"   },
   cancelado:  { color:"rgba(239,68,68,0.75)", glow:"rgba(239,68,68,0.10)", label:"Cancelado" },
 };
 
 function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando, onAtualizar}){
+  const {T, S} = useFlowTheme();
   const acc = STATUS_ACCENT[r.status] || STATUS_ACCENT.cancelado;
   const dtInicio = r.data_hora_inicio ? (r.data_hora_inicio.toDate ? r.data_hora_inicio.toDate() : new Date(r.data_hora_inicio)) : null;
   const dtCriado = r.criadoEm ? (r.criadoEm.toDate ? r.criadoEm.toDate() : new Date(r.criadoEm)) : null;
@@ -739,8 +805,8 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
 
   return (
     <div className="flow-reserva-card" style={{
-      background:"rgba(17,17,25,0.92)",
-      border:`1px solid rgba(238,234,226,0.07)`,
+      background:T.cardBg,
+      border:`1px solid ${T.line}`,
       borderLeft:`3px solid ${acc.color}`,
       borderRadius:14,
       padding:"18px 22px",
@@ -754,7 +820,7 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
       position:"relative",
       overflow:"hidden",
     }}
-    onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 4px 32px rgba(0,0,0,0.38), 0 0 0 1px rgba(238,234,226,0.09)`;}}
+    onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 4px 32px rgba(0,0,0,0.38), 0 0 0 1px ${T.lineHi}`;}}
     onMouseLeave={e=>{e.currentTarget.style.boxShadow=`0 2px 24px rgba(0,0,0,0.28)`;}}
     >
       <div style={{position:"absolute",top:0,left:0,width:120,height:"100%",background:`linear-gradient(90deg, ${acc.glow} 0%, transparent 100%)`,pointerEvents:"none",borderRadius:"14px 0 0 14px"}}/>
@@ -762,66 +828,66 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
       {/* Coluna 1: Cliente */}
       <div style={{minWidth:0}}>
         <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:8}}>
-          <div style={{width:32,height:32,borderRadius:10,background:"linear-gradient(140deg,#D9B96E 0%,#856830 100%)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:"#040408",flexShrink:0,letterSpacing:"-0.5px",boxShadow:"0 0 0 1px rgba(192,155,82,0.20)"}}>
+          <div style={{width:32,height:32,borderRadius:10,background:`linear-gradient(140deg,${T.goldHi} 0%,${T.goldLo} 100%)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,color:T.avatarText,flexShrink:0,letterSpacing:"-0.5px",boxShadow:"0 0 0 1px rgba(192,155,82,0.20)"}}>
             {initials(r.cliente_nome)}
           </div>
-          <span style={{fontSize:13,fontWeight:700,color:"#EEEAE2",letterSpacing:"-0.1px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.cliente_nome||"—"}</span>
+          <span style={{fontSize:13,fontWeight:700,color:T.text100,letterSpacing:"-0.1px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.cliente_nome||"—"}</span>
         </div>
         <div style={{display:"flex",flexDirection:"column",gap:4,paddingLeft:2}}>
           {r.cliente_email&&(
             <div style={{display:"flex",alignItems:"center",gap:5}}>
-              <span style={{color:"rgba(238,234,226,0.25)",flexShrink:0}}>{IcR.mail}</span>
-              <span style={{fontSize:11,color:"rgba(238,234,226,0.38)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.cliente_email}</span>
+              <span style={{color:T.text35,flexShrink:0}}>{IcR.mail}</span>
+              <span style={{fontSize:11,color:T.text35,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.cliente_email}</span>
             </div>
           )}
           {r.cliente_telefone&&(
             <div style={{display:"flex",alignItems:"center",gap:5}}>
-              <span style={{color:"rgba(238,234,226,0.25)",flexShrink:0}}>{IcR.phone}</span>
-              <span style={{fontSize:11,color:"rgba(238,234,226,0.38)"}}>{r.cliente_telefone}</span>
+              <span style={{color:T.text35,flexShrink:0}}>{IcR.phone}</span>
+              <span style={{fontSize:11,color:T.text35}}>{r.cliente_telefone}</span>
             </div>
           )}
         </div>
       </div>
 
       {/* Coluna 2: Serviço */}
-      <div style={{borderLeft:"1px solid rgba(238,234,226,0.06)",paddingLeft:20,display:"flex",flexDirection:"column",gap:10}}>
+      <div style={{borderLeft:"1px solid ${T.line}",paddingLeft:20,display:"flex",flexDirection:"column",gap:10}}>
         <div>
           <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
-            <span style={{color:"rgba(192,155,82,0.50)",flexShrink:0}}>{IcR.scissor}</span>
-            <span style={{fontSize:9.5,fontWeight:700,color:"rgba(238,234,226,0.22)",textTransform:"uppercase",letterSpacing:"1.2px"}}>Serviço</span>
+            <span style={{color:T.text65,flexShrink:0}}>{IcR.scissor}</span>
+            <span style={{fontSize:9.5,fontWeight:700,color:T.text18,textTransform:"uppercase",letterSpacing:"1.2px"}}>Serviço</span>
           </div>
-          <p style={{fontSize:13,fontWeight:600,color:"rgba(238,234,226,0.85)",lineHeight:1.3}}>{r.servico_nome||"—"}</p>
+          <p style={{fontSize:13,fontWeight:600,color:T.text65,lineHeight:1.3}}>{r.servico_nome||"—"}</p>
           {r.servico_duracao_min&&(
             <div style={{display:"flex",alignItems:"center",gap:4,marginTop:3}}>
-              <span style={{color:"rgba(192,155,82,0.35)"}}>{IcR.clock}</span>
-              <span style={{fontSize:11,color:"rgba(192,155,82,0.55)",fontWeight:500}}>{formatDuracao(r.servico_duracao_min)}</span>
+              <span style={{color:T.text35}}>{IcR.clock}</span>
+              <span style={{fontSize:11,color:T.text65,fontWeight:500}}>{formatDuracao(r.servico_duracao_min)}</span>
             </div>
           )}
         </div>
         {isAdmin&&prestadoresAtivos.length>1&&pr&&(
           <div style={{display:"flex",alignItems:"center",gap:6}}>
-            <div style={{width:20,height:20,borderRadius:6,background:"linear-gradient(140deg,#D9B96E 0%,#856830 100%)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:800,color:"#040408",flexShrink:0}}>{initials(pr.nome)}</div>
-            <span style={{fontSize:11,color:"rgba(192,155,82,0.65)",fontWeight:500}}>{pr.nome}</span>
+            <div style={{width:20,height:20,borderRadius:6,background:`linear-gradient(140deg,${T.goldHi} 0%,${T.goldLo} 100%)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:8,fontWeight:800,color:T.avatarText,flexShrink:0}}>{initials(pr.nome)}</div>
+            <span style={{fontSize:11,color:T.text65,fontWeight:500}}>{pr.nome}</span>
           </div>
         )}
       </div>
 
       {/* Coluna 3: Datas */}
-      <div style={{borderLeft:"1px solid rgba(238,234,226,0.06)",paddingLeft:20,display:"flex",flexDirection:"column",gap:10}}>
+      <div style={{borderLeft:"1px solid ${T.line}",paddingLeft:20,display:"flex",flexDirection:"column",gap:10}}>
         {dtInicio&&(
           <div>
             <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
-              <span style={{color:"rgba(192,155,82,0.50)",flexShrink:0}}>{IcR.cal}</span>
-              <span style={{fontSize:9.5,fontWeight:700,color:"rgba(238,234,226,0.22)",textTransform:"uppercase",letterSpacing:"1.2px"}}>Agendado para</span>
+              <span style={{color:T.text65,flexShrink:0}}>{IcR.cal}</span>
+              <span style={{fontSize:9.5,fontWeight:700,color:T.text18,textTransform:"uppercase",letterSpacing:"1.2px"}}>Agendado para</span>
             </div>
-            <p style={{fontSize:14,fontWeight:700,color:"#EEEAE2",letterSpacing:"-0.3px",lineHeight:1}}>{fmtData(dtInicio)}</p>
-            <p style={{fontSize:12,color:"rgba(192,155,82,0.75)",fontWeight:600,marginTop:2}}>{fmtHora(dtInicio)}</p>
+            <p style={{fontSize:14,fontWeight:700,color:T.text100,letterSpacing:"-0.3px",lineHeight:1}}>{fmtData(dtInicio)}</p>
+            <p style={{fontSize:12,color:T.gold,fontWeight:600,marginTop:2}}>{fmtHora(dtInicio)}</p>
           </div>
         )}
         {dtCriado&&(
           <div>
-            <span style={{fontSize:9.5,fontWeight:600,color:"rgba(238,234,226,0.18)",textTransform:"uppercase",letterSpacing:"1px"}}>Criado em</span>
-            <p style={{fontSize:11,color:"rgba(238,234,226,0.28)",marginTop:2}}>{fmtCurto(dtCriado)}</p>
+            <span style={{fontSize:9.5,fontWeight:600,color:T.text18,textTransform:"uppercase",letterSpacing:"1px"}}>Criado em</span>
+            <p style={{fontSize:11,color:T.text18,marginTop:2}}>{fmtCurto(dtCriado)}</p>
           </div>
         )}
       </div>
@@ -842,7 +908,7 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
           <div style={{display:"flex",gap:6,flexWrap:"wrap",justifyContent:"flex-end"}}>
             {r.status==="pendente"&&(
               <>
-                <button onClick={()=>onAtualizar(r.id,"confirmado")} disabled={atualizando===r.id} style={{padding:"6px 12px",border:"1px solid rgba(45,211,122,0.30)",borderRadius:8,background:"rgba(45,211,122,0.08)",color:"#2DD37A",fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",opacity:atualizando===r.id?0.5:1}}>✓ Confirmar</button>
+                <button onClick={()=>onAtualizar(r.id,"confirmado")} disabled={atualizando===r.id} style={{padding:"6px 12px",border:"1px solid rgba(45,211,122,0.30)",borderRadius:8,background:T.emeraldA10,color:T.emerald,fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",opacity:atualizando===r.id?0.5:1}}>✓ Confirmar</button>
                 <button onClick={()=>onAtualizar(r.id,"cancelado")} disabled={atualizando===r.id} style={{padding:"6px 12px",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,background:"rgba(239,68,68,0.06)",color:"#F87171",fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",opacity:atualizando===r.id?0.5:1}}>✕ Cancelar</button>
               </>
             )}
@@ -850,7 +916,7 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
               <button onClick={()=>onAtualizar(r.id,"cancelado")} disabled={atualizando===r.id} style={{padding:"6px 12px",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,background:"rgba(239,68,68,0.06)",color:"#F87171",fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",opacity:atualizando===r.id?0.5:1}}>✕ Cancelar</button>
             )}
             {r.status==="cancelado"&&(
-              <button onClick={()=>onAtualizar(r.id,"pendente")} disabled={atualizando===r.id} style={{padding:"6px 12px",border:"1px solid rgba(238,234,226,0.12)",borderRadius:8,background:"rgba(238,234,226,0.04)",color:"rgba(238,234,226,0.45)",fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",opacity:atualizando===r.id?0.5:1}}>↺ Reabrir</button>
+              <button onClick={()=>onAtualizar(r.id,"pendente")} disabled={atualizando===r.id} style={{padding:"6px 12px",border:"1px solid ${T.lineHi}",borderRadius:8,background:T.text08,color:T.text65,fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",opacity:atualizando===r.id?0.5:1}}>↺ Reabrir</button>
             )}
           </div>
         )}
@@ -860,6 +926,7 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
 }
 
 function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar}){
+  const {T, S} = useFlowTheme();
   const [reservas,setReservas]=useState([]);
   const [loading,setLoading]=useState(true);
   const [aba,setAba]=useState("ativas");
@@ -946,7 +1013,7 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
     {key:"pendente",   label:"Pendente",   count:ativas.filter(r=>r.status==="pendente").length},
     {key:"confirmado", label:"Confirmado", count:ativas.filter(r=>r.status==="confirmado").length},
   ];
-  const SUB_COLORS={todos:"#C09B52",pendente:"#D9B96E",confirmado:"#2DD37A"};
+  const SUB_COLORS={todos:T.gold,pendente:T.goldHi,confirmado:T.emerald};
 
   const limparBusca=()=>{ setBusca(""); setBuscarData(""); };
   const temBusca=busca.trim()||buscarData;
@@ -954,12 +1021,12 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
   const sortBtnStyle=(campo)=>({
     display:"flex",alignItems:"center",gap:5,
     padding:"6px 13px",borderRadius:8,border:"none",
-    background: sortBy===campo ? "rgba(192,155,82,0.12)" : "rgba(238,234,226,0.04)",
-    color: sortBy===campo ? "#D9B96E" : "rgba(238,234,226,0.35)",
+    background: sortBy===campo ? T.goldA12 : T.text08,
+    color: sortBy===campo ? T.goldHi : T.text35,
     fontSize:11.5,fontWeight:sortBy===campo?700:500,
     cursor:"pointer",transition:"all 0.2s",
     borderWidth:1,borderStyle:"solid",
-    borderColor: sortBy===campo ? "rgba(192,155,82,0.28)" : "rgba(238,234,226,0.07)",
+    borderColor: sortBy===campo ? "rgba(192,155,82,0.28)" : T.line,
   });
   const sortArrow=(campo)=>sortBy===campo?(sortDir==="desc"?" ↓":" ↑"):" ↕";
 
@@ -968,9 +1035,9 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
       <Toast t={t}/>
 
       {/* ══ ABAS PRINCIPAIS ══ */}
-      <div style={{display:"flex",gap:0,background:"rgba(238,234,226,0.03)",border:"1px solid rgba(238,234,226,0.07)",borderRadius:14,padding:4,alignSelf:"flex-start"}}>
+      <div style={{display:"flex",gap:0,background:T.text08,border:"1px solid ${T.line}",borderRadius:14,padding:4,alignSelf:"flex-start"}}>
         {[
-          {key:"ativas",    label:"Ativas",     count:ativas.length,    cor:"#2DD37A", icon:"✦"},
+          {key:"ativas",    label:"Ativas",     count:ativas.length,    cor:T.emerald, icon:"✦"},
           {key:"canceladas",label:"Canceladas", count:canceladas.length,cor:"#F87171", icon:"✕"},
         ].map(({key,label,count,cor,icon})=>{
           const on=aba===key;
@@ -978,15 +1045,15 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
             <button key={key} onClick={()=>{setAba(key);setFiltroStatus("todos");limparBusca();}} style={{
               display:"flex",alignItems:"center",gap:7,
               padding:"8px 18px",borderRadius:10,border:"none",
-              background: on ? (key==="ativas"?"rgba(45,211,122,0.10)":"rgba(239,68,68,0.09)") : "transparent",
-              color: on ? cor : "rgba(238,234,226,0.30)",
+              background: on ? (key==="ativas"?T.emeraldA10:"rgba(239,68,68,0.09)") : "transparent",
+              color: on ? cor : T.text35,
               fontSize:13,fontWeight:on?700:500,
               cursor:"pointer",transition:"all 0.2s",
               boxShadow: on ? `0 0 0 1px ${cor}30` : "none",
             }}>
               <span style={{fontSize:10}}>{icon}</span>
               {label}
-              <span style={{fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:20,background:on?`${cor}20`:"rgba(238,234,226,0.05)",color:on?cor:"rgba(238,234,226,0.20)",border:on?`1px solid ${cor}33`:"1px solid transparent"}}>{count}</span>
+              <span style={{fontSize:10,fontWeight:700,padding:"1px 7px",borderRadius:20,background:on?`${cor}20`:T.text08,color:on?cor:T.text18,border:on?`1px solid ${cor}33`:"1px solid transparent"}}>{count}</span>
             </button>
           );
         })}
@@ -994,8 +1061,8 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
 
       {/* ══ BARRA DE PESQUISA UNIFICADA ══ */}
       <div style={{
-        background:"rgba(17,17,25,0.80)",
-        border:"1px solid rgba(238,234,226,0.07)",
+        background:T.cardBgLo,
+        border:"1px solid ${T.line}",
         borderRadius:14,padding:"12px 14px",
         backdropFilter:"blur(12px)",
         display:"flex",flexDirection:"column",gap:10,
@@ -1004,7 +1071,7 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
         <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
           {/* Input unificado: nome ou serviço */}
           <div style={{position:"relative",flex:"2 1 200px",minWidth:160,display:"flex",alignItems:"center"}}>
-            <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:"rgba(238,234,226,0.22)",pointerEvents:"none",display:"flex"}}>{IcR.search}</span>
+            <span style={{position:"absolute",left:11,top:"50%",transform:"translateY(-50%)",color:T.text18,pointerEvents:"none",display:"flex"}}>{IcR.search}</span>
             <input
               type="text"
               placeholder="Buscar por cliente ou serviço…"
@@ -1015,12 +1082,12 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
           </div>
           {/* Data */}
           <div style={{position:"relative",flex:"1 1 140px",minWidth:130,display:"flex",alignItems:"center"}}>
-            <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:"rgba(238,234,226,0.22)",pointerEvents:"none",display:"flex"}}>{IcR.cal}</span>
+            <span style={{position:"absolute",left:10,top:"50%",transform:"translateY(-50%)",color:T.text18,pointerEvents:"none",display:"flex"}}>{IcR.cal}</span>
             <input
               type="date"
               value={buscarData}
               onChange={e=>setBuscarData(e.target.value)}
-              style={{...S.input,paddingLeft:30,fontSize:12,height:36,padding:"0 10px 0 30px",color:buscarData?"#EEEAE2":"rgba(238,234,226,0.25)"}}
+              style={{...S.input,paddingLeft:30,fontSize:12,height:36,padding:"0 10px 0 30px",color:buscarData?T.text100:T.text35}}
             />
           </div>
           {temBusca&&(
@@ -1032,7 +1099,7 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
 
         {/* Linha 2: sort + status + prestador + contador */}
         <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
-          <span style={{fontSize:10.5,fontWeight:700,color:"rgba(238,234,226,0.20)",textTransform:"uppercase",letterSpacing:"1px",whiteSpace:"nowrap"}}>Ordenar:</span>
+          <span style={{fontSize:10.5,fontWeight:700,color:T.text18,textTransform:"uppercase",letterSpacing:"1px",whiteSpace:"nowrap"}}>Ordenar:</span>
           <button onClick={()=>toggleSort("data")}  style={sortBtnStyle("data")}>
             {IcR.cal} Data{sortArrow("data")}
           </button>
@@ -1042,23 +1109,23 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
 
           {aba==="ativas"&&(
             <>
-              <div style={{width:1,height:22,background:"rgba(238,234,226,0.07)",margin:"0 4px"}}/>
-              <span style={{fontSize:10.5,fontWeight:700,color:"rgba(238,234,226,0.20)",textTransform:"uppercase",letterSpacing:"1px",whiteSpace:"nowrap"}}>Status:</span>
-              <div style={{display:"flex",gap:3,background:"rgba(238,234,226,0.03)",border:"1px solid rgba(238,234,226,0.06)",borderRadius:9,padding:"3px"}}>
+              <div style={{width:1,height:22,background:T.line,margin:"0 4px"}}/>
+              <span style={{fontSize:10.5,fontWeight:700,color:T.text18,textTransform:"uppercase",letterSpacing:"1px",whiteSpace:"nowrap"}}>Status:</span>
+              <div style={{display:"flex",gap:3,background:T.text08,border:"1px solid ${T.line}",borderRadius:9,padding:"3px"}}>
                 {SUB_FILTROS.map(({key,label,count})=>{
                   const on=filtroStatus===key;
                   const cor=SUB_COLORS[key];
                   return (
                     <button key={key} onClick={()=>setFiltroStatus(key)} style={{
                       padding:"4px 11px",borderRadius:7,border:"none",
-                      background: on ? "rgba(238,234,226,0.07)" : "transparent",
-                      color: on ? cor : "rgba(238,234,226,0.28)",
+                      background: on ? T.line : "transparent",
+                      color: on ? cor : T.text18,
                       fontSize:11.5,fontWeight:on?700:500,
                       cursor:"pointer",transition:"all 0.2s",
                       display:"flex",alignItems:"center",gap:5,
                     }}>
                       {label}
-                      <span style={{fontSize:10,fontWeight:700,padding:"1px 6px",borderRadius:20,background:on?`${cor}22`:"rgba(238,234,226,0.05)",color:on?cor:"rgba(238,234,226,0.18)",border:on?`1px solid ${cor}33`:"1px solid transparent"}}>{count}</span>
+                      <span style={{fontSize:10,fontWeight:700,padding:"1px 6px",borderRadius:20,background:on?`${cor}22`:T.text08,color:on?cor:T.text18,border:on?`1px solid ${cor}33`:"1px solid transparent"}}>{count}</span>
                     </button>
                   );
                 })}
@@ -1068,7 +1135,7 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
 
           {isAdmin&&prestadoresAtivos.length>1&&(
             <>
-              <div style={{width:1,height:22,background:"rgba(238,234,226,0.07)",margin:"0 4px"}}/>
+              <div style={{width:1,height:22,background:T.line,margin:"0 4px"}}/>
               <select style={{...S.select,width:"auto",minWidth:140,fontSize:11.5,padding:"5px 10px",height:32}} value={filtroP} onChange={e=>setFiltroP(e.target.value)}>
                 <option value="todos">Toda a equipe</option>
                 {prestadoresAtivos.map(p=><option key={p.id} value={p.id}>{p.nome}{p.isAdmin?" (você)":""}</option>)}
@@ -1077,7 +1144,7 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
           )}
 
           <div style={{marginLeft:"auto"}}>
-            <span style={{fontSize:11,color:"rgba(238,234,226,0.18)",fontWeight:600,textTransform:"uppercase",letterSpacing:"0.8px"}}>
+            <span style={{fontSize:11,color:T.text18,fontWeight:600,textTransform:"uppercase",letterSpacing:"0.8px"}}>
               {listaAtual.length} reserva{listaAtual.length!==1?"s":""}
             </span>
           </div>
@@ -1087,13 +1154,13 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
       {/* ══ LISTA ══ */}
       {listaAtual.length===0?(
         <div style={{...S.card,textAlign:"center",padding:"60px 24px",display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
-          <div style={{width:52,height:52,borderRadius:16,background:"rgba(238,234,226,0.04)",border:"1px solid rgba(238,234,226,0.07)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>
+          <div style={{width:52,height:52,borderRadius:16,background:T.text08,border:"1px solid ${T.line}",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>
             {aba==="canceladas"?"🚫":"📭"}
           </div>
-          <p style={{fontSize:14,fontWeight:700,color:"rgba(238,234,226,0.50)",letterSpacing:"-0.1px"}}>
+          <p style={{fontSize:14,fontWeight:700,color:T.text65,letterSpacing:"-0.1px"}}>
             {temBusca?"Nenhum resultado encontrado":"Nenhuma reserva aqui"}
           </p>
-          <p style={{fontSize:12,color:"rgba(238,234,226,0.22)"}}>
+          <p style={{fontSize:12,color:T.text18}}>
             {temBusca?"Tente outros termos de busca":aba==="canceladas"?"Nenhuma reserva foi cancelada ainda":"Sem reservas ativas no momento"}
           </p>
           {temBusca&&<button onClick={limparBusca} style={{...S.btnGhost,fontSize:12,marginTop:4}}>Limpar busca</button>}
@@ -1123,6 +1190,7 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
 
 // ─── Tela Configurações ───────────────────────────────────────────────────────
 function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestadorFoco}){
+  const {T, S} = useFlowTheme();
   const [prestadorId,setPrestadorId]=useState(prestadorFoco||(isAdmin?"admin":meuPrestadorId));
   const [config,setConfig]=useState(CONFIG_DEFAULT);
   const [loading,setLoading]=useState(true);
@@ -1245,7 +1313,7 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
       <Toast t={t}/>
 
       {isAdmin&&prestadoresAtivos.length>1?(
-        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderLeft:`3px solid ${T.gold}`,borderRadius:14,padding:"16px 20px",display:"flex",alignItems:"center",gap:14,backdropFilter:"blur(12px)",position:"relative",overflow:"hidden",flexWrap:"wrap"}}>
+        <div style={{background:T.cardBg,border:`1px solid ${T.line}`,borderLeft:`3px solid ${T.gold}`,borderRadius:14,padding:"16px 20px",display:"flex",alignItems:"center",gap:14,backdropFilter:"blur(12px)",position:"relative",overflow:"hidden",flexWrap:"wrap"}}>
           <div style={{position:"absolute",top:0,left:0,width:120,height:"100%",background:`linear-gradient(90deg,${T.goldA06} 0%,transparent 100%)`,pointerEvents:"none"}}/>
           <div style={{width:36,height:36,borderRadius:10,background:T.goldA06,border:`1px solid ${T.goldA22}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.gold,flexShrink:0,fontSize:14}}>{IcCfg.profile}</div>
           <div style={{flex:1,minWidth:160}}>
@@ -1257,7 +1325,7 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
           {prestadorAtual&&<span style={S.badge(prestadorAtual.ativo?"green":"gray")}>{prestadorAtual.ativo?"Ativo":"Inativo"}</span>}
         </div>
       ):(!isAdmin&&prestadorAtual&&(
-        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderLeft:`3px solid ${T.gold}`,borderRadius:14,padding:"16px 20px",display:"flex",alignItems:"center",gap:14,backdropFilter:"blur(12px)",position:"relative",overflow:"hidden"}}>
+        <div style={{background:T.cardBg,border:`1px solid ${T.line}`,borderLeft:`3px solid ${T.gold}`,borderRadius:14,padding:"16px 20px",display:"flex",alignItems:"center",gap:14,backdropFilter:"blur(12px)",position:"relative",overflow:"hidden"}}>
           <div style={{position:"absolute",top:0,left:0,width:120,height:"100%",background:`linear-gradient(90deg,${T.goldA06} 0%,transparent 100%)`,pointerEvents:"none"}}/>
           <Avatar nome={prestadorAtual.nome}/>
           <div style={{flex:1}}>
@@ -1271,7 +1339,7 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
       {loading?<Loading/>:<>
 
         {/* Seção 1: Identidade */}
-        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderRadius:14,padding:"20px 22px",backdropFilter:"blur(12px)"}}>
+        <div style={{background:T.cardBg,border:`1px solid ${T.line}`,borderRadius:14,padding:"20px 22px",backdropFilter:"blur(12px)"}}>
           {secaoHeader(IcCfg.pencil,"Identidade Pública","O que o cliente vê ao abrir sua página de agendamento.")}
           <div className="flow-grid2">
             <div>
@@ -1286,7 +1354,7 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
         </div>
 
         {/* Seção 2: Horários */}
-        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderRadius:14,padding:"20px 22px",backdropFilter:"blur(12px)"}}>
+        <div style={{background:T.cardBg,border:`1px solid ${T.line}`,borderRadius:14,padding:"20px 22px",backdropFilter:"blur(12px)"}}>
           {secaoHeader(IcCfg.clock2,"Horários de Atendimento","Defina quando você recebe clientes. Os horários disponíveis são gerados automaticamente.")}
           <p style={{...S.label,marginBottom:10}}>Dias de Atendimento</p>
           <div style={{display:"flex",gap:6,marginBottom:20,flexWrap:"wrap"}}>
@@ -1295,8 +1363,8 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
               return (
                 <button key={d.key} onClick={()=>toggleDia(d.key)} style={{
                   width:46,height:46,borderRadius:10,
-                  border:a?`1px solid ${T.gold}`:`1px solid rgba(238,234,226,0.07)`,
-                  background:a?T.goldA12:"rgba(255,255,255,0.02)",
+                  border:a?`1px solid ${T.gold}`:`1px solid ${T.line}`,
+                  background:a?T.goldA12:T.rowAlt,
                   color:a?T.gold:T.text35,
                   fontSize:11.5,fontWeight:a?700:400,
                   cursor:"pointer",transition:"all 0.2s",
@@ -1322,19 +1390,19 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
               </select>
             </div>
           </div>
-          <div style={{marginTop:14,padding:"10px 14px",background:"rgba(192,155,82,0.04)",border:`1px solid ${T.goldA12}`,borderRadius:10,fontSize:11.5,color:T.text35,lineHeight:1.65,display:"flex",gap:8,alignItems:"flex-start"}}>
+          <div style={{marginTop:14,padding:"10px 14px",background:T.goldA06,border:`1px solid ${T.goldA12}`,borderRadius:10,fontSize:11.5,color:T.text35,lineHeight:1.65,display:"flex",gap:8,alignItems:"flex-start"}}>
             <span style={{flexShrink:0,marginTop:1}}>💡</span>
             <span>O intervalo define o passo entre os horários disponíveis para o cliente — a duração real de cada serviço é sempre respeitada.</span>
           </div>
         </div>
 
         {/* Seção 2.5: Pausas Recorrentes (almoço, etc.) */}
-        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderRadius:14,padding:"20px 22px",backdropFilter:"blur(12px)"}}>
+        <div style={{background:T.cardBg,border:`1px solid ${T.line}`,borderRadius:14,padding:"20px 22px",backdropFilter:"blur(12px)"}}>
           {secaoHeader(IcCfg.clock2,"Pausas Recorrentes","Horários fixos bloqueados todos os dias — como almoço. Salvo junto com as configurações.")}
           {(config.bloqueiosRecorrentes||[]).length>0&&(
-            <div style={{marginBottom:14,borderRadius:10,overflow:"hidden",border:`1px solid rgba(238,234,226,0.07)`}}>
+            <div style={{marginBottom:14,borderRadius:10,overflow:"hidden",border:`1px solid ${T.line}`}}>
               {(config.bloqueiosRecorrentes||[]).map((p,i)=>(
-                <div key={p.id} style={{display:"flex",alignItems:"center",gap:14,padding:"11px 16px",borderBottom:i<(config.bloqueiosRecorrentes.length-1)?`1px solid rgba(238,234,226,0.05)`:"none",background:i%2===0?"rgba(255,255,255,0.012)":"transparent"}}>
+                <div key={p.id} style={{display:"flex",alignItems:"center",gap:14,padding:"11px 16px",borderBottom:i<(config.bloqueiosRecorrentes.length-1)?`1px solid ${T.line}`:"none",background:i%2===0?T.rowAlt:"transparent"}}>
                   <div style={{flex:1}}>
                     <span style={{fontSize:13,fontWeight:600,color:T.text100}}>{p.motivo||"Pausa"}</span>
                     <span style={{fontSize:12,color:T.text35,marginLeft:10}}>{p.inicio} → {p.fim}</span>
@@ -1344,7 +1412,7 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
               ))}
             </div>
           )}
-          <div style={{background:"rgba(192,155,82,0.03)",border:`1px dashed ${T.goldA22}`,borderRadius:10,padding:"16px 18px"}}>
+          <div style={{background:T.goldA06,border:`1px dashed ${T.goldA22}`,borderRadius:10,padding:"16px 18px"}}>
             <p style={{fontSize:12,fontWeight:700,color:T.gold,textTransform:"uppercase",letterSpacing:"1px",marginBottom:14}}>+ Nova Pausa</p>
             <div style={{display:"grid",gridTemplateColumns:"1fr 110px 110px auto",gap:10,alignItems:"flex-end"}}>
               <div><label style={S.label}>Descrição</label><input style={S.input} value={novaP.motivo} onChange={e=>setNovaP(p=>({...p,motivo:e.target.value}))} placeholder="Ex: Almoço"/></div>
@@ -1356,18 +1424,18 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
         </div>
 
         {/* Seção 2.6: Bloqueios por Data */}
-        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderRadius:14,padding:"20px 22px",backdropFilter:"blur(12px)"}}>
+        <div style={{background:T.cardBg,border:`1px solid ${T.line}`,borderRadius:14,padding:"20px 22px",backdropFilter:"blur(12px)"}}>
           {secaoHeader(
             <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>,
             "Bloqueios por Data",
             "Feche datas específicas ou horários pontuais — feriados, ausências, compromissos."
           )}
           {bloqueiosData.length>0&&(
-            <div style={{marginBottom:14,borderRadius:10,overflow:"hidden",border:`1px solid rgba(238,234,226,0.07)`}}>
+            <div style={{marginBottom:14,borderRadius:10,overflow:"hidden",border:`1px solid ${T.line}`}}>
               {bloqueiosData.map((b,i)=>{
                 const passado=b.data<new Date().toISOString().slice(0,10);
                 return (
-                  <div key={b.id} style={{display:"flex",alignItems:"center",gap:14,padding:"11px 16px",borderBottom:i<bloqueiosData.length-1?`1px solid rgba(238,234,226,0.05)`:"none",background:i%2===0?"rgba(255,255,255,0.012)":"transparent",opacity:passado?0.45:1}}>
+                  <div key={b.id} style={{display:"flex",alignItems:"center",gap:14,padding:"11px 16px",borderBottom:i<bloqueiosData.length-1?`1px solid ${T.line}`:"none",background:i%2===0?T.rowAlt:"transparent",opacity:passado?0.45:1}}>
                     <div style={{flex:1}}>
                       <span style={{fontSize:13,fontWeight:600,color:T.text100}}>{b.motivo||"Bloqueio"}</span>
                       <span style={{fontSize:12,color:T.text35,marginLeft:10}}>
@@ -1382,11 +1450,11 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
             </div>
           )}
           {bloqueiosData.length===0&&(
-            <div style={{textAlign:"center",padding:"20px 16px",marginBottom:14,background:"rgba(255,255,255,0.01)",border:`1px dashed rgba(238,234,226,0.07)`,borderRadius:10}}>
+            <div style={{textAlign:"center",padding:"20px 16px",marginBottom:14,background:T.rowAlt,border:`1px dashed ${T.line}`,borderRadius:10}}>
               <p style={{fontSize:13,color:T.text35}}>Nenhum bloqueio cadastrado</p>
             </div>
           )}
-          <div style={{background:"rgba(96,165,250,0.03)",border:`1px dashed rgba(96,165,250,0.22)`,borderRadius:10,padding:"16px 18px"}}>
+          <div style={{background:T.blueA10,border:`1px dashed rgba(96,165,250,0.22)`,borderRadius:10,padding:"16px 18px"}}>
             <p style={{fontSize:12,fontWeight:700,color:T.blue,textTransform:"uppercase",letterSpacing:"1px",marginBottom:14}}>+ Novo Bloqueio</p>
             <div style={{display:"grid",gridTemplateColumns:"160px 1fr",gap:12,marginBottom:12}}>
               <div><label style={S.label}>Data *</label><input type="date" style={S.input} value={novoB.data} min={new Date().toISOString().slice(0,10)} onChange={e=>setNovoB(p=>({...p,data:e.target.value}))}/></div>
@@ -1415,10 +1483,10 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
         </div>
 
         {/* Seção 3: Serviços */}
-        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderRadius:14,padding:"20px 22px",backdropFilter:"blur(12px)"}}>
+        <div style={{background:T.cardBg,border:`1px solid ${T.line}`,borderRadius:14,padding:"20px 22px",backdropFilter:"blur(12px)"}}>
           {secaoHeader(IcCfg.tag2,"Serviços Oferecidos","Os clientes escolhem um serviço antes de selecionar o horário.")}
           {(config.serviços||[]).length>0&&(
-            <div style={{marginBottom:16,borderRadius:10,overflow:"hidden",border:`1px solid rgba(238,234,226,0.07)`}}>
+            <div style={{marginBottom:16,borderRadius:10,overflow:"hidden",border:`1px solid ${T.line}`}}>
               {config.serviços.map((s,i)=>(
                 <div key={s.id} style={{
                   display:"grid",
@@ -1426,8 +1494,8 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
                   gap:"0 20px",
                   alignItems:"center",
                   padding:"13px 16px",
-                  borderBottom:i<config.serviços.length-1?`1px solid rgba(238,234,226,0.05)`:"none",
-                  background:i%2===0?"rgba(255,255,255,0.012)":"transparent",
+                  borderBottom:i<config.serviços.length-1?`1px solid ${T.line}`:"none",
+                  background:i%2===0?T.rowAlt:"transparent",
                 }}>
                   <div>
                     <p style={{fontSize:13,fontWeight:600,color:T.text100,marginBottom:2}}>{s.nome}</p>
@@ -1446,12 +1514,12 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
             </div>
           )}
           {(config.serviços||[]).length===0&&(
-            <div style={{textAlign:"center",padding:"28px 16px",marginBottom:16,background:"rgba(255,255,255,0.01)",border:`1px dashed rgba(238,234,226,0.07)`,borderRadius:10}}>
+            <div style={{textAlign:"center",padding:"28px 16px",marginBottom:16,background:T.rowAlt,border:`1px dashed ${T.line}`,borderRadius:10}}>
               <p style={{fontSize:13,color:T.text35,marginBottom:4}}>Nenhum serviço cadastrado ainda</p>
               <p style={{fontSize:11.5,color:T.text18}}>Adicione abaixo para que os clientes possam agendar.</p>
             </div>
           )}
-          <div style={{background:"rgba(192,155,82,0.03)",border:`1px dashed ${T.goldA22}`,borderRadius:10,padding:"16px 18px"}}>
+          <div style={{background:T.goldA06,border:`1px dashed ${T.goldA22}`,borderRadius:10,padding:"16px 18px"}}>
             <p style={{fontSize:12,fontWeight:700,color:T.gold,textTransform:"uppercase",letterSpacing:"1px",marginBottom:14}}>+ Novo Serviço</p>
             <div className="flow-grid3" style={{marginBottom:12}}>
               <div><label style={S.label}>Nome *</label><input style={S.input} value={novoS.nome} onChange={e=>setNovoS(p=>({...p,nome:e.target.value}))} placeholder="Ex: Manicure com Esmaltação"/></div>
@@ -1477,6 +1545,7 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
 
 // ─── Tela Link Público ────────────────────────────────────────────────────────
 function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
+  const {T, S} = useFlowTheme();
   const [configs,setConfigs]=useState({});
   const [copied,setCopied]=useState(null);
   const [expanded,setExpanded]=useState(null);
@@ -1502,7 +1571,7 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
   return (
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
       {isAdmin&&(
-        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderLeft:`3px solid ${T.gold}`,borderRadius:14,padding:"16px 20px",backdropFilter:"blur(12px)",position:"relative",overflow:"hidden",display:"flex",alignItems:"flex-start",gap:14}}>
+        <div style={{background:T.cardBg,border:`1px solid ${T.line}`,borderLeft:`3px solid ${T.gold}`,borderRadius:14,padding:"16px 20px",backdropFilter:"blur(12px)",position:"relative",overflow:"hidden",display:"flex",alignItems:"flex-start",gap:14}}>
           <div style={{position:"absolute",top:0,left:0,width:120,height:"100%",background:`linear-gradient(90deg,${T.goldA06} 0%,transparent 100%)`,pointerEvents:"none"}}/>
           <div style={{width:36,height:36,borderRadius:10,background:T.goldA06,border:`1px solid ${T.goldA22}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.gold,flexShrink:0,fontSize:16}}>🔗</div>
           <div style={{flex:1}}>
@@ -1516,7 +1585,7 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
       )}
 
       {lista.length===0?(
-        <div style={{background:"rgba(17,17,25,0.92)",border:`1px solid rgba(238,234,226,0.07)`,borderRadius:14,padding:"52px 24px",textAlign:"center",backdropFilter:"blur(12px)"}}>
+        <div style={{background:T.cardBg,border:`1px solid ${T.line}`,borderRadius:14,padding:"52px 24px",textAlign:"center",backdropFilter:"blur(12px)"}}>
           <p style={{fontSize:22,marginBottom:8}}>📭</p>
           <p style={{fontSize:13,fontWeight:700,color:T.text35}}>Nenhum prestador ativo no momento.</p>
         </div>
@@ -1532,12 +1601,12 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
           const diasAtivos=(cfg?.diasAtivos||[]);
           const isExpanded=expanded===p.id;
           const statusBorder = prontoParaCompartilhar ? T.emerald : T.goldLo;
-          const statusGlow   = prontoParaCompartilhar ? "rgba(45,211,122,0.08)" : "rgba(192,155,82,0.06)";
+          const statusGlow   = prontoParaCompartilhar ? T.emeraldA10 : T.goldA06;
 
           return (
             <div key={p.id} style={{
-              background:"rgba(17,17,25,0.92)",
-              border:`1px solid rgba(238,234,226,0.07)`,
+              background:T.cardBg,
+              border:`1px solid ${T.line}`,
               borderLeft:`3px solid ${statusBorder}`,
               borderRadius:14,
               backdropFilter:"blur(12px)",
@@ -1545,7 +1614,7 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
               transition:"box-shadow 0.25s",
               position:"relative",
             }}
-            onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 4px 32px rgba(0,0,0,0.38), 0 0 0 1px rgba(238,234,226,0.07)`;}}
+            onMouseEnter={e=>{e.currentTarget.style.boxShadow=`0 4px 32px rgba(0,0,0,0.38), 0 0 0 1px ${T.line}`;}}
             onMouseLeave={e=>{e.currentTarget.style.boxShadow="none";}}>
               <div style={{position:"absolute",top:0,left:0,width:120,height:"100%",background:`linear-gradient(90deg,${statusGlow} 0%,transparent 100%)`,pointerEvents:"none"}}/>
 
@@ -1581,20 +1650,20 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
               </div>
 
               {/* URL */}
-              <div style={{margin:"0 22px 16px",padding:"10px 14px",background:"rgba(255,255,255,0.025)",border:`1px solid rgba(238,234,226,0.06)`,borderRadius:10,display:"flex",alignItems:"center",gap:10}}>
+              <div style={{margin:"0 22px 16px",padding:"10px 14px",background:T.rowAlt,border:`1px solid ${T.line}`,borderRadius:10,display:"flex",alignItems:"center",gap:10}}>
                 <div style={{width:22,height:22,borderRadius:6,background:T.goldA06,border:`1px solid ${T.goldA12}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.gold,flexShrink:0,fontSize:10}}>🔗</div>
                 <span style={{fontSize:11.5,color:T.text35,flex:1,wordBreak:"break-all",fontFamily:"'JetBrains Mono', monospace"}}>{link}</span>
               </div>
 
               {/* Checklist */}
-              <div style={{margin:"0 22px",padding:"12px 16px",background:"rgba(255,255,255,0.015)",border:`1px solid rgba(238,234,226,0.05)`,borderRadius:10,display:"flex",gap:24,flexWrap:"wrap",marginBottom:prontoParaCompartilhar&&!isExpanded?16:12}}>
+              <div style={{margin:"0 22px",padding:"12px 16px",background:T.rowAlt,border:`1px solid ${T.line}`,borderRadius:10,display:"flex",gap:24,flexWrap:"wrap",marginBottom:prontoParaCompartilhar&&!isExpanded?16:12}}>
                 <CheckItem ok={temNome} label="Nome preenchido"/>
                 <CheckItem ok={temH} label={temH?`${diasAtivos.length} dias ativos`:"Horários configurados"}/>
                 <CheckItem ok={temS} label={temS?`${numServicos} serviço${numServicos!==1?"s":""}`:"Serviços cadastrados"}/>
               </div>
 
               {!prontoParaCompartilhar&&(
-                <div style={{margin:"0 22px",marginBottom:16,padding:"10px 14px",background:"rgba(192,155,82,0.04)",border:`1px solid rgba(192,155,82,0.18)`,borderRadius:10,fontSize:11.5,color:"#D9B96E",display:"flex",gap:8,alignItems:"flex-start"}}>
+                <div style={{margin:"0 22px",marginBottom:16,padding:"10px 14px",background:T.goldA06,border:`1px solid rgba(192,155,82,0.18)`,borderRadius:10,fontSize:11.5,color:T.goldHi,display:"flex",gap:8,alignItems:"flex-start"}}>
                   <span style={{flexShrink:0}}>⚠️</span>
                   <span>
                     {[!temNome&&"preencha o nome público",!temH&&"configure dias e horários",!temS&&"adicione pelo menos um serviço"].filter(Boolean).join(", ")}
@@ -1604,14 +1673,14 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
               )}
 
               {isExpanded&&(
-                <div style={{borderTop:`1px solid rgba(238,234,226,0.05)`,padding:"16px 22px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
+                <div style={{borderTop:`1px solid ${T.line}`,padding:"16px 22px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:16}}>
                   <div>
                     <p style={{...S.sectionTitle,marginBottom:10}}>Dias Ativos</p>
                     <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
                       {["dom","seg","ter","qua","qui","sex","sab"].map(k=>{
                         const ativo=diasAtivos.includes(k);
                         const label={dom:"Dom",seg:"Seg",ter:"Ter",qua:"Qua",qui:"Qui",sex:"Sex",sab:"Sáb"}[k];
-                        return <div key={k} style={{padding:"5px 10px",borderRadius:7,fontSize:11,fontWeight:ativo?700:400,background:ativo?T.goldA12:"rgba(255,255,255,0.02)",border:ativo?`1px solid ${T.goldA22}`:`1px solid rgba(238,234,226,0.05)`,color:ativo?T.gold:T.text18}}>{label}</div>;
+                        return <div key={k} style={{padding:"5px 10px",borderRadius:7,fontSize:11,fontWeight:ativo?700:400,background:ativo?T.goldA12:T.rowAlt,border:ativo?`1px solid ${T.goldA22}`:`1px solid ${T.line}`,color:ativo?T.gold:T.text18}}>{label}</div>;
                       })}
                     </div>
                     {cfg?.horaInicio&&cfg?.horaFim&&(
@@ -1623,7 +1692,7 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
                     {numServicos===0?<p style={{fontSize:12,color:T.text18}}>Nenhum serviço cadastrado.</p>:(
                       <div style={{display:"flex",flexDirection:"column",gap:6}}>
                         {(cfg?.serviços||[]).slice(0,4).map(s=>(
-                          <div key={s.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:"rgba(255,255,255,0.02)",borderRadius:8,border:`1px solid rgba(238,234,226,0.05)`}}>
+                          <div key={s.id} style={{display:"flex",alignItems:"center",gap:8,padding:"7px 10px",background:T.rowAlt,borderRadius:8,border:`1px solid ${T.line}`}}>
                             <span style={{fontSize:12,color:T.text100,fontWeight:600,flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{s.nome}</span>
                             <span style={{fontSize:11,color:T.text35,whiteSpace:"nowrap"}}>{formatDuracao(s.duracao_min)}</span>
                             <span style={{...S.badge(s.preco>0?"yellow":"gray"),fontSize:10}}>{s.preco>0?`R$${Number(s.preco).toLocaleString("pt-BR",{minimumFractionDigits:2})}`:"Free"}</span>
@@ -1645,13 +1714,14 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
 
 // ─── Upgrade Wall ─────────────────────────────────────────────────────────────
 function TelaUpgrade({onVoltar}){
+  const {T, S} = useFlowTheme();
   return (
     <div style={S.upgradeWall}>
-      <div style={{width:72,height:72,borderRadius:20,background:"linear-gradient(140deg,#D9B96E 0%,#856830 100%)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,boxShadow:"0 0 0 1px rgba(192,155,82,0.25), 0 12px 40px rgba(192,155,82,0.22)"}}>
-        <svg width="28" height="28" fill="none" stroke="#040408" strokeWidth="2" viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+      <div style={{width:72,height:72,borderRadius:20,background:`linear-gradient(140deg,${T.goldHi} 0%,${T.goldLo} 100%)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:30,boxShadow:`0 0 0 1px ${T.goldA22}, 0 12px 40px ${T.goldA12}`}}>
+        <svg width="28" height="28" fill="none" stroke={T.avatarText} strokeWidth="2" viewBox="0 0 24 24"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
       </div>
-      <h2 style={{fontSize:24,fontWeight:800,color:"#EEEAE2",marginBottom:4,letterSpacing:"-0.5px"}}>Assent Flow</h2>
-      <p style={{fontSize:14,color:"rgba(238,234,226,0.40)",maxWidth:340,lineHeight:1.7,marginBottom:24}}>Disponível no plano <strong style={{color:"#D9B96E"}}>Profissional</strong>.</p>
+      <h2 style={{fontSize:24,fontWeight:800,color:T.text100,marginBottom:4,letterSpacing:"-0.5px"}}>Assent Flow</h2>
+      <p style={{fontSize:14,color:T.text35,maxWidth:340,lineHeight:1.7,marginBottom:24}}>Disponível no plano <strong style={{color:T.goldHi}}>Profissional</strong>.</p>
       <div style={{display:"flex",gap:12}}>
         <button style={{...S.btnPrimary,padding:"11px 28px",fontSize:14}} onClick={()=>window.open("mailto:contato@assentagencia.com.br?subject=Upgrade Profissional","_blank")}>⭐ Fazer Upgrade</button>
         <button onClick={onVoltar} style={S.btnGhost}>Voltar</button>
@@ -1661,7 +1731,7 @@ function TelaUpgrade({onVoltar}){
 }
 
 // ─── CSS Responsivo ───────────────────────────────────────────────────────────
-const FLOW_RESPONSIVE_CSS = `
+function getFlowCSS(T) { return `
   /* Grids responsivos */
   .flow-grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
   .flow-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -1718,7 +1788,7 @@ const FLOW_RESPONSIVE_CSS = `
     display: none;
     position: fixed;
     inset: 0;
-    background: rgba(4,4,8,0.72);
+    background: ${T.overlayMd};
     z-index: 199;
     backdrop-filter: blur(4px);
     animation: fadeIn 0.22s ease;
@@ -1731,7 +1801,7 @@ const FLOW_RESPONSIVE_CSS = `
     background: none;
     border: none;
     cursor: pointer;
-    color: rgba(238,234,226,0.55);
+    color: ${T.text65};
     padding: 6px;
     border-radius: 8px;
     align-items: center;
@@ -1739,7 +1809,7 @@ const FLOW_RESPONSIVE_CSS = `
     transition: color 0.15s, background 0.15s;
     flex-shrink: 0;
   }
-  .flow-hamburger:hover { color: #EEEAE2; background: rgba(238,234,226,0.06); }
+  .flow-hamburger:hover { color: ${T.text100}; background: ${T.text08}; }
 
   /* Bottom nav mobile */
   .flow-bottom-nav {
@@ -1747,8 +1817,8 @@ const FLOW_RESPONSIVE_CSS = `
     position: fixed;
     bottom: 0; left: 0; right: 0;
     height: 60px;
-    background: rgba(7,7,13,0.96);
-    border-top: 1px solid rgba(238,234,226,0.07);
+    background: ${T.glassHi};
+    border-top: 1px solid ${T.line};
     z-index: 150;
     align-items: center;
     justify-content: space-around;
@@ -1767,7 +1837,7 @@ const FLOW_RESPONSIVE_CSS = `
     padding: 6px 12px;
     border-radius: 10px;
     transition: all 0.18s;
-    color: rgba(238,234,226,0.30);
+    color: ${T.text35};
     font-size: 9.5px;
     font-weight: 600;
     letter-spacing: 0.2px;
@@ -1777,8 +1847,8 @@ const FLOW_RESPONSIVE_CSS = `
     min-width: 52px;
   }
   .flow-bnav-item.active {
-    color: #C09B52;
-    background: rgba(192,155,82,0.08);
+    color: ${T.gold};
+    background: ${T.goldA06};
   }
 
   /* ReservaCard: 4 colunas → 2 colunas → 1 coluna */
@@ -1798,7 +1868,7 @@ const FLOW_RESPONSIVE_CSS = `
       padding-left: 0 !important;
     }
   }
-`;
+`; }
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
 export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
@@ -1809,6 +1879,12 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
   const [loadingP,setLoadingP]   = useState(true);
   const [prestadorFoco,setPrestadorFoco] = useState(null);
   const [sidebarOpen,setSidebarOpen] = useState(false);
+
+  // ── Tema reativo ──
+  const isDark = theme !== "light";
+  const T = useMemo(() => getT(isDark), [isDark]);
+  const S = useMemo(() => getS(T), [T]);
+  const themeCtx = useMemo(() => ({ T, S }), [T, S]);
 
   const meuPrestadorId = isAdmin ? "admin" : (prestadores.find(p=>p.linkedUserId===user?.uid&&p.ativo)?.id || null);
 
@@ -1878,16 +1954,22 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
 
   // Guards
   if(!tenantUid) return null;
-  if(plano!=="profissional") return <div style={S.root}><TelaUpgrade onVoltar={onVoltar}/></div>;
+  if(plano!=="profissional") return (
+    <FlowThemeCtx.Provider value={themeCtx}>
+      <div style={S.root}><TelaUpgrade onVoltar={onVoltar}/></div>
+    </FlowThemeCtx.Provider>
+  );
   if(!podeVer("agendamento")) return (
-    <div style={{...S.root,alignItems:"center",justifyContent:"center"}}>
-      <div style={{textAlign:"center",padding:40,display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
-        <div style={{width:60,height:60,borderRadius:18,background:"rgba(239,68,68,0.08)",border:"1px solid rgba(239,68,68,0.20)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>🔒</div>
-        <p style={{fontSize:16,fontWeight:700,color:"#EEEAE2",letterSpacing:"-0.2px"}}>Acesso Restrito</p>
-        <p style={{fontSize:13,color:"rgba(238,234,226,0.35)",marginBottom:8,lineHeight:1.6,maxWidth:300}}>Seu perfil não possui acesso ao módulo de Agendamentos.</p>
-        <button onClick={onVoltar} style={S.btnGhost}>← Voltar ao Gestão</button>
+    <FlowThemeCtx.Provider value={themeCtx}>
+      <div style={{...S.root,alignItems:"center",justifyContent:"center"}}>
+        <div style={{textAlign:"center",padding:40,display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
+          <div style={{width:60,height:60,borderRadius:18,background:T.redA06,border:`1px solid ${T.redA18}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:26}}>🔒</div>
+          <p style={{fontSize:16,fontWeight:700,color:T.text100,letterSpacing:"-0.2px"}}>Acesso Restrito</p>
+          <p style={{fontSize:13,color:T.text35,marginBottom:8,lineHeight:1.6,maxWidth:300}}>Seu perfil não possui acesso ao módulo de Agendamentos.</p>
+          <button onClick={onVoltar} style={S.btnGhost}>← Voltar ao Gestão</button>
+        </div>
       </div>
-    </div>
+    </FlowThemeCtx.Provider>
   );
 
   const TELAS=[
@@ -1903,18 +1985,19 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
   const BOTTOM_TELAS = TELAS.slice(0, 4);
 
   return (
+    <FlowThemeCtx.Provider value={themeCtx}>
     <div style={S.root}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
         * { box-sizing: border-box; }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(192,155,82,0.18); border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(192,155,82,0.35); }
+        ::-webkit-scrollbar-thumb { background: ${T.scrollThumb}; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: ${T.scrollHover}; }
         @keyframes flow-reveal { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
-        input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(0.5) sepia(1) saturate(2) hue-rotate(5deg); opacity:0.5; cursor:pointer; }
-        input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.5) sepia(1) saturate(2) hue-rotate(5deg); opacity:0.5; cursor:pointer; }
-        ${FLOW_RESPONSIVE_CSS}
+        input[type="date"]::-webkit-calendar-picker-indicator { filter: ${isDark ? "invert(0.5) sepia(1) saturate(2) hue-rotate(5deg)" : "none"}; opacity:0.5; cursor:pointer; }
+        input[type="time"]::-webkit-calendar-picker-indicator { filter: ${isDark ? "invert(0.5) sepia(1) saturate(2) hue-rotate(5deg)" : "none"}; opacity:0.5; cursor:pointer; }
+        ${getFlowCSS(T)}
       `}</style>
 
       {/* Overlay mobile */}
@@ -1926,7 +2009,7 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
       <aside className={`flow-sidebar${sidebarOpen?" open":""}`} style={S.sidebar}>
         <div style={S.sidebarHeader}>
           <div style={S.logoRow}>
-            <img src="/logo2_flow.png" alt="Flow" style={{ height:112, maxWidth:"100%", objectFit:"contain", display:"block" }} />
+            <img src="/logo2_flow.png" alt="Flow" style={{ height:72, maxWidth:"100%", objectFit:"contain", display:"block" }} />
           </div>
         </div>
         <nav style={{flex:1}}>
@@ -1949,7 +2032,7 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
             {sidebarOpen ? Ic.close : Ic.menu}
           </button>
           <span style={S.topbarTitle}>{titulos[tela]}</span>
-          <span className="flow-plan-badge" style={{fontSize:10,padding:"4px 12px",borderRadius:20,border:"1px solid rgba(192,155,82,0.25)",background:"rgba(192,155,82,0.08)",color:"#D9B96E",fontWeight:700,letterSpacing:"0.8px",textTransform:"uppercase",flexShrink:0}}>★ Profissional</span>
+          <span className="flow-plan-badge" style={{fontSize:10,padding:"4px 12px",borderRadius:20,border:"1px solid rgba(192,155,82,0.25)",background:T.goldA06,color:T.goldHi,fontWeight:700,letterSpacing:"0.8px",textTransform:"uppercase",flexShrink:0}}>★ Profissional</span>
         </header>
 
         <div className="flow-content" style={S.content}>
@@ -1987,5 +2070,6 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
         )}
       </nav>
     </div>
+    </FlowThemeCtx.Provider>
   );
 }
