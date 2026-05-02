@@ -14,6 +14,9 @@ const admin                       = require("firebase-admin");
 
 admin.initializeApp();
 
+/* ─── Importa funções de notificacoes ─── */
+const notificacoesFunctions = require('./src/notificacoes');
+
 const db     = admin.firestore();
 const fbAuth = admin.auth();
 
@@ -955,3 +958,9 @@ exports.onTrialExpiry = onSchedule(
     console.log(`${snapshot.size} licenças trial expiradas desativadas.`);
   }
 );
+
+/* ─── Exporta funções de notificacoes ─── */
+module.exports = {
+  ...module.exports,
+  ...notificacoesFunctions,
+};
