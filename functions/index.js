@@ -32,6 +32,16 @@ const CALL_OPTIONS = {
   ],
 };
 
+const ADMIN_CALL_OPTIONS = {
+  enforceAppCheck: false,
+  cors: [
+    "https://ag.assentagencia.com.br",
+    "https://assent2-0.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+  ],
+};
+
 /* Opções para as funções PIX — onRequest com CORS manual */
 const PIX_ORIGINS = new Set([
   "https://ag.assentagencia.com.br",
@@ -242,16 +252,6 @@ exports.criarUsuario = onCall(CALL_OPTIONS, async (request) => {
   if (!nome || !email || !senha || !cargo) {
     throw new HttpsError("invalid-argument", "Campos obrigatórios ausentes.");
   }
-
-   const ADMIN_CALL_OPTIONS = {
-  enforceAppCheck: false,   // painel admin não usa App Check
-  cors: [
-    "https://ag.assentagencia.com.br",
-    "https://assent2-0.vercel.app",
-    "http://localhost:5173",
-    "http://localhost:3000",
-  ],
-};
    
   const CARGOS_VALIDOS = ["financeiro", "comercial", "compras", "operacional", "vendedor", "suporte"];
   if (!CARGOS_VALIDOS.includes(cargo)) {
