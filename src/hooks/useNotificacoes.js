@@ -12,6 +12,7 @@ import {
   onSnapshot,
   doc,
   updateDoc,
+  setDoc,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { initFCM, obterTokenPush, escutarNotificacoesAbertas } from '../lib/fcm';
@@ -65,6 +66,22 @@ function tocarSomNotificacao() {
   }
 }
 
+async function salvarTokenFCM(uid, vapidKey) {
+  try {
+    const token = await obterTokenPush(vapidKey);
+    if (!token) return;
+    // setDoc com merge cria o doc se não existir
+    await setDoc(
+      doc(db, 'usuarios', uid),
+      { fcmToken: token, fcmTokenAtualizado: new Date() },
+      { merge: true }
+    );
+    console.log('[FCM] Token salvo');
+  } catch (err) {
+    console.error('[FCM] Erro ao salvar token:', err.message);
+  }
+}
+
 export function useNotificacoes(tenantUid, user) {
   const [notificacoes, setNotificacoes] = useState([]);
   const idsConhecidosRef = useRef(null);
@@ -77,35 +94,32 @@ export function useNotificacoes(tenantUid, user) {
     }
   }, []);
 
-  // Setup FCM + pedir permissão na primeira vez
+  // Setup FCM + token
   useEffect(() => {
     if (!tenantUid || !user?.uid) return;
 
-    // Inicializa FCM
     initFCM();
 
-    // Pede permissão de notificação
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().then((permission) => {
-        if (permission === 'granted') {
-          // Obtém e salva token de push
-          const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
-          obterTokenPush(vapidKey).then((token) => {
-            if (token) {
-              // Salva token no Firestore (para backend enviar push)
-              updateDoc(doc(db, 'usuarios', user.uid), {
-                fcmToken: token,
-                fcmTokenAtualizado: new Date(),
-              }).catch(console.error);
-            }
-          });
-        }
-      });
+    const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
+
+    if ('Notification' in window) {
+      const permission = Notification.permission;
+
+      if (permission === 'granted') {
+        // Já tem permissão — salva/atualiza token direto
+        salvarTokenFCM(user.uid, vapidKey);
+      } else if (permission === 'default') {
+        // Pede permissão
+        Notification.requestPermission().then((result) => {
+          if (result === 'granted') {
+            salvarTokenFCM(user.uid, vapidKey);
+          }
+        });
+      }
     }
 
-    // Listener FCM quando app está aberta
-    unsubFcmRef.current = escutarNotificacoesAbertas((payload) => {
-      // Toca som se recebeu notificação com app aberta
+    // Listener foreground
+    unsubFcmRef.current = escutarNotificacoesAbertas(() => {
       tocarSomNotificacao();
     });
 
@@ -139,9 +153,7 @@ export function useNotificacoes(tenantUid, user) {
           idsConhecidosRef.current = idsAtuais;
         } else {
           const novos = docs.filter((d) => !idsConhecidosRef.current.has(d.id));
-          if (novos.length > 0) {
-            tocarSomNotificacao();
-          }
+          if (novos.length > 0) tocarSomNotificacao();
           idsConhecidosRef.current = idsAtuais;
         }
 
@@ -162,10 +174,9 @@ export function useNotificacoes(tenantUid, user) {
     async (notifId) => {
       if (!tenantUid || !notifId) return;
       try {
-        await updateDoc(
-          doc(db, 'users', tenantUid, 'notificacoes', notifId),
-          { lida: true }
-        );
+        await updateDoc(doc(db, 'users', tenantUid, 'notificacoes', notifId), {
+          lida: true,
+        });
       } catch (err) {
         console.error('[useNotificacoes] marcarLida erro:', err.code, err.message);
       }
@@ -173,7 +184,5 @@ export function useNotificacoes(tenantUid, user) {
     [tenantUid]
   );
 
-  const naoLidas = notificacoes.length;
-
-  return { notificacoes, naoLidas, marcarLida, initAudio };
+  return { notificacoes, naoLidas: notificacoes.length, marcarLida, initAudio };
 }
