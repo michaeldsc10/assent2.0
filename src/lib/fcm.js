@@ -23,35 +23,26 @@ export function initFCM() {
 }
 
 async function getSwRegistration() {
-  if (swRegistration) return swRegistration;
+  if (swRegistration?.active) return swRegistration;
 
-  // Verifica se já existe um SW registrado para este scope
-  const existing = await navigator.serviceWorker.getRegistration('/');
-  if (existing) {
-    swRegistration = existing;
-    return swRegistration;
-  }
-
-  // Registra novo
+  // Registra se necessário (idempotente — não duplica se já existir)
   swRegistration = await navigator.serviceWorker.register(
     '/firebase-messaging-sw.js',
     { scope: '/' }
   );
 
-  // Aguarda SW ficar ativo
-  await new Promise((resolve) => {
-    if (swRegistration.active) return resolve();
-    const worker = swRegistration.installing || swRegistration.waiting;
-    if (!worker) return resolve();
-    worker.addEventListener('statechange', function handler() {
-      if (worker.state === 'activated') {
-        worker.removeEventListener('statechange', handler);
-        resolve();
-      }
-    });
-  });
+  // Aguarda SW activated + controlling antes de qualquer getToken
+  await navigator.serviceWorker.ready;
 
-  console.log('[FCM] SW registrado');
+  // Se após ready ainda não há controller, força claim via SW
+  if (!navigator.serviceWorker.controller) {
+    console.warn('[FCM] SW ativo mas não controlling — aguardando controllerchange');
+    await new Promise((resolve) => {
+      navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true });
+    });
+  }
+
+  console.log('[FCM] SW pronto e controlling');
   return swRegistration;
 }
 
