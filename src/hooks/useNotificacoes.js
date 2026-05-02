@@ -13,7 +13,6 @@ import {
   doc,
   updateDoc,
   setDoc,
-  getDoc,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { initFCM, obterTokenPush, escutarNotificacoesAbertas } from '../lib/fcm';
@@ -67,34 +66,18 @@ function tocarSomNotificacao() {
   }
 }
 
-async function salvarTokenFCM(uid, vapidKey, { forceRefresh = false } = {}) {
+// Sempre chama getToken — FCM retorna o mesmo se ainda válido,
+// ou gera novo se o token foi invalidado/removido
+async function salvarTokenFCM(uid, vapidKey) {
   try {
-    // Se não forçar refresh, verifica se token salvo ainda é válido
-    if (!forceRefresh) {
-      const snap = await getDoc(doc(db, 'usuarios', uid));
-      const tokenSalvo = snap.data()?.fcmToken;
-
-      // Token salvo há menos de 7 dias → reutiliza
-      const atualizado = snap.data()?.fcmTokenAtualizado?.toDate?.();
-      const diasDesdeUpdate = atualizado
-        ? (Date.now() - atualizado.getTime()) / 86400000
-        : Infinity;
-
-      if (tokenSalvo && diasDesdeUpdate < 7) {
-        console.log('[FCM] Token ainda válido, pulando refresh');
-        return;
-      }
-    }
-
     const token = await obterTokenPush(vapidKey);
     if (!token) return;
-
     await setDoc(
       doc(db, 'usuarios', uid),
       { fcmToken: token, fcmTokenAtualizado: new Date() },
       { merge: true }
     );
-    console.log('[FCM] Token salvo/atualizado');
+    console.log('[FCM] Token salvo');
   } catch (err) {
     console.error('[FCM] Erro ao salvar token:', err.message);
   }
@@ -120,30 +103,26 @@ export function useNotificacoes(tenantUid, user) {
 
     const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
-    const setupToken = (forceRefresh = false) => {
+    const setupToken = () => {
       if (!('Notification' in window)) return;
-      const permission = Notification.permission;
-
-      if (permission === 'granted') {
-        salvarTokenFCM(user.uid, vapidKey, { forceRefresh });
-      } else if (permission === 'default') {
+      if (Notification.permission === 'granted') {
+        salvarTokenFCM(user.uid, vapidKey);
+      } else if (Notification.permission === 'default') {
         Notification.requestPermission().then((result) => {
-          if (result === 'granted') salvarTokenFCM(user.uid, vapidKey, { forceRefresh });
+          if (result === 'granted') salvarTokenFCM(user.uid, vapidKey);
         });
       }
     };
 
-    // Salva token normal na inicialização
-    setupToken(false);
+    setupToken();
 
-    // Se o SW mudar (update), força geração de novo token
+    // SW atualizado → renova token imediatamente
     const handleControllerChange = () => {
-      console.log('[FCM] SW trocado — forçando refresh do token');
-      setupToken(true);
+      console.log('[FCM] SW trocado — renovando token');
+      salvarTokenFCM(user.uid, vapidKey);
     };
     navigator.serviceWorker?.addEventListener('controllerchange', handleControllerChange);
 
-    // Listener foreground
     unsubFcmRef.current = escutarNotificacoesAbertas(() => {
       tocarSomNotificacao();
     });
