@@ -4,7 +4,7 @@
    ═══════════════════════════════════════════════════ */
 
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
-import { app } from './firebase';
+import { app } from '../lib/firebase.js';
 
 let messagingInstance = null;
 
