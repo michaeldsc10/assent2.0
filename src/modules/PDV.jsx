@@ -1432,13 +1432,14 @@ export default function PDV({ onVoltar }) {
     <>
       <style>{CSS}</style>
       <div id="recibo-print-root" />
+      {showPagModal && (
         <ModalPagamento
           restante={restante}
           taxas={taxas}
           onConfirm={(p) => { setPagamentos(ps => [...ps, p]); setShowPagModal(false); }}
           onClose={() => setShowPagModal(false)}
         />
-      
+      )}
 
       {showSenhaCancelar && (
         <ModalSenhaCancelar
