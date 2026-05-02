@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════
-   ASSENT v2.0 — firebase.js
-   Configuração Firebase + Auth + Verificação de Licença
+   firebase.js (ATUALIZADO)
+   Adicione getMessaging às imports
    ═══════════════════════════════════════════════════ */
 
 import { initializeApp } from "firebase/app";
@@ -21,10 +21,9 @@ import {
 
 import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
+import { getMessaging } from "firebase/messaging"; // ← NOVO
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
-// ⚠️ Todas as chaves são lidas de variáveis de ambiente (.env)
-// Nunca commite valores reais neste arquivo.
 export const firebaseConfig = {
   apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -37,8 +36,6 @@ export const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-// ── App Check ──
-// Em dev, usa token de debug (aparece no console do navegador)
 if (import.meta.env.DEV) {
   self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
 }
@@ -51,12 +48,9 @@ initializeAppCheck(app, {
 export const auth      = getAuth(app);
 export const db        = getFirestore(app);
 export const storage   = getStorage(app);
-
-/* ── Cloud Functions (mesma região do functions/index.js) ── */
 export const functions = getFunctions(app, "us-central1");
+export const messaging = getMessaging(app); // ← NOVO (inicializa FCM)
 
-
-/* ── Funções de Autenticação ── */
 export const login    = (email, password) =>
   signInWithEmailAndPassword(auth, email, password);
 
@@ -65,10 +59,8 @@ export const register = (email, password) =>
 
 export const logout = () => signOut(auth);
 
-/* ── Listener de Estado de Autenticação ── */
 export { onAuthStateChanged };
 
-/* ── Verificar Licença PRO ── */
 export const verificarLicencaPro = async (uid) => {
   if (!uid) return false;
 
