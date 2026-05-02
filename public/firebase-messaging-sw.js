@@ -81,20 +81,17 @@ self.addEventListener('pushsubscriptionchange', (event) => {
       .then(newToken => {
         console.log('[SW] Novo token obtido:', newToken?.substring(0, 20) + '...');
         if (newToken) {
-          // Notificar clients do novo token
-          self.clients.matchAll().then(clients => {
-            clients.forEach(client => {
-              if (client.postMessage) {
-                client.postMessage({
-                  type: 'PUSH_TOKEN_RENEWED',
-                  token: newToken,
-                });
-              }
-            });
-          });
+          // Armazenar em IndexedDB para main thread pegar depois
+          const dbRequest = indexedDB.open('assent-fcm', 1);
+          dbRequest.onsuccess = () => {
+            const db = dbRequest.result;
+            const tx = db.transaction('tokens', 'readwrite');
+            tx.objectStore('tokens').put({ key: 'current', value: newToken, timestamp: Date.now() });
+          };
+          dbRequest.onerror = () => console.warn('[SW] IndexedDB falhou');
         }
       })
-      .catch(err => console.error('[SW] Erro ao renovar token:', err))
+      .catch(err => console.warn('[SW] Token renovação falhou (esperado):', err.message))
   );
 });
 
