@@ -32,7 +32,7 @@ self.addEventListener('push', (event) => {
       body,
       icon: '/favicon.ico',
       badge: '/favicon.ico',
-      tag: 'notif-assent',
+      tag: `notif-assent-${Date.now()}`,
     });
     console.log('[SW] notificação exibida');
   };
