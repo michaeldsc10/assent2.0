@@ -4,7 +4,7 @@
    ═══════════════════════════════════════════════════ */
 
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
-import { app } from '../lib/firebase.js';
+import { messaging } from './firebase';
 
 let messagingInstance = null;
 
@@ -15,7 +15,7 @@ export function initFCM() {
   }
 
   try {
-    messagingInstance = getMessaging(app);
+    messagingInstance = messaging; // usa instância do firebase.js
     
     // Registra Service Worker
     navigator.serviceWorker.register('/firebase-messaging-sw.js', {
