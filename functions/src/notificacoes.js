@@ -24,11 +24,21 @@ exports.enviarNotificacaoReserva = onDocumentCreated(
     const { tenantUid, notifId } = event.params;
     const notif = snap.data();
 
-    const { destinatarioUid, titulo, mensagem, tipo, assuntoId } = notif;
+    const { destinatarioUid, titulo, mensagem, tipo, assuntoId, payload } = notif;
 
-    if (!destinatarioUid || !titulo || !mensagem) {
-      console.error('[FCM] Notificação incompleta:', notif);
+    if (!destinatarioUid) {
+      console.error('[FCM] destinatarioUid faltando:', notif);
       return;
+    }
+
+    // Gera titulo e mensagem automaticamente se não existirem
+    let notifTitulo = titulo || 'Nova Notificação';
+    let notifMensagem = mensagem || 'Você tem uma nova notificação';
+
+    // Se vier payload com cliente/data/hora, formata melhor
+    if (payload?.cliente) {
+      notifTitulo = `Nova Reserva - ${payload.cliente}`;
+      notifMensagem = `${payload.data} às ${payload.hora}`;
     }
 
     try {
@@ -51,8 +61,8 @@ exports.enviarNotificacaoReserva = onDocumentCreated(
       // Payload seguro — sem expor dados sensíveis
       const message = {
         notification: {
-          title: titulo,
-          body: mensagem,
+          title: notifTitulo,
+          body: notifMensagem,
         },
         data: {
           tipo: tipo || 'notificacao',
