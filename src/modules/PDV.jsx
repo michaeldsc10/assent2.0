@@ -2209,8 +2209,8 @@ const CSS = `
 /* ── BARRA DE ATALHOS ── */
 .pdv-shortcut-bar {
   height: var(--pdv-shortcut-h);
-  background: rgba(10,10,16,0.95);
-  border-bottom: 1px solid rgba(255,255,255,0.05);
+  background: #0d0f18;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
   display: flex;
   align-items: center;
   padding: 0 16px;
@@ -2218,45 +2218,44 @@ const CSS = `
   position: sticky;
   top: 0;
   z-index: 11;
-  backdrop-filter: blur(8px);
 }
 .pdv-shortcut-btn {
   display: flex; align-items: center; gap: 6px;
   padding: 4px 10px; border-radius: 5px;
   background: none; border: none; cursor: pointer;
-  color: var(--pdv-text-3); font-size: 11px; font-weight: 500;
+  color: #b0b3cc; font-size: 11px; font-weight: 600;
   font-family: 'DM Sans', 'Segoe UI', sans-serif;
   transition: color .15s, background .15s;
   white-space: nowrap;
   user-select: none;
 }
 .pdv-shortcut-btn:hover {
-  color: var(--pdv-text-2);
-  background: rgba(255,255,255,0.05);
+  color: #e8e8f0;
+  background: rgba(255,255,255,0.07);
 }
 .pdv-shortcut-btn--finalizar:not(.pdv-shortcut-btn--disabled):hover {
   color: var(--pdv-gold);
   background: var(--pdv-gold-dim);
 }
 .pdv-shortcut-btn--disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
 }
 .pdv-shortcut-key {
   display: inline-flex; align-items: center; justify-content: center;
-  background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14);
-  border-bottom: 2px solid rgba(255,255,255,0.18);
-  border-radius: 4px; padding: 1px 5px;
+  background: #1e2130; border: 1px solid rgba(255,255,255,0.25);
+  border-bottom: 2px solid rgba(255,255,255,0.35);
+  border-radius: 4px; padding: 1px 6px;
   font-size: 10px; font-family: monospace;
-  color: var(--pdv-text-3); line-height: 1.5;
-  letter-spacing: .04em; font-weight: 700;
+  color: #e0e2f0; line-height: 1.5;
+  letter-spacing: .04em; font-weight: 800;
   transition: color .15s, border-color .15s;
 }
 .pdv-shortcut-key--gold {
-  color: var(--pdv-gold);
-  border-color: rgba(200,165,94,0.3);
-  border-bottom-color: rgba(200,165,94,0.5);
-  background: rgba(200,165,94,0.08);
+  color: #e8c97a;
+  border-color: rgba(200,165,94,0.55);
+  border-bottom-color: rgba(200,165,94,0.75);
+  background: rgba(200,165,94,0.12);
 }
 .pdv-shortcut-badge {
   background: var(--pdv-gold);
@@ -2268,15 +2267,14 @@ const CSS = `
 }
 .pdv-shortcut-divider {
   width: 1px; height: 14px;
-  background: rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.15);
   margin: 0 4px;
   flex-shrink: 0;
 }
 .pdv-shortcut-hint {
   display: flex; align-items: center; gap: 6px;
   padding: 4px 10px;
-  color: var(--pdv-text-3); font-size: 11px;
-  opacity: 0.6;
+  color: #7a7d96; font-size: 11px;
   white-space: nowrap;
 }
 @media (max-width: 700px) {
