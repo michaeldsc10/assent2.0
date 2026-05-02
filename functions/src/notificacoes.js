@@ -10,10 +10,6 @@ const admin = require('firebase-admin');
 const db = admin.firestore();
 const messaging = admin.messaging();
 
-/**
- * Trigger: Quando documento em users/{tenantUid}/notificacoes é criado
- * Envia Web Push para dispositivos do destinatário
- */
 exports.enviarNotificacaoReserva = onDocumentCreated(
   {
     document: 'users/{tenantUid}/notificacoes/{notifId}',
@@ -21,7 +17,7 @@ exports.enviarNotificacaoReserva = onDocumentCreated(
   },
   async (event) => {
     const snap = event.data;
-    const { tenantUid, notifId } = event.params;
+    const { tenantUid } = event.params;
     const notif = snap.data();
 
     const { destinatarioUid, titulo, mensagem, tipo, assuntoId, payload } = notif;
@@ -31,20 +27,16 @@ exports.enviarNotificacaoReserva = onDocumentCreated(
       return;
     }
 
-    // Gera titulo e mensagem automaticamente se não existirem
     let notifTitulo = titulo || 'Nova Notificação';
     let notifMensagem = mensagem || 'Você tem uma nova notificação';
 
-    // Se vier payload com cliente/data/hora, formata melhor
     if (payload?.cliente) {
       notifTitulo = `Nova Reserva - ${payload.cliente}`;
       notifMensagem = `${payload.data} às ${payload.hora}`;
     }
 
     try {
-      // Busca token FCM do usuário destinatário
-      const usuarioRef = db.collection('usuarios').doc(destinatarioUid);
-      const usuarioSnap = await usuarioRef.get();
+      const usuarioSnap = await db.collection('usuarios').doc(destinatarioUid).get();
 
       if (!usuarioSnap.exists) {
         console.warn(`[FCM] Usuário ${destinatarioUid} não encontrado`);
@@ -58,7 +50,6 @@ exports.enviarNotificacaoReserva = onDocumentCreated(
         return;
       }
 
-      // Payload seguro — sem expor dados sensíveis
       const message = {
         notification: {
           title: notifTitulo,
@@ -67,11 +58,10 @@ exports.enviarNotificacaoReserva = onDocumentCreated(
         data: {
           tipo: tipo || 'notificacao',
           assuntoId: assuntoId || '',
-          tenantUid: tenantUid,
+          tenantUid,
           timestamp: new Date().toISOString(),
         },
         token: fcmToken,
-        // Android
         android: {
           priority: 'high',
           notification: {
@@ -80,7 +70,6 @@ exports.enviarNotificacaoReserva = onDocumentCreated(
             tag: 'notificacao-assent',
           },
         },
-        // iOS
         apns: {
           payload: {
             aps: {
@@ -91,37 +80,32 @@ exports.enviarNotificacaoReserva = onDocumentCreated(
         },
       };
 
-      // Envia push
       const messageId = await messaging.send(message);
       console.log(`[FCM] Push enviado: ${messageId}`);
 
-      // Log para auditoria (opcional)
       await db.collection('logs-fcm').doc().set({
         messageId,
         destinatarioUid,
         notifId: snap.id,
-        titulo,
+        titulo: notifTitulo,        // nunca undefined
         status: 'enviado',
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
     } catch (error) {
       console.error('[FCM] Erro ao enviar:', error);
 
-      // Log de erro
       await db.collection('logs-fcm').doc().set({
         destinatarioUid,
         notifId: snap.id,
-        titulo,
+        titulo: titulo || 'sem titulo', // nunca undefined
         status: 'erro',
         erro: error.message,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
-  });
+  }
+);
 
-/**
- * Função auxiliar: Atualiza token FCM quando usuário faz login
- */
 exports.atualizarTokenFCM = onCall(
   { region: 'us-central1' },
   async (request) => {
@@ -141,7 +125,6 @@ exports.atualizarTokenFCM = onCall(
         fcmToken,
         fcmTokenAtualizado: admin.firestore.FieldValue.serverTimestamp(),
       });
-
       return { success: true, uid };
     } catch (error) {
       console.error('[FCM] Erro ao atualizar token:', error);
