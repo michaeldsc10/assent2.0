@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════
    hooks/useNotificacoes.js
-   Notificações Firestore + Web Push (FCM)
+   Notificações Firestore + Web Push (FCM) + IndexedDB
    ═══════════════════════════════════════════════════ */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -15,6 +15,39 @@ import {
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { initFCM, obterTokenPush, escutarNotificacoesAbertas } from '../lib/fcm';
+
+// ═══════════════════════════════════════════════════
+// INDEXEDDB - SINCRONIZAR TOKEN RENOVADO DO SW
+// ═══════════════════════════════════════════════════
+
+const initIndexedDB = async () => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('assent-fcm', 1);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('tokens')) {
+        db.createObjectStore('tokens', { keyPath: 'key' });
+      }
+    };
+  });
+};
+
+const getTokenFromIndexedDB = async () => {
+  try {
+    const db = await initIndexedDB();
+    return new Promise((resolve) => {
+      const tx = db.transaction('tokens', 'readonly');
+      const request = tx.objectStore('tokens').get('current');
+      request.onsuccess = () => resolve(request.result?.value || null);
+      request.onerror = () => resolve(null);
+    });
+  } catch (err) {
+    console.warn('[useNotificacoes] IndexedDB erro:', err.message);
+    return null;
+  }
+};
 
 let sharedAudioCtx = null;
 
@@ -69,6 +102,7 @@ export function useNotificacoes(tenantUid, user) {
   const [notificacoes, setNotificacoes] = useState([]);
   const idsConhecidosRef = useRef(null);
   const unsubFcmRef = useRef(null);
+  const lastTokenRef = useRef(null);
 
   const initAudio = useCallback(() => {
     initAudioContext();
@@ -92,6 +126,7 @@ export function useNotificacoes(tenantUid, user) {
           const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
           obterTokenPush(vapidKey).then((token) => {
             if (token) {
+              lastTokenRef.current = token;
               // Salva token no Firestore (para backend enviar push)
               updateDoc(doc(db, 'usuarios', user.uid), {
                 fcmToken: token,
@@ -112,6 +147,27 @@ export function useNotificacoes(tenantUid, user) {
     return () => {
       if (unsubFcmRef.current) unsubFcmRef.current();
     };
+  }, [tenantUid, user?.uid]);
+
+  // Polling IndexedDB para token renovado (pushsubscriptionchange)
+  useEffect(() => {
+    if (!tenantUid || !user?.uid) return;
+
+    const checkTokenInterval = setInterval(async () => {
+      const dbToken = await getTokenFromIndexedDB();
+      if (dbToken && dbToken !== lastTokenRef.current) {
+        console.log('[useNotificacoes] Token renovado detectado');
+        lastTokenRef.current = dbToken;
+        
+        // Salva token novo no Firestore
+        updateDoc(doc(db, 'usuarios', user.uid), {
+          fcmToken: dbToken,
+          fcmTokenAtualizado: new Date(),
+        }).catch(console.error);
+      }
+    }, 5000); // verifica a cada 5s
+
+    return () => clearInterval(checkTokenInterval);
   }, [tenantUid, user?.uid]);
 
   // Listener Firestore (mesmo de antes)
