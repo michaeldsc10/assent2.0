@@ -8,8 +8,33 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-com
 
 let messaging = null;
 
-// ── Registra listeners ANTES de inicializar ──
+// ═══════════════════════════════════════════════════
+// REGISTRAR TODOS OS LISTENERS NO TOP-LEVEL
+// ═══════════════════════════════════════════════════
+
+// 1. Lifecycle
+self.addEventListener('install', () => {
+  console.log('[SW] Instalando...');
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', () => {
+  console.log('[SW] Ativando...');
+  self.clients.claim();
+});
+
+// 2. Push events
+self.addEventListener('push', (event) => {
+  console.log('[SW] Push recebido');
+});
+
+self.addEventListener('pushsubscriptionchange', (event) => {
+  console.log('[SW] Subscription mudou');
+});
+
+// 3. Notificações
 self.addEventListener('notificationclick', (event) => {
+  console.log('[SW] Notificação clicada');
   event.notification.close();
 
   event.waitUntil(
@@ -24,26 +49,11 @@ self.addEventListener('notificationclick', (event) => {
   );
 });
 
-self.addEventListener('push', (event) => {
-  // Handler padrão para push events (se não vier via FCM)
-  console.log('[SW] Push event:', event);
+self.addEventListener('notificationclose', (event) => {
+  console.log('[SW] Notificação fechada');
 });
 
-self.addEventListener('pushsubscriptionchange', (event) => {
-  // Handler para quando subscription expira
-  console.log('[SW] Subscription changed:', event);
-});
-
-// ── Lifecycle ──
-self.addEventListener('install', () => {
-  self.skipWaiting();
-});
-
-self.addEventListener('activate', () => {
-  self.clients.claim();
-});
-
-// ── Recebe config do main thread via postMessage ──
+// 4. Mensagens do main thread
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'INIT_FIREBASE') {
     const config = event.data.config;
@@ -52,8 +62,10 @@ self.addEventListener('message', (event) => {
       firebase.initializeApp(config);
       messaging = firebase.messaging();
 
-      // ── Handler FCM: Notificação em background ──
+      // Handler para mensagens em background
       messaging.onBackgroundMessage((payload) => {
+        console.log('[SW] FCM recebido em background:', payload.notification?.title);
+        
         const title = payload.notification?.title || 'Nova Notificação';
         const options = {
           body: payload.notification?.body || '',
@@ -68,8 +80,10 @@ self.addEventListener('message', (event) => {
       });
 
       console.log('[SW] Firebase inicializado com sucesso');
+      event.ports[0].postMessage({ status: 'ready' });
     } catch (err) {
       console.error('[SW] Erro ao inicializar Firebase:', err);
+      event.ports[0].postMessage({ status: 'error', error: err.message });
     }
   }
 });
