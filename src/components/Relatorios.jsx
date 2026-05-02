@@ -219,18 +219,39 @@ const CSS = `
   padding: 10px 18px; gap: 8px;
   border-bottom: 1px solid var(--border);
   font-size: 13px; color: var(--text-2); align-items: center;
+  transition: background .18s, box-shadow .18s, transform .15s;
+  position: relative;
 }
-.dre-row:hover { background: rgba(255,255,255,0.015); }
+.dre-row:hover {
+  background: rgba(200,165,94,0.06);
+  box-shadow: inset 3px 0 0 rgba(200,165,94,0.5);
+  transform: translateX(2px);
+  z-index: 1;
+}
 .dre-row-cat {
-  background: var(--s2);
-  font-size: 9px; font-weight: 600; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--text-3);
-  padding: 7px 18px; border-bottom: 1px solid var(--border);
+  background: linear-gradient(90deg, rgba(200,165,94,0.12) 0%, rgba(200,165,94,0.04) 60%, transparent 100%);
+  font-size: 10px; font-weight: 700; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--gold);
+  padding: 9px 18px 9px 16px;
+  border-bottom: 1px solid rgba(200,165,94,0.22);
+  border-left: 3px solid rgba(200,165,94,0.7);
+  text-shadow: 0 0 18px rgba(200,165,94,0.35);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  cursor: default;
+  letter-spacing: .1em;
+  transform: none !important;
 }
 .dre-row-result {
-  background: rgba(0,0,0,0.18);
+  background: rgba(0,0,0,0.22);
   font-weight: 700;
   border-top: 1px solid var(--border-h);
+  border-bottom: 2px solid rgba(200,165,94,0.3);
+  font-size: 14px;
+}
+.dre-row-result:hover {
+  background: rgba(0,0,0,0.28);
+  box-shadow: inset 3px 0 0 rgba(200,165,94,0.6);
+  transform: translateX(2px);
 }
 .dre-label { color: var(--text); }
 .dre-sub-label { color: var(--text-2); padding-left: 14px; }
@@ -260,7 +281,11 @@ const CSS = `
 .dre-resultado-esquerda {
   display: flex; align-items: center; gap: 10px;
 }
-.dre-resultado-emoji { font-size: 20px; line-height: 1; }
+.dre-resultado-indicator {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+}
+.dre-resultado-banner.lucro    .dre-resultado-indicator { background: var(--green); box-shadow: 0 0 8px rgba(74,222,128,0.6); }
+.dre-resultado-banner.prejuizo .dre-resultado-indicator { background: var(--red);   box-shadow: 0 0 8px rgba(224,82,82,0.6); }
 .dre-resultado-textos { display: flex; flex-direction: column; gap: 2px; }
 .dre-resultado-titulo {
   font-family: 'Sora', sans-serif; font-size: 13px;
@@ -623,7 +648,7 @@ const CSS = `
     gap: 6px;
     font-size: 12px;
   }
-  .dre-row-cat { padding: 6px 12px; }
+  .dre-row-cat { padding: 7px 12px 7px 10px; }
   .dre-val { font-size: 12px; }
   .dre-pct { font-size: 10px; min-width: 36px; }
 
@@ -1470,7 +1495,7 @@ function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], intervalo
                 cursor: "default",
               }}
             >
-              ✓ Regime de Caixa
+              Regime de Caixa
             </span>
           </div>
           <button className="btn-secondary" style={{ fontSize: 11, padding: "5px 12px" }} onClick={handleExport}>
@@ -1564,7 +1589,7 @@ function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], intervalo
         return (
           <div className={`dre-resultado-banner ${isLucro ? "lucro" : "prejuizo"}`}>
             <div className="dre-resultado-esquerda">
-              <span className="dre-resultado-emoji">{isLucro ? "✅" : "❌"}</span>
+              <span className="dre-resultado-indicator" />
               <div className="dre-resultado-textos">
                 <span className="dre-resultado-titulo">
                   {isLucro ? "Lucro do Período" : "Prejuízo do Período"}
