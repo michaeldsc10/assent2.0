@@ -787,14 +787,13 @@ const IcR = {
   search:  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>,
 };
 
-const STATUS_ACCENT = {
-  confirmado: { color:T.emerald, glow:T.emeraldA10, label:"Confirmado" },
-  pendente:   { color:T.goldHi, glow:T.goldA12,  label:"Pendente"   },
-  cancelado:  { color:"rgba(239,68,68,0.75)", glow:"rgba(239,68,68,0.10)", label:"Cancelado" },
-};
-
 function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando, onAtualizar}){
   const {T, S} = useFlowTheme();
+  const STATUS_ACCENT = {
+    confirmado: { color:T.emerald, glow:T.emeraldA10, label:"Confirmado" },
+    pendente:   { color:T.goldHi, glow:T.goldA12,  label:"Pendente"   },
+    cancelado:  { color:"rgba(239,68,68,0.75)", glow:"rgba(239,68,68,0.10)", label:"Cancelado" },
+  };
   const acc = STATUS_ACCENT[r.status] || STATUS_ACCENT.cancelado;
   const dtInicio = r.data_hora_inicio ? (r.data_hora_inicio.toDate ? r.data_hora_inicio.toDate() : new Date(r.data_hora_inicio)) : null;
   const dtCriado = r.criadoEm ? (r.criadoEm.toDate ? r.criadoEm.toDate() : new Date(r.criadoEm)) : null;
