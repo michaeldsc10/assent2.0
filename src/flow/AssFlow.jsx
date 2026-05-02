@@ -757,7 +757,7 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
       {/* Modal especialidade */}
       {editando&&(
         <div style={{position:"fixed",inset:0,background:T.overlay,display:"flex",alignItems:"center",justifyContent:"center",zIndex:200,backdropFilter:"blur(6px)",padding:"0 16px"}}>
-          <div style={{background:T.cardBg,border:"1px solid ${T.lineHi}",borderRadius:20,padding:28,width:"100%",maxWidth:380,display:"flex",flexDirection:"column",gap:18,boxShadow:"0 24px 64px rgba(0,0,0,0.55)"}}>
+          <div style={{background:T.cardBg,border:`1px solid ${T.lineHi}`,borderRadius:20,padding:28,width:"100%",maxWidth:380,display:"flex",flexDirection:"column",gap:18,boxShadow:"0 24px 64px rgba(0,0,0,0.55)"}}>
             <p style={{fontSize:14,fontWeight:700,color:T.text100,letterSpacing:"-0.2px"}}>Especialidade / Título</p>
             <p style={{fontSize:12,color:T.text35}}>Exibido na página pública do agendamento, abaixo do nome.</p>
             <div>
