@@ -340,27 +340,77 @@ function ModalCupom({ venda, troco, empresa, onClose }) {
           </div>
           <button className="cupom-close" onClick={onClose}><X size={14} /></button>
         </div>
+
         <div className="cupom-paper">
-          <div className="cupom-empresa">{empresa.nome}</div>
-          {empresa.endereco && <div className="cupom-sub">{empresa.endereco}</div>}
+          {/* Cabeçalho empresa */}
+          {empresa?.logo && (
+            <div style={{ textAlign:"center", marginBottom:6 }}>
+              <img src={empresa.logo} alt="Logo" style={{ maxHeight:52, maxWidth:140, filter:"grayscale(100%)", objectFit:"contain" }} />
+            </div>
+          )}
+          <div className="cupom-empresa">{empresa?.nomeEmpresa || "ASSENT"}</div>
+          {empresa?.cnpj    && <div className="cupom-sub">CNPJ: {empresa.cnpj}</div>}
+          {empresa?.endereco && <div className="cupom-sub">{empresa.endereco}</div>}
+          <div className="cupom-sub" style={{ marginTop:4, marginBottom:2 }}>Recibo de Venda</div>
           <div className="cupom-divider" />
-          <div className="cupom-meta">#{venda.id} · {dataHora}</div>
+
+          {/* Meta */}
+          <div style={{ fontSize:11 }}><strong>ID:</strong> {venda.id}</div>
+          <div style={{ fontSize:11 }}><strong>Data:</strong> {dataHora}</div>
+          {venda.cliente   && <div style={{ fontSize:11 }}><strong>Cliente:</strong> {venda.cliente}</div>}
+          {venda.operador  && <div style={{ fontSize:11 }}><strong>Operador:</strong> {venda.operador}</div>}
           <div className="cupom-divider" />
-          {(venda.itens || []).map((item, i) => (
-            <div key={i} className="cupom-item">
-              <span className="cupom-item-nome">{item.produto?.nome || item.nome || "—"}</span>
-              <span className="cupom-item-qty">{item.qty}x</span>
-              <span className="cupom-item-val">{Number(item.subtotal||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span>
+
+          {/* Cabeçalho itens */}
+          <div style={{ display:"grid", gridTemplateColumns:"1fr auto auto", gap:"2px 8px", fontSize:10, fontWeight:"bold", marginBottom:4 }}>
+            <span>PRODUTO / SERVIÇO</span>
+            <span style={{ textAlign:"right" }}>QTD</span>
+            <span style={{ textAlign:"right" }}>TOTAL</span>
+          </div>
+
+          {/* Itens */}
+          {(venda.itens || []).map((item, i) => {
+            const nome   = item.produto?.nome || item.nome || "—";
+            const preco  = item.precoUnit || 0;
+            const qty    = item.qty || 1;
+            const total  = preco * qty;
+            return (
+              <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr auto auto", gap:"1px 8px", fontSize:11, marginBottom:5 }}>
+                <span style={{ fontWeight:"bold" }}>{nome}</span>
+                <span style={{ textAlign:"right", fontWeight:"bold" }}>{qty}x</span>
+                <span style={{ textAlign:"right", fontWeight:"bold" }}>{fmtR$PDV(total)}</span>
+                <span style={{ fontSize:10, color:"#555", gridColumn:"1/-1" }}>Unitário: {fmtR$PDV(preco)}</span>
+              </div>
+            );
+          })}
+
+          <div className="cupom-divider" />
+
+          {/* Total */}
+          <div style={{ display:"flex", justifyContent:"space-between", fontWeight:"bold", fontSize:14, marginTop:2 }}>
+            <span>TOTAL</span>
+            <span>{fmtR$PDV(venda.total)}</span>
+          </div>
+          {troco != null && troco > 0 && (
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"#1a7a3c", fontWeight:600 }}>
+              <span>Troco</span><span>{fmtR$PDV(troco)}</span>
+            </div>
+          )}
+
+          <div className="cupom-divider" />
+
+          {/* Pagamento */}
+          <div style={{ fontSize:11, fontWeight:"bold", marginBottom:3 }}>FORMA DE PAGAMENTO</div>
+          {(venda.pagamentos || []).map((p, i) => (
+            <div key={i} style={{ display:"flex", justifyContent:"space-between", fontSize:11 }}>
+              <span>{p.label}</span>
+              <span style={{ fontWeight:"bold" }}>{fmtR$PDV(p.valor ?? venda.total)}</span>
             </div>
           ))}
-          <div className="cupom-divider" />
-          <div className="cupom-total-row"><span>Total</span><span style={{fontWeight:700}}>{Number(venda.total||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>
-          {troco != null && <div className="cupom-total-row"><span>Troco</span><span style={{color:"#1a7a3c",fontWeight:600}}>{Number(troco).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>}
-          <div className="cupom-total-row"><span>Pagamento</span><span>{FORMA_LABEL_CUPOM[venda.formaPag]||"—"}</span></div>
-          {venda.cliente && <div className="cupom-total-row"><span>Cliente</span><span>{venda.cliente}</span></div>}
-          <div className="cupom-divider" />
-          <div className="cupom-rodape">Obrigado pela preferência!</div>
+
+          <div className="cupom-rodape" style={{ marginTop:12 }}>Obrigado!</div>
         </div>
+
         <div className="cupom-modal-footer">
           <button className="cupom-btn-imprimir" onClick={imprimir}><Printer size={14}/> Imprimir</button>
           <button className="cupom-btn-fechar" onClick={onClose}>Fechar</button>
@@ -1388,7 +1438,7 @@ export default function PDV({ onVoltar }) {
           onConfirm={(p) => { setPagamentos(ps => [...ps, p]); setShowPagModal(false); }}
           onClose={() => setShowPagModal(false)}
         />
-     
+      )}
 
       {showSenhaCancelar && (
         <ModalSenhaCancelar
@@ -2305,7 +2355,7 @@ const CSS = `
 }
 .cupom-modal {
   background: #16181f; border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 14px; width: 320px; max-height: 88vh;
+  border-radius: 14px; width: 400px; max-height: 90vh;
   display: flex; flex-direction: column;
   box-shadow: 0 24px 64px rgba(0,0,0,0.7);
   animation: slideUp .18s ease; overflow: hidden;
