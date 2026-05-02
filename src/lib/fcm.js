@@ -4,7 +4,7 @@
    ═══════════════════════════════════════════════════ */
 
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
-import { messaging } from './firebase';
+import { firebaseConfig } from './firebase';
 
 let messagingInstance = null;
 
@@ -15,11 +15,20 @@ export function initFCM() {
   }
 
   try {
-    messagingInstance = messaging; // usa instância do firebase.js
-    
+    messagingInstance = getMessaging();
+
     // Registra Service Worker
     navigator.serviceWorker.register('/firebase-messaging-sw.js', {
       scope: '/',
+    }).then((registration) => {
+      // Envia config via postMessage (seguro — sem expor keys na network)
+      if (registration.active) {
+        registration.active.postMessage({
+          type: 'INIT_FIREBASE',
+          config: firebaseConfig,
+        });
+      }
+      console.log('[FCM] SW registrado');
     }).catch((err) => {
       console.error('[FCM] Erro ao registrar SW:', err);
     });
