@@ -13,6 +13,7 @@ import {
   doc,
   updateDoc,
   setDoc,
+  getDoc,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { initFCM, obterTokenPush, escutarNotificacoesAbertas } from '../lib/fcm';
@@ -66,17 +67,34 @@ function tocarSomNotificacao() {
   }
 }
 
-async function salvarTokenFCM(uid, vapidKey) {
+async function salvarTokenFCM(uid, vapidKey, { forceRefresh = false } = {}) {
   try {
+    // Se não forçar refresh, verifica se token salvo ainda é válido
+    if (!forceRefresh) {
+      const snap = await getDoc(doc(db, 'usuarios', uid));
+      const tokenSalvo = snap.data()?.fcmToken;
+
+      // Token salvo há menos de 7 dias → reutiliza
+      const atualizado = snap.data()?.fcmTokenAtualizado?.toDate?.();
+      const diasDesdeUpdate = atualizado
+        ? (Date.now() - atualizado.getTime()) / 86400000
+        : Infinity;
+
+      if (tokenSalvo && diasDesdeUpdate < 7) {
+        console.log('[FCM] Token ainda válido, pulando refresh');
+        return;
+      }
+    }
+
     const token = await obterTokenPush(vapidKey);
     if (!token) return;
-    // setDoc com merge cria o doc se não existir
+
     await setDoc(
       doc(db, 'usuarios', uid),
       { fcmToken: token, fcmTokenAtualizado: new Date() },
       { merge: true }
     );
-    console.log('[FCM] Token salvo');
+    console.log('[FCM] Token salvo/atualizado');
   } catch (err) {
     console.error('[FCM] Erro ao salvar token:', err.message);
   }
@@ -102,21 +120,28 @@ export function useNotificacoes(tenantUid, user) {
 
     const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
-    if ('Notification' in window) {
+    const setupToken = (forceRefresh = false) => {
+      if (!('Notification' in window)) return;
       const permission = Notification.permission;
 
       if (permission === 'granted') {
-        // Já tem permissão — salva/atualiza token direto
-        salvarTokenFCM(user.uid, vapidKey);
+        salvarTokenFCM(user.uid, vapidKey, { forceRefresh });
       } else if (permission === 'default') {
-        // Pede permissão
         Notification.requestPermission().then((result) => {
-          if (result === 'granted') {
-            salvarTokenFCM(user.uid, vapidKey);
-          }
+          if (result === 'granted') salvarTokenFCM(user.uid, vapidKey, { forceRefresh });
         });
       }
-    }
+    };
+
+    // Salva token normal na inicialização
+    setupToken(false);
+
+    // Se o SW mudar (update), força geração de novo token
+    const handleControllerChange = () => {
+      console.log('[FCM] SW trocado — forçando refresh do token');
+      setupToken(true);
+    };
+    navigator.serviceWorker?.addEventListener('controllerchange', handleControllerChange);
 
     // Listener foreground
     unsubFcmRef.current = escutarNotificacoesAbertas(() => {
@@ -125,6 +150,7 @@ export function useNotificacoes(tenantUid, user) {
 
     return () => {
       if (unsubFcmRef.current) unsubFcmRef.current();
+      navigator.serviceWorker?.removeEventListener('controllerchange', handleControllerChange);
     };
   }, [tenantUid, user?.uid]);
 
