@@ -87,19 +87,32 @@ exports.enviarNotificacaoReserva = onDocumentCreated(
         messageId,
         destinatarioUid,
         notifId: snap.id,
-        titulo: notifTitulo,        // nunca undefined
+        titulo: notifTitulo,
         status: 'enviado',
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
     } catch (error) {
-      console.error('[FCM] Erro ao enviar:', error);
+      // Token inválido/expirado → remove para forçar renovação no próximo login
+      if (
+        error.code === 'messaging/registration-token-not-registered' ||
+        error.code === 'messaging/invalid-registration-token'
+      ) {
+        console.warn(`[FCM] Token inválido para ${destinatarioUid} — removendo`);
+        await db.collection('usuarios').doc(destinatarioUid).update({
+          fcmToken: admin.firestore.FieldValue.delete(),
+          fcmTokenAtualizado: admin.firestore.FieldValue.delete(),
+        });
+      } else {
+        console.error('[FCM] Erro ao enviar:', error);
+      }
 
       await db.collection('logs-fcm').doc().set({
         destinatarioUid,
         notifId: snap.id,
-        titulo: titulo || 'sem titulo', // nunca undefined
+        titulo: titulo || 'sem titulo',
         status: 'erro',
         erro: error.message,
+        errorCode: error.code || null,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
