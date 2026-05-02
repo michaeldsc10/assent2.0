@@ -1143,33 +1143,6 @@ export default function PDV({ onVoltar }) {
     }
   }, [showBuscaModal]);
 
-  /* ── Atalhos de teclado globais ── */
-  useEffect(() => {
-    const handleKey = (e) => {
-      // Não dispara atalhos se estiver digitando em inputs (exceto os próprios modais)
-      const tag = document.activeElement?.tagName?.toLowerCase();
-      const isInput = tag === "input" || tag === "textarea" || tag === "select";
-
-      if (e.key === "F8") {
-        e.preventDefault();
-        setShowBuscaModal(s => !s);
-        return;
-      }
-      if (e.key === "F9") {
-        e.preventDefault();
-        if (!finalizando && vencido && carrinho.length > 0) finalizarVenda();
-        return;
-      }
-      if (e.key === "Escape") {
-        if (showBuscaModal) { setShowBuscaModal(false); return; }
-        if (showPagModal)   { setShowPagModal(false);   return; }
-        if (showQrPix)      { setShowQrPix(false);      return; }
-      }
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [finalizando, vencido, carrinho, showBuscaModal, showPagModal, showQrPix]);
-
   /* ─── Mapeamento forma → label ─── */
   const FORMA_LABEL = {
     dinheiro: "Dinheiro",
@@ -1438,6 +1411,30 @@ export default function PDV({ onVoltar }) {
       setFinalizando(false);
     }
   };
+
+  /* ── Atalhos de teclado globais ── */
+  /* Inserido APÓS todas as declarações que referencia (vencido, finalizando, carrinho, finalizarVenda) */
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === "F8") {
+        e.preventDefault();
+        setShowBuscaModal(s => !s);
+        return;
+      }
+      if (e.key === "F9") {
+        e.preventDefault();
+        if (!finalizando && vencido && carrinho.length > 0) finalizarVenda();
+        return;
+      }
+      if (e.key === "Escape") {
+        if (showBuscaModal) { setShowBuscaModal(false); return; }
+        if (showPagModal)   { setShowPagModal(false);   return; }
+        if (showQrPix)      { setShowQrPix(false);      return; }
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [finalizando, vencido, carrinho, showBuscaModal, showPagModal, showQrPix, finalizarVenda]);
 
   /* ══════════════════════════════════
      RENDER — VENDA FINALIZADA
