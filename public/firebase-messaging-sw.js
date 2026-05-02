@@ -1,51 +1,48 @@
 /* ═══════════════════════════════════════════════════
-   public/firebase-messaging-sw.js
-   Service Worker — Web Push sem SDK compat
+   public/firebase-messaging-sw.js - DEBUG
    ═══════════════════════════════════════════════════ */
 
 self.addEventListener('install', (event) => {
+  console.log('[SW] install');
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
+  console.log('[SW] activate');
   event.waitUntil(self.clients.claim());
 });
 
-// PUSH — recebe payload FCM direto
 self.addEventListener('push', (event) => {
-  if (!event.data) return;
+  console.log('[SW] push recebido', event.data?.text());
 
-  let data = {};
-  try {
-    data = event.data.json();
-  } catch {
-    return;
-  }
+  const show = async () => {
+    let title = 'Nova Notificação';
+    let body = '';
 
-  // FCM envia em data.notification ou data.data
-  const notif = data.notification || {};
-  const extra = data.data || {};
+    try {
+      const data = event.data?.json();
+      title = data?.notification?.title || data?.data?.title || title;
+      body  = data?.notification?.body  || data?.data?.body  || body;
+    } catch {
+      body = event.data?.text() || '';
+    }
 
-  const title = notif.title || extra.title || 'Nova Notificação';
-  const options = {
-    body: notif.body || extra.body || '',
-    icon: notif.icon || '/favicon.ico',
-    badge: '/favicon.ico',
-    tag: notif.tag || extra.tag || 'notif-assent',
-    requireInteraction: false,
-    data: {
-      url: extra.url || notif.click_action || '/',
-      ...extra,
-    },
+    console.log('[SW] exibindo:', title, body);
+    await self.registration.showNotification(title, {
+      body,
+      icon: '/favicon.ico',
+      badge: '/favicon.ico',
+      tag: 'notif-assent',
+    });
+    console.log('[SW] notificação exibida');
   };
 
-  event.waitUntil(self.registration.showNotification(title, options));
+  event.waitUntil(show());
 });
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const url = event.notification.data?.url || '/';
-
   event.waitUntil(
     self.clients
       .matchAll({ type: 'window', includeUncontrolled: true })
