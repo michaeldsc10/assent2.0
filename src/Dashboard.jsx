@@ -520,7 +520,7 @@ const RESPONSIVE_CSS = `
    CSS DO DASHBOARD (layout base)
    ═══════════════════════════════════════════════ */
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Sora:wght@300;400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body, #root { height: 100%; width: 100%; margin: 0; padding: 0; }
@@ -553,8 +553,8 @@ const CSS = `
     --sidebar-w-sm: 64px;
     --header-h:     62px;
     --sidebar-transition: width 0.22s cubic-bezier(0.4,0,0.2,1);
-    font-family: 'DM Sans', sans-serif;
-    --font-display: 'Playfair Display', serif;
+    font-family: 'Inter', system-ui, sans-serif;
+    --font-display: 'Inter', system-ui, sans-serif;
     color-scheme: dark;
   }
 
@@ -615,7 +615,7 @@ const CSS = `
     width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
     background: linear-gradient(135deg, #b8952e, #e0c060);
     display: flex; align-items: center; justify-content: center;
-    font-family: 'Sora', sans-serif; font-weight: 700; font-size: 13px;
+    font-family: 'Inter', system-ui, sans-serif; font-weight: 700; font-size: 13px;
     color: #0a0808; letter-spacing: -0.5px;
   }
   .ag-header-logo-name {
@@ -639,7 +639,7 @@ const CSS = `
     position: absolute; top: -5px; right: -5px;
     background: var(--red); color: #fff;
     border-radius: 10px; font-size: 9px; font-weight: 700;
-    padding: 1px 5px; font-family: 'IBM Plex Mono', monospace;
+    padding: 1px 5px; font-family: 'JetBrains Mono', monospace;
     line-height: 1.6; pointer-events: none;
     border: 2px solid var(--bg);
   }
@@ -681,7 +681,7 @@ const CSS = `
   }
   .ag-notif-item-meta {
     font-size: 10px; color: var(--text-3);
-    font-family: 'IBM Plex Mono', monospace; margin-top: 3px;
+    font-family: 'JetBrains Mono', monospace; margin-top: 3px;
   }
   .ag-notif-empty {
     padding: 40px 16px; text-align: center;
@@ -702,7 +702,7 @@ const CSS = `
     border: 1.5px solid var(--gold-d);
     display: flex; align-items: center; justify-content: center;
     font-size: 12px; font-weight: 600; color: var(--gold);
-    font-family: 'Sora', sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
     overflow: hidden;
   }
   .ag-user-name {
@@ -728,7 +728,7 @@ const CSS = `
     display: flex; align-items: center; gap: 9px;
     padding: 9px 12px; border-radius: 8px; border: none;
     background: transparent; color: var(--text-2);
-    font-family: 'DM Sans', sans-serif; font-size: 13px;
+    font-family: 'Inter', system-ui, sans-serif; font-size: 13px;
     cursor: pointer; width: 100%; text-align: left;
     transition: background .1s, color .1s;
   }
@@ -835,7 +835,7 @@ const CSS = `
   .ag-search input {
     background: transparent; border: none; outline: none;
     color: var(--text); font-size: 12px; width: 100%;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
   }
   .ag-search input::placeholder { color: var(--text-3); }
 
@@ -844,7 +844,7 @@ const CSS = `
     padding: 5px 12px; border-radius: 20px; font-size: 11px;
     cursor: pointer; border: 1px solid transparent;
     background: transparent; color: var(--text-2);
-    font-family: 'DM Sans', sans-serif; transition: all .13s;
+    font-family: 'Inter', system-ui, sans-serif; transition: all .13s;
   }
   .ag-period-btn:hover  { background: var(--s2); color: var(--text); }
   .ag-period-btn.active { background: var(--gold-d); border-color: rgba(200,165,94,.3); color: var(--gold); }
@@ -893,7 +893,7 @@ const CSS = `
   .ag-view-all {
     font-size: 11px; color: var(--gold);
     background: transparent; border: none; cursor: pointer;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Inter', system-ui, sans-serif;
     display: flex; align-items: center; gap: 3px; transition: opacity .13s;
   }
   .ag-view-all:hover { opacity: .75; }
@@ -911,12 +911,12 @@ const CSS = `
     width: 44px; height: 44px; border-radius: 11px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
   }
-  .ag-mini-val { font-family: 'Sora', sans-serif; font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
+  .ag-mini-val { font-family: 'Inter', system-ui, sans-serif; font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
   .ag-mini-lbl { font-size: 11px; color: var(--text-2); margin-top: 4px; }
 
   /* ══ KPI CARDS ══ */
   .ag-kpi-label { font-size: 10px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; color: var(--text-2); margin-bottom: 10px; }
-  .ag-kpi-val   { font-family: 'Sora', sans-serif; font-size: 24px; font-weight: 700; color: var(--text); line-height: 1; }
+  .ag-kpi-val   { font-family: 'Inter', system-ui, sans-serif; font-size: 24px; font-weight: 700; color: var(--text); line-height: 1; }
   .ag-kpi-meta  { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
   .ag-trend     { font-size: 11px; font-weight: 500; display: flex; align-items: center; gap: 2px; }
   .ag-sub       { font-size: 11px; color: var(--text-3); }
@@ -937,7 +937,7 @@ const CSS = `
   .ag-despesa-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; padding: 18px; }
   .ag-despesa-card { border-radius: 10px; padding: 15px; }
   .ag-despesa-label { font-size: 9px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; margin-bottom: 8px; }
-  .ag-despesa-count { font-family: 'Sora', sans-serif; font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
+  .ag-despesa-count { font-family: 'Inter', system-ui, sans-serif; font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
   .ag-despesa-val   { font-size: 11px; color: var(--text-2); margin-top: 6px; }
 
   /* ══ FILTRO PERSONALIZADO ══ */
@@ -950,7 +950,7 @@ const CSS = `
   .ag-custom-range label { font-size: 10px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); white-space: nowrap; }
   .ag-date-input {
     background: var(--s3); border: 1px solid var(--border); border-radius: 7px;
-    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 12px;
+    color: var(--text); font-family: 'Inter', system-ui, sans-serif; font-size: 12px;
     padding: 5px 8px; outline: none; cursor: pointer; transition: border-color .15s; color-scheme: dark;
   }
   .ag-date-input:focus { border-color: var(--gold); }
@@ -975,7 +975,7 @@ const CSS = `
     flex: 1; display: flex; align-items: center; justify-content: center;
     flex-direction: column; gap: 10px; color: var(--text-3);
   }
-  .ag-placeholder h2 { font-family: 'Sora',sans-serif; font-size: 18px; font-weight: 600; color: var(--text-2); }
+  .ag-placeholder h2 { font-family: 'Inter', system-ui, sans-serif; font-size: 18px; font-weight: 600; color: var(--text-2); }
   .ag-placeholder p  { font-size: 13px; }
 
   /* ══ MOBILE BOTTOM NAV ══ */
@@ -993,7 +993,7 @@ const CSS = `
     display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 3px;
     background: transparent; border: none; cursor: pointer;
-    color: var(--text-3); font-family: 'DM Sans', sans-serif;
+    color: var(--text-3); font-family: 'Inter', system-ui, sans-serif;
     font-size: 9px; font-weight: 500; letter-spacing: .03em;
     transition: color .15s, background .15s;
     padding: 4px 2px;
@@ -1936,7 +1936,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
-              fontSize: 12, fontWeight: 500, fontFamily: "'DM Sans', sans-serif",
+              fontSize: 12, fontWeight: 500, fontFamily: "'Inter', system-ui, sans-serif",
               background: dashView === "overview" ? "var(--s3)" : "transparent",
               color: dashView === "overview" ? "var(--text)" : "var(--text-3)",
               borderColor: dashView === "overview" ? "var(--border-h)" : "transparent",
@@ -1950,7 +1950,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             style={{
               display: "flex", alignItems: "center", gap: 6,
               padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
-              fontSize: 12, fontWeight: 500, fontFamily: "'DM Sans', sans-serif",
+              fontSize: 12, fontWeight: 500, fontFamily: "'Inter', system-ui, sans-serif",
               background: dashView === "charts" ? "var(--gold-d)" : "transparent",
               color: dashView === "charts" ? "var(--gold)" : "var(--text-3)",
               transition: "all .15s",
@@ -2070,7 +2070,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             color: "var(--text)",
             fontSize: 13,
             padding: "7px 10px",
-            fontFamily: "'DM Sans', sans-serif",
+            fontFamily: "'Inter', system-ui, sans-serif",
             outline: "none",
           }}
         >
@@ -2612,7 +2612,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             <div style={{ flex: 1 }}>
               <div style={{ marginBottom: 20 }}>
                 <div style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 6 }}>Score Geral</div>
-                <div style={{ fontSize: 42, fontWeight: 700, color: "var(--gold)", lineHeight: 1, fontFamily: "'Sora', sans-serif" }}>
+                <div style={{ fontSize: 42, fontWeight: 700, color: "var(--gold)", lineHeight: 1, fontFamily: "'Inter', system-ui, sans-serif" }}>
                   {Math.round(radarData.reduce((s, d) => s + d.A, 0) / radarData.length)}%
                 </div>
                 <div style={{ fontSize: 12, color: "var(--text-2)", marginTop: 6 }}>Meta: 85%</div>
@@ -2669,15 +2669,15 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               <div style={{ display: "flex", gap: 24, marginBottom: 18, flexWrap: "wrap" }}>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--text-2)" }}>Novos (12 meses)</span>
-                  <span style={{ fontSize: 28, fontWeight: 700, color: "var(--blue)", fontFamily: "'Sora', sans-serif", lineHeight: 1 }}>{totalNovos12m}</span>
+                  <span style={{ fontSize: 28, fontWeight: 700, color: "var(--blue)", fontFamily: "'Inter', system-ui, sans-serif", lineHeight: 1 }}>{totalNovos12m}</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--text-2)" }}>Base total</span>
-                  <span style={{ fontSize: 28, fontWeight: 700, color: "var(--gold)", fontFamily: "'Sora', sans-serif", lineHeight: 1 }}>{dash.numClientes}</span>
+                  <span style={{ fontSize: 28, fontWeight: 700, color: "var(--gold)", fontFamily: "'Inter', system-ui, sans-serif", lineHeight: 1 }}>{dash.numClientes}</span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                   <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--text-2)" }}>Melhor mês</span>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: "var(--green)", fontFamily: "'Sora', sans-serif", lineHeight: 1 }}>{mesComMaisNovos.mes} <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-2)" }}>({mesComMaisNovos.novos} cadastros)</span></span>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: "var(--green)", fontFamily: "'Inter', system-ui, sans-serif", lineHeight: 1 }}>{mesComMaisNovos.mes} <span style={{ fontSize: 13, fontWeight: 500, color: "var(--text-2)" }}>({mesComMaisNovos.novos} cadastros)</span></span>
                 </div>
               </div>
               <ResponsiveContainer width="100%" height={210}>
@@ -2818,7 +2818,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                               }}>
                                 Insight
                               </span>
-                              <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'IBM Plex Mono', monospace" }}>
+                              <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
                                 {tempoRelativo}
                               </span>
                               {n.prioridade === "high" && (
@@ -2877,7 +2877,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                                 borderRadius: 20, padding: "2px 7px", flexShrink: 0,
                               }}>{labelUrgencia}</span>
                             </div>
-                            <div style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'IBM Plex Mono', monospace" }}>
+                            <div style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
                               Despesa {n.titulo.split("—")[1]?.trim() || ""} · Ir para Despesas →
                             </div>
                           </div>
@@ -2909,7 +2909,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                                 background: "var(--gold)", borderRadius: 20,
                                 padding: "2px 8px", flexShrink: 0,
                               }}>Reserva</span>
-                              <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'IBM Plex Mono', monospace" }}>
+                              <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
                                 {n.criadoEm?.toDate
                                   ? n.criadoEm.toDate().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
                                   : "—"}
@@ -2923,7 +2923,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                               <span style={{ color: "var(--text-2)" }}>Serviço:</span> {n.payload?.servico || "—"}<br />
                               <span style={{ color: "var(--text-2)" }}>Data:</span> {n.payload?.data || "—"} às {n.payload?.hora || "—"}
                             </div>
-                            <div style={{ fontSize: 10, color: "var(--gold)", marginTop: 5, fontFamily: "'IBM Plex Mono', monospace" }}>
+                            <div style={{ fontSize: 10, color: "var(--gold)", marginTop: 5, fontFamily: "'JetBrains Mono', monospace" }}>
                               Ir para Reservas →
                             </div>
                           </div>
@@ -2940,7 +2940,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                               background: "var(--gold-d)", border: "1px solid rgba(200,165,94,0.2)",
                               borderRadius: 20, padding: "2px 8px", flexShrink: 0,
                             }}>Sistema</span>
-                            <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'IBM Plex Mono', monospace" }}>
+                            <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
                               {n.criadoEm?.toDate
                                 ? n.criadoEm.toDate().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
                                 : "—"}
@@ -2959,7 +2959,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                                 background: "linear-gradient(135deg,#B8860B,#D4AF37)",
                                 color: "#050505", fontSize: 11, fontWeight: 700,
                                 letterSpacing: "0.8px", textDecoration: "none",
-                                fontFamily: "'IBM Plex Mono', monospace",
+                                fontFamily: "'JetBrains Mono', monospace",
                               }}
                             >
                               {n.btnTexto || "Ver mais"} ↗
@@ -3359,7 +3359,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     width: "100%", padding: "13px 20px",
                     background: "linear-gradient(135deg, #B8860B 0%, #D4AF37 60%, #F0D060 100%)",
                     border: "none", borderRadius: 10,
-                    color: "#0a0808", fontFamily: "'DM Sans', sans-serif",
+                    color: "#0a0808", fontFamily: "'Inter', system-ui, sans-serif",
                     fontSize: 13, fontWeight: 700, letterSpacing: "0.08em",
                     cursor: "pointer", textDecoration: "none", textTransform: "uppercase",
                     boxShadow: "0 4px 20px rgba(212,175,55,0.35)",
