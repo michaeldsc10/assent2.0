@@ -1388,7 +1388,7 @@ export default function PDV({ onVoltar }) {
           onConfirm={(p) => { setPagamentos(ps => [...ps, p]); setShowPagModal(false); }}
           onClose={() => setShowPagModal(false)}
         />
-      )}
+     
 
       {showSenhaCancelar && (
         <ModalSenhaCancelar
