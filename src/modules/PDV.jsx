@@ -306,27 +306,28 @@ function ModalCupom({ venda, troco, empresa, onClose }) {
   };
 
   const imprimir = () => {
-    const win = window.open("", "cupom_pdv", "width=360,height=640,toolbar=0,menubar=0,scrollbars=1");
-    if (!win) return;
-    const linhaItens = (venda.itens || []).map(item =>
-      `<div class="row"><span class="nome">${item.produto?.nome || item.nome || "—"}</span><span class="qtd">${item.qty}x</span><span class="val">${Number(item.subtotal||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>`
-    ).join("");
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Cupom</title>
-<style>@page{size:80mm auto;margin:3mm 4mm}*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Courier New',monospace;font-size:11px;width:72mm;color:#111}.center{text-align:center}.empresa-nome{font-size:14px;font-weight:bold;margin-bottom:2px}.empresa-sub{font-size:10px;color:#555}.divider{border:none;border-top:1px dashed #999;margin:6px 0}.row{display:flex;gap:4px;padding:3px 0;border-bottom:1px dotted #ddd}.row .nome{flex:1}.row .qtd{color:#555;flex-shrink:0}.row .val{flex-shrink:0;text-align:right;font-weight:600}.total-row{display:flex;justify-content:space-between;padding:2px 0}.total-grande{font-size:14px;font-weight:bold;padding:4px 0}.rodape{font-size:9px;color:#777;text-align:center;margin-top:4px}</style>
-</head><body>
-<div class="center"><div class="empresa-nome">${empresa.nome||"ASSENT"}</div>${empresa.endereco?`<div class="empresa-sub">${empresa.endereco}</div>`:""}</div>
-<hr class="divider"><div class="center" style="font-size:10px;color:#777">#${venda.id} · ${dataHora}</div><hr class="divider">
-${linhaItens}<hr class="divider">
-<div class="total-row"><span>Subtotal</span><span>${Number(venda.total||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>
-<div class="total-row total-grande"><span>TOTAL</span><span>${Number(venda.total||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>
-${troco!=null?`<div class="total-row"><span>Troco</span><span>${Number(troco).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}</span></div>`:""}
-<hr class="divider">
-<div class="total-row"><span>Pagamento</span><span>${FORMA_LABEL_CUPOM[venda.formaPag]||"—"}</span></div>
-${venda.cliente?`<div class="total-row"><span>Cliente</span><span>${venda.cliente}</span></div>`:""}
-<hr class="divider"><div class="rodape">Obrigado pela preferência!</div>
-</body></html>`);
-    win.document.close();
-    setTimeout(() => { win.focus(); win.print(); win.close(); }, 400);
+    const vendaParaRecibo = {
+      idVenda:    venda.id,
+      id:         venda.id,
+      total:      venda.total,
+      pagamentos: venda.pagamentos,
+      parcelas:   venda.parcelas || 1,
+      cliente:    venda.cliente,
+      operador:   venda.operador,
+      itens: (venda.itens || []).map(item => ({
+        nome:    item.produto?.nome || item.nome || "—",
+        preco:   item.precoUnit || 0,
+        qtd:     item.qty || 1,
+        desconto: 0,
+      })),
+      troco: troco,
+    };
+    if (troco != null && troco > 0) {
+      vendaParaRecibo.pagamentos = (venda.pagamentos || []).map((p, i) =>
+        i === 0 ? { ...p, label: `${p.label} (troco: ${fmtR$PDV(troco)})` } : p
+      );
+    }
+    imprimirRecibo(vendaParaRecibo, empresa);
   };
 
   return (
@@ -887,6 +888,108 @@ function ModalSenhaCancelar({ senhaCadastrada, onConfirm, onClose }) {
 /* ═══════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ═══════════════════════════════════════════════════ */
+
+/* ── Recibo de impressão — mesmo modelo de Vendas.jsx ── */
+const fmtR$PDV = (v) =>
+  `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+
+function imprimirRecibo(venda, empresa) {
+  const el = document.getElementById("recibo-print-root");
+  if (!el) return;
+  const itens = venda.itens || [];
+  const descontos = itens.reduce((s, i) => s + (i.desconto || 0), 0);
+
+  const temTaxa = venda.valorTaxa > 0;
+  const temParc = venda.parcelas > 1;
+
+  const pagamentos = venda.pagamentos && venda.pagamentos.length > 0
+    ? venda.pagamentos
+    : [{ label: venda.formaPagamento || "—", valor: venda.total }];
+
+  const pgtoLinhas = pagamentos.map(p => {
+    const label = temParc && pagamentos.length === 1
+      ? `${p.label} — ${venda.parcelas}x de ${fmtR$PDV(venda.total / venda.parcelas)}`
+      : p.label;
+    return `
+      <div style="display:flex;justify-content:space-between;font-size:12px;">
+        <span>${label}</span>
+        <span style="font-weight:bold;">${fmtR$PDV(p.valor ?? venda.total)}</span>
+      </div>`;
+  }).join("");
+
+  const logoHtml = empresa?.logo
+    ? `<div style="text-align:center;margin-bottom:6px;">
+         <img src="${empresa.logo}" alt="Logo" style="max-height:60px;max-width:180px;filter:grayscale(100%);object-fit:contain;" />
+       </div>`
+    : "";
+  const nomeEmpresaHtml = empresa?.nomeEmpresa
+    ? `<div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:3px;">${empresa.nomeEmpresa}</div>`
+    : `<div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:3px;">ASSENT</div>`;
+  const cnpjHtml = empresa?.cnpj
+    ? `<div style="text-align:center;font-size:10px;margin-bottom:2px;">CNPJ: ${empresa.cnpj}</div>`
+    : "";
+  const enderecoHtml = empresa?.endereco
+    ? `<div style="text-align:center;font-size:10px;margin-bottom:2px;">${empresa.endereco}</div>`
+    : "";
+
+  el.innerHTML = `
+    <div class="recibo-print">
+      ${logoHtml}
+      ${nomeEmpresaHtml}
+      ${cnpjHtml}
+      ${enderecoHtml}
+      <div style="text-align:center;font-size:11px;margin:6px 0 10px;">Recibo de Venda</div>
+      <div style="border-top:1px dashed #000;margin:6px 0;"></div>
+
+      <div style="font-size:12px;"><strong>ID:</strong> ${venda.idVenda || venda.id}</div>
+      <div style="font-size:12px;"><strong>Data:</strong> ${new Date().toLocaleDateString("pt-BR")}</div>
+      ${venda.cliente ? `<div style="font-size:12px;"><strong>Cliente:</strong> ${venda.cliente}</div>` : ""}
+      ${venda.operador ? `<div style="font-size:12px;"><strong>Operador:</strong> ${venda.operador}</div>` : ""}
+
+      <div style="border-top:1px dashed #000;margin:8px 0;"></div>
+
+      <div style="display:grid;grid-template-columns:1fr auto auto;gap:2px 8px;font-size:11px;font-weight:bold;margin-bottom:4px;">
+        <span>PRODUTO / SERVIÇO</span>
+        <span style="text-align:right;">QTD</span>
+        <span style="text-align:right;">TOTAL</span>
+      </div>
+      ${itens.map(i => {
+        const totalItem = (i.preco || 0) * (i.qtd || 1) - (i.desconto || 0);
+        return `
+          <div style="display:grid;grid-template-columns:1fr auto auto;gap:1px 8px;font-size:11px;margin-bottom:5px;">
+            <span style="font-weight:bold;">${i.nome || "Item livre"}</span>
+            <span style="text-align:right;font-weight:bold;">${i.qtd}x</span>
+            <span style="text-align:right;font-weight:bold;">${fmtR$PDV(totalItem)}</span>
+            <span style="font-size:10px;color:#444;grid-column:1/-1;">Unitário: ${fmtR$PDV(i.preco)}</span>
+            ${i.desconto > 0 ? `<span style="font-size:10px;color:#444;grid-column:1/-1;">Desconto: -${fmtR$PDV(i.desconto)}</span>` : ""}
+          </div>`;
+      }).join("")}
+
+      <div style="border-top:1px dashed #000;margin:8px 0;"></div>
+
+      ${descontos > 0 ? `
+        <div style="display:flex;justify-content:space-between;font-size:11px;">
+          <span>Descontos</span><span>-${fmtR$PDV(descontos)}</span>
+        </div>` : ""}
+      ${temTaxa ? `
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#444;">
+          <span>Taxa cartão (${venda.taxaPercentual}%)</span><span>${fmtR$PDV(venda.valorTaxa)}</span>
+        </div>` : ""}
+      <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:14px;margin-top:4px;">
+        <span>TOTAL</span><span>${fmtR$PDV(venda.total)}</span>
+      </div>
+
+      <div style="border-top:1px dashed #000;margin:8px 0;"></div>
+
+      <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">FORMA DE PAGAMENTO</div>
+      ${pgtoLinhas}
+
+      <div style="text-align:center;font-size:10px;margin-top:14px;">Obrigado!</div>
+    </div>
+  `;
+  window.print();
+}
+
 export default function PDV({ onVoltar }) {
   const { tenantUid, vendedorNome, vendedorId, cargo, user } = useAuth();
   const { config, loading: cfgLoading } = useConfiguracoes(tenantUid);
@@ -1205,6 +1308,7 @@ export default function PDV({ onVoltar }) {
         pagamentos: pagamentosLimpos,
         itens:      carrinho,
         cliente:    cliente?.nome || null,
+        operador:   operadorDisplay || null,
       });
 
     } catch (e) {
@@ -1222,6 +1326,7 @@ export default function PDV({ onVoltar }) {
     return (
       <>
         <style>{CSS}</style>
+        <div id="recibo-print-root" />
         <div className="pdv-root">
           <div className="pdv-success-screen">
             <div className="pdv-success-card">
@@ -1262,7 +1367,7 @@ export default function PDV({ onVoltar }) {
               const t = (vendaFinalizada.pagamentos || []).reduce((s,p)=>s+(p.troco||0),0);
               return t > 0 ? t : null;
             })()}
-            empresa={{ nome: nomeEmpresa, logo: logoEmpresa, endereco: empresa.endereco, telefone: empresa.telefone }}
+          empresa={empresa}
             onClose={() => setShowCupom(false)}
           />
         )}
@@ -1276,7 +1381,7 @@ export default function PDV({ onVoltar }) {
   return (
     <>
       <style>{CSS}</style>
-      {showPagModal && (
+      <div id="recibo-print-root" />
         <ModalPagamento
           restante={restante}
           taxas={taxas}
@@ -2588,4 +2693,21 @@ const CSS = `
 .pdv-pag-item-label { font-size: 12px; font-weight: 600; color: var(--pdv-text); }
 .pdv-pag-item-taxa  { font-size: 10px; color: var(--pdv-text-3); }
 .pdv-pag-item-valor { font-size: 13px; font-weight: 700; color: var(--pdv-gold); flex-shrink: 0; }
+
+/* ── Print — Recibo ── */
+@media print {
+  body { visibility: hidden !important; }
+  #recibo-print-root {
+    visibility: visible !important; display: block !important;
+    position: fixed; top: 0; left: 0; width: 100%; z-index: 99999;
+  }
+  #recibo-print-root * { visibility: visible !important; }
+  .recibo-print {
+    font-family: 'Courier New', monospace;
+    width: 80mm; margin: 0 auto; padding: 8mm;
+    font-size: 12px; color: #000 !important; background: #fff;
+  }
+  .recibo-print * { color: #000 !important; }
+}
+#recibo-print-root { display: none; }
 `;
