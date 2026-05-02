@@ -42,19 +42,28 @@ export function initFCM() {
 
 /**
  * Obtém token de push do usuário
- * Requer permissão de notificação do browser
  * @returns {Promise<string|null>} Token ou null se falhar
  */
 export async function obterTokenPush(vapidKey) {
-  if (!messagingInstance) {
-    messagingInstance = initFCM();
-  }
-
-  if (!messagingInstance) return null;
-
   try {
-    const token = await getToken(messagingInstance, { vapidKey });
-    return token || null;
+    // Tenta obter messaging global (já inicializado em firebase.js)
+    const msg = messagingInstance || getMessaging();
+    
+    if (!msg) {
+      console.error('[FCM] Messaging não disponível');
+      return null;
+    }
+
+    console.log('[FCM] Obtendo token com VAPID:', vapidKey ? 'sim' : 'não');
+    const token = await getToken(msg, { vapidKey });
+    
+    if (token) {
+      console.log('[FCM] Token obtido:', token.substring(0, 20) + '...');
+      return token;
+    } else {
+      console.warn('[FCM] getToken retornou vazio');
+      return null;
+    }
   } catch (err) {
     console.error('[FCM] Erro ao obter token:', err.code, err.message);
     return null;
