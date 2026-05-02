@@ -184,35 +184,106 @@ function gerarESCPOS({ mesa, itens, clienteNome, isAdicional = false, horario })
 }
 
 /* ─────────────────────────────────────────────────────
-   RECIBO DE VENDA (impressão via window.print)
+   RECIBO DE VENDA — mesmo modelo de Vendas.jsx
+   Assinatura: imprimirRecibo(venda, empresa)
 ───────────────────────────────────────────────────── */
-function imprimirRecibo(dados) {
-  const { mesa, itens, formaPgto, cliente, total, taxaPerc, valorTaxa, vendaId, parcelas } = dados;
-  const el = document.getElementById("mesas-recibo-root");
+function imprimirRecibo(venda, empresa) {
+  const el = document.getElementById("recibo-print-root");
   if (!el) return;
+  const itens = venda.itens || [];
+  const descontos = itens.reduce((s, i) => s + (i.desconto || 0), 0);
+
+  const temTaxa = venda.valorTaxa > 0;
+  const temParc = venda.parcelas > 1;
+
+  const pagamentos = venda.pagamentos && venda.pagamentos.length > 0
+    ? venda.pagamentos
+    : [{ label: venda.formaPagamento || "—", valor: venda.total }];
+
+  const pgtoLinhas = pagamentos.map(p => {
+    const label = temParc && pagamentos.length === 1
+      ? `${p.label} — ${venda.parcelas}x de ${fmtR$(venda.total / venda.parcelas)}`
+      : p.label;
+    return `
+      <div style="display:flex;justify-content:space-between;font-size:12px;">
+        <span>${label}</span>
+        <span style="font-weight:bold;">${fmtR$(p.valor ?? venda.total)}</span>
+      </div>`;
+  }).join("");
+
+  const logoHtml = empresa?.logo
+    ? `<div style="text-align:center;margin-bottom:6px;">
+         <img src="${empresa.logo}" alt="Logo" style="max-height:60px;max-width:180px;filter:grayscale(100%);object-fit:contain;" />
+       </div>`
+    : "";
+  const nomeEmpresa = empresa?.nomeEmpresa
+    ? `<div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:3px;">${empresa.nomeEmpresa}</div>`
+    : `<div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:3px;">ASSENT</div>`;
+  const cnpjHtml = empresa?.cnpj
+    ? `<div style="text-align:center;font-size:10px;margin-bottom:2px;">CNPJ: ${empresa.cnpj}</div>`
+    : "";
+  const enderecoHtml = empresa?.endereco
+    ? `<div style="text-align:center;font-size:10px;margin-bottom:2px;">${empresa.endereco}</div>`
+    : "";
 
   el.innerHTML = `
-    <div class="mesas-recibo-print">
-      <div style="text-align:center;font-weight:bold;font-size:15px;margin-bottom:4px;">ASSENT</div>
-      <div style="text-align:center;font-size:11px;margin-bottom:12px;">Recibo de Consumo</div>
-      ${vendaId ? `<div style="font-size:11px;">Venda: ${vendaId}</div>` : ""}
-      <div style="font-size:11px;">Mesa: ${mesa}</div>
-      ${cliente ? `<div style="font-size:11px;">Cliente: ${cliente}</div>` : ""}
-      <div style="font-size:11px;">Pgto: ${formaPgto}${parcelas > 1 ? ` — ${parcelas}x` : ""}</div>
+    <div class="recibo-print">
+      ${logoHtml}
+      ${nomeEmpresa}
+      ${cnpjHtml}
+      ${enderecoHtml}
+      <div style="text-align:center;font-size:11px;margin:6px 0 10px;">Recibo de Consumo</div>
+      <div style="border-top:1px dashed #000;margin:6px 0;"></div>
+
+      <div style="font-size:12px;"><strong>ID:</strong> ${venda.idVenda || venda.id}</div>
+      <div style="font-size:12px;"><strong>Data:</strong> ${venda.data ? new Date(venda.data).toLocaleDateString("pt-BR") : new Date().toLocaleDateString("pt-BR")}</div>
+      ${venda.mesa ? `<div style="font-size:12px;"><strong>Mesa:</strong> ${venda.mesa}</div>` : ""}
+      ${venda.cliente ? `<div style="font-size:12px;"><strong>Cliente:</strong> ${venda.cliente}</div>` : ""}
+      ${venda.vendedor ? `<div style="font-size:12px;"><strong>Operador:</strong> ${venda.vendedor}</div>` : ""}
+
       <div style="border-top:1px dashed #000;margin:8px 0;"></div>
-      ${itens.map(i => `
-        <div style="display:flex;justify-content:space-between;font-size:12px;">
-          <span>${i.qtd}x ${i.nome}</span>
-          <span>${fmtR$((i.preco || 0) * (i.qtd || 1))}</span>
-        </div>
-      `).join("")}
-      <div style="border-top:1px dashed #000;margin:8px 0;"></div>
-      ${taxaPerc > 0 ? `<div style="display:flex;justify-content:space-between;font-size:11px;color:#555;"><span>Taxa (${taxaPerc}%)</span><span>${fmtR$(valorTaxa)}</span></div>` : ""}
-      <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:14px;">
-        <span>TOTAL</span><span>${fmtR$(total)}</span>
+
+      <div style="display:grid;grid-template-columns:1fr auto auto;gap:2px 8px;font-size:11px;font-weight:bold;margin-bottom:4px;">
+        <span>PRODUTO / SERVIÇO</span>
+        <span style="text-align:right;">QTD</span>
+        <span style="text-align:right;">TOTAL</span>
       </div>
-      ${parcelas > 1 ? `<div style="font-size:11px;text-align:right;">${parcelas}x de ${fmtR$(total / parcelas)}</div>` : ""}
-      <div style="text-align:center;font-size:10px;margin-top:14px;">Obrigado pela preferência!</div>
+      ${itens.map(i => {
+        const totalItem = (i.preco || 0) * (i.qtd || 1) - (i.desconto || 0);
+        return `
+          <div style="display:grid;grid-template-columns:1fr auto auto;gap:1px 8px;font-size:11px;margin-bottom:5px;">
+            <span style="font-weight:bold;">${i.nome || "Item livre"}</span>
+            <span style="text-align:right;font-weight:bold;">${i.qtd}x</span>
+            <span style="text-align:right;font-weight:bold;">${fmtR$(totalItem)}</span>
+            <span style="font-size:10px;color:#444;grid-column:1/-1;">Unitário: ${fmtR$(i.preco)}</span>
+            ${i.desconto > 0 ? `<span style="font-size:10px;color:#444;grid-column:1/-1;">Desconto: -${fmtR$(i.desconto)}</span>` : ""}
+          </div>`;
+      }).join("")}
+
+      <div style="border-top:1px dashed #000;margin:8px 0;"></div>
+
+      ${descontos > 0 ? `
+        <div style="display:flex;justify-content:space-between;font-size:11px;">
+          <span>Descontos</span><span>-${fmtR$(descontos)}</span>
+        </div>` : ""}
+      ${temTaxa ? `
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:#444;">
+          <span>Taxa cartão (${venda.taxaPercentual}%)</span><span>${fmtR$(venda.valorTaxa)}</span>
+        </div>` : ""}
+      <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:14px;margin-top:4px;">
+        <span>TOTAL</span><span>${fmtR$(venda.total)}</span>
+      </div>
+
+      <div style="border-top:1px dashed #000;margin:8px 0;"></div>
+
+      <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">FORMA DE PAGAMENTO</div>
+      ${pgtoLinhas}
+
+      ${venda.observacao ? `
+        <div style="border-top:1px dashed #000;margin:8px 0;"></div>
+        <div style="font-size:11px;"><strong>Obs:</strong> ${venda.observacao}</div>` : ""}
+
+      <div style="text-align:center;font-size:10px;margin-top:14px;">Obrigado!</div>
     </div>
   `;
   window.print();
@@ -257,17 +328,17 @@ const CSS = `
     body { visibility: hidden !important; }
 
     /* Recibo de venda */
-    #mesas-recibo-root {
+    #recibo-print-root {
       visibility: visible !important; display: block !important;
       position: fixed; top: 0; left: 0; width: 100%; z-index: 99999;
     }
-    #mesas-recibo-root * { visibility: visible !important; }
-    .mesas-recibo-print {
+    #recibo-print-root * { visibility: visible !important; }
+    .recibo-print {
       font-family: 'Courier New', monospace;
       width: 80mm; margin: 0 auto; padding: 8mm;
       font-size: 12px; color: #000 !important; background: #fff;
     }
-    .mesas-recibo-print * { color: #000 !important; }
+    .recibo-print * { color: #000 !important; }
 
     /* Ticket de cozinha */
     #coz-ticket-root {
@@ -1437,15 +1508,19 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
 
       await logAction({ tenantUid: uid, nomeUsuario, cargo, acao: "criar", modulo: "Mesas", descricao: `Fechou Mesa ${mesa.numero} — Venda ${novoId} — R$ ${total.toFixed(2)}` });
       onVendaSalva({
-        id: novoId,
-        mesa: mesa.numero,
+        id:             novoId,
+        idVenda:        novoId,
+        mesa:           mesa.numero,
         itens,
-        formaPgto: payload.formaPagamento,
-        cliente: payload.cliente,
+        formaPagamento: payload.formaPagamento,
+        formaPgto:      payload.formaPagamento,
+        pagamentos:     [{ label: payload.formaPagamento, valor: total }],
+        cliente:        payload.cliente,
         total,
-        taxaPerc: taxaInfo.perc,
-        valorTaxa: taxaInfo.valor,
-        parcelas: formaPgto === "Cartão de Crédito" ? parcelas : 1,
+        taxaPercentual: taxaInfo.perc,
+        taxaPerc:       taxaInfo.perc,
+        valorTaxa:      taxaInfo.valor,
+        parcelas:       formaPgto === "Cartão de Crédito" ? parcelas : 1,
       });
       onClose();
     } catch (err) {
@@ -2079,14 +2154,14 @@ function ModalConfigMesas({ uid, mesas, onClose, nomeUsuario, cargo }) {
 /* ═══════════════════════════════════════════════════
    MODAL: RECIBO PÓS-VENDA
    ═══════════════════════════════════════════════════ */
-function ModalRecibo({ dados, onClose }) {
+function ModalRecibo({ dados, empresa, onClose }) {
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-box modal-box-sm">
         <div className="modal-header">
           <div>
             <div className="modal-title">✅ Mesa {dados.mesa} fechada</div>
-            <div className="modal-sub">Venda {dados.id} gerada com sucesso</div>
+            <div className="modal-sub">Venda {dados.idVenda || dados.id} gerada com sucesso</div>
           </div>
           <button className="modal-close" onClick={onClose}>
             <X size={14} color="var(--text-2)" />
@@ -2107,7 +2182,7 @@ function ModalRecibo({ dados, onClose }) {
           <button
             className="btn-secondary"
             style={{ width: "100%", justifyContent: "center" }}
-            onClick={() => imprimirRecibo(dados)}
+            onClick={() => imprimirRecibo(dados, empresa)}
           >
             <Printer size={14} /> Imprimir Recibo
           </button>
@@ -2150,6 +2225,7 @@ export default function Mesas() {
   const [produtos, setProdutos] = useState([]);
   const [servicos, setServicos] = useState([]);
   const [taxas, setTaxas] = useState(TAXAS_DEFAULT);
+  const [configEmpresa, setConfigEmpresa] = useState({});
   const [loading, setLoading] = useState(true);
 
   const [mesaModal, setMesaModal] = useState(null);      // mesa selecionada
@@ -2208,8 +2284,10 @@ export default function Mesas() {
     }, fsSnapshotError("Mesas:historico"));
 
     getDoc(doc(db, "users", uid, "config", "geral")).then(snap => {
-      if (snap.exists() && snap.data().taxas) {
-        setTaxas(prev => ({ ...TAXAS_DEFAULT, ...snap.data().taxas }));
+      if (snap.exists()) {
+        const d = snap.data();
+        if (d.taxas) setTaxas(prev => ({ ...TAXAS_DEFAULT, ...d.taxas }));
+        if (d.empresa) setConfigEmpresa(d.empresa);
       }
     }).catch(() => {});
 
@@ -2239,7 +2317,7 @@ export default function Mesas() {
     <>
       <style>{CSS}</style>
       {/* Roots de impressão (invisíveis na tela) */}
-      <div id="mesas-recibo-root" />
+      <div id="recibo-print-root" />
       <div id="coz-ticket-root" />
 
       <div className="mesas-page">
@@ -2434,6 +2512,7 @@ export default function Mesas() {
       {reciboModal && (
         <ModalRecibo
           dados={reciboModal}
+          empresa={configEmpresa}
           onClose={() => setReciboModal(null)}
         />
       )}
