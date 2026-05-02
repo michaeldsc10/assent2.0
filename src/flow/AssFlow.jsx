@@ -473,6 +473,15 @@ function CheckItem({ok,label}){
   </div>;
 }
 
+// ─── STATUS_ACCENT Global ──────────────────────────────────────────────────────
+function getStatusAccent(T) {
+  return {
+    confirmado: { color:T.emerald, glow:T.emeraldA10, label:"Confirmado" },
+    pendente:   { color:T.goldHi, glow:T.goldA12,  label:"Pendente"   },
+    cancelado:  { color:"rgba(239,68,68,0.75)", glow:"rgba(239,68,68,0.10)", label:"Cancelado" },
+  };
+}
+
 // ─── Visão Geral ──────────────────────────────────────────────────────────────
 function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
   const {T, S} = useFlowTheme();
@@ -553,7 +562,8 @@ function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
               {proximas.map(r=>{
                 const pr=prestadores.find(p=>p.id===r.prestadorId);
-                const acc2 = STATUS_ACCENT[r.status] || STATUS_ACCENT.cancelado;
+                const statusMap = getStatusAccent(T);
+                const acc2 = statusMap[r.status] || statusMap.cancelado;
                 return <div key={r.id} style={{
                   display:"flex",justifyContent:"space-between",alignItems:"center",
                   padding:"10px 14px",
@@ -789,12 +799,8 @@ const IcR = {
 
 function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando, onAtualizar}){
   const {T, S} = useFlowTheme();
-  const STATUS_ACCENT = {
-    confirmado: { color:T.emerald, glow:T.emeraldA10, label:"Confirmado" },
-    pendente:   { color:T.goldHi, glow:T.goldA12,  label:"Pendente"   },
-    cancelado:  { color:"rgba(239,68,68,0.75)", glow:"rgba(239,68,68,0.10)", label:"Cancelado" },
-  };
-  const acc = STATUS_ACCENT[r.status] || STATUS_ACCENT.cancelado;
+  const statusMap = getStatusAccent(T);
+  const acc = statusMap[r.status] || statusMap.cancelado;
   const dtInicio = r.data_hora_inicio ? (r.data_hora_inicio.toDate ? r.data_hora_inicio.toDate() : new Date(r.data_hora_inicio)) : null;
   const dtCriado = r.criadoEm ? (r.criadoEm.toDate ? r.criadoEm.toDate() : new Date(r.criadoEm)) : null;
 
