@@ -42,7 +42,7 @@ if (import.meta.env.DEV) {
 
 initializeAppCheck(app, {
   provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_SITE_KEY),
-  isTokenAutoRefreshEnabled: true,
+  isTokenAutoRefreshEnabled: false,
 });
 
 export const auth      = getAuth(app);
