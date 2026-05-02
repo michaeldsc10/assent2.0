@@ -20,17 +20,17 @@ import ConfigPage         from "./ConfigPage";
 import NotificacoesLeads  from "./NotificacoesLeads";
 import { useLeads }       from "./useLeads";
 
-// ── Fontes do CRM (Outfit + Cormorant Garamond) ────────────────────────────
+// ── Fontes do CRM — alinhadas ao Dashboard (Inter + JetBrains Mono) ──────────
 if (!document.getElementById("crm-fonts")) {
   const link = document.createElement("link");
   link.id   = "crm-fonts";
   link.rel  = "stylesheet";
-  link.href = "https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=Cormorant+Garamond:wght@400;600&display=swap";
+  link.href = "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap";
   document.head.appendChild(link);
 }
 
-const FONT         = "'Outfit', system-ui, sans-serif";
-const FONT_DISPLAY = "'Cormorant Garamond', Georgia, serif";
+const FONT         = "'Inter', system-ui, sans-serif";
+const FONT_DISPLAY = "'Inter', system-ui, sans-serif";
 
 // ─── Hook de Breakpoint ───────────────────────────────────────────────────────
 function useBreakpoint() {
