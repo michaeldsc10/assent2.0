@@ -812,6 +812,13 @@ const CSS = `
 .rcr-kpi-trend.down { color: var(--red);   }
 .rcr-kpi-trend.neu  { color: var(--text-3); }
 .rcr-kpi-sub { font-size: 11px; color: var(--text-3); }
+.rcr-kpi-clickable { user-select: none; }
+.rcr-kpi-clickable:hover { border-color: var(--gold); }
+.rcr-kpi-active { border-color: var(--gold) !important; box-shadow: 0 0 0 2px rgba(200,165,94,0.18); }
+.rcr-kpi-active::before { opacity: 1 !important; }
+.rcr-kpi-active.green { border-color: var(--green) !important; box-shadow: 0 0 0 2px rgba(72,199,142,0.18); }
+.rcr-kpi-active.red   { border-color: var(--red)   !important; box-shadow: 0 0 0 2px rgba(224,82,82,0.18); }
+.rcr-kpi-active.blue  { border-color: var(--blue, #5b8ef0) !important; box-shadow: 0 0 0 2px rgba(91,142,240,0.18); }
 
 /* ── Charts ── */
 .rcr-charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
@@ -4480,11 +4487,15 @@ function RcrDonut({ dados, size = 110 }) {
 }
 
 /* ── KPI Card ── */
-function RcrKpi({ icon: Icon, label, value, sub, cor = "gold", trend }) {
+function RcrKpi({ icon: Icon, label, value, sub, cor = "gold", trend, onClick, active }) {
   const trendCls = trend === null || trend === undefined ? "" : trend > 0 ? "up" : trend < 0 ? "down" : "neu";
   const TrendIcon = !trend ? Minus : trend > 0 ? ArrowUpRight : ArrowDownRight;
   return (
-    <div className={`rcr-kpi ${cor}`}>
+    <div
+      className={`rcr-kpi ${cor}${onClick ? " rcr-kpi-clickable" : ""}${active ? " rcr-kpi-active" : ""}`}
+      onClick={onClick}
+      style={onClick ? { cursor: "pointer" } : undefined}
+    >
       <div className={`rcr-kpi-icon ${cor}`}><Icon size={16} /></div>
       <div className="rcr-kpi-label">{label}</div>
       <div className={`rcr-kpi-val ${cor}`}>{value}</div>
@@ -4654,45 +4665,6 @@ function RelatorioCompras({ compras = [], fornecedores = [], intervalo }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
 
-      {/* ── Tabela detalhada ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div className="rcr-section-title"><Package size={15} />Detalhamento</div>
-        <button className="btn-secondary" style={{ fontSize: 12, padding: "6px 14px" }} onClick={handleExport}><Download size={13} />Exportar Excel</button>
-      </div>
-      <div className="rcr-table-wrap">
-        <div className="rcr-table-header"><span className="rcr-table-title">Registro de Compras</span><span className="rcr-table-badge">{tabelaItens.length} registros</span></div>
-        <div className="rcr-row rcr-row-head" style={{ gridTemplateColumns: "90px 1fr 1fr 120px 140px 100px" }}>
-          <SortTh label="Data" sortKey="data" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort}>Data</SortTh>
-          <SortTh label="Fornecedor" sortKey="_nomeSort" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort}>Fornecedor</SortTh>
-          <span>Itens</span>
-          <SortTh label="Valor" sortKey="valorTotal" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort} align="right"><span style={{width:"100%",textAlign:"right"}}>Valor</span></SortTh>
-          <span>Pagamento</span>
-          <SortTh label="Status" sortKey="status" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort}>Status</SortTh>
-        </div>
-        {tabelaItens.length === 0
-          ? <div className="rcr-empty" style={{ padding: 40 }}><ShoppingCart size={24} opacity={0.3} /><p>Nenhuma compra com os filtros selecionados.</p></div>
-          : [...tabelaItens].map(c=>({...c, _nomeSort: getNome(c)})).sort((a,b)=>{
-              const va=a[cmpSK],vb=b[cmpSK];
-              if(cmpSK==="data"){ const da=new Date(a.data),db=new Date(b.data); return cmpSD==="asc"?da-db:db-da; }
-              if(cmpSK==="valorTotal"){ const na=Number(a.valorTotal||0),nb=Number(b.valorTotal||0); return cmpSD==="asc"?na-nb:nb-na; }
-              const sa=String(va??"").toLowerCase(),sb=String(vb??"").toLowerCase();
-              return cmpSD==="asc"?sa.localeCompare(sb,"pt-BR"):sb.localeCompare(sa,"pt-BR");
-            }).map((c) => {
-              const d = parseDateISO(c.data);
-              return (
-                <div key={c.id} className="rcr-row" style={{ gridTemplateColumns: "90px 1fr 1fr 120px 140px 100px" }}>
-                  <span>{d ? d.split("-").reverse().join("/") : "—"}</span>
-                  <span style={{ color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getNome(c)}</span>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getDesc(c)}</span>
-                  <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: c.status === "cancelado" ? "var(--text-3)" : "var(--text)" }}>{fmtR$(Number(c.valorTotal || 0))}</span>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getMetodo(c)}</span>
-                  <span><span className={`rcr-badge ${c.status || "pendente"}`}>{c.status || "pendente"}</span></span>
-                </div>
-              );
-            })
-        }
-      </div>
-
       {/* ── Filtros ── */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -4720,12 +4692,12 @@ function RelatorioCompras({ compras = [], fornecedores = [], intervalo }) {
         )}
       </div>
 
-      {/* ── KPIs ── */}
+      {/* ── KPIs clicáveis ── */}
       <div className="rcr-kpi-grid">
-        <RcrKpi icon={DollarSign}   label="Total Gasto (pago)"  value={fmtR$(totalGasto)}    cor="gold"  trend={tendencia} />
-        <RcrKpi icon={Clock}        label="A Pagar (pendente)"  value={fmtR$(totalPendente)}  cor="blue"  sub={`${pendentes.length} compra${pendentes.length !== 1 ? "s" : ""}`} />
+        <RcrKpi icon={DollarSign}   label="Total Gasto (pago)"  value={fmtR$(totalGasto)}    cor="gold"  trend={tendencia}                                                         onClick={() => setFiltroStatus(f => f === "pago"      ? "todos" : "pago")}      active={filtroStatus === "pago"} />
+        <RcrKpi icon={Clock}        label="A Pagar (pendente)"  value={fmtR$(totalPendente)}  cor="blue"  sub={`${pendentes.length} compra${pendentes.length !== 1 ? "s" : ""}`}  onClick={() => setFiltroStatus(f => f === "pendente"  ? "todos" : "pendente")}  active={filtroStatus === "pendente"} />
         <RcrKpi icon={ShoppingCart} label="Ticket Médio"        value={fmtR$(ticketMedio)}    cor="green" sub={`${pagas.length} compras pagas`} />
-        <RcrKpi icon={Target}       label="Cancelado"           value={fmtR$(totalCancelado)} cor="red"   sub={`${canceladas.length} compra${canceladas.length !== 1 ? "s" : ""}`} />
+        <RcrKpi icon={Target}       label="Cancelado"           value={fmtR$(totalCancelado)} cor="red"   sub={`${canceladas.length} compra${canceladas.length !== 1 ? "s" : ""}`} onClick={() => setFiltroStatus(f => f === "cancelado" ? "todos" : "cancelado")} active={filtroStatus === "cancelado"} />
       </div>
 
       {/* ── Métricas rápidas ── */}
@@ -4843,6 +4815,45 @@ function RelatorioCompras({ compras = [], fornecedores = [], intervalo }) {
           </div>
         </>
       )}
+
+      {/* ── Tabela detalhada ── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="rcr-section-title"><Package size={15} />Detalhamento</div>
+        <button className="btn-secondary" style={{ fontSize: 12, padding: "6px 14px" }} onClick={handleExport}><Download size={13} />Exportar Excel</button>
+      </div>
+      <div className="rcr-table-wrap">
+        <div className="rcr-table-header"><span className="rcr-table-title">Registro de Compras</span><span className="rcr-table-badge">{tabelaItens.length} registros</span></div>
+        <div className="rcr-row rcr-row-head" style={{ gridTemplateColumns: "90px 1fr 1fr 120px 140px 100px" }}>
+          <SortTh label="Data" sortKey="data" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort}>Data</SortTh>
+          <SortTh label="Fornecedor" sortKey="_nomeSort" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort}>Fornecedor</SortTh>
+          <span>Itens</span>
+          <SortTh label="Valor" sortKey="valorTotal" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort} align="right"><span style={{width:"100%",textAlign:"right"}}>Valor</span></SortTh>
+          <span>Pagamento</span>
+          <SortTh label="Status" sortKey="status" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort}>Status</SortTh>
+        </div>
+        {tabelaItens.length === 0
+          ? <div className="rcr-empty" style={{ padding: 40 }}><ShoppingCart size={24} opacity={0.3} /><p>Nenhuma compra com os filtros selecionados.</p></div>
+          : [...tabelaItens].map(c=>({...c, _nomeSort: getNome(c)})).sort((a,b)=>{
+              const va=a[cmpSK],vb=b[cmpSK];
+              if(cmpSK==="data"){ const da=new Date(a.data),db=new Date(b.data); return cmpSD==="asc"?da-db:db-da; }
+              if(cmpSK==="valorTotal"){ const na=Number(a.valorTotal||0),nb=Number(b.valorTotal||0); return cmpSD==="asc"?na-nb:nb-na; }
+              const sa=String(va??"").toLowerCase(),sb=String(vb??"").toLowerCase();
+              return cmpSD==="asc"?sa.localeCompare(sb,"pt-BR"):sb.localeCompare(sa,"pt-BR");
+            }).map((c) => {
+              const d = parseDateISO(c.data);
+              return (
+                <div key={c.id} className="rcr-row" style={{ gridTemplateColumns: "90px 1fr 1fr 120px 140px 100px" }}>
+                  <span>{d ? d.split("-").reverse().join("/") : "—"}</span>
+                  <span style={{ color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getNome(c)}</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getDesc(c)}</span>
+                  <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: c.status === "cancelado" ? "var(--text-3)" : "var(--text)" }}>{fmtR$(Number(c.valorTotal || 0))}</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getMetodo(c)}</span>
+                  <span><span className={`rcr-badge ${c.status || "pendente"}`}>{c.status || "pendente"}</span></span>
+                </div>
+              );
+            })
+        }
+      </div>
 
     </div>
   );
@@ -4979,49 +4990,7 @@ function RelatorioContasReceber({ aReceber = [], intervalo }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
 
-      {/* ── Tabela detalhada ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div className="rcr-section-title"><Receipt size={15} />Detalhamento</div>
-        <button className="btn-secondary" style={{ fontSize: 12, padding: "6px 14px" }} onClick={handleExport}><Download size={13} />Exportar Excel</button>
-      </div>
-      <div className="rcr-table-wrap">
-        <div className="rcr-table-header"><span className="rcr-table-title">Contas a Receber</span><span className="rcr-table-badge">{tabelaItens.length} registros</span></div>
-        <div className="rcr-row rcr-row-head" style={{ gridTemplateColumns: "95px 1fr 1fr 120px 120px 100px" }}>
-          <SortTh label="Vencimento" sortKey="dataVencimento" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Vencimento</SortTh>
-          <SortTh label="Cliente" sortKey="cliente" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Cliente</SortTh>
-          <SortTh label="Descrição" sortKey="descricao" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Descrição</SortTh>
-          <SortTh label="Valor Total" sortKey="valorTotal" currentKey={rctSK} currentDir={rctSD} onSort={rctSort} align="right"><span style={{width:"100%",textAlign:"right"}}>Valor Total</span></SortTh>
-          <SortTh label="Restante" sortKey="valorRestante" currentKey={rctSK} currentDir={rctSD} onSort={rctSort} align="right"><span style={{width:"100%",textAlign:"right"}}>Restante</span></SortTh>
-          <SortTh label="Status" sortKey="_status" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Status</SortTh>
-        </div>
-        {tabelaItens.length === 0
-          ? <div className="rcr-empty" style={{ padding: 40 }}><Receipt size={24} opacity={0.3} /><p>Nenhuma conta com os filtros selecionados.</p></div>
-          : [...tabelaItens].sort((a,b)=>{
-              const va=a[rctSK],vb=b[rctSK];
-              if(rctSK==="dataVencimento"){ const da=new Date(a.dataVencimento),db=new Date(b.dataVencimento); return rctSD==="asc"?da-db:db-da; }
-              if(rctSK==="valorTotal"||rctSK==="valorRestante"){ const na=Number(a[rctSK]||0),nb=Number(b[rctSK]||0); return rctSD==="asc"?na-nb:nb-na; }
-              const sa=String(va??"").toLowerCase(),sb=String(vb??"").toLowerCase();
-              return rctSD==="asc"?sa.localeCompare(sb,"pt-BR"):sb.localeCompare(sa,"pt-BR");
-            }).map((item, i) => {
-              const d = parseDateISO(item.dataVencimento);
-              const dFmt = d ? d.split("-").reverse().join("/") : "—";
-              const vTotal   = Number(item.valorTotal || item.valor || 0);
-              const vRestante= Number(item.valorRestante ?? vTotal);
-              return (
-                <div key={item.id || i} className="rcr-row" style={{ gridTemplateColumns: "95px 1fr 1fr 120px 120px 100px", background: d === hoje ? "rgba(200,165,94,0.04)" : undefined }}>
-                  <span style={{ color: item._status === "vencido" ? "var(--red)" : "var(--text-2)" }}>{dFmt}</span>
-                  <span style={{ color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.cliente || item.nomeCliente || "—"}</span>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.descricao || "—"}</span>
-                  <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: "var(--text)" }}>{fmtR$(vTotal)}</span>
-                  <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: item._status === "pago" ? "var(--green)" : item._status === "vencido" ? "var(--red)" : "var(--gold)" }}>{fmtR$(vRestante)}</span>
-                  <span><span className={`rcr-badge ${item._status}`}>{item._status}</span></span>
-                </div>
-              );
-            })
-        }
-      </div>
-
-      {/* ── Filtros ── */}
+      {/* ── Filtros de status ── */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <span className="rcr-filter-label">Status</span>
         <div className="rcr-filters">
@@ -5033,11 +5002,11 @@ function RelatorioContasReceber({ aReceber = [], intervalo }) {
         </div>
       </div>
 
-      {/* ── KPIs ── */}
+      {/* ── KPIs clicáveis ── */}
       <div className="rcr-kpi-grid">
-        <RcrKpi icon={CheckCircle} label="Receita Recebida"       value={fmtR$(totalRecebido)}  cor="green" trend={tendencia} />
-        <RcrKpi icon={Clock}       label="Pendente a Receber"     value={fmtR$(totalPendente)}  cor="gold"  sub={`${pendentes.length} cobranças`} />
-        <RcrKpi icon={AlertCircle} label="Vencido / Inadimplente" value={fmtR$(totalVencido)}   cor="red"   sub={fmtPct(txInadimplencia) + " inadimplência"} />
+        <RcrKpi icon={CheckCircle} label="Receita Recebida"       value={fmtR$(totalRecebido)}  cor="green" trend={tendencia}   onClick={() => setFiltroStatus(f => f === "pago"     ? "todos" : "pago")}     active={filtroStatus === "pago"} />
+        <RcrKpi icon={Clock}       label="Pendente a Receber"     value={fmtR$(totalPendente)}  cor="gold"  sub={`${pendentes.length} cobranças`}                                    onClick={() => setFiltroStatus(f => f === "pendente" ? "todos" : "pendente")} active={filtroStatus === "pendente"} />
+        <RcrKpi icon={AlertCircle} label="Vencido / Inadimplente" value={fmtR$(totalVencido)}   cor="red"   sub={fmtPct(txInadimplencia) + " inadimplência"}                         onClick={() => setFiltroStatus(f => f === "vencido"  ? "todos" : "vencido")}  active={filtroStatus === "vencido"} />
         <RcrKpi icon={Calendar}    label="Previsão 30 dias"       value={fmtR$(totalFluxo30)}   cor="blue"  sub={`${fluxoFuturo.length} cobranças futuras`} />
       </div>
 
@@ -5153,6 +5122,48 @@ function RelatorioContasReceber({ aReceber = [], intervalo }) {
           </div>
         </>
       )}
+
+      {/* ── Tabela detalhada ── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="rcr-section-title"><Receipt size={15} />Detalhamento</div>
+        <button className="btn-secondary" style={{ fontSize: 12, padding: "6px 14px" }} onClick={handleExport}><Download size={13} />Exportar Excel</button>
+      </div>
+      <div className="rcr-table-wrap">
+        <div className="rcr-table-header"><span className="rcr-table-title">Contas a Receber</span><span className="rcr-table-badge">{tabelaItens.length} registros</span></div>
+        <div className="rcr-row rcr-row-head" style={{ gridTemplateColumns: "95px 1fr 1fr 120px 120px 100px" }}>
+          <SortTh label="Vencimento" sortKey="dataVencimento" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Vencimento</SortTh>
+          <SortTh label="Cliente" sortKey="cliente" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Cliente</SortTh>
+          <SortTh label="Descrição" sortKey="descricao" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Descrição</SortTh>
+          <SortTh label="Valor Total" sortKey="valorTotal" currentKey={rctSK} currentDir={rctSD} onSort={rctSort} align="right"><span style={{width:"100%",textAlign:"right"}}>Valor Total</span></SortTh>
+          <SortTh label="Restante" sortKey="valorRestante" currentKey={rctSK} currentDir={rctSD} onSort={rctSort} align="right"><span style={{width:"100%",textAlign:"right"}}>Restante</span></SortTh>
+          <SortTh label="Status" sortKey="_status" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Status</SortTh>
+        </div>
+        {tabelaItens.length === 0
+          ? <div className="rcr-empty" style={{ padding: 40 }}><Receipt size={24} opacity={0.3} /><p>Nenhuma conta com os filtros selecionados.</p></div>
+          : [...tabelaItens].sort((a,b)=>{
+              const va=a[rctSK],vb=b[rctSK];
+              if(rctSK==="dataVencimento"){ const da=new Date(a.dataVencimento),db=new Date(b.dataVencimento); return rctSD==="asc"?da-db:db-da; }
+              if(rctSK==="valorTotal"||rctSK==="valorRestante"){ const na=Number(a[rctSK]||0),nb=Number(b[rctSK]||0); return rctSD==="asc"?na-nb:nb-na; }
+              const sa=String(va??"").toLowerCase(),sb=String(vb??"").toLowerCase();
+              return rctSD==="asc"?sa.localeCompare(sb,"pt-BR"):sb.localeCompare(sa,"pt-BR");
+            }).map((item, i) => {
+              const d = parseDateISO(item.dataVencimento);
+              const dFmt = d ? d.split("-").reverse().join("/") : "—";
+              const vTotal    = Number(item.valorTotal || item.valor || 0);
+              const vRestante = Number(item.valorRestante ?? vTotal);
+              return (
+                <div key={item.id || i} className="rcr-row" style={{ gridTemplateColumns: "95px 1fr 1fr 120px 120px 100px", background: d === hoje ? "rgba(200,165,94,0.04)" : undefined }}>
+                  <span style={{ color: item._status === "vencido" ? "var(--red)" : "var(--text-2)" }}>{dFmt}</span>
+                  <span style={{ color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.cliente || item.nomeCliente || "—"}</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.descricao || "—"}</span>
+                  <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: "var(--text)" }}>{fmtR$(vTotal)}</span>
+                  <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: item._status === "pago" ? "var(--green)" : item._status === "vencido" ? "var(--red)" : "var(--gold)" }}>{fmtR$(vRestante)}</span>
+                  <span><span className={`rcr-badge ${item._status}`}>{item._status}</span></span>
+                </div>
+              );
+            })
+        }
+      </div>
 
     </div>
   );
