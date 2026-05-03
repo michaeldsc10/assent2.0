@@ -1248,6 +1248,85 @@ function exportarExcel(nomeRelatorio, sheets) {
 /* ══════════════════════════════════════════════════════
    RELATÓRIO: DRE
    ══════════════════════════════════════════════════════ */
+
+/* ══════════════════════════════════════════════════════
+   HOOK & COMPONENTE: ordenação de tabelas
+   ══════════════════════════════════════════════════════ */
+function useSort(data, defaultKey = null, defaultDir = "desc") {
+  const [sortKey, setSortKey] = useState(defaultKey);
+  const [sortDir, setSortDir] = useState(defaultDir);
+
+  const handleSort = useCallback((key) => {
+    if (sortKey === key) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  }, [sortKey]);
+
+  const sorted = useMemo(() => {
+    if (!sortKey || !data?.length) return data || [];
+    return [...data].sort((a, b) => {
+      const va = a[sortKey];
+      const vb = b[sortKey];
+      // Detecta data
+      const tryDate = (v) => {
+        if (!v) return null;
+        const s = String(v);
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) return new Date(s);
+        if (/^\d{2}\/\d{2}\/\d{4}/.test(s)) {
+          const [d, m, y] = s.split("/");
+          return new Date(`${y}-${m}-${d}`);
+        }
+        return null;
+      };
+      const da = tryDate(va), db = tryDate(vb);
+      if (da && db) return sortDir === "asc" ? da - db : db - da;
+      // Numero
+      const na = parseFloat(String(va ?? "").replace(/[^\d.,-]/g, "").replace(",", "."));
+      const nb = parseFloat(String(vb ?? "").replace(/[^\d.,-]/g, "").replace(",", "."));
+      if (!isNaN(na) && !isNaN(nb)) return sortDir === "asc" ? na - nb : nb - na;
+      // String
+      const sa = String(va ?? "").toLowerCase();
+      const sb = String(vb ?? "").toLowerCase();
+      return sortDir === "asc" ? sa.localeCompare(sb, "pt-BR") : sb.localeCompare(sa, "pt-BR");
+    });
+  }, [data, sortKey, sortDir]);
+
+  return { sorted, sortKey, sortDir, handleSort };
+}
+
+function SortTh({ label, sortKey: sk, currentKey, currentDir, onSort, align = "left", children }) {
+  const active = currentKey === sk;
+  return (
+    <span
+      onClick={() => onSort(sk)}
+      style={{
+        cursor: "pointer", userSelect: "none",
+        display: "inline-flex", alignItems: "center", gap: 4,
+        justifyContent: align === "right" ? "flex-end" : "flex-start",
+        color: active ? "var(--gold)" : "inherit",
+        transition: "color .15s",
+      }}
+      title={`Ordenar por ${label}`}
+    >
+      {children || label}
+      <span style={{
+        display: "inline-flex", flexDirection: "column",
+        gap: 1.5, opacity: active ? 1 : 0.3, lineHeight: 1, flexShrink: 0,
+      }}>
+        <svg width="6" height="4" viewBox="0 0 6 4" fill="none">
+          <path d="M3 0L6 4H0L3 0Z" fill={active && currentDir === "asc" ? "var(--gold)" : "currentColor"} />
+        </svg>
+        <svg width="6" height="4" viewBox="0 0 6 4" fill="none">
+          <path d="M3 4L0 0H6L3 4Z" fill={active && currentDir === "desc" ? "var(--gold)" : "currentColor"} />
+        </svg>
+      </span>
+    </span>
+  );
+}
+
 function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], intervalo, uid }) {
   /* Estado para guardar taxas do Firestore (config/geral) — usadas só como fallback */
   const [configTaxas, setConfigTaxas] = useState(null);
@@ -1723,6 +1802,7 @@ function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], in
     if (!filtroTipo) return dados.transacoes;
     return dados.transacoes.filter((t) => t.tipo === filtroTipo);
   }, [dados.transacoes, filtroTipo]);
+  const { sorted: finOrdenado, sortKey: finSK, sortDir: finSD, handleSort: finSort } = useSort(transacoesFiltradas, 'data', 'desc');
 
   const handleExport = () => {
     exportarExcel("financeiro", [{
@@ -1801,7 +1881,7 @@ function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], in
             <strong style={{ color: filtroTipo === "entrada" ? "var(--green)" : "var(--red)" }}>
               {filtroTipo === "entrada" ? "Entradas" : "Saídas / Despesas"}
             </strong>
-            {" "}· {transacoesFiltradas.length} registro{transacoesFiltradas.length !== 1 ? "s" : ""}
+            {" "}· {finOrdenado.length} registro{finOrdenado.length !== 1 ? "s" : ""}
           </span>
           <button
             className="btn-secondary"
@@ -1817,7 +1897,7 @@ function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], in
       <div className="ext-wrap">
         <div className="ext-header">
           <span className="ext-title">Extrato Financeiro</span>
-          <span className="ext-badge">{transacoesFiltradas.length}</span>
+          <span className="ext-badge">{finOrdenado.length}</span>
         </div>
 
         {transacoesFiltradas.length === 0 ? (
@@ -1826,15 +1906,15 @@ function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], in
           <>
             {/* Cabeçalho */}
             <div className="ext-row ext-row-head">
-              <span>Data</span>
-              <span>Descrição</span>
+              <SortTh label="Data" sortKey="data" currentKey={finSK} currentDir={finSD} onSort={finSort}>Data</SortTh>
+              <SortTh label="Descrição" sortKey="descricao" currentKey={finSK} currentDir={finSD} onSort={finSort}>Descrição</SortTh>
               <span className="ext-col-entrada" style={{ textAlign: "right" }}>Entrada</span>
               <span className="ext-col-saida"   style={{ textAlign: "right" }}>Saída</span>
               <span style={{ textAlign: "right" }}>Saldo</span>
             </div>
 
             {/* Linhas */}
-            {transacoesFiltradas.map((t) => (
+            {finOrdenado.map((t) => (
               <div key={t._id} className="ext-row ext-row-body">
                 {/* Data */}
                 <div className="ext-cell">
@@ -3898,8 +3978,11 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
             </div>
             {/* Cabeçalho — oculto no mobile */}
             <div className="rel-inline-table-head" style={{ display: "grid", gridTemplateColumns: "72px 1.4fr 120px 120px 110px 110px 110px", padding: "10px 18px", gap: 8, background: "var(--s2)", borderBottom: "1px solid var(--border)", fontSize: 10, fontWeight: 600, letterSpacing: ".07em", textTransform: "uppercase", color: "var(--text-3)" }}>
-              <span>ID</span><span>Nome</span><span>Documento</span>
-              <span>Mensalidade</span><span>Prox. Venc.</span>
+              <SortTh label="ID" sortKey="docId" currentKey={alnSK} currentDir={alnSD} onSort={alnSort}>ID</SortTh>
+              <SortTh label="Nome" sortKey="nome" currentKey={alnSK} currentDir={alnSD} onSort={alnSort}>Nome</SortTh>
+              <span>Documento</span>
+              <SortTh label="Mensalidade" sortKey="mensalidade" currentKey={alnSK} currentDir={alnSD} onSort={alnSort}>Mensalidade</SortTh>
+              <SortTh label="Prox. Venc." sortKey="proxVenc" currentKey={alnSK} currentDir={alnSD} onSort={alnSort}>Prox. Venc.</SortTh>
               <span>Aberto</span><span>Situação</span>
             </div>
             {/* Linhas */}
@@ -3909,7 +3992,16 @@ function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
                   ? "Nenhum aluno matriculado."
                   : `Nenhum aluno com situação "${filtroSit}".`}
               </div>
-            ) : linhasFiltradas.map((l, i) => (
+            ) : [...linhasFiltradas].sort((a,b)=>{
+                const va=a[alnSK],vb=b[alnSK];
+                const tryD=(v)=>{if(!v)return null;const s=String(v);if(/^\d{4}-\d{2}-\d{2}/.test(s))return new Date(s);if(/^\d{2}\/\d{2}\/\d{4}/.test(s)){const[d,m,y]=s.split("/");return new Date(`${y}-${m}-${d}`);}return null;};
+                const da=tryD(va),db=tryD(vb);
+                if(da&&db)return alnSD==="asc"?da-db:db-da;
+                const na=parseFloat(String(va??"").replace(/[^\d.,-]/g,"").replace(",",".")),nb=parseFloat(String(vb??"").replace(/[^\d.,-]/g,"").replace(",","."));
+                if(!isNaN(na)&&!isNaN(nb))return alnSD==="asc"?na-nb:nb-na;
+                const sa=String(va??"").toLowerCase(),sb=String(vb??"").toLowerCase();
+                return alnSD==="asc"?sa.localeCompare(sb,"pt-BR"):sb.localeCompare(sa,"pt-BR");
+              }).map((l, i) => (
               <div key={l.docId || i} className="rel-inline-table-row" style={{ display: "grid", gridTemplateColumns: "72px 1.4fr 120px 120px 110px 110px 110px", padding: "11px 18px", gap: 8, borderBottom: i < linhasFiltradas.length - 1 ? "1px solid var(--border)" : "none", alignItems: "center", fontSize: 12, color: "var(--text-2)", transition: "background .13s" }}
                 onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.02)"}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
@@ -4422,6 +4514,9 @@ function RcrInsight({ tipo, texto }) {
    ══════════════════════════════════════════════════════ */
 function RelatorioCompras({ compras = [], fornecedores = [], intervalo }) {
   const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [cmpSK, setCmpSK] = useState("data");
+  const [cmpSD, setCmpSD] = useState("desc");
+  const cmpSort = (k) => { if(cmpSK===k){ setCmpSD(d=>d==="asc"?"desc":"asc"); } else { setCmpSK(k); setCmpSD("asc"); } };
   const [filtroPag,    setFiltroPag]    = useState("todos");
 
   /* ── Mapa de fornecedores para lookup O(1) ── */
@@ -4715,11 +4810,22 @@ function RelatorioCompras({ compras = [], fornecedores = [], intervalo }) {
       <div className="rcr-table-wrap">
         <div className="rcr-table-header"><span className="rcr-table-title">Registro de Compras</span><span className="rcr-table-badge">{tabelaItens.length} registros</span></div>
         <div className="rcr-row rcr-row-head" style={{ gridTemplateColumns: "90px 1fr 1fr 120px 140px 100px" }}>
-          <span>Data</span><span>Fornecedor</span><span>Itens</span><span style={{ textAlign: "right" }}>Valor</span><span>Pagamento</span><span>Status</span>
+          <SortTh label="Data" sortKey="data" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort}>Data</SortTh>
+          <SortTh label="Fornecedor" sortKey="_nomeSort" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort}>Fornecedor</SortTh>
+          <span>Itens</span>
+          <SortTh label="Valor" sortKey="valorTotal" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort} align="right"><span style={{width:"100%",textAlign:"right"}}>Valor</span></SortTh>
+          <span>Pagamento</span>
+          <SortTh label="Status" sortKey="status" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort}>Status</SortTh>
         </div>
         {tabelaItens.length === 0
           ? <div className="rcr-empty" style={{ padding: 40 }}><ShoppingCart size={24} opacity={0.3} /><p>Nenhuma compra com os filtros selecionados.</p></div>
-          : tabelaItens.map((c) => {
+          : [...tabelaItens].map(c=>({...c, _nomeSort: getNome(c)})).sort((a,b)=>{
+              const va=a[cmpSK],vb=b[cmpSK];
+              if(cmpSK==="data"){ const da=new Date(a.data),db=new Date(b.data); return cmpSD==="asc"?da-db:db-da; }
+              if(cmpSK==="valorTotal"){ const na=Number(a.valorTotal||0),nb=Number(b.valorTotal||0); return cmpSD==="asc"?na-nb:nb-na; }
+              const sa=String(va??"").toLowerCase(),sb=String(vb??"").toLowerCase();
+              return cmpSD==="asc"?sa.localeCompare(sb,"pt-BR"):sb.localeCompare(sa,"pt-BR");
+            }).map((c) => {
               const d = parseDateISO(c.data);
               return (
                 <div key={c.id} className="rcr-row" style={{ gridTemplateColumns: "90px 1fr 1fr 120px 140px 100px" }}>
@@ -4743,6 +4849,9 @@ function RelatorioCompras({ compras = [], fornecedores = [], intervalo }) {
    ══════════════════════════════════════════════════════ */
 function RelatorioContasReceber({ aReceber = [], intervalo }) {
   const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [rctSK, setRctSK] = useState("dataVencimento");
+  const [rctSD, setRctSD] = useState("asc");
+  const rctSort = (k) => { if(rctSK===k){ setRctSD(d=>d==="asc"?"desc":"asc"); } else { setRctSK(k); setRctSD("asc"); } };
   const hoje = hojeISO_rcr();
 
   const calcStatusRcr = useCallback((item) => {
@@ -5007,11 +5116,22 @@ function RelatorioContasReceber({ aReceber = [], intervalo }) {
       <div className="rcr-table-wrap">
         <div className="rcr-table-header"><span className="rcr-table-title">Contas a Receber</span><span className="rcr-table-badge">{tabelaItens.length} registros</span></div>
         <div className="rcr-row rcr-row-head" style={{ gridTemplateColumns: "95px 1fr 1fr 120px 120px 100px" }}>
-          <span>Vencimento</span><span>Cliente</span><span>Descrição</span><span style={{ textAlign: "right" }}>Valor Total</span><span style={{ textAlign: "right" }}>Restante</span><span>Status</span>
+          <SortTh label="Vencimento" sortKey="dataVencimento" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Vencimento</SortTh>
+          <SortTh label="Cliente" sortKey="cliente" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Cliente</SortTh>
+          <SortTh label="Descrição" sortKey="descricao" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Descrição</SortTh>
+          <SortTh label="Valor Total" sortKey="valorTotal" currentKey={rctSK} currentDir={rctSD} onSort={rctSort} align="right"><span style={{width:"100%",textAlign:"right"}}>Valor Total</span></SortTh>
+          <SortTh label="Restante" sortKey="valorRestante" currentKey={rctSK} currentDir={rctSD} onSort={rctSort} align="right"><span style={{width:"100%",textAlign:"right"}}>Restante</span></SortTh>
+          <SortTh label="Status" sortKey="_status" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Status</SortTh>
         </div>
         {tabelaItens.length === 0
           ? <div className="rcr-empty" style={{ padding: 40 }}><Receipt size={24} opacity={0.3} /><p>Nenhuma conta com os filtros selecionados.</p></div>
-          : tabelaItens.map((item, i) => {
+          : [...tabelaItens].sort((a,b)=>{
+              const va=a[rctSK],vb=b[rctSK];
+              if(rctSK==="dataVencimento"){ const da=new Date(a.dataVencimento),db=new Date(b.dataVencimento); return rctSD==="asc"?da-db:db-da; }
+              if(rctSK==="valorTotal"||rctSK==="valorRestante"){ const na=Number(a[rctSK]||0),nb=Number(b[rctSK]||0); return rctSD==="asc"?na-nb:nb-na; }
+              const sa=String(va??"").toLowerCase(),sb=String(vb??"").toLowerCase();
+              return rctSD==="asc"?sa.localeCompare(sb,"pt-BR"):sb.localeCompare(sa,"pt-BR");
+            }).map((item, i) => {
               const d = parseDateISO(item.dataVencimento);
               const dFmt = d ? d.split("-").reverse().join("/") : "—";
               const vTotal   = Number(item.valorTotal || item.valor || 0);
@@ -5094,6 +5214,12 @@ const TITULO_RELATORIO = {
    ══════════════════════════════════════════════════════ */
 function RelatorioVendedores({ vendas, vendedores, intervalo }) {
   const [vendedorSel, setVendedorSel] = useState("todos");
+  const [vndSK, setVndSK] = useState("faturamento");
+  const [vndSD, setVndSD] = useState("desc");
+  const vndSort = (k) => { if(vndSK===k){ setVndSD(d=>d==="asc"?"desc":"asc"); } else { setVndSK(k); setVndSD("asc"); } };
+  const [txSK, setTxSK] = useState("data");
+  const [txSD, setTxSD] = useState("desc");
+  const txSort = (k) => { if(txSK===k){ setTxSD(d=>d==="asc"?"desc":"asc"); } else { setTxSK(k); setTxSD("asc"); } };
   const [vendedorDropOpen, setVendedorDropOpen] = useState(false);
   const vendedorDropRef = useRef(null);
 
@@ -5475,15 +5601,15 @@ function RelatorioVendedores({ vendas, vendedores, intervalo }) {
                 display: "grid", padding: "9px 18px", gap: 8,
               }}>
                 <span>Pos.</span>
-                <span>Vendedor</span>
+                <SortTh label="Vendedor" sortKey="nome" currentKey={vndSK} currentDir={vndSD} onSort={vndSort}>Vendedor</SortTh>
                 <span style={{ textAlign: "right" }}>Vendas</span>
-                <span style={{ textAlign: "right" }}>Faturamento</span>
-                <span style={{ textAlign: "right" }}>Lucro Gerado</span>
+                <SortTh label="Faturamento" sortKey="faturamento" currentKey={vndSK} currentDir={vndSD} onSort={vndSort} align="right"><span style={{display:"block",textAlign:"right",width:"100%"}}>Faturamento</span></SortTh>
+                <SortTh label="Lucro" sortKey="lucro" currentKey={vndSK} currentDir={vndSD} onSort={vndSort} align="right"><span style={{display:"block",textAlign:"right",width:"100%"}}>Lucro Gerado</span></SortTh>
                 <span style={{ textAlign: "right" }}>Com.%</span>
-                <span style={{ textAlign: "right" }}>Comissão R$</span>
+                <SortTh label="Comissão" sortKey="comissao" currentKey={vndSK} currentDir={vndSD} onSort={vndSort} align="right"><span style={{display:"block",textAlign:"right",width:"100%"}}>Comissão R$</span></SortTh>
               </div>
 
-              {ranking.map((r, i) => {
+              {(vndSK ? [...ranking].sort((a,b)=>{ const na=a[vndSK],nb=b[vndSK]; if(typeof na==="string") return vndSD==="asc"?na.localeCompare(nb,"pt-BR"):nb.localeCompare(na,"pt-BR"); return vndSD==="asc"?Number(na)-Number(nb):Number(nb)-Number(na); }) : ranking).map((r, i) => {
                 const barPct = totais.faturamento > 0
                   ? (r.faturamento / totais.faturamento) * 100
                   : 0;
@@ -5660,16 +5786,16 @@ function RelatorioVendedores({ vendas, vendedores, intervalo }) {
                 gridTemplateColumns: "88px 1fr 1fr 110px 110px 110px 110px",
                 display: "grid", padding: "9px 18px", gap: 8,
               }}>
-                <span>Data</span>
-                <span>Cliente</span>
+                <SortTh label="Data" sortKey="data" currentKey={txSK} currentDir={txSD} onSort={txSort}>Data</SortTh>
+                <SortTh label="Cliente" sortKey="cliente" currentKey={txSK} currentDir={txSD} onSort={txSort}>Cliente</SortTh>
                 <span>Produto / Serviço</span>
                 <span>Forma Pgto</span>
-                <span style={{ textAlign: "right" }}>Total</span>
+                <SortTh label="Total" sortKey="total" currentKey={txSK} currentDir={txSD} onSort={txSort} align="right"><span style={{display:"block",textAlign:"right",width:"100%"}}>Total</span></SortTh>
                 <span style={{ textAlign: "right" }}>Lucro</span>
                 <span style={{ textAlign: "right" }}>Comissão</span>
               </div>
 
-              {transacoes.map((v) => {
+              {([...transacoes].sort((a,b)=>{ if(txSK==="data"||!txSK){const da=new Date(a.data),db=new Date(b.data);return txSD==="asc"?da-db:db-da;} if(txSK==="total"){const na=Number(a.total||0),nb=Number(b.total||0);return txSD==="asc"?na-nb:nb-na;} const sa=String(a[txSK]||"").toLowerCase(),sb=String(b[txSK]||"").toLowerCase();return txSD==="asc"?sa.localeCompare(sb,"pt-BR"):sb.localeCompare(sa,"pt-BR"); })).map((v) => {
                 const custo     = Number(v.custoTotal || 0);
                 const lucroBase = v.lucroEstimado != null
                   ? Number(v.lucroEstimado)
@@ -5769,6 +5895,9 @@ function RelatorioVendedores({ vendas, vendedores, intervalo }) {
    Permissão excluir: somente admin
    ══════════════════════════════════════════════════════ */
 function RelatorioPDV({ vendas, intervalo, isAdmin }) {
+  const [pdvSK, setPdvSK] = useState("data");
+  const [pdvSD, setPdvSD] = useState("desc");
+  const pdvSort = (k) => { if(pdvSK===k){ setPdvSD(d=>d==="asc"?"desc":"asc"); } else { setPdvSK(k); setPdvSD("asc"); } };
   const vendasPDV = useMemo(() =>
     vendas.filter((v) =>
       v.origem === "pdv" &&
@@ -5926,17 +6055,14 @@ function RelatorioPDV({ vendas, intervalo, isAdmin }) {
           <span className="tr-badge">{vendasPDV.length}</span>
         </div>
         <div className="tr-head" style={{ gridTemplateColumns: "88px 90px 1fr 1fr 120px 110px", display: "grid", padding: "9px 18px", gap: 8 }}>
-          <span>Data</span>
-          <span>ID</span>
-          <span>Cliente</span>
+          <SortTh label="Data" sortKey="data" currentKey={pdvSK} currentDir={pdvSD} onSort={pdvSort}>Data</SortTh>
+          <SortTh label="ID" sortKey="idVenda" currentKey={pdvSK} currentDir={pdvSD} onSort={pdvSort}>ID</SortTh>
+          <SortTh label="Cliente" sortKey="cliente" currentKey={pdvSK} currentDir={pdvSD} onSort={pdvSort}>Cliente</SortTh>
           <span>Itens</span>
           <span>Pagamento</span>
-          <span style={{ textAlign: "right" }}>Total</span>
+          <SortTh label="Total" sortKey="total" currentKey={pdvSK} currentDir={pdvSD} onSort={pdvSort} align="right"><span style={{display:"block",textAlign:"right",width:"100%"}}>Total</span></SortTh>
         </div>
-        {vendasPDV
-          .slice()
-          .sort((a, b) => new Date(b.data) - new Date(a.data))
-          .map((v) => {
+        {[...vendasPDV].sort((a,b)=>{ if(pdvSK==="data"||!pdvSK){const da=new Date(a.data),db=new Date(b.data);return pdvSD==="asc"?da-db:db-da;} if(pdvSK==="total"){const na=Number(a.total||0),nb=Number(b.total||0);return pdvSD==="asc"?na-nb:nb-na;} const sa=String(a[pdvSK]||"").toLowerCase(),sb=String(b[pdvSK]||"").toLowerCase();return pdvSD==="asc"?sa.localeCompare(sb,"pt-BR"):sb.localeCompare(sa,"pt-BR"); }).map((v) => {
             const descItens = (v.itens || []).map(i => `${i.nome || "?"} x${i.qty || 1}`).join(", ") || "—";
             return (
               <div key={v.id} className="tr-row" style={{ gridTemplateColumns: "88px 90px 1fr 1fr 120px 110px" }}>
