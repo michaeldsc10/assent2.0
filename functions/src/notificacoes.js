@@ -10,6 +10,11 @@ const admin = require('firebase-admin');
 const db = admin.firestore();
 const messaging = admin.messaging();
 
+const TOKEN_INVALIDO = new Set([
+  'messaging/registration-token-not-registered',
+  'messaging/invalid-registration-token',
+]);
+
 exports.enviarNotificacaoReserva = onDocumentCreated(
   {
     document: 'users/{tenantUid}/notificacoes/{notifId}',
@@ -43,76 +48,79 @@ exports.enviarNotificacaoReserva = onDocumentCreated(
         return;
       }
 
-      const { fcmToken } = usuarioSnap.data();
+      const data = usuarioSnap.data();
 
-      if (!fcmToken) {
-        console.warn(`[FCM] Usuário ${destinatarioUid} sem token FCM`);
+      // Suporta array (novo) e string legada (retrocompat)
+      let tokens = [];
+      if (Array.isArray(data.fcmTokens)) {
+        tokens = data.fcmTokens.filter(Boolean);
+      } else if (data.fcmToken) {
+        tokens = [data.fcmToken];
+      }
+
+      if (tokens.length === 0) {
+        console.warn(`[FCM] Usuário ${destinatarioUid} sem tokens FCM`);
         return;
       }
 
-      const message = {
-        notification: {
-          title: notifTitulo,
-          body: notifMensagem,
-        },
+      const mensagemBase = {
+        notification: { title: notifTitulo, body: notifMensagem },
         data: {
           tipo: tipo || 'notificacao',
           assuntoId: assuntoId || '',
           tenantUid,
           timestamp: new Date().toISOString(),
         },
-        token: fcmToken,
         android: {
           priority: 'high',
-          notification: {
-            sound: 'default',
-            defaultSound: true,
-            tag: 'notificacao-assent',
-          },
+          notification: { sound: 'default', defaultSound: true },
         },
         apns: {
-          payload: {
-            aps: {
-              sound: 'default',
-              badge: 1,
-            },
-          },
+          payload: { aps: { sound: 'default', badge: 1 } },
         },
       };
 
-      const messageId = await messaging.send(message);
-      console.log(`[FCM] Push enviado: ${messageId}`);
+      const resultados = await Promise.allSettled(
+        tokens.map((token) => messaging.send({ ...mensagemBase, token }))
+      );
+
+      const tokensInvalidos = [];
+      resultados.forEach((res, i) => {
+        if (res.status === 'fulfilled') {
+          console.log(`[FCM] Push enviado: ${res.value}`);
+        } else {
+          const code = res.reason?.code;
+          console.error(`[FCM] Erro token[${i}]:`, code, res.reason?.message);
+          if (TOKEN_INVALIDO.has(code)) tokensInvalidos.push(tokens[i]);
+        }
+      });
+
+      // Remove tokens inválidos do array
+      if (tokensInvalidos.length > 0) {
+        const tokensValidos = tokens.filter((t) => !tokensInvalidos.includes(t));
+        await db.collection('usuarios').doc(destinatarioUid).update({
+          fcmTokens: tokensValidos,
+        });
+        console.log(`[FCM] ${tokensInvalidos.length} token(s) inválido(s) removido(s)`);
+      }
 
       await db.collection('logs-fcm').doc().set({
-        messageId,
         destinatarioUid,
         notifId: snap.id,
         titulo: notifTitulo,
-        status: 'enviado',
+        totalTokens: tokens.length,
+        tokensInvalidos: tokensInvalidos.length,
+        status: 'processado',
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
     } catch (error) {
-      // Token inválido/expirado → remove para forçar renovação no próximo login
-      if (
-        error.code === 'messaging/registration-token-not-registered' ||
-        error.code === 'messaging/invalid-registration-token'
-      ) {
-        console.warn(`[FCM] Token inválido para ${destinatarioUid} — removendo`);
-        await db.collection('usuarios').doc(destinatarioUid).update({
-          fcmToken: admin.firestore.FieldValue.delete(),
-          fcmTokenAtualizado: admin.firestore.FieldValue.delete(),
-        });
-      } else {
-        console.error('[FCM] Erro ao enviar:', error);
-      }
-
+      console.error('[FCM] Erro geral:', error);
       await db.collection('logs-fcm').doc().set({
         destinatarioUid,
         notifId: snap.id,
         titulo: titulo || 'sem titulo',
         status: 'erro',
         erro: error.message,
-        errorCode: error.code || null,
         timestamp: admin.firestore.FieldValue.serverTimestamp(),
       });
     }
@@ -134,10 +142,10 @@ exports.atualizarTokenFCM = onCall(
     }
 
     try {
-      await db.collection('usuarios').doc(uid).update({
-        fcmToken,
-        fcmTokenAtualizado: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      await db.collection('usuarios').doc(uid).set(
+        { fcmTokens: admin.firestore.FieldValue.arrayUnion(fcmToken) },
+        { merge: true }
+      );
       return { success: true, uid };
     } catch (error) {
       console.error('[FCM] Erro ao atualizar token:', error);
