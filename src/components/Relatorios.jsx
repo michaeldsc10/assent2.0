@@ -4654,6 +4654,45 @@ function RelatorioCompras({ compras = [], fornecedores = [], intervalo }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
 
+      {/* ── Tabela detalhada ── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="rcr-section-title"><Package size={15} />Detalhamento</div>
+        <button className="btn-secondary" style={{ fontSize: 12, padding: "6px 14px" }} onClick={handleExport}><Download size={13} />Exportar Excel</button>
+      </div>
+      <div className="rcr-table-wrap">
+        <div className="rcr-table-header"><span className="rcr-table-title">Registro de Compras</span><span className="rcr-table-badge">{tabelaItens.length} registros</span></div>
+        <div className="rcr-row rcr-row-head" style={{ gridTemplateColumns: "90px 1fr 1fr 120px 140px 100px" }}>
+          <SortTh label="Data" sortKey="data" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort}>Data</SortTh>
+          <SortTh label="Fornecedor" sortKey="_nomeSort" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort}>Fornecedor</SortTh>
+          <span>Itens</span>
+          <SortTh label="Valor" sortKey="valorTotal" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort} align="right"><span style={{width:"100%",textAlign:"right"}}>Valor</span></SortTh>
+          <span>Pagamento</span>
+          <SortTh label="Status" sortKey="status" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort}>Status</SortTh>
+        </div>
+        {tabelaItens.length === 0
+          ? <div className="rcr-empty" style={{ padding: 40 }}><ShoppingCart size={24} opacity={0.3} /><p>Nenhuma compra com os filtros selecionados.</p></div>
+          : [...tabelaItens].map(c=>({...c, _nomeSort: getNome(c)})).sort((a,b)=>{
+              const va=a[cmpSK],vb=b[cmpSK];
+              if(cmpSK==="data"){ const da=new Date(a.data),db=new Date(b.data); return cmpSD==="asc"?da-db:db-da; }
+              if(cmpSK==="valorTotal"){ const na=Number(a.valorTotal||0),nb=Number(b.valorTotal||0); return cmpSD==="asc"?na-nb:nb-na; }
+              const sa=String(va??"").toLowerCase(),sb=String(vb??"").toLowerCase();
+              return cmpSD==="asc"?sa.localeCompare(sb,"pt-BR"):sb.localeCompare(sa,"pt-BR");
+            }).map((c) => {
+              const d = parseDateISO(c.data);
+              return (
+                <div key={c.id} className="rcr-row" style={{ gridTemplateColumns: "90px 1fr 1fr 120px 140px 100px" }}>
+                  <span>{d ? d.split("-").reverse().join("/") : "—"}</span>
+                  <span style={{ color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getNome(c)}</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getDesc(c)}</span>
+                  <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: c.status === "cancelado" ? "var(--text-3)" : "var(--text)" }}>{fmtR$(Number(c.valorTotal || 0))}</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getMetodo(c)}</span>
+                  <span><span className={`rcr-badge ${c.status || "pendente"}`}>{c.status || "pendente"}</span></span>
+                </div>
+              );
+            })
+        }
+      </div>
+
       {/* ── Filtros ── */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -4805,44 +4844,6 @@ function RelatorioCompras({ compras = [], fornecedores = [], intervalo }) {
         </>
       )}
 
-      {/* ── Tabela detalhada ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div className="rcr-section-title"><Package size={15} />Detalhamento</div>
-        <button className="btn-secondary" style={{ fontSize: 12, padding: "6px 14px" }} onClick={handleExport}><Download size={13} />Exportar Excel</button>
-      </div>
-      <div className="rcr-table-wrap">
-        <div className="rcr-table-header"><span className="rcr-table-title">Registro de Compras</span><span className="rcr-table-badge">{tabelaItens.length} registros</span></div>
-        <div className="rcr-row rcr-row-head" style={{ gridTemplateColumns: "90px 1fr 1fr 120px 140px 100px" }}>
-          <SortTh label="Data" sortKey="data" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort}>Data</SortTh>
-          <SortTh label="Fornecedor" sortKey="_nomeSort" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort}>Fornecedor</SortTh>
-          <span>Itens</span>
-          <SortTh label="Valor" sortKey="valorTotal" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort} align="right"><span style={{width:"100%",textAlign:"right"}}>Valor</span></SortTh>
-          <span>Pagamento</span>
-          <SortTh label="Status" sortKey="status" currentKey={cmpSK} currentDir={cmpSD} onSort={cmpSort}>Status</SortTh>
-        </div>
-        {tabelaItens.length === 0
-          ? <div className="rcr-empty" style={{ padding: 40 }}><ShoppingCart size={24} opacity={0.3} /><p>Nenhuma compra com os filtros selecionados.</p></div>
-          : [...tabelaItens].map(c=>({...c, _nomeSort: getNome(c)})).sort((a,b)=>{
-              const va=a[cmpSK],vb=b[cmpSK];
-              if(cmpSK==="data"){ const da=new Date(a.data),db=new Date(b.data); return cmpSD==="asc"?da-db:db-da; }
-              if(cmpSK==="valorTotal"){ const na=Number(a.valorTotal||0),nb=Number(b.valorTotal||0); return cmpSD==="asc"?na-nb:nb-na; }
-              const sa=String(va??"").toLowerCase(),sb=String(vb??"").toLowerCase();
-              return cmpSD==="asc"?sa.localeCompare(sb,"pt-BR"):sb.localeCompare(sa,"pt-BR");
-            }).map((c) => {
-              const d = parseDateISO(c.data);
-              return (
-                <div key={c.id} className="rcr-row" style={{ gridTemplateColumns: "90px 1fr 1fr 120px 140px 100px" }}>
-                  <span>{d ? d.split("-").reverse().join("/") : "—"}</span>
-                  <span style={{ color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getNome(c)}</span>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getDesc(c)}</span>
-                  <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: c.status === "cancelado" ? "var(--text-3)" : "var(--text)" }}>{fmtR$(Number(c.valorTotal || 0))}</span>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{getMetodo(c)}</span>
-                  <span><span className={`rcr-badge ${c.status || "pendente"}`}>{c.status || "pendente"}</span></span>
-                </div>
-              );
-            })
-        }
-      </div>
     </div>
   );
 }
@@ -4978,6 +4979,48 @@ function RelatorioContasReceber({ aReceber = [], intervalo }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
 
+      {/* ── Tabela detalhada ── */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div className="rcr-section-title"><Receipt size={15} />Detalhamento</div>
+        <button className="btn-secondary" style={{ fontSize: 12, padding: "6px 14px" }} onClick={handleExport}><Download size={13} />Exportar Excel</button>
+      </div>
+      <div className="rcr-table-wrap">
+        <div className="rcr-table-header"><span className="rcr-table-title">Contas a Receber</span><span className="rcr-table-badge">{tabelaItens.length} registros</span></div>
+        <div className="rcr-row rcr-row-head" style={{ gridTemplateColumns: "95px 1fr 1fr 120px 120px 100px" }}>
+          <SortTh label="Vencimento" sortKey="dataVencimento" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Vencimento</SortTh>
+          <SortTh label="Cliente" sortKey="cliente" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Cliente</SortTh>
+          <SortTh label="Descrição" sortKey="descricao" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Descrição</SortTh>
+          <SortTh label="Valor Total" sortKey="valorTotal" currentKey={rctSK} currentDir={rctSD} onSort={rctSort} align="right"><span style={{width:"100%",textAlign:"right"}}>Valor Total</span></SortTh>
+          <SortTh label="Restante" sortKey="valorRestante" currentKey={rctSK} currentDir={rctSD} onSort={rctSort} align="right"><span style={{width:"100%",textAlign:"right"}}>Restante</span></SortTh>
+          <SortTh label="Status" sortKey="_status" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Status</SortTh>
+        </div>
+        {tabelaItens.length === 0
+          ? <div className="rcr-empty" style={{ padding: 40 }}><Receipt size={24} opacity={0.3} /><p>Nenhuma conta com os filtros selecionados.</p></div>
+          : [...tabelaItens].sort((a,b)=>{
+              const va=a[rctSK],vb=b[rctSK];
+              if(rctSK==="dataVencimento"){ const da=new Date(a.dataVencimento),db=new Date(b.dataVencimento); return rctSD==="asc"?da-db:db-da; }
+              if(rctSK==="valorTotal"||rctSK==="valorRestante"){ const na=Number(a[rctSK]||0),nb=Number(b[rctSK]||0); return rctSD==="asc"?na-nb:nb-na; }
+              const sa=String(va??"").toLowerCase(),sb=String(vb??"").toLowerCase();
+              return rctSD==="asc"?sa.localeCompare(sb,"pt-BR"):sb.localeCompare(sa,"pt-BR");
+            }).map((item, i) => {
+              const d = parseDateISO(item.dataVencimento);
+              const dFmt = d ? d.split("-").reverse().join("/") : "—";
+              const vTotal   = Number(item.valorTotal || item.valor || 0);
+              const vRestante= Number(item.valorRestante ?? vTotal);
+              return (
+                <div key={item.id || i} className="rcr-row" style={{ gridTemplateColumns: "95px 1fr 1fr 120px 120px 100px", background: d === hoje ? "rgba(200,165,94,0.04)" : undefined }}>
+                  <span style={{ color: item._status === "vencido" ? "var(--red)" : "var(--text-2)" }}>{dFmt}</span>
+                  <span style={{ color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.cliente || item.nomeCliente || "—"}</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.descricao || "—"}</span>
+                  <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: "var(--text)" }}>{fmtR$(vTotal)}</span>
+                  <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: item._status === "pago" ? "var(--green)" : item._status === "vencido" ? "var(--red)" : "var(--gold)" }}>{fmtR$(vRestante)}</span>
+                  <span><span className={`rcr-badge ${item._status}`}>{item._status}</span></span>
+                </div>
+              );
+            })
+        }
+      </div>
+
       {/* ── Filtros ── */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <span className="rcr-filter-label">Status</span>
@@ -5111,47 +5154,6 @@ function RelatorioContasReceber({ aReceber = [], intervalo }) {
         </>
       )}
 
-      {/* ── Tabela detalhada ── */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <div className="rcr-section-title"><Receipt size={15} />Detalhamento</div>
-        <button className="btn-secondary" style={{ fontSize: 12, padding: "6px 14px" }} onClick={handleExport}><Download size={13} />Exportar Excel</button>
-      </div>
-      <div className="rcr-table-wrap">
-        <div className="rcr-table-header"><span className="rcr-table-title">Contas a Receber</span><span className="rcr-table-badge">{tabelaItens.length} registros</span></div>
-        <div className="rcr-row rcr-row-head" style={{ gridTemplateColumns: "95px 1fr 1fr 120px 120px 100px" }}>
-          <SortTh label="Vencimento" sortKey="dataVencimento" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Vencimento</SortTh>
-          <SortTh label="Cliente" sortKey="cliente" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Cliente</SortTh>
-          <SortTh label="Descrição" sortKey="descricao" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Descrição</SortTh>
-          <SortTh label="Valor Total" sortKey="valorTotal" currentKey={rctSK} currentDir={rctSD} onSort={rctSort} align="right"><span style={{width:"100%",textAlign:"right"}}>Valor Total</span></SortTh>
-          <SortTh label="Restante" sortKey="valorRestante" currentKey={rctSK} currentDir={rctSD} onSort={rctSort} align="right"><span style={{width:"100%",textAlign:"right"}}>Restante</span></SortTh>
-          <SortTh label="Status" sortKey="_status" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Status</SortTh>
-        </div>
-        {tabelaItens.length === 0
-          ? <div className="rcr-empty" style={{ padding: 40 }}><Receipt size={24} opacity={0.3} /><p>Nenhuma conta com os filtros selecionados.</p></div>
-          : [...tabelaItens].sort((a,b)=>{
-              const va=a[rctSK],vb=b[rctSK];
-              if(rctSK==="dataVencimento"){ const da=new Date(a.dataVencimento),db=new Date(b.dataVencimento); return rctSD==="asc"?da-db:db-da; }
-              if(rctSK==="valorTotal"||rctSK==="valorRestante"){ const na=Number(a[rctSK]||0),nb=Number(b[rctSK]||0); return rctSD==="asc"?na-nb:nb-na; }
-              const sa=String(va??"").toLowerCase(),sb=String(vb??"").toLowerCase();
-              return rctSD==="asc"?sa.localeCompare(sb,"pt-BR"):sb.localeCompare(sa,"pt-BR");
-            }).map((item, i) => {
-              const d = parseDateISO(item.dataVencimento);
-              const dFmt = d ? d.split("-").reverse().join("/") : "—";
-              const vTotal   = Number(item.valorTotal || item.valor || 0);
-              const vRestante= Number(item.valorRestante ?? vTotal);
-              return (
-                <div key={item.id || i} className="rcr-row" style={{ gridTemplateColumns: "95px 1fr 1fr 120px 120px 100px", background: d === hoje ? "rgba(200,165,94,0.04)" : undefined }}>
-                  <span style={{ color: item._status === "vencido" ? "var(--red)" : "var(--text-2)" }}>{dFmt}</span>
-                  <span style={{ color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.cliente || item.nomeCliente || "—"}</span>
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.descricao || "—"}</span>
-                  <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: "var(--text)" }}>{fmtR$(vTotal)}</span>
-                  <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: item._status === "pago" ? "var(--green)" : item._status === "vencido" ? "var(--red)" : "var(--gold)" }}>{fmtR$(vRestante)}</span>
-                  <span><span className={`rcr-badge ${item._status}`}>{item._status}</span></span>
-                </div>
-              );
-            })
-        }
-      </div>
     </div>
   );
 }
