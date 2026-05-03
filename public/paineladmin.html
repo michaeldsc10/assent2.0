@@ -3313,9 +3313,9 @@ async function loadAnuncios() {
       return;
     }
 
-    const destLabel = { todos:'📢 Todos', pro:'⭐ PRO', free:'👤 Free' };
+    const destLabel = { todos:'📢 Todos', profissional:'★ Profissional', essencial:'📦 Essencial', trial:'⏳ Trial', pro:'⭐ PRO', free:'👤 Free' };
     function resolveAnuncioDest(d) {
-      if (d.destinatario !== 'individual') return destLabel[d.destinatario] || 'Todos';
+      if (d.destinatario !== 'individual') return destLabel[d.destinatario] || d.destinatario || 'Todos';
       return `👤 ${d.destinatarioNome || d.destinatarioEmail || d.uid || '?'}`;
     }
     container.innerHTML = snap.docs.map(doc => {
