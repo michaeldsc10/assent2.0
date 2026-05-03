@@ -3122,12 +3122,12 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                       color: sistemaAtivo === "flow" ? "var(--gold)" : "var(--text-2)",
                     }}
                   >
-                    <div style={{
-                      width: 20, height: 20, borderRadius: 5, flexShrink: 0,
-                      background: "rgba(200,165,94,0.12)", border: "1px solid rgba(200,165,94,0.25)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 11, color: "var(--gold)",
-                    }}>◷</div>
+                    <img
+                      src="/flow.png"
+                      alt="Assent Flow"
+                      style={{ width: 20, height: 20, borderRadius: 5, objectFit: "cover", flexShrink: 0 }}
+                      onError={(e) => { e.target.style.display = "none"; }}
+                    />
                     <span style={{ flex: 1 }}>Assent Flow</span>
                     {sistemaAtivo === "flow" ? (
                       <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />
