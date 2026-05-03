@@ -1876,10 +1876,10 @@ function getFlowCSS(T) { return `
 `; }
 
 // ─── Componente Principal ─────────────────────────────────────────────────────
-export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
+export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,initialTab,onTabChange}){
   // HOOKS PRIMEIRO
   const {isAdmin,podeVer,podeEditar,user} = useAuth();
-  const [tela,setTela]           = useState("overview");
+  const [tela,setTela]           = useState(initialTab || "overview");
   const [prestadores,setPrestadores] = useState([]);
   const [loadingP,setLoadingP]   = useState(true);
   const [prestadorFoco,setPrestadorFoco] = useState(null);
@@ -1954,7 +1954,7 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar}){
   },[tenantUid]);
 
   // Fechar sidebar ao navegar
-  const irPara=(key)=>{ setTela(key); setSidebarOpen(false); };
+  const irPara=(key)=>{ setTela(key); setSidebarOpen(false); onTabChange?.(key); };
   const irParaConfiguracoes=(pid)=>{ setPrestadorFoco(pid); irPara("configuracoes"); };
 
   // Guards
