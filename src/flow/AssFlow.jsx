@@ -15,7 +15,7 @@ import { useAuth } from "../contexts/AuthContext.jsx";
 import {
   getFirestore, collection, doc, onSnapshot,
   setDoc, updateDoc, deleteDoc, getDoc, addDoc,
-  serverTimestamp, query, orderBy, where,
+  serverTimestamp, query, orderBy, where, writeBatch,
 } from "firebase/firestore";
 
 const db = getFirestore();
@@ -960,7 +960,19 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
     if(!podeEditar) return;
     setAtualizando(id);
     try {
-      await updateDoc(doc(db,"users",tenantUid,"agendamento_reservas",id),{status:novoStatus,atualizadoEm:serverTimestamp()});
+      const reservaRef=doc(db,"users",tenantUid,"agendamento_reservas",id);
+      const batch=writeBatch(db);
+      batch.update(reservaRef,{status:novoStatus,atualizadoEm:serverTimestamp()});
+
+      if(novoStatus==="cancelado"){
+        const snap=await getDoc(reservaRef);
+        const slotKey=snap.exists()?snap.data().slotKey:null;
+        if(slotKey){
+          batch.delete(doc(db,"users",tenantUid,"agendamento_slots",slotKey));
+        }
+      }
+
+      await batch.commit();
       showT(novoStatus==="confirmado"?"Confirmada!":novoStatus==="cancelado"?"Cancelada.":"Reaberta.",novoStatus==="confirmado"?"success":"error");
     } catch { showT("Erro.","error"); }
     setAtualizando(null);
