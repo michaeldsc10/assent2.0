@@ -3392,12 +3392,12 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 )}
               </div>
             ) : anuncioModal.imageUrl ? (
-              <div style={{ width: "100%", maxHeight: 220, overflow: "hidden", background: "var(--s2)" }}>
+              <div style={{ width: "100%", height: 220, overflow: "hidden", background: "var(--s2)" }}>
                 <img
                   src={anuncioModal.imageUrl}
                   alt=""
                   style={{
-                    width: "100%", height: "100%", objectFit: "cover", display: "block", maxHeight: 220,
+                    width: "100%", height: "100%", objectFit: "cover", display: "block",
                     objectPosition: `${anuncioModal.imgPosX ?? 50}% ${anuncioModal.imgPosY ?? 50}%`,
                     transform: anuncioModal.imgZoom > 100 ? `scale(${anuncioModal.imgZoom / 100})` : undefined,
                     transformOrigin: `${anuncioModal.imgPosX ?? 50}% ${anuncioModal.imgPosY ?? 50}%`,
