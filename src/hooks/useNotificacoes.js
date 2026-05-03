@@ -32,7 +32,6 @@ function initAudioContext() {
 function tocarSomNotificacao() {
   const ctx = sharedAudioCtx;
   if (!ctx) return;
-
   try {
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -6;
@@ -66,15 +65,19 @@ function tocarSomNotificacao() {
   }
 }
 
-// Sempre chama getToken — FCM retorna o mesmo se ainda válido,
-// ou gera novo se o token foi invalidado/removido
+// Salva token no array fcmTokens (arrayUnion = sem duplicatas)
 async function salvarTokenFCM(uid, vapidKey) {
   try {
     const token = await obterTokenPush(vapidKey);
     if (!token) return;
+
+    const { arrayUnion } = await import('firebase/firestore');
     await setDoc(
       doc(db, 'usuarios', uid),
-      { fcmToken: token, fcmTokenAtualizado: new Date() },
+      {
+        fcmTokens: arrayUnion(token),
+        fcmTokenAtualizado: new Date(),
+      },
       { merge: true }
     );
     console.log('[FCM] Token salvo');
@@ -116,7 +119,7 @@ export function useNotificacoes(tenantUid, user) {
 
     setupToken();
 
-    // SW atualizado → renova token imediatamente
+    // SW atualizado → adiciona novo token ao array
     const handleControllerChange = () => {
       console.log('[FCM] SW trocado — renovando token');
       salvarTokenFCM(user.uid, vapidKey);
