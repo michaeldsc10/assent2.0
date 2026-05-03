@@ -1158,6 +1158,7 @@ export default function Dashboard() {
   const [customRange,   setCustomRange]  = useState({ from: "", to: "" });
   const [module,        setModule]       = useState("Dashboard");
   const [sistemaAtivo,  setSistemaAtivo] = useState("gestao"); // "gestao" | "crm" | "flow"
+  const [flowInitialTab, setFlowInitialTab] = useState("overview");
   const [userName,      setUserName]     = useState("Usuário");
   const [userAvatar,    setUserAvatar]   = useState(null);
   const [menuVisivel,   setMenuVisivel]  = useState({});
@@ -2930,7 +2931,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                             }}
                             onClick={() => {
                               marcarReservaLida(n.id);
-                              setModule("AssFlow");
+                              setFlowInitialTab("reservas");
+                              setSistemaAtivo("flow");
                               setNotifOpen(false);
                             }}
                           >
@@ -3209,6 +3211,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 onVoltar={() => setSistemaAtivo("gestao")}
                 theme={theme}
                 onToggleTheme={toggleTheme}
+                initialTab={flowInitialTab}
+                onTabChange={setFlowInitialTab}
               />
             ) : (
               renderModulo()
