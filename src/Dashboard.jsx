@@ -1317,8 +1317,11 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         );
         const globais = todos.filter(d =>
           d.destinatario === "todos" ||
-          (d.destinatario === "pro"  && isPro) ||
-          (d.destinatario === "free" && !isPro)
+          // Slugs reais gravados pelo painel admin
+          d.destinatario === licencaSlug ||
+          // Aliases legados (caso algum doc antigo use "pro"/"free")
+          (d.destinatario === "pro"  && licencaSlug === "profissional") ||
+          (d.destinatario === "free" && (licencaSlug === "essencial" || licencaSlug === "trial"))
         );
 
         // Individuais têm prioridade; dentro de cada grupo, mais recente primeiro
@@ -1345,7 +1348,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
     buscarAnuncio();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantUid, isPro]);
+  }, [tenantUid, isPro, licencaSlug]);
 
   const fecharAnuncioModal = () => {
     if (!anuncioModal) return;
@@ -3357,16 +3360,48 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               onMouseOut={e => e.currentTarget.style.background = "rgba(0,0,0,0.4)"}
             >✕</button>
 
-            {/* Imagem (se houver) */}
-            {anuncioModal.imageUrl && (
+            {/* Mídia: imagem ou vídeo */}
+            {anuncioModal.mediaType === "video" && anuncioModal.videoUrl ? (
+              <div style={{ width: "100%", maxHeight: 220, overflow: "hidden", background: "#000" }}>
+                {/youtube\.com|youtu\.be/.test(anuncioModal.videoUrl) ? (() => {
+                  const ytMatch = anuncioModal.videoUrl.match(
+                    /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/
+                  );
+                  const embedUrl = ytMatch
+                    ? `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1&mute=1&loop=1&playlist=${ytMatch[1]}`
+                    : anuncioModal.videoUrl;
+                  return (
+                    <iframe
+                      src={embedUrl}
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      style={{ width: "100%", height: 220, display: "block", border: "none" }}
+                      title="Anúncio"
+                    />
+                  );
+                })() : (
+                  <video
+                    src={anuncioModal.videoUrl}
+                    autoPlay muted loop playsInline
+                    style={{ width: "100%", maxHeight: 220, objectFit: "cover", display: "block" }}
+                  />
+                )}
+              </div>
+            ) : anuncioModal.imageUrl ? (
               <div style={{ width: "100%", maxHeight: 220, overflow: "hidden", background: "var(--s2)" }}>
                 <img
                   src={anuncioModal.imageUrl}
                   alt=""
-                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", maxHeight: 220 }}
+                  style={{
+                    width: "100%", height: "100%", objectFit: "cover", display: "block", maxHeight: 220,
+                    objectPosition: `${anuncioModal.imgPosX ?? 50}% ${anuncioModal.imgPosY ?? 50}%`,
+                    transform: anuncioModal.imgZoom > 100 ? `scale(${anuncioModal.imgZoom / 100})` : undefined,
+                    transformOrigin: `${anuncioModal.imgPosX ?? 50}% ${anuncioModal.imgPosY ?? 50}%`,
+                  }}
                 />
               </div>
-            )}
+            ) : null}
 
             {/* Conteúdo */}
             <div style={{ padding: "24px 22px 22px" }}>
