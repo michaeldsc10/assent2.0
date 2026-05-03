@@ -3797,6 +3797,9 @@ function AlunosGraficos({ alunos, vendas, dados }) {
    Lista com situação de pagamento, totais e ticket médio
    ══════════════════════════════════════════════════════ */
 function RelatorioAlunos({ alunos, aReceber, vendas, intervalo }) {
+  const [alnSK, setAlnSK] = useState("nome");
+  const [alnSD, setAlnSD] = useState("asc");
+  const alnSort = (k) => { if(alnSK===k){ setAlnSD(d=>d==="asc"?"desc":"asc"); } else { setAlnSK(k); setAlnSD("asc"); } };
   const [view, setView]       = useState("lista"); // "lista" | "graficos"
   const [filtroSit, setFiltroSit] = useState("todos");
 
