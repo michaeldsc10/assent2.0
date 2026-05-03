@@ -504,7 +504,7 @@ function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
   const amanha=new Date(hoje); amanha.setDate(amanha.getDate()+1);
   const semana=new Date(hoje); semana.setDate(semana.getDate()+7);
   const f=isAdmin&&filtroP!=="todos"?reservas.filter(r=>r.prestadorId===filtroP):reservas;
-  const total=f.length,confirmadas=f.filter(r=>r.status==="confirmado").length,pendentes=f.filter(r=>r.status==="pendente").length,canceladas=f.filter(r=>r.status==="cancelado").length;
+  const confirmadas=f.filter(r=>r.status==="confirmado").length,pendentes=f.filter(r=>r.status==="pendente").length,canceladas=f.filter(r=>r.status==="cancelado").length,total=confirmadas+pendentes;
   const hojeR=f.filter(r=>{if(!r.data_hora_inicio)return false;const d=r.data_hora_inicio.toDate?r.data_hora_inicio.toDate():new Date(r.data_hora_inicio);return d>=hoje&&d<amanha;});
   const semanaR=f.filter(r=>{if(!r.data_hora_inicio)return false;const d=r.data_hora_inicio.toDate?r.data_hora_inicio.toDate():new Date(r.data_hora_inicio);return d>=hoje&&d<semana;});
   const proximas=f.filter(r=>{if(!r.data_hora_inicio||r.status==="cancelado")return false;const d=r.data_hora_inicio.toDate?r.data_hora_inicio.toDate():new Date(r.data_hora_inicio);return d>=hoje;}).sort((a,b)=>{const da=a.data_hora_inicio.toDate?a.data_hora_inicio.toDate():new Date(a.data_hora_inicio),db2=b.data_hora_inicio.toDate?b.data_hora_inicio.toDate():new Date(b.data_hora_inicio);return da-db2;}).slice(0,5);
@@ -551,9 +551,9 @@ function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
         <div style={S.card}>
           <p style={S.sectionTitle}>Status das Reservas</p>
           <div style={{display:"flex",flexDirection:"column",gap:12}}>
-            <StatusBar label="Confirmadas" value={confirmadas} total={total} color={T.emerald}/>
-            <StatusBar label="Pendentes" value={pendentes} total={total} color={T.gold}/>
-            <StatusBar label="Canceladas" value={canceladas} total={total} color={T.red}/>
+            <StatusBar label="Confirmadas" value={confirmadas} total={f.length} color={T.emerald}/>
+            <StatusBar label="Pendentes" value={pendentes} total={f.length} color={T.gold}/>
+            <StatusBar label="Canceladas" value={canceladas} total={f.length} color={T.red}/>
           </div>
         </div>
         <div style={S.card}>
