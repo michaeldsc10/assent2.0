@@ -1273,8 +1273,11 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         // Filtro de destinatário
         const planOk =
           n.destinatario === "todos" ||
-          (n.destinatario === "pro"  && isPro) ||
-          (n.destinatario === "free" && !isPro) ||
+          // Slugs reais gravados pelo painel admin
+          n.destinatario === licencaSlug ||
+          // Aliases legados (docs antigos com "pro"/"free")
+          (n.destinatario === "pro"  && licencaSlug === "profissional") ||
+          (n.destinatario === "free" && (licencaSlug === "essencial" || licencaSlug === "trial")) ||
           // Notificação individual: verifica se é para este tenant/usuário
           (n.destinatario === "individual" && (n.destinatarioUid === tenantUid || n.uid === tenantUid));
         if (!planOk) return false;
@@ -1286,7 +1289,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       setNotificacoes(filtradas);
     }, fsSnapshotError("Dashboard:notificacoes"));
     return unsub;
-  }, [tenantUid, isPro]);
+  }, [tenantUid, isPro, licencaSlug]);
 
   /* ── Anúncios Modais — busca ao entrar, mostra o mais recente ativo ── */
   useEffect(() => {
