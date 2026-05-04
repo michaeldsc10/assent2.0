@@ -1164,6 +1164,90 @@ const CSS = `
   .ag-app.light .ag-header-logo-icon {
     background: linear-gradient(135deg, #b8952e, #d4af37);
   }
+
+/* ── CARD DE SAUDAÇÃO FLUTUANTE ── */
+.ag-saudacao-card {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  min-width: 300px;
+  max-width: 420px;
+  width: calc(100vw - 48px);
+  background: linear-gradient(135deg, rgba(30,26,18,0.97) 0%, rgba(22,19,12,0.99) 100%);
+  border: 1px solid rgba(212,175,55,0.35);
+  border-radius: 18px;
+  padding: 18px 20px 16px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(212,175,55,0.08) inset, 0 0 60px rgba(212,175,55,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: ag-saudacao-in 0.45s cubic-bezier(0.34,1.56,0.64,1) both;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.ag-saudacao-card.ag-saudacao-out {
+  animation: ag-saudacao-out 0.3s ease-in both;
+}
+@keyframes ag-saudacao-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(24px) scale(0.95); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1);    }
+}
+@keyframes ag-saudacao-out {
+  from { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1);    }
+  to   { opacity: 0; transform: translateX(-50%) translateY(16px) scale(0.96); }
+}
+.ag-saudacao-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ag-saudacao-emoji {
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.ag-saudacao-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  flex: 1;
+}
+.ag-saudacao-sub {
+  font-size: 13px;
+  color: var(--text-muted, rgba(255,255,255,0.55));
+  line-height: 1.45;
+  padding-left: 34px;
+}
+.ag-saudacao-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255,255,255,0.35);
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.ag-saudacao-close:hover {
+  color: rgba(255,255,255,0.8);
+  background: rgba(255,255,255,0.07);
+}
+.ag-saudacao-linha {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(212,175,55,0.25), transparent);
+  margin: 4px 0;
+}
+@media (max-width: 480px) {
+  .ag-saudacao-card { bottom: 80px; }
+}
 `;
 
 /* ══════════════════════════════════════════════════════
@@ -1203,16 +1287,96 @@ function Val({ v, loading, prefix = "", suffix = "" }) {
 }
 
 /* ══════════════════════════════════════════════════════
+   SAUDAÇÃO FLUTUANTE
+═══════════════════════════════════════════════════════ */
+function getSaudacaoTempo() {
+  const h = new Date().getHours();
+  if (h >= 5  && h < 12) return { texto: "Bom dia",   emoji: "☀️" };
+  if (h >= 12 && h < 18) return { texto: "Boa tarde", emoji: "🌤️" };
+  return { texto: "Boa noite", emoji: "🌙" };
+}
+
+const FRASES_SAUDACAO = [
+  "É muito bom ter você por aqui.",
+  "Que bom te ver de volta!",
+  "Seu negócio está esperando por você.",
+  "Pronto para fazer acontecer hoje?",
+  "Bem-vindo de volta ao seu painel.",
+  "Mais um dia de oportunidades te esperando.",
+  "Que a sua gestão flua com leveza hoje.",
+  "Tudo pronto para você arrasar.",
+  "Sua equipe está online e operando.",
+  "Cada acesso é um passo rumo ao crescimento.",
+  "O sucesso começa com uma boa gestão.",
+  "Seu painel está atualizado e pronto.",
+  "Grandes resultados começam por aqui.",
+  "Foco, estratégia e execução. Vamos lá!",
+  "Você chegou. Agora é só executar.",
+  "O melhor momento para agir é agora.",
+  "Negócios inteligentes começam com dados claros.",
+  "Que este acesso te aproxime das suas metas.",
+  "Aqui é onde as decisões certas acontecem.",
+  "Bem-vindo ao centro de controle do seu negócio.",
+  "A gestão eficiente é a sua vantagem competitiva.",
+  "Cada cliente bem atendido começa aqui.",
+  "Você está no lugar certo, na hora certa.",
+  "Vamos transformar dados em resultados hoje?",
+  "Sua presença já faz a diferença.",
+  "Controle, visão e crescimento. Seja bem-vindo.",
+  "O sucesso do seu negócio está em boas mãos — as suas.",
+  "Que hoje seja mais produtivo que ontem.",
+  "Acesso registrado. Vamos fazer acontecer?",
+  "Seu negócio evoluiu desde a última vez que você esteve aqui.",
+];
+
+function SaudacaoCard({ nome, onClose }) {
+  const [saindo, setSaindo] = useState(false);
+  const { texto, emoji } = getSaudacaoTempo();
+  const frase = useMemo(
+    () => FRASES_SAUDACAO[Math.floor(Math.random() * FRASES_SAUDACAO.length)],
+    []
+  );
+
+  const fechar = () => {
+    setSaindo(true);
+    setTimeout(onClose, 280);
+  };
+
+  // auto-fecha após 7s
+  useEffect(() => {
+    const t = setTimeout(fechar, 7000);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <div className={`ag-saudacao-card${saindo ? " ag-saudacao-out" : ""}`} role="status" aria-live="polite">
+      <div className="ag-saudacao-header">
+        <span className="ag-saudacao-emoji">{emoji}</span>
+        <span className="ag-saudacao-title">{texto}, {nome}!</span>
+        <button className="ag-saudacao-close" onClick={fechar} aria-label="Fechar saudação">
+          <X size={15} />
+        </button>
+      </div>
+      <div className="ag-saudacao-linha" />
+      <p className="ag-saudacao-sub">{frase}</p>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
 ═══════════════════════════════════════════════════════ */
 export default function Dashboard() {
   const [period,        setPeriod]       = useState("Este mês");
   const [customRange,   setCustomRange]  = useState({ from: "", to: "" });
   const [module,        setModule]       = useState("Dashboard");
-  const [sistemaAtivo,  setSistemaAtivo] = useState("gestao"); // "gestao" | "crm" | "flow"
+  const [sistemaAtivo,  setSistemaAtivo] = useState("gestao");
   const [flowInitialTab, setFlowInitialTab] = useState("overview");
   const [userName,      setUserName]     = useState("Usuário");
   const [userAvatar,    setUserAvatar]   = useState(null);
+  const [saudacaoVisivel, setSaudacaoVisivel] = useState(
+    () => sessionStorage.getItem("ag_saudacao_shown") !== "true"
+  );
   const [menuVisivel,   setMenuVisivel]  = useState({});
   const [collapsed,     setCollapsed]    = useState(
     () => localStorage.getItem("ag_sidebar_collapsed") === "true"
@@ -2812,6 +2976,16 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   return (
     <>
       <style>{CSS}</style>
+
+      {saudacaoVisivel && (
+        <SaudacaoCard
+          nome={nomeUsuario || userName}
+          onClose={() => {
+            setSaudacaoVisivel(false);
+            sessionStorage.setItem("ag_saudacao_shown", "true");
+          }}
+        />
+      )}
 
       <div className={`ag-app${theme === "light" ? " light" : ""}`}>
 
