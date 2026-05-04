@@ -11,8 +11,24 @@ const { onCall, onRequest,
 const { getFirestore,
         Timestamp, FieldValue }   = require("firebase-admin/firestore");
 const admin                       = require("firebase-admin");
+const Stripe                      = require("stripe");
+const nodemailer                  = require("nodemailer");
+const { defineSecret }            = require("firebase-functions/params");
 
 admin.initializeApp();
+
+/* ─── Secrets Stripe + Email (Firebase Secret Manager) ─── */
+const STRIPE_SECRET_KEY     = defineSecret("STRIPE_SECRET_KEY");
+const STRIPE_WEBHOOK_SECRET = defineSecret("STRIPE_WEBHOOK_SECRET");
+const MAIL_USER             = defineSecret("MAIL_USER");
+const MAIL_PASS             = defineSecret("MAIL_PASS");
+
+/* Limites por plano — espelha o que o frontend já usa */
+const LIMITES_PLANO = {
+  trial:        { vendasMes: 500,  loginsExtras: 5  },
+  essencial:    { vendasMes: 500,  loginsExtras: 5  },
+  profissional: { vendasMes: 1500, loginsExtras: 15 },
+};
 
 /* ─── Importa funções de notificacoes ─── */
 const notificacoesFunctions = require('./src/notificacoes');
@@ -956,6 +972,349 @@ exports.onTrialExpiry = onSchedule(
     }
 
     console.log(`${snapshot.size} licenças trial expiradas desativadas.`);
+  }
+);
+
+
+/* ═══════════════════════════════════════════════════════════════
+   STRIPE WEBHOOK — Ativação automática de licença após pagamento
+   
+   Eventos tratados:
+     checkout.session.completed    → pagamento direto OU início de trial
+     invoice.payment_succeeded     → trial convertido em pago
+     customer.subscription.deleted → trial expirou / cancelamento
+   
+   Configurar no Stripe Dashboard → Developers → Webhooks:
+     Endpoint: https://us-central1-assent-2b945.cloudfunctions.net/stripeWebhook
+     Events:   checkout.session.completed
+               invoice.payment_succeeded
+               customer.subscription.deleted
+   
+   Secrets a criar (firebase functions:secrets:set):
+     STRIPE_SECRET_KEY      → sk_live_...
+     STRIPE_WEBHOOK_SECRET  → whsec_...
+     MAIL_USER              → assent.ofc@gmail.com
+     MAIL_PASS              → senha-de-app-gmail
+═══════════════════════════════════════════════════════════════ */
+
+/* ─── helpers internos do webhook ─── */
+
+async function _getOrCreateAuthUser(email) {
+  try {
+    const u = await admin.auth().getUserByEmail(email);
+    return { uid: u.uid, isNew: false };
+  } catch (err) {
+    if (err.code !== "auth/user-not-found") throw err;
+    const u = await admin.auth().createUser({
+      email,
+      emailVerified: false,
+      displayName:   email.split("@")[0],
+    });
+    return { uid: u.uid, isNew: true };
+  }
+}
+
+async function _setLicenca(uid, plano, rootData, planoData) {
+  const ts = FieldValue.serverTimestamp();
+
+  // Root: licencas/{uid}
+  await db.collection("licencas").doc(uid).set(
+    { ...rootData, atualizadoEm: ts },
+    { merge: true }
+  );
+
+  // Subcollection: licencas/{uid}/plano/{plano}
+  if (planoData) {
+    await db.collection("licencas").doc(uid)
+      .collection("plano").doc(plano)
+      .set({ ...planoData, atualizadoEm: ts }, { merge: true });
+  }
+}
+
+async function _getUidByStripeCustomer(customerId) {
+  const snap = await db.collectionGroup("plano")
+    .where("stripeCustomerId", "==", customerId)
+    .limit(1)
+    .get();
+  if (snap.empty) return null;
+  // path: licencas/{uid}/plano/{plano}
+  return { uid: snap.docs[0].ref.parent.parent.id, plano: snap.docs[0].id };
+}
+
+function _makeMailer(mailUser, mailPass) {
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: { user: mailUser, pass: mailPass },
+  });
+}
+
+async function _sendWelcomeEmail({ mailUser, mailPass, email, resetLink, plano, isTrial }) {
+  const label = { essencial: "Essencial", profissional: "Profissional", trial: "Essencial" }[plano] ?? plano;
+  const trialBlurb = isTrial
+    ? `<p style="color:#d4af37;font-size:13px">Trial de <strong>7 dias</strong> ativo. Nenhuma cobrança agora.</p>`
+    : "";
+  await _makeMailer(mailUser, mailPass).sendMail({
+    from:    `"ASSENT Gestão" <${mailUser}>`,
+    to:      email,
+    subject: isTrial ? "Seu trial de 7 dias no ASSENT Gestão começou ✦" : "Seu acesso ao ASSENT Gestão está pronto ✦",
+    html: `
+      <div style="font-family:Inter,sans-serif;background:#070707;color:#fff;padding:40px;border-radius:12px;max-width:520px;margin:auto">
+        <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#d4af37">ASSENT Gestão</div>
+        <p style="color:#aaa;margin-bottom:12px">Plano <strong style="color:#fff">${label}</strong> ativado.</p>
+        ${trialBlurb}
+        <p style="color:#ccc;line-height:1.6">Crie sua senha para acessar o sistema:</p>
+        <a href="${resetLink}" style="display:inline-block;margin-top:24px;padding:14px 28px;background:linear-gradient(135deg,#f4d77a,#d4af37,#a47d1f);color:#1a1100;font-weight:700;border-radius:8px;text-decoration:none;font-size:14px">
+          Criar minha senha →
+        </a>
+        <p style="color:#555;font-size:12px;margin-top:32px">
+          Link válido por 1 hora. Se expirar, use "Esqueci minha senha".<br/>
+          Dúvidas? <a href="mailto:assent.ofc@gmail.com" style="color:#d4af37">assent.ofc@gmail.com</a>
+        </p>
+      </div>`,
+  });
+}
+
+async function _sendTrialExpiredEmail({ mailUser, mailPass, email }) {
+  await _makeMailer(mailUser, mailPass).sendMail({
+    from:    `"ASSENT Gestão" <${mailUser}>`,
+    to:      email,
+    subject: "Seu trial ASSENT Gestão expirou",
+    html: `
+      <div style="font-family:Inter,sans-serif;background:#070707;color:#fff;padding:40px;border-radius:12px;max-width:520px;margin:auto">
+        <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#d4af37">ASSENT Gestão</div>
+        <p style="color:#aaa">Seu período de trial encerrou e o acesso foi pausado.</p>
+        <a href="https://assentagencia.com.br/#planos" style="display:inline-block;margin-top:24px;padding:14px 28px;background:linear-gradient(135deg,#f4d77a,#d4af37,#a47d1f);color:#1a1100;font-weight:700;border-radius:8px;text-decoration:none;font-size:14px">
+          Ver planos →
+        </a>
+        <p style="color:#555;font-size:12px;margin-top:32px">
+          Dúvidas? <a href="mailto:assent.ofc@gmail.com" style="color:#d4af37">assent.ofc@gmail.com</a>
+        </p>
+      </div>`,
+  });
+}
+
+/* ─── stripeWebhook ─── */
+exports.stripeWebhook = onRequest(
+  {
+    region:  "us-central1",
+    secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, MAIL_USER, MAIL_PASS],
+    // Sem CORS — chamada server-to-server do Stripe
+  },
+  async (req, res) => {
+    if (req.method !== "POST") return res.status(405).end();
+
+    // 1. Verificar assinatura — NUNCA pular
+    const stripe = Stripe(STRIPE_SECRET_KEY.value(), { apiVersion: "2024-04-10" });
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.rawBody,
+        req.headers["stripe-signature"],
+        STRIPE_WEBHOOK_SECRET.value()
+      );
+    } catch (err) {
+      console.error("[stripeWebhook] Assinatura invalida:", err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    const mailUser = MAIL_USER.value();
+    const mailPass = MAIL_PASS.value();
+
+    /* ── checkout.session.completed ── */
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+      const email   = session.customer_details?.email;
+      const plano   = session.metadata?.plano;    // "essencial" | "profissional"
+      const periodo = session.metadata?.periodo;  // "mensal" | "anual"
+
+      if (!email || !plano) {
+        console.error("[stripeWebhook] Metadata ausente:", session.id, { email, plano });
+        return res.status(200).json({ received: true, warning: "metadata_missing" });
+      }
+
+      try {
+        const { uid, isNew } = await _getOrCreateAuthUser(email);
+
+        // Detecta trial
+        let isTrial     = false;
+        let planoRaiz   = plano;
+        let trialExpira = null;
+
+        if (session.mode === "subscription" && session.subscription) {
+          const sub = await stripe.subscriptions.retrieve(session.subscription);
+          if (sub.status === "trialing") {
+            isTrial     = true;
+            planoRaiz   = "trial";  // onTrialExpiry usa esse valor para query
+            trialExpira = FieldValue.serverTimestamp(); // veja abaixo — usamos Date
+          }
+        }
+
+        // Root doc
+        const rootData = {
+          plano:            planoRaiz,
+          ativo:            true,
+          email,
+          stripeCustomerId: session.customer ?? null,
+        };
+        if (isTrial) {
+          // trialExpira = agora + 7 dias (Timestamp compatível com onTrialExpiry)
+          const expira = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+          rootData.trialExpira = Timestamp.fromDate(expira);
+        }
+
+        // Subdoc: se trial → plano/trial ; se pago direto → plano/essencial ou /profissional
+        const subdocPlano = planoRaiz; // "trial" | "essencial" | "profissional"
+        const limites     = LIMITES_PLANO[plano] ?? LIMITES_PLANO.essencial;
+
+        await _setLicenca(uid, subdocPlano, rootData, {
+          ativo:            true,
+          status:           isTrial ? "trial" : "ativo",
+          periodo,
+          email,
+          stripeCustomerId: session.customer ?? null,
+          stripeSessionId:  session.id,
+          limites,
+          contagem:         { vendasMes: 0 },
+          ativadoEm:        FieldValue.serverTimestamp(),
+        });
+
+        console.log(`[stripeWebhook] Licenca ativada — licencas/${uid}/plano/${subdocPlano} | trial:${isTrial}`);
+
+        // E-mail só para usuários novos
+        if (isNew) {
+          try {
+            const resetLink = await admin.auth().generatePasswordResetLink(email, {
+              url: "https://ag.assentagencia.com.br",
+            });
+            await _sendWelcomeEmail({ mailUser, mailPass, email, resetLink, plano, isTrial });
+            console.log("[stripeWebhook] E-mail enviado:", email);
+          } catch (mailErr) {
+            console.error("[stripeWebhook] Falha e-mail (licenca OK):", mailErr.message);
+          }
+        }
+
+        return res.status(200).json({ received: true, uid, plano: subdocPlano });
+
+      } catch (err) {
+        console.error("[stripeWebhook] Erro checkout.session.completed:", err);
+        return res.status(500).send("Internal Server Error");
+      }
+    }
+
+    /* ── invoice.payment_succeeded — trial convertido em pago ── */
+    if (event.type === "invoice.payment_succeeded") {
+      const invoice    = event.data.object;
+
+      // Ignora a invoice de R$0 gerada no início do trial
+      if (!invoice.amount_paid || invoice.amount_paid === 0) {
+        return res.status(200).json({ received: true, skipped: "zero_invoice" });
+      }
+
+      const customerId = invoice.customer;
+      try {
+        const result = await _getUidByStripeCustomer(customerId);
+        if (!result) {
+          console.error("[stripeWebhook] UID nao encontrado para customer:", customerId);
+          return res.status(200).json({ received: true, warning: "uid_not_found" });
+        }
+
+        const { uid } = result;
+
+        // Descobre o plano real (vem do metadata da subscription ou da invoice)
+        const subId  = invoice.subscription;
+        const sub    = subId ? await stripe.subscriptions.retrieve(subId) : null;
+        const plano  = sub?.metadata?.plano ?? invoice.metadata?.plano ?? "essencial";
+        const periodo = sub?.metadata?.periodo ?? invoice.metadata?.periodo ?? "mensal";
+        const limites = LIMITES_PLANO[plano] ?? LIMITES_PLANO.essencial;
+
+        // Atualiza root — remove trial, seta plano real
+        await db.collection("licencas").doc(uid).set({
+          plano,
+          ativo:        true,
+          atualizadoEm: FieldValue.serverTimestamp(),
+          trialExpira:  FieldValue.delete(),
+        }, { merge: true });
+
+        // Cria/atualiza subdoc do plano pago
+        await db.collection("licencas").doc(uid)
+          .collection("plano").doc(plano)
+          .set({
+            ativo:        true,
+            status:       "ativo",
+            periodo,
+            limites,
+            contagem:     { vendasMes: 0 },
+            atualizadoEm: FieldValue.serverTimestamp(),
+          }, { merge: true });
+
+        // Desativa subdoc trial se existia
+        const trialRef = db.collection("licencas").doc(uid).collection("plano").doc("trial");
+        const trialSnap = await trialRef.get();
+        if (trialSnap.exists) {
+          await trialRef.update({ ativo: false, atualizadoEm: FieldValue.serverTimestamp() });
+        }
+
+        console.log(`[stripeWebhook] Trial convertido — licencas/${uid}/plano/${plano}`);
+        return res.status(200).json({ received: true, uid, plano });
+
+      } catch (err) {
+        console.error("[stripeWebhook] Erro invoice.payment_succeeded:", err);
+        return res.status(500).send("Internal Server Error");
+      }
+    }
+
+    /* ── customer.subscription.deleted — expirou ou cancelou ── */
+    if (event.type === "customer.subscription.deleted") {
+      const sub        = event.data.object;
+      const customerId = sub.customer;
+
+      try {
+        const result = await _getUidByStripeCustomer(customerId);
+        if (!result) {
+          console.error("[stripeWebhook] UID nao encontrado para customer:", customerId);
+          return res.status(200).json({ received: true, warning: "uid_not_found" });
+        }
+
+        const { uid, plano } = result;
+
+        // Busca email antes de revogar
+        const rootSnap = await db.collection("licencas").doc(uid).get();
+        const email    = rootSnap.data()?.email;
+
+        // Revoga root e subdoc
+        await db.collection("licencas").doc(uid).set({
+          ativo:        false,
+          atualizadoEm: FieldValue.serverTimestamp(),
+        }, { merge: true });
+
+        await db.collection("licencas").doc(uid)
+          .collection("plano").doc(plano)
+          .set({
+            ativo:        false,
+            status:       "cancelado",
+            atualizadoEm: FieldValue.serverTimestamp(),
+          }, { merge: true });
+
+        console.log(`[stripeWebhook] Acesso revogado — licencas/${uid}/plano/${plano}`);
+
+        if (email) {
+          try {
+            await _sendTrialExpiredEmail({ mailUser, mailPass, email });
+          } catch (mailErr) {
+            console.error("[stripeWebhook] Falha e-mail expiracao:", mailErr.message);
+          }
+        }
+
+        return res.status(200).json({ received: true, uid, plano, status: "cancelado" });
+
+      } catch (err) {
+        console.error("[stripeWebhook] Erro customer.subscription.deleted:", err);
+        return res.status(500).send("Internal Server Error");
+      }
+    }
+
+    // Evento nao tratado
+    return res.status(200).json({ received: true });
   }
 );
 
