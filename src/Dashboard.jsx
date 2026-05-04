@@ -1168,13 +1168,11 @@ const CSS = `
 /* ── CARD DE SAUDAÇÃO FLUTUANTE ── */
 .ag-saudacao-card {
   position: fixed;
-  bottom: 28px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 72px;
+  left: 24px;
   z-index: 9999;
-  min-width: 300px;
-  max-width: 420px;
-  width: calc(100vw - 48px);
+  min-width: 280px;
+  max-width: 340px;
   background: linear-gradient(135deg, rgba(30,26,18,0.97) 0%, rgba(22,19,12,0.99) 100%);
   border: 1px solid rgba(212,175,55,0.35);
   border-radius: 18px;
@@ -1187,16 +1185,23 @@ const CSS = `
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
 }
+.ag-saudacao-card:not(.ag-saudacao-out) {
+  animation: ag-saudacao-in 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards, ag-saudacao-float 3s ease-in-out 0.45s infinite;
+}
 .ag-saudacao-card.ag-saudacao-out {
   animation: ag-saudacao-out 0.3s ease-in both;
 }
 @keyframes ag-saudacao-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(24px) scale(0.95); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1);    }
+  from { opacity: 0; transform: translateY(-16px) scale(0.95); }
+  to   { opacity: 1; transform: translateY(0)      scale(1);   }
+}
+@keyframes ag-saudacao-float {
+  0%, 100% { transform: translateY(0);   }
+  50%       { transform: translateY(-6px); }
 }
 @keyframes ag-saudacao-out {
-  from { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1);    }
-  to   { opacity: 0; transform: translateX(-50%) translateY(16px) scale(0.96); }
+  from { opacity: 1; transform: translateY(0);    }
+  to   { opacity: 0; transform: translateY(-10px); }
 }
 .ag-saudacao-header {
   display: flex;
@@ -1246,7 +1251,7 @@ const CSS = `
   margin: 4px 0;
 }
 @media (max-width: 480px) {
-  .ag-saudacao-card { bottom: 80px; }
+  .ag-saudacao-card { top: 68px; left: 12px; max-width: calc(100vw - 24px); }
 }
 `;
 
