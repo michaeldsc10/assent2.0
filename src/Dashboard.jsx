@@ -691,6 +691,7 @@ const CSS = `
 
   /* CTA da notificação do sistema — pílula gold sofisticada */
   .ag-notif-cta {
+    align-self: flex-start;
     display: inline-flex; align-items: center; gap: 6px;
     margin-top: 10px;
     padding: 5px 12px 5px 13px;
