@@ -689,6 +689,57 @@ const CSS = `
     font-size: 12px; color: var(--text-3);
   }
 
+  /* CTA da notificação do sistema — pílula gold sofisticada */
+  .ag-notif-cta {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-top: 10px;
+    padding: 5px 12px 5px 13px;
+    border-radius: 999px;
+    background: linear-gradient(135deg,#9C6F0A 0%,#D4AF37 50%,#9C6F0A 100%);
+    background-size: 220% 100%;
+    background-position: 0% 50%;
+    color: #050505;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.7px; text-transform: uppercase;
+    text-decoration: none;
+    font-family: 'JetBrains Mono', monospace;
+    border: 1px solid rgba(212,175,55,.55);
+    box-shadow:
+      0 1px 2px rgba(0,0,0,.30),
+      inset 0 1px 0 rgba(255,255,255,.20);
+    transition:
+      background-position .55s ease,
+      transform .2s ease,
+      box-shadow .25s ease,
+      border-color .25s ease;
+    cursor: pointer; user-select: none;
+    position: relative; overflow: hidden;
+  }
+  .ag-notif-cta::before {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(120deg,transparent 30%,rgba(255,255,255,.45) 50%,transparent 70%);
+    transform: translateX(-120%);
+    transition: transform .7s ease;
+    pointer-events: none;
+  }
+  .ag-notif-cta:hover {
+    background-position: 100% 50%;
+    transform: translateY(-1px);
+    border-color: rgba(212,175,55,.95);
+    box-shadow:
+      0 6px 18px rgba(212,175,55,.30),
+      0 0 0 1px rgba(212,175,55,.25),
+      inset 0 1px 0 rgba(255,255,255,.28);
+  }
+  .ag-notif-cta:hover::before { transform: translateX(120%); }
+  .ag-notif-cta:active { transform: translateY(0); }
+  .ag-notif-cta-arrow {
+    display: inline-block;
+    transition: transform .25s ease;
+    font-weight: 800;
+  }
+  .ag-notif-cta:hover .ag-notif-cta-arrow { transform: translate(2px,-2px); }
+
   .ag-user-area { position: relative; display: flex; align-items: center; margin-left: 10px; }
   .ag-user-trigger {
     display: flex; align-items: center; gap: 9px;
@@ -1480,12 +1531,15 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     _ts: n.criadoEm?.toDate ? n.criadoEm.toDate().getTime() : 0,
   }));
 
-  /* Normaliza notificações de reserva do AssFlow */
-  const notifReservasNorm = notifReservas.map((n) => ({
-    ...n,
-    tipo: "nova_reserva",
-    _ts:  n.criadoEm?.toDate ? n.criadoEm.toDate().getTime() : Date.now(),
-  }));
+  /* Normaliza notificações de reserva do AssFlow
+     — só docs com tipo==nova_reserva E payload válido (defensivo contra
+     docs estranhos escritos na mesma subcoleção por outros sistemas) */
+  const notifReservasNorm = notifReservas
+    .filter((n) => n.tipo === "nova_reserva" && n.payload && typeof n.payload === "object")
+    .map((n) => ({
+      ...n,
+      _ts: n.criadoEm?.toDate ? n.criadoEm.toDate().getTime() : Date.now(),
+    }));
 
   /* Merge cronológico: mais recente/urgente primeiro */
   const todasNotif = [...notifDespesasNorm, ...notifSistemaNorm, ...notifInsightsNorm, ...notifReservasNorm]
@@ -2993,16 +3047,10 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                               href={n.btnUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              style={{
-                                display: "inline-block", marginTop: 8,
-                                padding: "5px 12px", borderRadius: 6,
-                                background: "linear-gradient(135deg,#B8860B,#D4AF37)",
-                                color: "#050505", fontSize: 11, fontWeight: 700,
-                                letterSpacing: "0.8px", textDecoration: "none",
-                                fontFamily: "'JetBrains Mono', monospace",
-                              }}
+                              className="ag-notif-cta"
                             >
-                              {n.btnTexto || "Ver mais"} ↗
+                              {n.btnTexto || "Ver mais"}
+                              <span className="ag-notif-cta-arrow" aria-hidden="true">↗</span>
                             </a>
                           )}
                         </div>
