@@ -688,32 +688,6 @@ const CSS = `
     padding: 40px 16px; text-align: center;
     font-size: 12px; color: var(--text-3);
   }
-  .ag-notif-cta {
-    display: inline-flex; align-items: center; gap: 5px;
-    margin-top: 8px; padding: 4px 10px 4px 9px;
-    border-radius: 20px; text-decoration: none;
-    font-size: 10px; font-weight: 600; letter-spacing: 0.6px;
-    color: #0a0a0a;
-    background: linear-gradient(135deg, #B8860B, #D4AF37);
-    border: 1px solid rgba(212,175,55,0.3);
-    position: relative; overflow: hidden;
-    transition: transform 0.2s ease, box-shadow 0.2s ease, gap 0.2s ease;
-  }
-  .ag-notif-cta::before {
-    content: ''; position: absolute; inset: 0;
-    background: linear-gradient(135deg, #D4AF37, #f0cc5a);
-    opacity: 0; transition: opacity 0.2s ease;
-  }
-  .ag-notif-cta:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 14px rgba(212,175,55,0.35);
-    gap: 7px;
-  }
-  .ag-notif-cta:hover::before { opacity: 1; }
-  .ag-notif-cta:active { transform: translateY(0); }
-  .ag-notif-cta-text, .ag-notif-cta-icon { position: relative; z-index: 1; }
-  .ag-notif-cta-icon { transition: transform 0.2s ease; }
-  .ag-notif-cta:hover .ag-notif-cta-icon { transform: translate(1px, -1px); }
 
   .ag-user-area { position: relative; display: flex; align-items: center; margin-left: 10px; }
   .ag-user-trigger {
@@ -3019,12 +2993,16 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                               href={n.btnUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="ag-notif-cta"
+                              style={{
+                                display: "inline-block", marginTop: 8,
+                                padding: "5px 12px", borderRadius: 6,
+                                background: "linear-gradient(135deg,#B8860B,#D4AF37)",
+                                color: "#050505", fontSize: 11, fontWeight: 700,
+                                letterSpacing: "0.8px", textDecoration: "none",
+                                fontFamily: "'JetBrains Mono', monospace",
+                              }}
                             >
-                              <span className="ag-notif-cta-text">{n.btnTexto || "Ver mais"}</span>
-                              <svg className="ag-notif-cta-icon" width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M1.5 8.5L8.5 1.5M8.5 1.5H3M8.5 1.5V7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
+                              {n.btnTexto || "Ver mais"} ↗
                             </a>
                           )}
                         </div>
@@ -3443,7 +3421,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 {anuncioModal.mensagem}
               </div>
 
-              {/* Botão CTA — sofisticado com animação */}
+              {/* Botão CTA */}
               {anuncioModal.btnTexto && (
                 <a
                   href={anuncioModal.btnUrl || "#"}
@@ -3451,29 +3429,21 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   rel="noopener noreferrer"
                   onClick={fecharAnuncioModal}
                   style={{
-                    display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
-                    padding: "10px 18px", margin: "0 auto",
-                    background: "#D4AF37",
-                    border: "none", borderRadius: 8,
-                    color: "#1a1a1a", fontFamily: "'Inter', system-ui, sans-serif",
-                    fontSize: 12, fontWeight: 600, letterSpacing: "0.5px",
-                    cursor: "pointer", textDecoration: "none",
-                    boxShadow: "0 2px 10px rgba(212,175,55,0.25)",
-                    transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    width: "100%", padding: "13px 20px",
+                    background: "linear-gradient(135deg, #B8860B 0%, #D4AF37 60%, #F0D060 100%)",
+                    border: "none", borderRadius: 10,
+                    color: "#0a0808", fontFamily: "'Inter', system-ui, sans-serif",
+                    fontSize: 13, fontWeight: 700, letterSpacing: "0.08em",
+                    cursor: "pointer", textDecoration: "none", textTransform: "uppercase",
+                    boxShadow: "0 4px 20px rgba(212,175,55,0.35)",
+                    transition: "opacity .2s, transform .1s",
                   }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = "#E5B957";
-                    e.currentTarget.style.boxShadow = "0 4px 16px rgba(212,175,55,0.4)";
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = "#D4AF37";
-                    e.currentTarget.style.boxShadow = "0 2px 10px rgba(212,175,55,0.25)";
-                    e.currentTarget.style.transform = "translateY(0)";
-                  }}
+                  onMouseOver={e => { e.currentTarget.style.opacity = ".88"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                  onMouseOut={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "translateY(0)"; }}
                 >
                   {anuncioModal.btnTexto}
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
                 </a>
               )}
             </div>
