@@ -711,9 +711,7 @@ const CSS = `
   }
   .ag-notif-cta:hover::before { opacity: 1; }
   .ag-notif-cta:active { transform: translateY(0); }
-  .ag-notif-cta-text, .ag-notif-cta-icon {
-    position: relative; z-index: 1;
-  }
+  .ag-notif-cta-text, .ag-notif-cta-icon { position: relative; z-index: 1; }
   .ag-notif-cta-icon { transition: transform 0.2s ease; }
   .ag-notif-cta:hover .ag-notif-cta-icon { transform: translate(1px, -1px); }
 
