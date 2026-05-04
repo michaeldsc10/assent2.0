@@ -4079,18 +4079,61 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
     const totalRecebido = recebidas.reduce((s, v) => s + Number(v.total || 0), 0);
     const totalPendente = mensAbertas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
     const totalVencido  = vencidas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
-    const ticketMedio   = recebidas.length > 0 ? totalRecebido / recebidas.length : 0;
+
+    /* Mapa aReceberDocId → documento aReceber para obter valorTotal real */
+    const aReceberMap = Object.fromEntries(
+      aReceber.filter(ar => ar.id).map(ar => [ar.id, ar])
+    );
+
+    /* Agrupa vendas de mensalidade pelo aReceberDocId (pagamentos parciais múltiplos)
+       para exibir UMA linha por mensalidade com totais corretos */
+    const gruposMensalidade = {};
+    recebidas.forEach(v => {
+      const docId = v.aReceberDocId || v.id; // fallback: cada venda é única
+      if (!gruposMensalidade[docId]) {
+        const arDoc = aReceberMap[docId];
+        gruposMensalidade[docId] = {
+          data:        v.data,
+          aluno:       v.clienteNome || v.cliente || "—",
+          mes:         v.mesReferencia || "—",
+          forma:       v.formaPagamento || "—",
+          valorTotal:  arDoc ? Number(arDoc.valorTotal || 0) : Number(v.total || 0),
+          valorPago:   0,
+          _lastData:   v.data,
+        };
+      }
+      gruposMensalidade[docId].valorPago   += Number(v.total || 0);
+      // mantém a data mais recente do grupo
+      if ((v.data || "") > (gruposMensalidade[docId]._lastData || "")) {
+        gruposMensalidade[docId]._lastData = v.data;
+        gruposMensalidade[docId].forma     = v.formaPagamento || gruposMensalidade[docId].forma;
+      }
+    });
 
     /* Linhas — recebidas no período */
-    const linhasRecebidas = recebidas
-      .sort((a, b) => (parseDate(b.data) || 0) - (parseDate(a.data) || 0))
-      .map(v => ({
-        data:  v.data,
-        aluno: v.clienteNome || v.cliente || "—",
-        mes:   v.mesReferencia || "—",
-        valor: Number(v.total || 0),
-        forma: v.formaPagamento || "—",
-      }));
+    const linhasRecebidas = Object.values(gruposMensalidade)
+      .map(g => {
+        const valorTotal    = g.valorTotal;
+        const valorPago     = Math.min(g.valorPago, valorTotal || g.valorPago);
+        const valorRestante = Math.max(0, valorTotal - valorPago);
+        const isParcial     = valorTotal > 0 && valorRestante > 0.005;
+        return {
+          data:         g._lastData || g.data,
+          aluno:        g.aluno,
+          mes:          g.mes,
+          forma:        g.forma,
+          valor:        valorTotal,  // sempre o total da mensalidade
+          valorPago,
+          valorRestante,
+          isParcial,
+        };
+      })
+      .sort((a, b) => (parseDate(b.data) || 0) - (parseDate(a.data) || 0));
+
+    /* ticket médio = média do valorTotal por mensalidade única */
+    const ticketMedio = linhasRecebidas.length > 0
+      ? linhasRecebidas.reduce((s, l) => s + l.valor, 0) / linhasRecebidas.length
+      : 0;
 
     /* Linhas — pendentes (ordenadas por vencimento) */
     const linhasPendentes = mensAbertas
@@ -4131,9 +4174,13 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
     exportarExcel("mensalidades", [
       {
         nome: "Recebidas no período",
-        colunas: ["Data", "Aluno", "Mês Ref.", "Forma Pag.", "Valor (R$)"],
+        colunas: ["Data", "Aluno", "Mês Ref.", "Forma Pag.", "Total Mensalidade (R$)", "Valor Pago (R$)", "Restante (R$)", "Status"],
         dados: dados.linhasRecebidas.map(l => [
-          fmtData(l.data), l.aluno, l.mes, l.forma, l.valor.toFixed(2),
+          fmtData(l.data), l.aluno, l.mes, l.forma,
+          l.valor.toFixed(2),
+          l.valorPago.toFixed(2),
+          l.valorRestante.toFixed(2),
+          l.isParcial ? "Parcial" : "Pago",
         ]),
       },
       {
@@ -4318,7 +4365,41 @@ function RelatorioMensalidades({ alunos, aReceber, vendas, caixa, intervalo }) {
             { key: "aluno", label: "Aluno" },
             { key: "mes",   label: "Mês Ref.",  render: (v) => fmtMesRef(v) },
             { key: "forma", label: "Pagamento" },
-            { key: "valor", label: "Valor",     render: (v) => <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: "var(--green)" }}>{fmtR$(v)}</span> },
+            {
+              key: "valor", label: "Valor",
+              render: (v, row) => {
+                if (!row.isParcial) {
+                  return <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: "var(--green)" }}>{fmtR$(v)}</span>;
+                }
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "flex-end" }}>
+                    <span style={{ fontFamily: "'Sora',sans-serif", fontWeight: 600, color: "var(--text)" }}>{fmtR$(v)}</span>
+                    <span style={{ fontSize: 10, color: "var(--text-3)", display: "flex", gap: 8 }}>
+                      <span style={{ color: "var(--green)" }}>Pago: {fmtR$(row.valorPago)}</span>
+                      <span style={{ color: "#F5A623" }}>Rest.: {fmtR$(row.valorRestante)}</span>
+                    </span>
+                  </div>
+                );
+              }
+            },
+            {
+              key: "isParcial", label: "Status",
+              render: (v) => v ? (
+                <span style={{
+                  display: "inline-flex", alignItems: "center", padding: "3px 9px",
+                  borderRadius: 20, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
+                  background: "rgba(245,166,35,.12)", color: "#F5A623",
+                  border: "1px solid rgba(245,166,35,.25)",
+                }}>Parcial</span>
+              ) : (
+                <span style={{
+                  display: "inline-flex", alignItems: "center", padding: "3px 9px",
+                  borderRadius: 20, fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
+                  background: "rgba(74,186,130,.12)", color: "var(--green)",
+                  border: "1px solid rgba(74,186,130,.25)",
+                }}>Pago</span>
+              ),
+            },
           ]}
           linhas={dados.linhasRecebidas}
           emptyMsg="Nenhuma mensalidade recebida neste período."
