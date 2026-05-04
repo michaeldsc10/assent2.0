@@ -688,6 +688,34 @@ const CSS = `
     padding: 40px 16px; text-align: center;
     font-size: 12px; color: var(--text-3);
   }
+  .ag-notif-cta {
+    display: inline-flex; align-items: center; gap: 5px;
+    margin-top: 8px; padding: 4px 10px 4px 9px;
+    border-radius: 20px; text-decoration: none;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.6px;
+    color: #0a0a0a;
+    background: linear-gradient(135deg, #B8860B, #D4AF37);
+    border: 1px solid rgba(212,175,55,0.3);
+    position: relative; overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, gap 0.2s ease;
+  }
+  .ag-notif-cta::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(135deg, #D4AF37, #f0cc5a);
+    opacity: 0; transition: opacity 0.2s ease;
+  }
+  .ag-notif-cta:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(212,175,55,0.35);
+    gap: 7px;
+  }
+  .ag-notif-cta:hover::before { opacity: 1; }
+  .ag-notif-cta:active { transform: translateY(0); }
+  .ag-notif-cta-text, .ag-notif-cta-icon {
+    position: relative; z-index: 1;
+  }
+  .ag-notif-cta-icon { transition: transform 0.2s ease; }
+  .ag-notif-cta:hover .ag-notif-cta-icon { transform: translate(1px, -1px); }
 
   .ag-user-area { position: relative; display: flex; align-items: center; margin-left: 10px; }
   .ag-user-trigger {
@@ -2993,16 +3021,12 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                               href={n.btnUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              style={{
-                                display: "inline-block", marginTop: 8,
-                                padding: "5px 12px", borderRadius: 6,
-                                background: "linear-gradient(135deg,#B8860B,#D4AF37)",
-                                color: "#050505", fontSize: 11, fontWeight: 700,
-                                letterSpacing: "0.8px", textDecoration: "none",
-                                fontFamily: "'JetBrains Mono', monospace",
-                              }}
+                              className="ag-notif-cta"
                             >
-                              {n.btnTexto || "Ver mais"} ↗
+                              <span className="ag-notif-cta-text">{n.btnTexto || "Ver mais"}</span>
+                              <svg className="ag-notif-cta-icon" width="10" height="10" viewBox="0 0 10 10" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M1.5 8.5L8.5 1.5M8.5 1.5H3M8.5 1.5V7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
                             </a>
                           )}
                         </div>
