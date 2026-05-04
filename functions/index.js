@@ -25,11 +25,17 @@ const STRIPE_TEST_WEBHOOK    = defineSecret("STRIPE_TEST_WEBHOOK_SECRET");
 const MAIL_USER              = defineSecret("MAIL_USER");
 const MAIL_PASS              = defineSecret("MAIL_PASS");
 
-/* Limites por plano — espelha o que o frontend já usa */
+/* Limites por plano — espelha o schema do atualizarPlano existente */
 const LIMITES_PLANO = {
-  trial:        { vendasMes: 500,  loginsExtras: 5  },
-  essencial:    { vendasMes: 500,  loginsExtras: 5  },
-  profissional: { vendasMes: 1500, loginsExtras: 15 },
+  trial:        { vendasMes: 500,  loginsExtras: 5,  alunos: 500  },
+  essencial:    { vendasMes: 500,  loginsExtras: 5,  alunos: 500  },
+  profissional: { vendasMes: 1500, loginsExtras: 15, alunos: 1000 },
+};
+
+const FEATURES_PLANO = {
+  trial:        { instaInsights: false },
+  essencial:    { instaInsights: false },
+  profissional: { instaInsights: true  },
 };
 
 /* ─── Importa funções de notificacoes ─── */
@@ -1181,15 +1187,35 @@ exports.stripeWebhook = onRequest(
         const subdocPlano = planoRaiz; // "trial" | "essencial" | "profissional"
         const limites     = LIMITES_PLANO[plano] ?? LIMITES_PLANO.essencial;
 
+        // dataVencimento vem do current_period_end da subscription
+        let dataVencimento = null;
+        let dataInicio     = null;
+        if (session.mode === "subscription" && session.subscription) {
+          try {
+            const subData = await stripe.subscriptions.retrieve(session.subscription);
+            dataInicio     = subData.current_period_start
+              ? Timestamp.fromDate(new Date(subData.current_period_start * 1000)) : null;
+            dataVencimento = subData.current_period_end
+              ? Timestamp.fromDate(new Date(subData.current_period_end  * 1000)) : null;
+          } catch (_) {}
+        }
+        if (!dataVencimento && isTrial) {
+          dataVencimento = Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+        }
+
         await _setLicenca(uid, subdocPlano, rootData, {
           ativo:            true,
           status:           isTrial ? "trial" : "ativo",
+          slug:             subdocPlano,
           periodo,
           email,
           stripeCustomerId: session.customer ?? null,
           stripeSessionId:  session.id,
           limites,
+          features:         FEATURES_PLANO[plano] ?? FEATURES_PLANO.essencial,
           contagem:         { vendasMes: 0 },
+          dataInicio,
+          dataVencimento,
           ativadoEm:        FieldValue.serverTimestamp(),
         });
 
@@ -1332,6 +1358,84 @@ exports.stripeWebhook = onRequest(
     return res.status(200).json({ received: true });
   }
 );
+
+
+/* ═══════════════════════════════════════════════════════════════
+   FUNÇÃO: atualizarPlano
+   Usada pelo painel admin para:
+     - changePlan      → muda plano do membro
+     - updateVencimento → atualiza dataVencimento no subdoc
+═══════════════════════════════════════════════════════════════ */
+exports.atualizarPlano = onCall(ADMIN_CALL_OPTIONS, async (request) => {
+  await verificarAdmin(request.auth?.uid);
+
+  const { targetUid, action, newSlug, newDataVencimento } = request.data;
+
+  if (!targetUid) throw new HttpsError("invalid-argument", "targetUid obrigatório.");
+
+  const licRootRef = db.collection("licencas").doc(targetUid);
+  const licRootSnap = await licRootRef.get();
+  if (!licRootSnap.exists) throw new HttpsError("not-found", "Licença não encontrada.");
+
+  const ts = FieldValue.serverTimestamp();
+
+  /* ── changePlan ── */
+  if (action === "changePlan") {
+    const PLANOS_VALIDOS = ["essencial", "profissional", "trial"];
+    if (!newSlug || !PLANOS_VALIDOS.includes(newSlug)) {
+      throw new HttpsError("invalid-argument", "Plano inválido.");
+    }
+
+    const currentSlug = licRootSnap.data()?.plano;
+    const limites     = LIMITES_PLANO[newSlug] ?? LIMITES_PLANO.essencial;
+
+    // Desativa subdoc antigo
+    if (currentSlug && currentSlug !== newSlug) {
+      await db.collection("licencas").doc(targetUid)
+        .collection("plano").doc(currentSlug)
+        .set({ ativo: false, atualizadoEm: ts }, { merge: true });
+    }
+
+    // Cria/ativa subdoc novo
+    await db.collection("licencas").doc(targetUid)
+      .collection("plano").doc(newSlug)
+      .set({
+        ativo:        true,
+        status:       "ativo",
+        slug:         newSlug,
+        limites,
+        features:     FEATURES_PLANO[newSlug] ?? FEATURES_PLANO.essencial,
+        atualizadoEm: ts,
+      }, { merge: true });
+
+    // Atualiza root
+    await licRootRef.set({
+      plano:        newSlug,
+      ativo:        true,
+      atualizadoEm: ts,
+    }, { merge: true });
+
+    return { ok: true, plano: newSlug };
+  }
+
+  /* ── updateVencimento ── */
+  if (action === "updateVencimento") {
+    if (!newDataVencimento) throw new HttpsError("invalid-argument", "newDataVencimento obrigatório.");
+
+    const currentSlug = licRootSnap.data()?.plano;
+    if (!currentSlug) throw new HttpsError("failed-precondition", "Membro sem plano definido.");
+
+    const dataVencimento = Timestamp.fromDate(new Date(newDataVencimento));
+
+    await db.collection("licencas").doc(targetUid)
+      .collection("plano").doc(currentSlug)
+      .set({ dataVencimento, atualizadoEm: ts }, { merge: true });
+
+    return { ok: true, dataVencimento: newDataVencimento };
+  }
+
+  throw new HttpsError("invalid-argument", `Action desconhecida: ${action}`);
+});
 
 /* ─── Exporta funções de notificacoes ─── */
 module.exports = {
