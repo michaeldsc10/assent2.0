@@ -2977,9 +2977,9 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     <>
       <style>{CSS}</style>
 
-      {saudacaoVisivel && (
+      {saudacaoVisivel && userName !== "Usuário" && (
         <SaudacaoCard
-          nome={nomeUsuario || userName}
+          nome={userName}
           onClose={() => {
             setSaudacaoVisivel(false);
             sessionStorage.setItem("ag_saudacao_shown", "true");
