@@ -3421,7 +3421,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 {anuncioModal.mensagem}
               </div>
 
-              {/* Botão CTA */}
+              {/* Botão CTA — sofisticado com animação */}
               {anuncioModal.btnTexto && (
                 <a
                   href={anuncioModal.btnUrl || "#"}
@@ -3429,21 +3429,29 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   rel="noopener noreferrer"
                   onClick={fecharAnuncioModal}
                   style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                    width: "100%", padding: "13px 20px",
-                    background: "linear-gradient(135deg, #B8860B 0%, #D4AF37 60%, #F0D060 100%)",
-                    border: "none", borderRadius: 10,
-                    color: "#0a0808", fontFamily: "'Inter', system-ui, sans-serif",
-                    fontSize: 13, fontWeight: 700, letterSpacing: "0.08em",
-                    cursor: "pointer", textDecoration: "none", textTransform: "uppercase",
-                    boxShadow: "0 4px 20px rgba(212,175,55,0.35)",
-                    transition: "opacity .2s, transform .1s",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    padding: "10px 18px", margin: "0 auto",
+                    background: "#D4AF37",
+                    border: "none", borderRadius: 8,
+                    color: "#1a1a1a", fontFamily: "'Inter', system-ui, sans-serif",
+                    fontSize: 12, fontWeight: 600, letterSpacing: "0.5px",
+                    cursor: "pointer", textDecoration: "none",
+                    boxShadow: "0 2px 10px rgba(212,175,55,0.25)",
+                    transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
                   }}
-                  onMouseOver={e => { e.currentTarget.style.opacity = ".88"; e.currentTarget.style.transform = "translateY(-1px)"; }}
-                  onMouseOut={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.transform = "translateY(0)"; }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = "#E5B957";
+                    e.currentTarget.style.boxShadow = "0 4px 16px rgba(212,175,55,0.4)";
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = "#D4AF37";
+                    e.currentTarget.style.boxShadow = "0 2px 10px rgba(212,175,55,0.25)";
+                    e.currentTarget.style.transform = "translateY(0)";
+                  }}
                 >
                   {anuncioModal.btnTexto}
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
                 </a>
               )}
             </div>
