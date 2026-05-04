@@ -1100,33 +1100,32 @@ exports.stripeWebhook = onRequest(
   {
     region:  "us-central1",
     secrets: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_TEST_SECRET_KEY, STRIPE_TEST_WEBHOOK, MAIL_USER, MAIL_PASS],
-    // Sem CORS — chamada server-to-server do Stripe
   },
   async (req, res) => {
     if (req.method !== "POST") return res.status(405).end();
+
+    // rawBody obrigatório para verificação de assinatura Stripe
+    const body = req.rawBody || Buffer.from(JSON.stringify(req.body));
 
     // 1. Verificar assinatura — tenta live primeiro, depois test
     const sig = req.headers["stripe-signature"];
     let event;
     let isTestMode = false;
 
-    // Tenta com secret de produção
     try {
-      const stripeTemp = Stripe(STRIPE_SECRET_KEY.value(), { apiVersion: "2024-04-10" });
-      event = stripeTemp.webhooks.constructEvent(req.rawBody, sig, STRIPE_WEBHOOK_SECRET.value());
+      const s = Stripe(STRIPE_SECRET_KEY.value(), { apiVersion: "2024-04-10" });
+      event = s.webhooks.constructEvent(body, sig, STRIPE_WEBHOOK_SECRET.value());
     } catch (_) {
-      // Tenta com secret de teste
       try {
-        const stripeTemp = Stripe(STRIPE_TEST_SECRET_KEY.value(), { apiVersion: "2024-04-10" });
-        event = stripeTemp.webhooks.constructEvent(req.rawBody, sig, STRIPE_TEST_WEBHOOK.value());
+        const s = Stripe(STRIPE_TEST_SECRET_KEY.value(), { apiVersion: "2024-04-10" });
+        event = s.webhooks.constructEvent(body, sig, STRIPE_TEST_WEBHOOK.value());
         isTestMode = true;
       } catch (err) {
-        console.error("[stripeWebhook] Assinatura invalida em ambos os modos:", err.message);
+        console.error("[stripeWebhook] Assinatura invalida:", err.message);
         return res.status(400).send(`Webhook Error: ${err.message}`);
       }
     }
 
-    // Instância Stripe correta para chamadas subsequentes (ex: retrieve subscription)
     const stripe = Stripe(
       isTestMode ? STRIPE_TEST_SECRET_KEY.value() : STRIPE_SECRET_KEY.value(),
       { apiVersion: "2024-04-10" }
