@@ -8,7 +8,7 @@
    ✓ Grid responsivo com melhor espaçamento
    ✓ Bottom Nav para mobile (< 720px)
    ✓ Overlay sidebar para mobile
-   ✓ CSS responsivo global injetado via useEffecf
+   ✓ CSS responsivo global injetado via useEffect
    ═══════════════════════════════════════════════════ */
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
@@ -1872,13 +1872,15 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   }, [searchQuery, runSearch]);
 
   /* ── Nome do usuário ──
-     Admin  → lê licencas/{tenantUid} → campo name
-     Convidado → lê users/{tenantUid}/usuarios/{authUser.uid} → campo nome */
+     Dono (uid === tenantUid) → lê licencas/{tenantUid} → campo name
+     Colaborador              → lê users/{tenantUid}/usuarios/{authUser.uid} → campo nome */
   useEffect(() => {
     if (!uid || !authUser) return;
 
-    if (isAdmin) {
-      // Admin: fonte de verdade é licencas/{uid}
+    const isOwner = authUser.uid === tenantUid;
+
+    if (isOwner) {
+      // Dono: fonte de verdade é licencas/{tenantUid}
       return onSnapshot(doc(db, "licencas", uid), (snap) => {
         const name =
           snap.data()?.name ||
@@ -1887,31 +1889,32 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           authUser?.email?.split("@")[0] ||
           "Usuário";
         setUserName(name);
-      }, fsSnapshotError("Dashboard:nomeAdmin"));
+      }, fsSnapshotError("Dashboard:nomeDono"));
     } else {
-      // Convidado: nome salvo em users/{tenantUid}/usuarios/{authUser.uid}
-      // Fallback: licencas/{uid}/name (admin do tenant cujo uid ≠ tenantUid)
+      // Colaborador: nome salvo em users/{tenantUid}/usuarios/{authUser.uid}
       return onSnapshot(doc(db, "users", uid, "usuarios", authUser.uid), async (snap) => {
         const nomeLocal = snap.data()?.nome;
         if (nomeLocal) { setUserName(nomeLocal); return; }
-        const licSnap = await getDoc(doc(db, "licencas", uid));
+        // fallback sem acesso à licença do dono — usa dados do Firebase Auth
         const name =
-          licSnap.data()?.name ||
           nomeUsuario ||
           authUser?.displayName ||
+          authUser?.email?.split("@")[0] ||
           "Usuário";
         setUserName(name);
-      }, fsSnapshotError("Dashboard:nomeConvidado"));
+      }, fsSnapshotError("Dashboard:nomeColaborador"));
     }
-  }, [uid, authUser, nomeUsuario, isAdmin]);
+  }, [uid, authUser, tenantUid, nomeUsuario]);
 
   /* ── Avatar ──
-     Admin     → users/{uid}/foto/avatar → campo base64
-     Convidado → users/{tenantUid}/usuarios/{authUser.uid} → campo fotoBase64 */
+     Dono        → users/{uid}/foto/avatar → campo base64
+     Colaborador → users/{tenantUid}/usuarios/{authUser.uid} → campo fotoBase64 */
   useEffect(() => {
     if (!uid || !authUser) return;
 
-    if (isAdmin) {
+    const isOwner = authUser.uid === tenantUid;
+
+    if (isOwner) {
       return onSnapshot(doc(db, "users", uid, "foto", "avatar"), (snap) => {
         if (snap.exists()) {
           const d = snap.data();
@@ -1919,15 +1922,15 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         } else {
           setUserAvatar(null);
         }
-      }, (err) => { fsError(err, "Dashboard:avatarAdmin"); setUserAvatar(null); });
+      }, (err) => { fsError(err, "Dashboard:avatarDono"); setUserAvatar(null); });
     } else {
-      // Convidado: foto salva no próprio documento do usuário
+      // Colaborador: foto salva no próprio documento do usuário
       return onSnapshot(doc(db, "users", uid, "usuarios", authUser.uid), (snap) => {
         const fotoBase64 = snap.data()?.fotoBase64 || null;
         setUserAvatar(fotoBase64);
-      }, (err) => { fsError(err, "Dashboard:avatarConvidado"); setUserAvatar(null); });
+      }, (err) => { fsError(err, "Dashboard:avatarColaborador"); setUserAvatar(null); });
     }
-  }, [uid, authUser, isAdmin]);
+  }, [uid, authUser, tenantUid]);
 
   /* ── Visibilidade do menu ── */
   useEffect(() => {
