@@ -8,7 +8,7 @@
    ✓ Grid responsivo com melhor espaçamento
    ✓ Bottom Nav para mobile (< 720px)
    ✓ Overlay sidebar para mobile
-   ✓ CSS responsivo global injetado via useEffect
+   ✓ CSS responsivo global injetado via useEffecf
    ═══════════════════════════════════════════════════ */
 
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
