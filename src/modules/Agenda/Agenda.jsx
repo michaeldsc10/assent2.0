@@ -4,20 +4,20 @@
    ═══════════════════════════════════════════════════ */
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { CalendarDays, List, Plus, X, CheckCircle2, Edit2, Trash2 } from "lucide-react";
+import { CalendarDays, List, Plus, X, CheckCircle2, Edit2, Trash2, Tag } from "lucide-react";
 import { db } from "../../lib/firebase";
 import { useAuth } from "../../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../../lib/logAction";
 import {  LIMITES_FREE } from "../../hooks/useLicenca";
 import { BannerLimite } from "../../hooks/LicencaUI";
 import {
-  collection, doc, setDoc, deleteDoc, onSnapshot, updateDoc,
+  collection, doc, setDoc, deleteDoc, onSnapshot, updateDoc, getDocs,
 } from "firebase/firestore";
 import AgendaLista from "./AgendaLista";
 import AgendaCalendario from "./AgendaCalendario";
 import EventoModal from "./EventoModal";
 
-/* ── Constantes ── */
+/* ── Constantes (fallback) ── */
 export const TIPOS = ["Reunião", "Visita", "Entrega", "Ligação", "Prazo", "Outro"];
 
 export const TIPO_ESTILO = {
@@ -28,6 +28,27 @@ export const TIPO_ESTILO = {
   "Prazo":   { bg: "rgba(224,82,82,0.14)",   color: "var(--red)" },
   "Outro":   { bg: "rgba(255,255,255,0.06)", color: "var(--text-2)" },
 };
+
+/* ── Helpers de cor ── */
+function hexToRgba(hex, alpha) {
+  if (!hex || !hex.startsWith("#") || hex.length < 7) return `rgba(255,255,255,${alpha})`;
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+/** Resolve estilo visual de um tipo — categorias Firestore têm prioridade */
+export function resolverEstiloTipo(tipo, categorias = []) {
+  const cat = categorias.find(c => c.nome === tipo);
+  if (cat) return { bg: hexToRgba(cat.color, 0.14), color: cat.color };
+  return TIPO_ESTILO[tipo] || TIPO_ESTILO["Outro"];
+}
+
+/** Lista de nomes de tipos a exibir no select */
+export function listaTipos(categorias = []) {
+  return categorias.length > 0 ? categorias.map(c => c.nome) : TIPOS;
+}
 
 /* ── Helpers ── */
 export const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -381,6 +402,72 @@ const CSS = `
   .confirm-body { padding: 28px 22px; text-align: center; color: var(--text-2); font-size: 13px; line-height: 1.6; }
   .confirm-icon { font-size: 36px; margin-bottom: 12px; }
 
+  /* ── Gerenciar Categorias ── */
+  .cat-lista {
+    display: flex; flex-direction: column; gap: 6px;
+    max-height: 300px; overflow-y: auto; margin-bottom: 20px;
+    padding-right: 4px;
+  }
+  .cat-lista::-webkit-scrollbar { width: 3px; }
+  .cat-lista::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
+
+  .cat-item {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 10px; border-radius: 9px;
+    background: var(--s2); border: 1px solid var(--border);
+    transition: border-color .13s;
+  }
+  .cat-item:hover { border-color: var(--border-h); }
+  .cat-item.editing { border-color: var(--gold); }
+
+  .cat-swatch {
+    width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .cat-nome { flex: 1; font-size: 13px; color: var(--text); font-family: 'DM Sans', sans-serif; }
+  .cat-nome-input {
+    flex: 1; background: var(--s3); border: 1px solid var(--border-h);
+    border-radius: 6px; padding: 4px 8px; color: var(--text);
+    font-size: 13px; font-family: 'DM Sans', sans-serif; outline: none;
+  }
+  .cat-nome-input:focus { border-color: var(--gold); }
+
+  .cat-color-pick {
+    -webkit-appearance: none; appearance: none;
+    width: 36px; height: 36px; border-radius: 8px;
+    border: 1px solid var(--border); cursor: pointer;
+    padding: 2px; background: var(--s2); flex-shrink: 0;
+  }
+  .cat-color-pick::-webkit-color-swatch-wrapper { padding: 0; border-radius: 6px; }
+  .cat-color-pick::-webkit-color-swatch { border: none; border-radius: 5px; }
+
+  .cat-add-form {
+    display: flex; gap: 8px; align-items: center;
+    padding: 12px; background: var(--s2); border: 1px dashed var(--border-h);
+    border-radius: 10px;
+  }
+  .cat-add-form .form-input { margin: 0; flex: 1; }
+
+  .cat-empty {
+    text-align: center; padding: 24px; color: var(--text-3);
+    font-size: 12px; background: var(--s2); border-radius: 9px;
+    border: 1px dashed var(--border); margin-bottom: 16px;
+  }
+
+  .cat-section-label {
+    font-size: 10px; font-weight: 600; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--text-3); margin-bottom: 8px;
+  }
+
+  .btn-cat-manage {
+    display: flex; align-items: center; gap: 6px; padding: 8px 13px;
+    border-radius: 9px; background: var(--s2); color: var(--text-2);
+    border: 1px solid var(--border); cursor: pointer;
+    font-family: 'DM Sans', sans-serif; font-size: 12px;
+    transition: all .13s; white-space: nowrap;
+  }
+  .btn-cat-manage:hover { background: var(--s1); color: var(--text); border-color: var(--border-h); }
+
   /* ── Print ── */
   @media print {
     .ag-page, .modal-overlay, body > * { display: none !important; }
@@ -410,7 +497,7 @@ const CSS = `
 /* ══════════════════════════════════════════════════════
    MODAL: Formulário de Evento (Criar / Editar)
    ══════════════════════════════════════════════════════ */
-function ModalFormEvento({ evento, onSave, onClose }) {
+function ModalFormEvento({ evento, onSave, onClose, categorias = [] }) {
   const isEdit = !!evento;
 
   const [form, setForm] = useState({
@@ -498,7 +585,7 @@ function ModalFormEvento({ evento, onSave, onClose }) {
                 value={form.tipo}
                 onChange={e => set("tipo", e.target.value)}
               >
-                {TIPOS.map(t => <option key={t} value={t}>{t}</option>)}
+                {listaTipos(categorias).map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
@@ -598,8 +685,202 @@ function ModalFormEvento({ evento, onSave, onClose }) {
 }
 
 /* ══════════════════════════════════════════════════════
-   MODAL: Confirmar Exclusão
+   MODAL: Gerenciar Categorias
    ══════════════════════════════════════════════════════ */
+const CORES_SUGERIDAS = [
+  "#5b8ef0", "#48c78e", "#D4AF37", "#c084fc",
+  "#e05252", "#f59e0b", "#06b6d4", "#f97316",
+  "#a78bfa", "#34d399", "#fb7185", "#94a3b8",
+];
+
+function ModalGerenciarCategorias({ categorias, onAdd, onEdit, onDelete, onClose }) {
+  const [editId,    setEditId]    = useState(null);
+  const [editNome,  setEditNome]  = useState("");
+  const [editColor, setEditColor] = useState("#5b8ef0");
+  const [novoNome,  setNovoNome]  = useState("");
+  const [novaCor,   setNovaCor]   = useState("#5b8ef0");
+  const [salvando,  setSalvando]  = useState(false);
+  const [deletId,   setDeletId]   = useState(null);
+
+  const iniciarEdit = (cat) => {
+    setEditId(cat.id);
+    setEditNome(cat.nome);
+    setEditColor(cat.color);
+  };
+  const cancelEdit = () => { setEditId(null); setEditNome(""); setEditColor("#5b8ef0"); };
+
+  const salvarEdit = async () => {
+    const nome = editNome.trim();
+    if (!nome) return;
+    setSalvando(true);
+    await onEdit(editId, { nome, color: editColor });
+    cancelEdit();
+    setSalvando(false);
+  };
+
+  const salvarNova = async () => {
+    const nome = novoNome.trim();
+    if (!nome) return;
+    setSalvando(true);
+    await onAdd({ nome, color: novaCor });
+    setNovoNome("");
+    setNovaCor("#5b8ef0");
+    setSalvando(false);
+  };
+
+  const confirmarDelete = async (id) => {
+    setSalvando(true);
+    await onDelete(id);
+    setDeletId(null);
+    setSalvando(false);
+  };
+
+  return (
+    <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box" style={{ maxWidth: 480 }}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">Categorias de Eventos</div>
+            <div className="modal-sub">Crie e personalize os tipos de evento</div>
+          </div>
+          <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)" /></button>
+        </div>
+
+        <div className="modal-body">
+          {/* Lista */}
+          <div className="cat-section-label">Categorias personalizadas</div>
+
+          {categorias.length === 0 ? (
+            <div className="cat-empty">
+              <Tag size={20} style={{ marginBottom: 8, opacity: .4 }} /><br />
+              Nenhuma categoria. Crie abaixo ou use os tipos padrão.
+            </div>
+          ) : (
+            <div className="cat-lista">
+              {categorias.map(cat => (
+                <div key={cat.id} className={`cat-item${editId === cat.id ? " editing" : ""}`}>
+                  {editId === cat.id ? (
+                    <>
+                      <input
+                        type="color"
+                        className="cat-color-pick"
+                        value={editColor}
+                        onChange={e => setEditColor(e.target.value)}
+                        title="Cor da categoria"
+                      />
+                      <input
+                        className="cat-nome-input"
+                        value={editNome}
+                        onChange={e => setEditNome(e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter") salvarEdit(); if (e.key === "Escape") cancelEdit(); }}
+                        autoFocus
+                        maxLength={40}
+                      />
+                      <button
+                        className="btn-icon btn-icon-done"
+                        title="Salvar"
+                        onClick={salvarEdit}
+                        disabled={salvando}
+                        style={{ color: "#48c78e", border: "1px solid rgba(72,199,142,.25)", background: "rgba(72,199,142,.1)" }}
+                      >
+                        <CheckCircle2 size={13} />
+                      </button>
+                      <button className="btn-icon btn-icon-del" title="Cancelar" onClick={cancelEdit}>
+                        <X size={13} />
+                      </button>
+                    </>
+                  ) : deletId === cat.id ? (
+                    <>
+                      <div className="cat-swatch" style={{ background: cat.color }} />
+                      <span className="cat-nome" style={{ color: "var(--red)", fontSize: 12 }}>
+                        Excluir &ldquo;{cat.nome}&rdquo;?
+                      </span>
+                      <button
+                        className="btn-danger"
+                        style={{ padding: "4px 12px", fontSize: 12 }}
+                        onClick={() => confirmarDelete(cat.id)}
+                        disabled={salvando}
+                      >Sim</button>
+                      <button
+                        className="btn-secondary"
+                        style={{ padding: "4px 12px", fontSize: 12 }}
+                        onClick={() => setDeletId(null)}
+                      >Não</button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="cat-swatch" style={{ background: cat.color }} />
+                      <span className="cat-nome">{cat.nome}</span>
+                      <button className="btn-icon btn-icon-edit" title="Editar" onClick={() => iniciarEdit(cat)}>
+                        <Edit2 size={12} />
+                      </button>
+                      <button className="btn-icon btn-icon-del" title="Excluir" onClick={() => setDeletId(cat.id)}>
+                        <Trash2 size={12} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Form nova categoria */}
+          <div className="cat-section-label" style={{ marginTop: 4 }}>Nova categoria</div>
+          <div className="cat-add-form">
+            <input
+              type="color"
+              className="cat-color-pick"
+              value={novaCor}
+              onChange={e => setNovaCor(e.target.value)}
+              title="Cor"
+            />
+            <input
+              className="form-input"
+              placeholder="Nome da categoria"
+              value={novoNome}
+              onChange={e => setNovoNome(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && salvarNova()}
+              maxLength={40}
+            />
+            <button
+              className="btn-primary"
+              style={{ padding: "9px 16px", flexShrink: 0 }}
+              onClick={salvarNova}
+              disabled={salvando || !novoNome.trim()}
+            >
+              <Plus size={13} />
+            </button>
+          </div>
+
+          {/* Cores sugeridas */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
+            {CORES_SUGERIDAS.map(c => (
+              <div
+                key={c}
+                onClick={() => {
+                  if (editId) setEditColor(c); else setNovaCor(c);
+                }}
+                title={c}
+                style={{
+                  width: 22, height: 22, borderRadius: 5, background: c, cursor: "pointer",
+                  border: (editId ? editColor : novaCor) === c
+                    ? "2px solid var(--text)" : "2px solid transparent",
+                  transition: "border .1s",
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Fechar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 function ModalConfirmDelete({ evento, onConfirm, onClose }) {
   const [excluindo, setExcluindo] = useState(false);
 
@@ -644,7 +925,7 @@ const FILTROS = ["Próximos", "Hoje", "Esta semana", "Todos"];
 
 export default function Agenda({ isPro = false }) {
   // ── Multi-tenant ──
-  const { tenantUid, cargo, nomeUsuario, podeCriar, podeEditar, podeExcluir } = useAuth();
+  const { tenantUid, cargo, nomeUsuario, podeCriar, podeEditar, podeExcluir, isAdmin } = useAuth();
 
   // ── Flags de permissão ──
   const podeCriarV   = podeCriar("agenda");
@@ -652,6 +933,7 @@ export default function Agenda({ isPro = false }) {
   const podeExcluirV = podeExcluir("agenda");
 
   const [eventos,  setEventos]  = useState([]);
+  const [categorias, setCategorias] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [modo,     setModo]     = useState("lista");   // "lista" | "calendario"
   const [filtro,   setFiltro]   = useState("Próximos");
@@ -660,6 +942,7 @@ export default function Agenda({ isPro = false }) {
   const [detalhes, setDetalhes] = useState(null);   // EventoModal
   const [formEvt,  setFormEvt]  = useState(null);   // null | "novo" | evento obj
   const [deletando, setDeletando] = useState(null);
+  const [gerenciarCat, setGerenciarCat] = useState(false);
 
   /* ── Auth ── */
 
@@ -674,6 +957,19 @@ export default function Agenda({ isPro = false }) {
       setLoading(false);
     }, () => setLoading(false));
 
+    return unsub;
+  }, [tenantUid]);
+
+  /* ── Snapshot Categorias ── */
+  useEffect(() => {
+    if (!tenantUid) return;
+    const col = collection(db, "users", tenantUid, "categoriasAgenda");
+    const unsub = onSnapshot(col, snap => {
+      const lista = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0));
+      setCategorias(lista);
+    });
     return unsub;
   }, [tenantUid]);
 
@@ -694,6 +990,26 @@ export default function Agenda({ isPro = false }) {
       default:           return eventos;
     }
   }, [eventos, filtro, hoje]);
+
+  /* ── Handlers Categorias ── */
+  const handleAddCategoria = useCallback(async ({ nome, color }) => {
+    if (!tenantUid) return;
+    const id = crypto.randomUUID();
+    await setDoc(doc(db, "users", tenantUid, "categoriasAgenda", id), {
+      id, nome, color,
+      ordem: Date.now(),
+    });
+  }, [tenantUid]);
+
+  const handleEditCategoria = useCallback(async (id, { nome, color }) => {
+    if (!tenantUid) return;
+    await updateDoc(doc(db, "users", tenantUid, "categoriasAgenda", id), { nome, color });
+  }, [tenantUid]);
+
+  const handleDeleteCategoria = useCallback(async (id) => {
+    if (!tenantUid) return;
+    await deleteDoc(doc(db, "users", tenantUid, "categoriasAgenda", id));
+  }, [tenantUid]);
 
   /* ── Handlers Firebase ── */
   const handleAdd = useCallback(async (dados) => {
@@ -762,6 +1078,16 @@ export default function Agenda({ isPro = false }) {
                 <CalendarDays size={13} /> Calendário
               </button>
             </div>
+
+            {isAdmin && (
+              <button
+                className="btn-cat-manage"
+                onClick={() => setGerenciarCat(true)}
+                title="Gerenciar categorias de eventos"
+              >
+                <Tag size={13} /> Categorias
+              </button>
+            )}
 
             <button
               className="btn-novo-evento"
@@ -846,6 +1172,17 @@ export default function Agenda({ isPro = false }) {
           evento={formEvt === "novo" ? null : formEvt}
           onSave={formEvt === "novo" ? handleAdd : handleEdit}
           onClose={() => setFormEvt(null)}
+          categorias={categorias}
+        />
+      )}
+
+      {gerenciarCat && (
+        <ModalGerenciarCategorias
+          categorias={categorias}
+          onAdd={handleAddCategoria}
+          onEdit={handleEditCategoria}
+          onDelete={handleDeleteCategoria}
+          onClose={() => setGerenciarCat(false)}
         />
       )}
 
