@@ -4,6 +4,7 @@
    ═══════════════════════════════════════════════════ */
 
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onSchedule }        = require('firebase-functions/v2/scheduler');
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const admin = require('firebase-admin');
 
@@ -151,5 +152,86 @@ exports.atualizarTokenFCM = onCall(
       console.error('[FCM] Erro ao atualizar token:', error);
       throw new HttpsError('internal', 'Erro ao atualizar token');
     }
+  }
+);
+
+
+/* ═══════════════════════════════════════════════════
+   Notificações agendadas — Agenda
+   Cria doc em users/{tenantUid}/notificacoes →
+   onDocumentCreated acima dispara FCM automaticamente
+   ═══════════════════════════════════════════════════ */
+
+function isoSP(date) {
+  return date.toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+}
+
+function montarMensagemAgenda(eventos) {
+  return eventos
+    .sort((a, b) => (a.horario || '').localeCompare(b.horario || ''))
+    .map((e) => {
+      const hora    = e.horario ? `${e.horario} — ` : '';
+      const nome    = e.titulo  || e.descricao || 'Evento';
+      const cliente = e.cliente ? ` (${e.cliente})` : '';
+      return `• ${hora}${nome}${cliente}`;
+    })
+    .join('\n');
+}
+
+async function processarAgendaTenants(dataISO, buildTitulo) {
+  const db      = admin.firestore();
+  const tenants = await db.collection('users').listDocuments();
+
+  await Promise.all(
+    tenants.map(async (ref) => {
+      const tenantUid = ref.id;
+      try {
+        const snap = await db
+          .collection(`users/${tenantUid}/eventos`)
+          .where('data',   '==', dataISO)
+          .where('status', '==', 'pendente')
+          .get();
+
+        if (snap.empty) return;
+
+        const eventos  = snap.docs.map((d) => d.data());
+        const qtd      = eventos.length;
+        const titulo   = buildTitulo(qtd);
+        const mensagem = montarMensagemAgenda(eventos);
+
+        await db.collection(`users/${tenantUid}/notificacoes`).add({
+          destinatarioUid : tenantUid,
+          titulo,
+          mensagem,
+          tipo            : 'agenda',
+          lida            : false,
+          criadoEm        : admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        console.log(`[Agenda] Notif criada — tenant:${tenantUid} data:${dataISO} qtd:${qtd}`);
+      } catch (err) {
+        console.error(`[Agenda] Erro tenant:${tenantUid}`, err.message);
+      }
+    })
+  );
+}
+
+exports.notifAgendaHoje = onSchedule(
+  { schedule: '0 6 * * *', timeZone: 'America/Sao_Paulo', region: 'us-central1' },
+  async () => {
+    await processarAgendaTenants(
+      isoSP(new Date()),
+      (qtd) => `📅 ${qtd} compromisso${qtd > 1 ? 's' : ''} hoje`,
+    );
+  }
+);
+
+exports.notifAgendaAmanha = onSchedule(
+  { schedule: '0 20 * * *', timeZone: 'America/Sao_Paulo', region: 'us-central1' },
+  async () => {
+    await processarAgendaTenants(
+      isoSP(new Date(Date.now() + 86_400_000)),
+      (qtd) => `🌙 Amanhã: ${qtd} compromisso${qtd > 1 ? 's' : ''}`,
+    );
   }
 );
