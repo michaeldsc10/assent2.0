@@ -5,7 +5,7 @@
    Preparado para integração futura com módulo de Vendas
    ═══════════════════════════════════════════════════ */
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Search,
   Plus,
@@ -33,6 +33,7 @@ import {
   serverTimestamp,
   runTransaction,
   getDoc,
+  getDocs,
 } from "firebase/firestore";
 
 /* ══════════════════════════════════════════════════
@@ -331,6 +332,37 @@ const CSS = `
     border: none; border-top: 1px solid var(--border); margin: 12px 0;
   }
 
+  /* Cliente autocomplete */
+  .cliente-wrap { position: relative; }
+  .cliente-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 9999;
+    background: var(--s1); border: 1px solid var(--border-h);
+    border-radius: 9px; overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    max-height: 200px; overflow-y: auto;
+  }
+  .cliente-dropdown::-webkit-scrollbar { width: 3px; }
+  .cliente-dropdown::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
+  .cliente-option {
+    padding: 9px 13px; cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background .1s;
+  }
+  .cliente-option:last-child { border-bottom: none; }
+  .cliente-option:hover { background: var(--s2); }
+  .cliente-option-nome { font-size: 13px; color: var(--text); }
+  .cliente-option-sub  { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+  .cliente-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(200,165,94,0.12); border: 1px solid rgba(200,165,94,.3);
+    border-radius: 6px; padding: 2px 8px; margin-top: 6px;
+    font-size: 11px; color: var(--gold);
+  }
+  .cliente-tag button {
+    background: none; border: none; cursor: pointer;
+    color: var(--gold); padding: 0; line-height: 1; display: flex;
+  }
+
   /* Confirm body */
   .confirm-body {
     padding: 28px 22px; text-align: center;
@@ -425,22 +457,80 @@ function StatusBadge({ status }) {
    ══════════════════════════════════════════════════ */
 function ModalFormConta({ conta, onSave, onClose }) {
   const isEdit = !!conta;
+  const { tenantUid } = useAuth();
 
+  /* ── Form state ── */
   const [form, setForm] = useState({
     clienteNome:    conta?.clienteNome    || "",
+    clienteId:      conta?.clienteId      || null,
     descricao:      conta?.descricao      || "",
     valorTotal:     conta?.valorTotal     != null ? String(conta.valorTotal) : "",
     valorPago:      conta?.valorPago      != null ? String(conta.valorPago)  : "0",
     dataVencimento: conta?.dataVencimento || "",
     observacoes:    conta?.observacoes    || "",
   });
-  const [erros, setErros]     = useState({});
+  const [erros, setErros]       = useState({});
   const [salvando, setSalvando] = useState(false);
+
+  /* ── Autocomplete state ── */
+  const [clientes, setClientes]         = useState([]);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [clienteVinculado, setClienteVinculado] = useState(
+    conta?.clienteId ? { id: conta.clienteId, nome: conta.clienteNome } : null
+  );
+  const inputRef = useRef(null);
+
+  /* ── Busca clientes uma vez ao montar ── */
+  useEffect(() => {
+    if (!tenantUid) return;
+    getDocs(collection(db, "users", tenantUid, "clientes"))
+      .then(snap => {
+        setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      })
+      .catch(err => fsError(err, "AReceber:ModalFormConta:clientes"));
+  }, [tenantUid]);
+
+  /* ── Filtra clientes pelo que foi digitado ── */
+  const clientesFiltrados = useMemo(() => {
+    const q = form.clienteNome.trim().toLowerCase();
+    if (!q) return clientes.slice(0, 8);
+    return clientes
+      .filter(c => (c.nome || c.nomeFantasia || "").toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [clientes, form.clienteNome]);
+
+  /* ── Fecha dropdown ao clicar fora ── */
+  useEffect(() => {
+    if (!dropdownOpen) return;
+    const handler = (e) => {
+      if (inputRef.current && !inputRef.current.closest(".cliente-wrap").contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [dropdownOpen]);
 
   const set = useCallback((campo, valor) => {
     setForm(f => ({ ...f, [campo]: valor }));
     setErros(e => ({ ...e, [campo]: "" }));
   }, []);
+
+  /* ── Selecionar cliente do dropdown ── */
+  const selecionarCliente = (c) => {
+    const nome = c.nome || c.nomeFantasia || "";
+    setForm(f => ({ ...f, clienteNome: nome, clienteId: c.id }));
+    setClienteVinculado({ id: c.id, nome });
+    setErros(e => ({ ...e, clienteNome: "" }));
+    setDropdownOpen(false);
+  };
+
+  /* ── Desvincular cliente (volta a free text) ── */
+  const desvincularCliente = () => {
+    setForm(f => ({ ...f, clienteId: null }));
+    setClienteVinculado(null);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
 
   const validar = () => {
     const e = {};
@@ -472,6 +562,7 @@ function ModalFormConta({ conta, onSave, onClose }) {
 
       await onSave({
         clienteNome:    form.clienteNome.trim(),
+        clienteId:      form.clienteId || null,
         descricao:      form.descricao.trim(),
         valorTotal,
         valorPago,
@@ -479,12 +570,10 @@ function ModalFormConta({ conta, onSave, onClose }) {
         dataVencimento: form.dataVencimento,
         observacoes:    form.observacoes.trim(),
         status,
-        // Campos para integração futura com módulo de Vendas
         origem:         isEdit ? (conta.origem || "manual") : "manual",
         referenciaId:   isEdit ? (conta.referenciaId || null) : null,
       });
     } finally {
-      // Garante reset mesmo se onSave lançar exceção
       setSalvando(false);
     }
   };
@@ -510,12 +599,57 @@ function ModalFormConta({ conta, onSave, onClose }) {
             <label className="form-label">
               Cliente <span className="form-label-req">*</span>
             </label>
-            <input
-              className={`form-input${erros.clienteNome ? " err" : ""}`}
-              placeholder="Nome do cliente"
-              value={form.clienteNome}
-              onChange={e => set("clienteNome", e.target.value)}
-            />
+            <div className="cliente-wrap">
+              <input
+                ref={inputRef}
+                className={`form-input${erros.clienteNome ? " err" : ""}`}
+                placeholder="Nome do cliente ou busque na lista…"
+                value={form.clienteNome}
+                disabled={!!clienteVinculado}
+                onChange={e => {
+                  set("clienteNome", e.target.value);
+                  // Se o usuário editou o texto, desvincula o cliente
+                  if (clienteVinculado) {
+                    setClienteVinculado(null);
+                    setForm(f => ({ ...f, clienteId: null }));
+                  }
+                  setDropdownOpen(true);
+                }}
+                onFocus={() => setDropdownOpen(true)}
+                autoComplete="off"
+              />
+
+              {/* Tag de cliente vinculado */}
+              {clienteVinculado && (
+                <div className="cliente-tag">
+                  <CheckCircle size={11} />
+                  Cliente cadastrado vinculado
+                  <button onClick={desvincularCliente} title="Desvincular">
+                    <X size={11} />
+                  </button>
+                </div>
+              )}
+
+              {/* Dropdown */}
+              {dropdownOpen && !clienteVinculado && clientesFiltrados.length > 0 && (
+                <div className="cliente-dropdown">
+                  {clientesFiltrados.map(c => {
+                    const nome = c.nome || c.nomeFantasia || "—";
+                    const sub  = c.email || c.telefone || c.cpf || c.cnpj || "";
+                    return (
+                      <div
+                        key={c.id}
+                        className="cliente-option"
+                        onMouseDown={e => { e.preventDefault(); selecionarCliente(c); }}
+                      >
+                        <div className="cliente-option-nome">{nome}</div>
+                        {sub && <div className="cliente-option-sub">{sub}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
             {erros.clienteNome && <div className="form-error">{erros.clienteNome}</div>}
           </div>
 
