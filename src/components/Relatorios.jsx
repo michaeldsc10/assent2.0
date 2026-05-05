@@ -5055,7 +5055,7 @@ function RelatorioContasReceber({ aReceber = [], intervalo }) {
       colunas: ["Vencimento", "Cliente", "Descrição", "Valor Total (R$)", "Valor Restante (R$)", "Status"],
       dados: tabelaItens.map((i) => [
         parseDateISO(i.dataVencimento) || "",
-        i.cliente || i.nomeCliente || "",
+        i.clienteNome || i.cliente || i.nomeCliente || "",
         i.descricao || "",
         Number(i.valorTotal || i.valor || 0),
         Number(i.valorRestante ?? i.valor ?? 0),
@@ -5100,7 +5100,7 @@ function RelatorioContasReceber({ aReceber = [], intervalo }) {
         <div className="rcr-table-header"><span className="rcr-table-title">Contas a Receber</span><span className="rcr-table-badge">{tabelaItens.length} registros</span></div>
         <div className="rcr-row rcr-row-head" style={{ gridTemplateColumns: "95px 1fr 1fr 120px 120px 100px" }}>
           <SortTh label="Vencimento" sortKey="dataVencimento" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Vencimento</SortTh>
-          <SortTh label="Cliente" sortKey="cliente" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Cliente</SortTh>
+          <SortTh label="Cliente" sortKey="clienteNome" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Cliente</SortTh>
           <SortTh label="Descrição" sortKey="descricao" currentKey={rctSK} currentDir={rctSD} onSort={rctSort}>Descrição</SortTh>
           <SortTh label="Valor Total" sortKey="valorTotal" currentKey={rctSK} currentDir={rctSD} onSort={rctSort} align="right"><span style={{width:"100%",textAlign:"right"}}>Valor Total</span></SortTh>
           <SortTh label="Restante" sortKey="valorRestante" currentKey={rctSK} currentDir={rctSD} onSort={rctSort} align="right"><span style={{width:"100%",textAlign:"right"}}>Restante</span></SortTh>
@@ -5122,7 +5122,7 @@ function RelatorioContasReceber({ aReceber = [], intervalo }) {
               return (
                 <div key={item.id || i} className="rcr-row" style={{ gridTemplateColumns: "95px 1fr 1fr 120px 120px 100px", background: d === hoje ? "rgba(200,165,94,0.04)" : undefined }}>
                   <span style={{ color: item._status === "vencido" ? "var(--red)" : "var(--text-2)" }}>{dFmt}</span>
-                  <span style={{ color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.cliente || item.nomeCliente || "—"}</span>
+                  <span style={{ color: "var(--text)", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.clienteNome || item.cliente || item.nomeCliente || "—"}</span>
                   <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.descricao || "—"}</span>
                   <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: "var(--text)" }}>{fmtR$(vTotal)}</span>
                   <span style={{ textAlign: "right", fontFamily: "Sora,sans-serif", fontWeight: 600, color: item._status === "pago" ? "var(--green)" : item._status === "vencido" ? "var(--red)" : "var(--gold)" }}>{fmtR$(vRestante)}</span>
@@ -5234,7 +5234,7 @@ function RelatorioContasReceber({ aReceber = [], intervalo }) {
                   return (
                     <div key={item.id || i} className="rcr-cf-row">
                       <span className="rcr-cf-date">{d}</span>
-                      <span className="rcr-cf-desc">{item.cliente || item.nomeCliente || "—"} — {item.descricao || "Cobrança"}</span>
+                      <span className="rcr-cf-desc">{item.clienteNome || item.cliente || item.nomeCliente || "—"} — {item.descricao || "Cobrança"}</span>
                       {dias !== null && <span style={{ fontSize: 10, color: dias <= 3 ? "var(--red)" : "var(--text-3)", marginRight: 8 }}>{dias === 0 ? "Hoje" : dias === 1 ? "Amanhã" : `em ${dias}d`}</span>}
                       <span className={`rcr-cf-val ${item._status}`}>{fmtR$(val)}</span>
                     </div>
