@@ -1890,7 +1890,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       }, fsSnapshotError("Dashboard:nomeAdmin"));
     } else {
       // Convidado: nome salvo em users/{tenantUid}/usuarios/{authUser.uid}
-      // Fallback: licencas/{uid}/name (admin do tenant com uid diferente do tenantUid)
+      // Fallback: licencas/{uid}/name (admin do tenant cujo uid ≠ tenantUid)
       return onSnapshot(doc(db, "users", uid, "usuarios", authUser.uid), async (snap) => {
         const nomeLocal = snap.data()?.nome;
         if (nomeLocal) { setUserName(nomeLocal); return; }
