@@ -57,7 +57,7 @@ import { usePermissao } from "./hooks/usePermissao";
 import { db, logout } from "./lib/firebase";
 import { initFCM, obterTokenPush } from "./lib/fcm";
 import { useAuth } from "./contexts/AuthContext";
-import { doc, onSnapshot, collection, query, orderBy, limit, where, getDocs, updateDoc } from "firebase/firestore";
+import { doc, onSnapshot, collection, query, orderBy, limit, where, getDocs, getDoc, updateDoc } from "firebase/firestore";
 import { fsError, fsSnapshotError } from "./utils/firestoreError";
 
 /* ── Hooks de dados ────────────────────────────── */
@@ -1890,12 +1890,15 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       }, fsSnapshotError("Dashboard:nomeAdmin"));
     } else {
       // Convidado: nome salvo em users/{tenantUid}/usuarios/{authUser.uid}
-      return onSnapshot(doc(db, "users", uid, "usuarios", authUser.uid), (snap) => {
+      // Fallback: licencas/{uid}/name (admin do tenant com uid diferente do tenantUid)
+      return onSnapshot(doc(db, "users", uid, "usuarios", authUser.uid), async (snap) => {
+        const nomeLocal = snap.data()?.nome;
+        if (nomeLocal) { setUserName(nomeLocal); return; }
+        const licSnap = await getDoc(doc(db, "licencas", uid));
         const name =
-          snap.data()?.nome ||
+          licSnap.data()?.name ||
           nomeUsuario ||
           authUser?.displayName ||
-          authUser?.email?.split("@")[0] ||
           "Usuário";
         setUserName(name);
       }, fsSnapshotError("Dashboard:nomeConvidado"));
