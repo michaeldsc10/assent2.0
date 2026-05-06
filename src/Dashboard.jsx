@@ -1368,6 +1368,49 @@ function SaudacaoCard({ nome, onClose }) {
   );
 }
 
+/* ─────────────────────────────────────
+   COMPONENTE: LoadingCubes
+   ───────────────────────────────────── */
+function LoadingCubes() {
+  return (
+    <>
+      <style>{`
+        @keyframes cube-bounce {
+          0%   { transform: translateY(0); }
+          25%  { transform: translateY(-12px); }
+          50%  { transform: translateY(0); }
+          100% { transform: translateY(0); }
+        }
+        .loading-cubes {
+          display: flex;
+          gap: 6px;
+          align-items: center;
+          justify-content: center;
+          height: 40px;
+        }
+        .cube {
+          width: 8px;
+          height: 8px;
+          background: linear-gradient(135deg, #D4AF37 0%, #F0D060 100%);
+          border-radius: 2px;
+          box-shadow: 0 2px 8px rgba(212, 175, 55, 0.4);
+          animation: cube-bounce 1.4s cubic-bezier(0.65, 0.05, 0.36, 0.95) infinite;
+        }
+        .cube:nth-child(1) { animation-delay: 0s; }
+        .cube:nth-child(2) { animation-delay: 0.14s; }
+        .cube:nth-child(3) { animation-delay: 0.28s; }
+        .cube:nth-child(4) { animation-delay: 0.42s; }
+      `}</style>
+      <div className="loading-cubes">
+        <div className="cube" />
+        <div className="cube" />
+        <div className="cube" />
+        <div className="cube" />
+      </div>
+    </>
+  );
+}
+
 /* ══════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
 ═══════════════════════════════════════════════════════ */
@@ -2253,7 +2296,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             }}>
               {searchLoading ? (
                 <div style={{ padding: "14px", fontSize: 13, color: "var(--text-3)", textAlign: "center" }}>
-                  Buscando...
+                  <LoadingCubes />
                 </div>
               ) : searchResults.length === 0 ? (
                 <div style={{ padding: "14px", fontSize: 13, color: "var(--text-3)", textAlign: "center" }}>
@@ -3351,8 +3394,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   )}
                 </button>
 
-                {/* ── Assent Flow — só aparece se plano for premium ── */}
-                {(isPro || licencaSlug === "profissional") && (
+                {/* ── Assent Flow — essencial, profissional e delux ── */}
+                {(licencaSlug === "essencial" || licencaSlug === "profissional" || licencaSlug === "delux") && (
                   <button
                     className="ag-dropdown-item"
                     onClick={() => { setSistemaAtivo("flow"); setDropdownOpen(false); }}
