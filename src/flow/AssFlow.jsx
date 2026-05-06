@@ -1896,6 +1896,8 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
   const [loadingP,setLoadingP]   = useState(true);
   const [prestadorFoco,setPrestadorFoco] = useState(null);
   const [sidebarOpen,setSidebarOpen] = useState(false);
+  // Contagem de reservas do mês corrente (todas, de todos os prestadores)
+  const [reservasMes,setReservasMes] = useState(0);
 
   // ── Tema reativo ──
   const isDark = theme !== "light";
@@ -1903,7 +1905,23 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
   const S = useMemo(() => getS(T), [T]);
   const themeCtx = useMemo(() => ({ T, S }), [T, S]);
 
+  const isEssencial = plano === "essencial";
+  const LIMITE_RESERVAS_ESSENCIAL = 150;
+
   const meuPrestadorId = isAdmin ? "admin" : (prestadores.find(p=>p.linkedUserId===user?.uid&&p.ativo)?.id || null);
+
+  // Contagem de reservas do mês — apenas para essencial
+  useEffect(()=>{
+    if(!tenantUid || !isEssencial) return;
+    const agora = new Date();
+    const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
+    const q = query(
+      collection(db,"users",tenantUid,"agendamento_reservas"),
+      where("criadoEm",">=",inicioMes)
+    );
+    const u = onSnapshot(q, snap => setReservasMes(snap.size));
+    return () => u();
+  },[tenantUid, isEssencial]);
 
   // Auto-init admin
   useEffect(()=>{
@@ -1971,7 +1989,7 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
 
   // Guards
   if(!tenantUid) return null;
-  if(plano!=="profissional") return (
+  if(plano !== "profissional" && plano !== "essencial" && plano !== "delux") return (
     <FlowThemeCtx.Provider value={themeCtx}>
       <div style={S.root}><TelaUpgrade onVoltar={onVoltar}/></div>
     </FlowThemeCtx.Provider>
@@ -2049,8 +2067,34 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
             {sidebarOpen ? Ic.close : Ic.menu}
           </button>
           <span style={S.topbarTitle}>{titulos[tela]}</span>
-          <span className="flow-plan-badge" style={{fontSize:10,padding:"4px 12px",borderRadius:20,border:"1px solid rgba(192,155,82,0.25)",background:T.goldA06,color:T.goldHi,fontWeight:700,letterSpacing:"0.8px",textTransform:"uppercase",flexShrink:0}}>★ Profissional</span>
+          <span className="flow-plan-badge" style={{fontSize:10,padding:"4px 12px",borderRadius:20,border:"1px solid rgba(192,155,82,0.25)",background:T.goldA06,color:T.goldHi,fontWeight:700,letterSpacing:"0.8px",textTransform:"uppercase",flexShrink:0}}>
+            {isEssencial ? "★ Essencial" : plano === "delux" ? "★ Delux" : "★ Profissional"}
+          </span>
         </header>
+
+        {/* Banner de limite mensal — só essencial */}
+        {isEssencial && (
+          <div style={{
+            margin:"12px 20px 0",
+            padding:"10px 16px",
+            borderRadius:10,
+            background: reservasMes >= LIMITE_RESERVAS_ESSENCIAL ? T.redA06 : T.goldA06,
+            border: `1px solid ${reservasMes >= LIMITE_RESERVAS_ESSENCIAL ? T.redA18 : T.goldA22}`,
+            display:"flex",alignItems:"center",justifyContent:"space-between",gap:8,
+          }}>
+            <span style={{fontSize:12,color: reservasMes >= LIMITE_RESERVAS_ESSENCIAL ? T.red : T.goldHi,fontWeight:600}}>
+              {reservasMes >= LIMITE_RESERVAS_ESSENCIAL
+                ? "⚠️ Limite mensal atingido — novas reservas bloqueadas pelo público"
+                : `Reservas este mês: ${reservasMes} / ${LIMITE_RESERVAS_ESSENCIAL}`}
+            </span>
+            {reservasMes >= LIMITE_RESERVAS_ESSENCIAL && (
+              <button
+                style={{fontSize:11,padding:"4px 12px",borderRadius:6,border:`1px solid ${T.goldA38}`,background:T.goldA12,color:T.goldHi,fontWeight:700,cursor:"pointer",whiteSpace:"nowrap"}}
+                onClick={()=>window.open("mailto:contato@assentagencia.com.br?subject=Upgrade Profissional","_blank")}
+              >⭐ Upgrade</button>
+            )}
+          </div>
+        )}
 
         <div className="flow-content" style={S.content}>
           {loadingP?<Loading/>:<>
