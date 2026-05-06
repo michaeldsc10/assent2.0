@@ -9,8 +9,8 @@
 
    Retorna:
      loading, loadingLicenca (alias compat), plano,
-     isTrial, isEssencial, isProfissional,
-     isPro (alias backward-compat → true se isProfissional),
+     isTrial, isEssencial, isProfissional, isDelux,
+     isPro (alias backward-compat → true se isProfissional || isDelux),
      ativo (alias backward-compat → licencaAtiva),
      trialExpirado, diasRestantesTrial,
      licencaAtiva, limites, features, contagemVendas, dataVencimento
@@ -24,15 +24,17 @@ import { db } from "../lib/firebase";
 // A fonte de verdade é o subdoc no Firestore — escrito apenas por Cloud Function.
 // Estes valores são usados somente se o subdoc ainda não existir.
 const LIMITES_DEFAULT = {
-  trial:        { loginsExtras: 15, vendasMes: 2500 },
-  essencial:    { loginsExtras: 5,  vendasMes: 500  },
-  profissional: { loginsExtras: 15, vendasMes: 2500 },
+  trial:        { loginsExtras: 15, vendasMes: 2500, reservasMes: 150 },
+  essencial:    { loginsExtras: 5,  vendasMes: 500,  reservasMes: 150 },
+  profissional: { loginsExtras: 15, vendasMes: 2500, reservasMes: Infinity },
+  delux:        { loginsExtras: 15, vendasMes: 2500, reservasMes: Infinity },
 };
 
 const FEATURES_DEFAULT = {
-  trial:        { instaInsights: true  }, // trial = acesso total
+  trial:        { instaInsights: true  },
   essencial:    { instaInsights: false },
   profissional: { instaInsights: true  },
+  delux:        { instaInsights: true  },
 };
 
 /* ── Limites do plano Free / Essencial ──────────────────────────
@@ -52,28 +54,30 @@ export const LIMITES_FREE = {
 // ── Estado inicial do hook ────────────────────────────────────────────────────
 const ESTADO_INICIAL = {
   loading:            true,
-  loadingLicenca:     true,  // alias backward-compat (v2: loadingLicenca)
-  plano:              null,  // "trial" | "essencial" | "profissional"
+  loadingLicenca:     true,
+  plano:              null,  // "trial" | "essencial" | "profissional" | "delux"
   isTrial:            false,
   isEssencial:        false,
   isProfissional:     false,
-  isPro:              false, // alias → isProfissional (backward-compat v2)
-  ativo:              false, // alias → licencaAtiva   (backward-compat v2)
+  isDelux:            false,
+  isPro:              false, // alias → isProfissional || isDelux (backward-compat)
+  ativo:              false,
   trialExpirado:      false,
   diasRestantesTrial: null,
   licencaAtiva:       false,
   limites:            LIMITES_DEFAULT.trial,
   features:           FEATURES_DEFAULT.trial,
-  contagemVendas:     0,     // incrementado por Cloud Function no subdoc
-  dataVencimento:     null,  // Date | null
+  contagemVendas:     0,
+  dataVencimento:     null,
 };
 
 // ── Helper: monta estado derivado garantindo aliases de backward-compat ───────
 function comAliases(estado) {
   return {
     ...estado,
-    loadingLicenca: estado.loading,        // v2: loadingLicenca
-    ativo:          estado.licencaAtiva,   // v2: ativo
+    loadingLicenca: estado.loading,
+    ativo:          estado.licencaAtiva,
+    isPro:          estado.isProfissional || estado.isDelux,
   };
 }
 
@@ -133,7 +137,7 @@ export function useLicenca(tenantUid) {
               isTrial:            true,
               isEssencial:        false,
               isProfissional:     false,
-              isPro:              false,
+              isDelux:            false,
               trialExpirado,
               diasRestantesTrial,
               licencaAtiva,
@@ -150,6 +154,7 @@ export function useLicenca(tenantUid) {
         // Subscreve o subdoc para limites e contagem em tempo real
         const isEssencial    = planoSlug === "essencial";
         const isProfissional = planoSlug === "profissional";
+        const isDelux        = planoSlug === "delux";
 
         unsubPlanoRef.current = onSnapshot(
           doc(db, "licencas", tenantUid, "plano", planoSlug),
@@ -161,7 +166,6 @@ export function useLicenca(tenantUid) {
             const contagemVendas = planoData?.contagem?.vendasMes ?? 0;
             const dataVencimento = planoData?.dataVencimento?.toDate?.() ?? null;
 
-            // licencaAtiva: raiz ativo + subdoc ativo (double-check)
             const subdocAtivo  = planoData ? planoData.ativo !== false : true;
             const licencaAtiva = data.ativo === true && subdocAtivo;
 
@@ -172,7 +176,7 @@ export function useLicenca(tenantUid) {
                 isTrial:            false,
                 isEssencial,
                 isProfissional,
-                isPro:              isProfissional, // alias backward-compat
+                isDelux,
                 trialExpirado:      false,
                 diasRestantesTrial: null,
                 licencaAtiva,
@@ -185,7 +189,6 @@ export function useLicenca(tenantUid) {
           },
           (err) => {
             console.error("[useLicenca] Erro no listener do subdoc de plano:", err);
-            // Fallback com defaults do plano conhecido
             setEstado((prev) =>
               comAliases({
                 ...prev,
@@ -193,7 +196,7 @@ export function useLicenca(tenantUid) {
                 plano:         planoSlug,
                 isEssencial,
                 isProfissional,
-                isPro:         isProfissional,
+                isDelux,
                 limites:       LIMITES_DEFAULT[planoSlug] ?? LIMITES_DEFAULT.essencial,
                 features:      FEATURES_DEFAULT[planoSlug] ?? FEATURES_DEFAULT.essencial,
               })
