@@ -2696,7 +2696,7 @@ useEffect(() => {
     }
 
     /* Imprimir recibo após criar */
-    imprimirRecibo({ ...payload, id: novoId }, empresa);
+    imprimirRecibo({ ...payload, id: novoId }, configEmpresa);
     await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.VENDAS, descricao: `Criou Venda ${novoId} — ${payload.cliente || "Consumidor Final"} — R$ ${Number(payload.total||0).toFixed(2)}` });
     setModalNova(false);
   };
