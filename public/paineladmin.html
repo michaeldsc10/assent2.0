@@ -2382,25 +2382,35 @@ async function loadAllMembers() {
         ]);
         const c = configDoc.exists ? configDoc.data() : {};
         const f = fotoDoc.exists   ? fotoDoc.data()   : {};
+
+        // Resolve plano via subcoleção (docs fixos essencial/profissional)
+        let planoSlug = '';
+        try {
+          const planoRef = db.collection('licencas').doc(uid).collection('plano');
+          const [essSnap, profSnap] = await Promise.all([
+            planoRef.doc('essencial').get(),
+            planoRef.doc('profissional').get(),
+          ]);
+          if (profSnap.exists && profSnap.data()?.ativo === true) planoSlug = 'profissional';
+          else if (essSnap.exists && essSnap.data()?.ativo === true) planoSlug = 'essencial';
+        } catch { /* sem plano */ }
+
         return {
           uid,
-          ativo:          lic.ativo      || false,
-          pro:            lic.pro        || false,
-          plano:          lic.plano      || '',
-          admin:          lic.admin      || false,
-          criadoEm:       toDate(lic.criadoEm),
-          proExpiradoEm:  toDate(lic.proExpiradoEm),
-          // proAtivadoEm: toDate(lic.proAtivadoEm),  // disponível quando estrutura estiver pronta
-          email:          lic.email      || '',
-          name:           lic.name       || 'Sem nome',
-          telefone:       lic.telefone   || '',
-          foto:           f.base64       || '',
-          endereco:       c.empresa?.endereco || c.endereço || '',
-          cnpj:           c.empresa?.cnpj        || '',
-          nomeEmpresa:    c.empresa?.nomeEmpresa || '',
+          ativo:       lic.ativo  || false,
+          plano:       planoSlug,
+          admin:       lic.admin  || false,
+          criadoEm:    toDate(lic.criadoEm),
+          email:       lic.email  || '',
+          name:        lic.name   || 'Sem nome',
+          telefone:    lic.telefone || '',
+          foto:        f.base64   || '',
+          endereco:    c.empresa?.endereco || c.endereço || '',
+          cnpj:        c.empresa?.cnpj || '',
+          nomeEmpresa: c.empresa?.nomeEmpresa || '',
         };
       } catch {
-        return { uid, ativo:true, pro:lic.pro||false, plano:lic.plano||'', admin:false, criadoEm:null, proExpiradoEm:null,
+        return { uid, ativo:true, plano:'', admin:false, criadoEm:null,
                  email: lic.email||'', name: lic.name||'—', telefone: lic.telefone||'',
                  foto:'', endereco:'', cnpj:'', nomeEmpresa:'' };
       }
@@ -3904,9 +3914,6 @@ function openModal(m) {
   document.getElementById('modalTitle').innerHTML =
     `${esc(m.name)}&ensp;${planBadgeHtml(m.plano)}`;
 
-  const diasSemPro = (!m.pro && m.proExpiradoEm)
-    ? Math.floor((new Date() - m.proExpiradoEm) / 86400000) : null;
-
   document.getElementById('modalBody').innerHTML = `
 
     <!-- Foto do membro -->
@@ -3953,24 +3960,16 @@ function openModal(m) {
       </div>
     </div>
 
-    <!-- Status PRO -->
+    <!-- Status da Assinatura -->
     <div class="modal-section">
       <div class="section-label">Status da Assinatura</div>
       <div class="info-grid">
         <div class="info-field">
           <div class="info-field-label">Status Atual</div>
           <div class="info-field-value" style="margin-top:4px">
-            ${planBadgeHtml(m.plano)}
+            ${m.plano ? planBadgeHtml(m.plano) : '<span class="free-badge" style="color:var(--text3)">Sem plano</span>'}
           </div>
         </div>
-        ${m.proExpiradoEm ? `
-        <div class="info-field">
-          <div class="info-field-label">PRO Expirou em</div>
-          <div class="info-field-value" style="color:var(--danger);font-family:'DM Mono',monospace;font-size:12px">
-            ${fmtDate(m.proExpiradoEm)}
-            ${diasSemPro !== null ? `<span style="color:var(--warning)"> (${diasSemPro}d atrás)</span>` : ''}
-          </div>
-        </div>` : ''}
       </div>
     </div>
 
@@ -3987,40 +3986,8 @@ function openModal(m) {
         </div>
       </div>` : ''}
 
-      ${m.pro ? `
-      <div class="timeline-item">
-        <div class="tl-dot" style="background:var(--gold)"></div>
-        <div>
-          <div class="tl-event" style="color:var(--gold)">PRO ativo</div>
-          <div class="tl-date">Assinatura em dia</div>
-        </div>
-      </div>` : ''}
-
-      ${m.proExpiradoEm ? `
-      <div class="timeline-item">
-        <div class="tl-dot" style="background:var(--danger)"></div>
-        <div>
-          <div class="tl-event" style="color:var(--danger)">PRO expirado</div>
-          <div class="tl-date">${fmtDateTime(m.proExpiradoEm)}</div>
-        </div>
-      </div>` : ''}
-
-      <!-- ──────────────────────────────────────────────────────────────
-           TODO: Histórico completo de assinaturas PRO
-           Quando a estrutura estiver disponível em:
-             licencas/{uid}/historicoPRO/{docId}
-           Campos esperados: ativadoEm, expiradoEm, plano, valor
-           
-           Implementação futura:
-           const historicoSnap = await db.collection('licencas').doc(uid)
-             .collection('historicoPRO').orderBy('ativadoEm','desc').get();
-           historicoSnap.docs.forEach(doc => {
-             const h = doc.data();
-             // Renderizar: ativadoEm, expiradoEm, plano, valor
-           });
-      ────────────────────────────────────────────────────────────────── -->
       <div style="font-size:10px;color:var(--text3);padding:14px 0;font-family:'DM Mono',monospace;letter-spacing:1px">
-        ·· Histórico detalhado de assinaturas PRO será exibido aqui ··
+        ·· Histórico detalhado de assinaturas será exibido aqui ··
       </div>
     </div>
 
@@ -4064,34 +4031,28 @@ async function loadMemberPlan(uid) {
   const section = document.getElementById('planSection');
   if (!section) return;
   try {
-    const licSnap = await db.collection('licencas').doc(uid).get();
-    if (!licSnap.exists) {
-      document.getElementById('planLoadState').innerHTML =
-        '<span style="color:var(--danger)">Licença não encontrada.</span>';
-      return;
-    }
-    const licData    = licSnap.data();
-    let currentSlug  = licData.plano || null;
+    // Lê os dois docs fixos em paralelo — estrutura real:
+    // licencas/{uid}/plano/essencial { ativo: true/false, ... }
+    // licencas/{uid}/plano/profissional { ativo: true/false, ... }
+    const planoRef = db.collection('licencas').doc(uid).collection('plano');
+    const [essSnap, profSnap] = await Promise.all([
+      planoRef.doc('essencial').get(),
+      planoRef.doc('profissional').get(),
+    ]);
 
-    // Fallback: se o campo raiz plano estiver ausente,
-    // busca o subdoc ativo diretamente na subcoleção
-    if (!currentSlug) {
-      const subSnap = await db.collection('licencas').doc(uid)
-        .collection('plano').where('ativo', '==', true).limit(1).get();
-      if (!subSnap.empty) {
-        // Usa o ID do doc (= slug) ou o campo slug interno
-        currentSlug = subSnap.docs[0].data().slug || subSnap.docs[0].id;
-      }
-    }
+    let currentSlug = null;
+    let planoData   = null;
 
-    if (!currentSlug) {
-      renderPlanSection(uid, null, null);
-      return;
+    if (profSnap.exists && profSnap.data()?.ativo === true) {
+      currentSlug = 'profissional';
+      planoData   = profSnap.data();
+    } else if (essSnap.exists && essSnap.data()?.ativo === true) {
+      currentSlug = 'essencial';
+      planoData   = essSnap.data();
     }
+    // nenhum ativo → currentSlug=null, renderiza "Sem plano"
 
-    const planoSnap = await db.collection('licencas').doc(uid)
-                               .collection('plano').doc(currentSlug).get();
-    renderPlanSection(uid, currentSlug, planoSnap.exists ? planoSnap.data() : null);
+    renderPlanSection(uid, currentSlug, planoData);
   } catch (e) {
     console.error('[loadMemberPlan]', e);
     const ls = document.getElementById('planLoadState');
@@ -4109,7 +4070,7 @@ function renderPlanSection(uid, slug, data) {
                    : safeSlug                    ? 'essencial'
                    : 'nenhum';
   const badgeIcon  = safeSlug === 'profissional' ? '★ ' : '';
-  const badgeLabel = safeSlug || 'Sem plano';
+  const badgeLabel = PLAN_CONFIGS[safeSlug]?.label || (safeSlug ? safeSlug : 'Sem plano');
 
   const venc = data?.dataVencimento
     ? fmtDate(data.dataVencimento.toDate ? data.dataVencimento.toDate() : new Date(data.dataVencimento))
