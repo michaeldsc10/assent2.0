@@ -21,9 +21,10 @@ export const RADAR_PADRAO = {
 
 // ─── Helper: converte Timestamp do Firestore ou string para Date ──────────────
 function toDate(val) {
-  if (!val) return new Date(0);
+  if (!val) return null;
   if (val?.toDate) return val.toDate();
-  return new Date(val);
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? null : d;
 }
 
 // ─── Helper: compara nome do cliente com tolerância a nomes parciais ──────────
@@ -72,6 +73,7 @@ function calcularScoreChurn(clientes = [], vendas = [], radar = RADAR_PADRAO) {
     const vendasCliente = vendas
       .filter((v) => matchNomeCliente(v.cliente, cliente.nome))
       .map((v) => ({ ...v, _data: toDate(v.data) }))
+      .filter((v) => v._data !== null)
       .sort((a, b) => a._data - b._data);
 
     if (vendasCliente.length === 0) {
@@ -109,7 +111,7 @@ function calcularScoreChurn(clientes = [], vendas = [], radar = RADAR_PADRAO) {
     const [produtoFavorito] =
       Object.entries(contagem).sort((a, b) => b[1] - a[1])[0] || [];
 
-    const mult = frequenciaMedia ? diasAusente / frequenciaMedia : null;
+    const mult = (frequenciaMedia && frequenciaMedia > 0) ? diasAusente / frequenciaMedia : null;
     let risco = "baixo";
     if (mult !== null) {
       if (mult > multAlto)  risco = "alto";
