@@ -20,17 +20,18 @@ import ConfigPage         from "./ConfigPage";
 import NotificacoesLeads  from "./NotificacoesLeads";
 import { useLeads }       from "./useLeads";
 
-// ── Fontes do CRM — alinhadas ao Dashboard (Inter + JetBrains Mono) ──────────
+// ── Fontes ────────────────────────────────────────────────────────────────────
 if (!document.getElementById("crm-fonts")) {
   const link = document.createElement("link");
   link.id   = "crm-fonts";
   link.rel  = "stylesheet";
-  link.href = "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap";
+  link.href = "https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap";
   document.head.appendChild(link);
 }
 
-const FONT         = "'Inter', system-ui, sans-serif";
-const FONT_DISPLAY = "'Inter', system-ui, sans-serif";
+const FONT       = "'Inter', system-ui, sans-serif";
+const FONT_BRAND = "'Cinzel', serif";
+const FONT_MONO  = "'JetBrains Mono', monospace";
 
 // ─── Hook de Breakpoint ───────────────────────────────────────────────────────
 function useBreakpoint() {
@@ -51,24 +52,60 @@ function useBreakpoint() {
 // ─── Temas ────────────────────────────────────────────────────────────────────
 const TEMAS = {
   dark: {
-    bg: "#09090b", surface: "#111114", surfaceAlt: "#18181c",
-    border: "#1e1e24", borderAlt: "#28282f",
-    text: "#eceaff", textMid: "#7a7990", textDim: "#3e3d50",
-    gold: "#c8a44a", goldDim: "#6a5520", goldGlow: "rgba(200,164,74,0.12)", goldBorder: "rgba(200,164,74,0.28)",
-    red: "#e05252", redDim: "#2a1010", redBorder: "rgba(224,82,82,0.22)",
-    yellow: "#d4903a", yellowDim: "#2a1a08", yellowBorder: "rgba(212,144,58,0.22)",
-    green: "#3aad78", greenDim: "#0d2419", greenBorder: "rgba(58,173,120,0.22)",
-    blue: "#4a8fd4", blueDim: "#0d1e35", blueBorder: "rgba(74,143,212,0.22)",
+    bg: "#070707",
+    surface: "#0f0f12",
+    surfaceAlt: "#16161a",
+    border: "rgba(255,255,255,0.07)",
+    borderAlt: "rgba(255,255,255,0.12)",
+    text: "#ffffff",
+    textMid: "rgba(255,255,255,0.55)",
+    textDim: "rgba(255,255,255,0.28)",
+    gold: "#d4af37",
+    goldLight: "#f4d77a",
+    goldDim: "rgba(212,175,55,0.08)",
+    goldGlow: "rgba(212,175,55,0.15)",
+    goldBorder: "rgba(212,175,55,0.22)",
+    goldGradient: "linear-gradient(135deg,#f4d77a 0%,#d4af37 50%,#a47d1f 100%)",
+    red: "#e05252",
+    redDim: "rgba(224,82,82,0.08)",
+    redBorder: "rgba(224,82,82,0.22)",
+    yellow: "#d4903a",
+    yellowDim: "rgba(212,144,58,0.08)",
+    yellowBorder: "rgba(212,144,58,0.22)",
+    green: "#3aad78",
+    greenDim: "rgba(58,173,120,0.08)",
+    greenBorder: "rgba(58,173,120,0.22)",
+    blue: "#4a8fd4",
+    blueDim: "rgba(74,143,212,0.08)",
+    blueBorder: "rgba(74,143,212,0.22)",
   },
   light: {
-    bg: "#f5f5f7", surface: "#ffffff", surfaceAlt: "#f0f0f3",
-    border: "#e2e2e8", borderAlt: "#d0d0d8",
-    text: "#111113", textMid: "#555565", textDim: "#aaaabc",
-    gold: "#a07828", goldDim: "#f5ead0", goldGlow: "rgba(160,120,40,0.08)", goldBorder: "rgba(160,120,40,0.25)",
-    red: "#c03030", redDim: "#fde8e8", redBorder: "rgba(192,48,48,0.22)",
-    yellow: "#b06010", yellowDim: "#fdf0e0", yellowBorder: "rgba(176,96,16,0.22)",
-    green: "#1e7a50", greenDim: "#e0f5ea", greenBorder: "rgba(30,122,80,0.22)",
-    blue: "#1a5fa0", blueDim: "#e0edf8", blueBorder: "rgba(26,95,160,0.22)",
+    bg: "#f4f4f6",
+    surface: "#ffffff",
+    surfaceAlt: "#f0f0f4",
+    border: "#e4e4ea",
+    borderAlt: "#d0d0d8",
+    text: "#0f0f12",
+    textMid: "#56566a",
+    textDim: "#a0a0b8",
+    gold: "#a07828",
+    goldLight: "#c8982a",
+    goldDim: "rgba(160,120,40,0.08)",
+    goldGlow: "rgba(160,120,40,0.08)",
+    goldBorder: "rgba(160,120,40,0.25)",
+    goldGradient: "linear-gradient(135deg,#c8982a 0%,#a07828 50%,#7a5a1a 100%)",
+    red: "#c03030",
+    redDim: "#fde8e8",
+    redBorder: "rgba(192,48,48,0.22)",
+    yellow: "#b06010",
+    yellowDim: "#fdf0e0",
+    yellowBorder: "rgba(176,96,16,0.22)",
+    green: "#1e7a50",
+    greenDim: "#e0f5ea",
+    greenBorder: "rgba(30,122,80,0.22)",
+    blue: "#1a5fa0",
+    blueDim: "#e0edf8",
+    blueBorder: "rgba(26,95,160,0.22)",
   },
 };
 
@@ -122,21 +159,21 @@ export function calcularTemperaturaLead(lead) {
 // ─── Badge de Risco ───────────────────────────────────────────────────────────
 function RiscoBadge({ risco, T }) {
   const map = {
-    alto:      { label: "Risco alto",    bg: T.redDim,    color: T.red,    border: T.redBorder    },
-    medio:     { label: "Atenção",       bg: T.yellowDim, color: T.yellow, border: T.yellowBorder },
-    baixo:     { label: "Fiel",          bg: T.greenDim,  color: T.green,  border: T.greenBorder  },
-    indefinido: { label: "Sem histórico", bg: T.surfaceAlt, color: T.textMid, border: T.border    },
+    alto:       { label: "Risco alto",    bg: T.redDim,    color: T.red,    border: T.redBorder    },
+    medio:      { label: "Atenção",       bg: T.yellowDim, color: T.yellow, border: T.yellowBorder },
+    baixo:      { label: "Fiel",          bg: T.greenDim,  color: T.green,  border: T.greenBorder  },
+    indefinido: { label: "Sem histórico", bg: "transparent", color: T.textDim, border: T.border    },
   };
   const s = map[risco] || map.indefinido;
   return (
     <span style={{
-      fontSize: 9.5, fontWeight: 600, padding: "3px 9px", borderRadius: 999,
+      fontSize: 9, fontWeight: 600, padding: "3px 10px", borderRadius: 999,
       background: s.bg, color: s.color, border: `1px solid ${s.border}`,
-      letterSpacing: "0.07em", textTransform: "uppercase",
+      letterSpacing: "0.10em", textTransform: "uppercase",
       display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
       fontFamily: FONT,
     }}>
-      <span style={{ width: 5, height: 5, borderRadius: "50%", background: s.color, display: "inline-block", flexShrink: 0 }} />
+      <span style={{ width: 4, height: 4, borderRadius: "50%", background: s.color, display: "inline-block", flexShrink: 0 }} />
       {s.label}
     </span>
   );
@@ -144,25 +181,39 @@ function RiscoBadge({ risco, T }) {
 
 // ─── Card de Métrica ──────────────────────────────────────────────────────────
 function MetricCard({ val, label, color, T }) {
+  const isGold = !color || color === T.gold;
   return (
     <div style={{
-      background: T.surface, border: `1px solid ${T.border}`,
-      borderRadius: 16, padding: "18px 20px 16px",
-      position: "relative", overflow: "hidden", transition: "border-color 0.18s",
+      background: T.surface,
+      border: `1px solid ${color ? `${color}28` : T.border}`,
+      borderRadius: 16, padding: "20px 22px 18px",
+      position: "relative", overflow: "hidden",
+      transition: "border-color 0.2s, box-shadow 0.2s",
     }}>
+      {/* top accent line */}
       <div style={{
-        position: "absolute", bottom: 0, left: 0, right: 0, height: 2,
-        background: color || T.border, borderRadius: "0 0 16px 16px",
-        opacity: color ? 0.85 : 0.3,
+        position: "absolute", top: 0, left: 0, right: 0, height: 2,
+        background: color
+          ? `linear-gradient(90deg, ${color}, ${color}44)`
+          : `linear-gradient(90deg, ${T.goldBorder}, transparent)`,
+        borderRadius: "16px 16px 0 0",
       }} />
+      {/* subtle glow top-right */}
+      {color && (
+        <div style={{
+          position: "absolute", top: -20, right: -20, width: 80, height: 80,
+          borderRadius: "50%", background: `${color}18`, filter: "blur(20px)",
+          pointerEvents: "none",
+        }} />
+      )}
       <div style={{
-        fontSize: 30, fontWeight: 600, color: color || T.text,
-        fontFamily: FONT_DISPLAY, letterSpacing: "-0.02em", lineHeight: 1,
-        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: 8,
+        fontSize: 28, fontWeight: 600, color: color || T.text,
+        fontFamily: FONT_MONO, letterSpacing: "-0.02em", lineHeight: 1,
+        marginBottom: 8,
       }}>{val}</div>
       <div style={{
-        fontSize: 9.5, color: T.textMid, textTransform: "uppercase",
-        letterSpacing: "0.10em", lineHeight: 1.4, fontWeight: 500,
+        fontSize: 9, color: T.textDim, textTransform: "uppercase",
+        letterSpacing: "0.12em", fontWeight: 600, fontFamily: FONT,
       }}>{label}</div>
     </div>
   );
@@ -170,8 +221,8 @@ function MetricCard({ val, label, color, T }) {
 
 // ─── Insight Card ─────────────────────────────────────────────────────────────
 function InsightCard({ insight, empresaNome, empresaId, T }) {
-  const [msg, setMsg]           = useState(null);
-  const [gerando, setGerando]   = useState(false);
+  const [msg, setMsg]             = useState(null);
+  const [gerando, setGerando]     = useState(false);
   const [ignorando, setIgnorando] = useState(false);
 
   const cores = {
@@ -183,7 +234,7 @@ function InsightCard({ insight, empresaNome, empresaId, T }) {
   const tipoKey = insight.tipo === "risco"
     ? (insight.prioridade === 1 ? "risco_alto" : "risco_medio")
     : insight.tipo;
-  const cor     = cores[tipoKey] || cores.risco_alto;
+  const cor      = cores[tipoKey] || cores.risco_alto;
   const telLimpo = (insight.telefone || "").replace(/\D/g, "");
 
   async function gerarMensagem() {
@@ -203,39 +254,51 @@ function InsightCard({ insight, empresaNome, empresaId, T }) {
   }
 
   return (
-    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, marginBottom: 10, overflow: "hidden", transition: "border-color 0.18s" }}>
+    <div style={{
+      background: T.surface,
+      border: `1px solid ${T.border}`,
+      borderRadius: 16, marginBottom: 10, overflow: "hidden",
+      transition: "border-color 0.2s",
+    }}>
       <div style={{ display: "flex" }}>
+        {/* left accent bar */}
         <div style={{
           width: 3, flexShrink: 0, background: cor.borda,
-          borderRadius: "16px 0 0 16px",
-          boxShadow: tipoKey === "risco_alto" ? `0 0 12px ${T.red}` : tipoKey === "risco_medio" ? `0 0 8px ${T.yellow}` : "none",
+          boxShadow: tipoKey === "risco_alto" ? `0 0 16px ${T.red}66` : "none",
         }} />
-        <div style={{ flex: 1, padding: "16px 16px 16px 14px" }}>
+        <div style={{ flex: 1, padding: "18px 18px 16px 16px" }}>
           <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+            {/* Avatar */}
             <div style={{
-              width: 40, height: 40, borderRadius: "50%", flexShrink: 0,
+              width: 42, height: 42, borderRadius: 12, flexShrink: 0,
               background: cor.badgeBg, color: cor.badgeColor,
-              border: `1.5px solid ${cor.border}`,
+              border: `1px solid ${cor.border}`,
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 13, fontWeight: 600, fontFamily: FONT,
+              fontSize: 12, fontWeight: 700, fontFamily: FONT_MONO,
+              letterSpacing: "0.02em",
             }}>
               {insight.cliente ? iniciais(insight.cliente) : "!"}
             </div>
+
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-                <span style={{ fontSize: 13.5, fontWeight: 600, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "60%", fontFamily: FONT }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 5 }}>
+                <span style={{
+                  fontSize: 13.5, fontWeight: 600, color: T.text,
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  maxWidth: "60%", fontFamily: FONT, letterSpacing: "-0.01em",
+                }}>
                   {insight.cliente || "Alerta"}
                 </span>
                 <span style={{
-                  fontSize: 9.5, fontWeight: 600, padding: "3px 9px", borderRadius: 999,
+                  fontSize: 9, fontWeight: 700, padding: "3px 10px", borderRadius: 999,
                   background: cor.badgeBg, color: cor.badgeColor, border: `1px solid ${cor.border}`,
-                  textTransform: "uppercase", letterSpacing: "0.07em", whiteSpace: "nowrap", fontFamily: FONT,
+                  textTransform: "uppercase", letterSpacing: "0.10em", whiteSpace: "nowrap", fontFamily: FONT,
                 }}>{cor.label}</span>
               </div>
-              <p style={{ fontSize: 12, color: T.textMid, lineHeight: 1.65, margin: 0, fontFamily: FONT, fontWeight: 300 }}>
+              <p style={{ fontSize: 12.5, color: T.textMid, lineHeight: 1.7, margin: 0, fontFamily: FONT, fontWeight: 300 }}>
                 {insight.descricao}
               </p>
-              <div style={{ display: "flex", gap: 14, marginTop: 8, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 16, marginTop: 10, flexWrap: "wrap" }}>
                 {insight.diasAusente != null && (
                   <span style={{ fontSize: 11, color: T.textDim, fontFamily: FONT }}>
                     ausente há <strong style={{ color: insight.prioridade === 1 ? T.red : T.yellow, fontWeight: 600 }}>{insight.diasAusente}d</strong>
@@ -243,60 +306,67 @@ function InsightCard({ insight, empresaNome, empresaId, T }) {
                 )}
                 {insight.ticketMedio != null && (
                   <span style={{ fontSize: 11, color: T.textDim, fontFamily: FONT }}>
-                    ticket <strong style={{ color: T.gold, fontWeight: 600 }}>{formatarReal(insight.ticketMedio)}</strong>
+                    ticket <strong style={{ color: T.gold, fontWeight: 600, fontFamily: FONT_MONO }}>{formatarReal(insight.ticketMedio)}</strong>
                   </span>
                 )}
                 {insight.preco != null && (
                   <span style={{ fontSize: 11, color: T.textDim, fontFamily: FONT }}>
-                    potencial <strong style={{ color: T.green, fontWeight: 600 }}>+{formatarReal(insight.preco)}</strong>
+                    potencial <strong style={{ color: T.green, fontWeight: 600, fontFamily: FONT_MONO }}>+{formatarReal(insight.preco)}</strong>
                   </span>
                 )}
               </div>
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap", alignItems: "center" }}>
+          {/* Actions */}
+          <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap", alignItems: "center" }}>
             <button onClick={gerarMensagem} disabled={gerando} style={{
-              fontSize: 11.5, fontWeight: 600, padding: "7px 16px", borderRadius: 8,
-              background: gerando ? T.surfaceAlt : T.gold, color: gerando ? T.textMid : "#000",
+              fontSize: 11.5, fontWeight: 600, padding: "8px 18px", borderRadius: 9,
+              background: gerando ? T.surfaceAlt : T.goldGradient,
+              color: gerando ? T.textMid : "#1a1100",
               border: gerando ? `1px solid ${T.border}` : "none",
               cursor: gerando ? "not-allowed" : "pointer",
-              letterSpacing: "0.04em", fontFamily: FONT, transition: "all 0.16s",
+              letterSpacing: "0.06em", fontFamily: FONT, transition: "all 0.18s",
+              boxShadow: gerando ? "none" : "0 4px 18px rgba(212,175,55,0.28)",
             }}>
               {gerando ? "Gerando..." : "✦ Gerar mensagem"}
             </button>
             {insight.telefone && (
               <button onClick={() => window.open(`https://wa.me/55${telLimpo}`, "_blank")} style={{
-                fontSize: 11.5, fontWeight: 500, padding: "7px 16px", borderRadius: 8,
-                background: "none", border: `1px solid ${T.border}`,
+                fontSize: 11.5, fontWeight: 500, padding: "8px 16px", borderRadius: 9,
+                background: "transparent", border: `1px solid ${T.border}`,
                 cursor: "pointer", color: T.textMid, letterSpacing: "0.04em", fontFamily: FONT,
+                transition: "border-color 0.15s",
               }}>WhatsApp</button>
             )}
             <button onClick={handleIgnorar} disabled={ignorando} title="Ignorar nos alertas futuros" style={{
-              fontSize: 11.5, fontWeight: 500, padding: "7px 14px", borderRadius: 8,
-              background: "none", border: `1px solid ${T.border}`,
+              fontSize: 11.5, fontWeight: 500, padding: "8px 14px", borderRadius: 9,
+              background: "transparent", border: `1px solid ${T.border}`,
               cursor: ignorando ? "not-allowed" : "pointer",
               color: ignorando ? T.textDim : T.textMid,
-              letterSpacing: "0.04em", fontFamily: FONT, marginLeft: "auto", transition: "all 0.16s",
+              letterSpacing: "0.04em", fontFamily: FONT, marginLeft: "auto", transition: "all 0.15s",
             }}>
-              {ignorando ? "Ignorando..." : "Ignorar cliente"}
+              {ignorando ? "Ignorando..." : "Ignorar"}
             </button>
           </div>
 
           {msg && (
-            <div style={{ marginTop: 12, background: T.surfaceAlt, borderRadius: 12, padding: "14px 16px", border: `1px solid ${T.borderAlt}` }}>
-              <p style={{ fontSize: 13, lineHeight: 1.75, margin: 0, color: T.text, whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: FONT, fontWeight: 300 }}>{msg}</p>
-              <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+            <div style={{
+              marginTop: 14, background: T.surfaceAlt, borderRadius: 12,
+              padding: "16px 18px", border: `1px solid ${T.borderAlt}`,
+            }}>
+              <p style={{ fontSize: 13, lineHeight: 1.8, margin: 0, color: T.text, whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: FONT, fontWeight: 300 }}>{msg}</p>
+              <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
                 {telLimpo && (
                   <button onClick={() => window.open(`https://wa.me/55${telLimpo}?text=${encodeURIComponent(msg)}`, "_blank")} style={{
-                    fontSize: 11.5, fontWeight: 600, padding: "7px 14px", borderRadius: 8,
-                    background: T.green, color: "#fff", border: "none", cursor: "pointer",
+                    fontSize: 11.5, fontWeight: 600, padding: "8px 16px", borderRadius: 9,
+                    background: T.greenGradient || T.green, color: "#fff", border: "none", cursor: "pointer",
                     letterSpacing: "0.04em", fontFamily: FONT,
                   }}>↗ Enviar no WhatsApp</button>
                 )}
                 <button onClick={gerarMensagem} style={{
-                  fontSize: 11.5, padding: "7px 14px", borderRadius: 8,
-                  background: "none", border: `1px solid ${T.border}`,
+                  fontSize: 11.5, padding: "8px 16px", borderRadius: 9,
+                  background: "transparent", border: `1px solid ${T.border}`,
                   cursor: "pointer", color: T.textMid, fontFamily: FONT,
                 }}>↺ Regenerar</button>
               </div>
@@ -357,8 +427,21 @@ Regras:
 
   return (
     <div style={{ maxWidth: 680 }}>
-      <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 20, marginBottom: 14 }}>
-        <p style={{ fontSize: 12, color: T.textMid, marginBottom: 14, lineHeight: 1.65, fontFamily: FONT, fontWeight: 300 }}>
+      {/* Input */}
+      <div style={{
+        background: T.surface, border: `1px solid ${T.border}`,
+        borderRadius: 16, padding: 20, marginBottom: 12,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
+            background: T.goldDim, border: `1px solid ${T.goldBorder}`, fontSize: 13, color: T.gold,
+          }}>✦</div>
+          <span style={{ fontSize: 11, fontWeight: 600, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: FONT }}>
+            Assistente IA
+          </span>
+        </div>
+        <p style={{ fontSize: 12.5, color: T.textMid, marginBottom: 14, lineHeight: 1.65, fontFamily: FONT, fontWeight: 300 }}>
           Faça qualquer pergunta sobre seus clientes. A IA analisa os dados em tempo real.
         </p>
         <div style={{ display: "flex", gap: 8 }}>
@@ -371,45 +454,51 @@ Regras:
               flex: 1, padding: "11px 14px", borderRadius: 10, fontSize: 13,
               border: `1px solid ${T.borderAlt}`, outline: "none",
               fontFamily: FONT, background: T.surfaceAlt, color: T.text, minWidth: 0,
+              transition: "border-color 0.15s",
             }}
           />
           <button onClick={() => perguntar()} disabled={pensando} style={{
-            padding: "11px 18px", borderRadius: 10, fontSize: 11.5, fontWeight: 600,
-            background: pensando ? T.surfaceAlt : T.gold, color: pensando ? T.textMid : "#000",
-            border: "none", cursor: pensando ? "not-allowed" : "pointer",
-            letterSpacing: "0.05em", textTransform: "uppercase", whiteSpace: "nowrap",
-            flexShrink: 0, fontFamily: FONT, transition: "all 0.16s",
+            padding: "11px 20px", borderRadius: 10, fontSize: 11.5, fontWeight: 600,
+            background: pensando ? T.surfaceAlt : T.goldGradient,
+            color: pensando ? T.textMid : "#1a1100",
+            border: pensando ? `1px solid ${T.border}` : "none",
+            cursor: pensando ? "not-allowed" : "pointer",
+            letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap",
+            flexShrink: 0, fontFamily: FONT, transition: "all 0.18s",
+            boxShadow: pensando ? "none" : "0 4px 18px rgba(212,175,55,0.28)",
           }}>
             {pensando ? "..." : "✦ Perguntar"}
           </button>
         </div>
       </div>
 
+      {/* Resposta */}
       {(resposta || pensando) && (
-        <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 20, marginBottom: 14 }}>
-          <p style={{ fontSize: 9.5, fontWeight: 700, color: T.gold, letterSpacing: "0.12em", marginBottom: 12, textTransform: "uppercase", fontFamily: FONT }}>
-            ✦ Assistente IA
-          </p>
+        <div style={{
+          background: T.goldDim, border: `1px solid ${T.goldBorder}`,
+          borderRadius: 16, padding: 20, marginBottom: 12,
+        }}>
           {pensando
-            ? <p style={{ fontSize: 13, color: T.textMid, fontFamily: FONT }}>Analisando dados...</p>
-            : <p style={{ fontSize: 13, lineHeight: 1.8, color: T.text, whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0, fontFamily: FONT, fontWeight: 300 }}>{resposta}</p>
+            ? <p style={{ fontSize: 13, color: T.textMid, fontFamily: FONT, margin: 0 }}>Analisando dados...</p>
+            : <p style={{ fontSize: 13, lineHeight: 1.85, color: T.text, whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0, fontFamily: FONT, fontWeight: 300 }}>{resposta}</p>
           }
         </div>
       )}
 
-      <p style={{ fontSize: 9.5, fontWeight: 700, color: T.textDim, letterSpacing: "0.12em", marginBottom: 10, textTransform: "uppercase", fontFamily: FONT }}>
+      {/* Sugestões */}
+      <p style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.14em", marginBottom: 10, textTransform: "uppercase", fontFamily: FONT }}>
         Sugestões rápidas
       </p>
       {sugestoes.map((s) => (
         <button key={s} onClick={() => perguntar(s)} style={{
           display: "flex", justifyContent: "space-between", alignItems: "center",
-          width: "100%", padding: "13px 16px", marginBottom: 7, textAlign: "left",
+          width: "100%", padding: "13px 16px", marginBottom: 8, textAlign: "left",
           background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12,
-          fontSize: 12, color: T.textMid, cursor: "pointer", fontFamily: FONT,
-          fontWeight: 300, transition: "border-color 0.15s",
+          fontSize: 12.5, color: T.textMid, cursor: "pointer", fontFamily: FONT,
+          fontWeight: 300, transition: "all 0.15s",
         }}>
           <span style={{ flex: 1, paddingRight: 8 }}>{s}</span>
-          <span style={{ color: T.textDim, fontSize: 14, flexShrink: 0 }}>→</span>
+          <span style={{ color: T.gold, fontSize: 13, flexShrink: 0 }}>→</span>
         </button>
       ))}
     </div>
@@ -426,29 +515,30 @@ function TabelaClientes({ clientes, T, onSelecionar }) {
   return (
     <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, overflow: "hidden" }}>
       <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, minWidth: 480, fontFamily: FONT }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5, minWidth: 480, fontFamily: FONT }}>
           <thead>
             <tr style={{ borderBottom: `1px solid ${T.border}` }}>
               {["Cliente", "Último serviço", "Ausente", "Ticket médio", "Score"].map((h) => (
-                <th key={h} style={{ textAlign: "left", padding: "13px 16px", fontSize: 9, fontWeight: 700, color: T.textDim, textTransform: "uppercase", letterSpacing: "0.10em", whiteSpace: "nowrap" }}>{h}</th>
+                <th key={h} style={{ textAlign: "left", padding: "14px 18px", fontSize: 9, fontWeight: 700, color: T.textDim, textTransform: "uppercase", letterSpacing: "0.12em", whiteSpace: "nowrap" }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {sorted.map((c, i) => (
-              <tr key={c.nome} style={{ borderBottom: `1px solid ${T.border}`, background: i % 2 === 0 ? "transparent" : T.surfaceAlt }}>
-                <td style={{ padding: "13px 16px", cursor: "pointer" }} onClick={() => onSelecionar(c)}>
-                  <div style={{ fontWeight: 600, color: T.text }}>{c.nome}</div>
-                  <div style={{ fontSize: 10, color: T.textDim, marginTop: 2 }}>{c.telefone || "—"}</div>
+              <tr key={c.nome} style={{ borderBottom: `1px solid ${T.border}`, background: i % 2 === 0 ? "transparent" : T.surfaceAlt, cursor: "pointer", transition: "background 0.12s" }}
+                onClick={() => onSelecionar(c)}>
+                <td style={{ padding: "14px 18px" }}>
+                  <div style={{ fontWeight: 600, color: T.text, letterSpacing: "-0.01em" }}>{c.nome}</div>
+                  <div style={{ fontSize: 10, color: T.textDim, marginTop: 2, fontFamily: FONT_MONO }}>{c.telefone || "—"}</div>
                 </td>
-                <td style={{ padding: "13px 16px", color: T.textMid, fontSize: 11.5, whiteSpace: "nowrap" }}>{c.produtoFavorito || "—"}</td>
-                <td style={{ padding: "13px 16px", fontWeight: 600, color: c.diasAusente > 30 ? T.red : T.textMid, whiteSpace: "nowrap" }}>
+                <td style={{ padding: "14px 18px", color: T.textMid, fontSize: 12, whiteSpace: "nowrap" }}>{c.produtoFavorito || "—"}</td>
+                <td style={{ padding: "14px 18px", fontWeight: 700, color: c.diasAusente > 30 ? T.red : T.textMid, whiteSpace: "nowrap", fontFamily: FONT_MONO }}>
                   {c.diasAusente != null ? `${c.diasAusente}d` : "—"}
                 </td>
-                <td style={{ padding: "13px 16px", color: T.gold, fontWeight: 600, whiteSpace: "nowrap" }}>
+                <td style={{ padding: "14px 18px", color: T.gold, fontWeight: 700, whiteSpace: "nowrap", fontFamily: FONT_MONO }}>
                   {c.ticketMedio != null ? formatarReal(c.ticketMedio) : "—"}
                 </td>
-                <td style={{ padding: "13px 16px" }}><RiscoBadge risco={c.risco} T={T} /></td>
+                <td style={{ padding: "14px 18px" }}><RiscoBadge risco={c.risco} T={T} /></td>
               </tr>
             ))}
           </tbody>
@@ -470,32 +560,33 @@ function CardsClientes({ clientes, T, onSelecionar }) {
       {sorted.map((c) => (
         <div key={c.nome} onClick={() => onSelecionar(c)} style={{
           background: T.surface, border: `1px solid ${T.border}`,
-          borderRadius: 14, padding: "14px 16px", marginBottom: 8, cursor: "pointer", fontFamily: FONT,
+          borderRadius: 14, padding: "16px 18px", marginBottom: 8,
+          cursor: "pointer", fontFamily: FONT, transition: "border-color 0.15s",
         }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
             <div style={{ flex: 1, minWidth: 0, paddingRight: 10 }}>
-              <div style={{ fontWeight: 600, fontSize: 13, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nome}</div>
-              {c.telefone && <div style={{ fontSize: 10, color: T.textDim, marginTop: 2 }}>{c.telefone}</div>}
+              <div style={{ fontWeight: 600, fontSize: 13.5, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>{c.nome}</div>
+              {c.telefone && <div style={{ fontSize: 10, color: T.textDim, marginTop: 3, fontFamily: FONT_MONO }}>{c.telefone}</div>}
             </div>
             <RiscoBadge risco={c.risco} T={T} />
           </div>
-          <div style={{ display: "flex", gap: 18, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
             {c.produtoFavorito && (
               <div>
-                <div style={{ fontSize: 9, color: T.textDim, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>Último serviço</div>
-                <div style={{ fontSize: 11.5, color: T.textMid, fontWeight: 300 }}>{c.produtoFavorito}</div>
+                <div style={{ fontSize: 9, color: T.textDim, textTransform: "uppercase", letterSpacing: "0.10em", marginBottom: 3 }}>Último serviço</div>
+                <div style={{ fontSize: 12, color: T.textMid, fontWeight: 300 }}>{c.produtoFavorito}</div>
               </div>
             )}
             {c.diasAusente != null && (
               <div>
-                <div style={{ fontSize: 9, color: T.textDim, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>Ausente</div>
-                <div style={{ fontSize: 11.5, fontWeight: 600, color: c.diasAusente > 30 ? T.red : T.textMid }}>{c.diasAusente}d</div>
+                <div style={{ fontSize: 9, color: T.textDim, textTransform: "uppercase", letterSpacing: "0.10em", marginBottom: 3 }}>Ausente</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: c.diasAusente > 30 ? T.red : T.textMid, fontFamily: FONT_MONO }}>{c.diasAusente}d</div>
               </div>
             )}
             {c.ticketMedio != null && (
               <div>
-                <div style={{ fontSize: 9, color: T.textDim, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 2 }}>Ticket médio</div>
-                <div style={{ fontSize: 11.5, fontWeight: 600, color: T.gold }}>{formatarReal(c.ticketMedio)}</div>
+                <div style={{ fontSize: 9, color: T.textDim, textTransform: "uppercase", letterSpacing: "0.10em", marginBottom: 3 }}>Ticket médio</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: T.gold, fontFamily: FONT_MONO }}>{formatarReal(c.ticketMedio)}</div>
               </div>
             )}
           </div>
@@ -517,28 +608,58 @@ function ModalHistoricoCRM({ cliente, vendas, T, onClose }) {
   const faturamentoTotal = historico.reduce((acc, v) => acc + (v.total || 0), 0);
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, padding: "20px", backdropFilter: "blur(6px)" }}>
-      <div style={{ background: T.surface, width: "100%", maxWidth: "550px", borderRadius: 20, border: `1px solid ${T.border}`, display: "flex", flexDirection: "column", maxHeight: "90vh", boxShadow: "0 24px 60px rgba(0,0,0,0.6)", fontFamily: FONT }}>
-        <div style={{ padding: "24px 28px", borderBottom: `1px solid ${T.border}`, position: "relative" }}>
-          <div style={{ fontSize: 9, color: T.gold, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 6 }}>Ficha do Cliente</div>
-          <h2 style={{ margin: 0, fontSize: 22, color: T.text, letterSpacing: "-0.01em", fontFamily: FONT_DISPLAY, fontWeight: 600 }}>{cliente.nome}</h2>
-          <div style={{ display: "flex", gap: 18, marginTop: 10 }}>
-            <span style={{ fontSize: 12, color: T.textMid }}>LTV: <b style={{ color: T.green, fontWeight: 600 }}>{formatarReal(faturamentoTotal)}</b></span>
-            <span style={{ fontSize: 12, color: T.textMid }}>Serviços: <b style={{ fontWeight: 600 }}>{historico.length}</b></span>
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      zIndex: 999, padding: "20px", backdropFilter: "blur(8px)",
+    }}>
+      <div style={{
+        background: "#0f0f12", width: "100%", maxWidth: "550px", borderRadius: 20,
+        border: `1px solid rgba(255,255,255,0.09)`,
+        display: "flex", flexDirection: "column", maxHeight: "90vh",
+        boxShadow: "0 30px 80px rgba(0,0,0,0.8)", fontFamily: FONT,
+        overflow: "hidden",
+      }}>
+        {/* Header do modal */}
+        <div style={{
+          padding: "24px 28px", borderBottom: `1px solid rgba(255,255,255,0.07)`,
+          position: "relative", background: "rgba(212,175,55,0.04)",
+        }}>
+          <div style={{ fontSize: 9, color: T.gold, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: 8, fontFamily: FONT }}>
+            Ficha do Cliente
           </div>
-          <button onClick={onClose} style={{ position: "absolute", top: 24, right: 24, background: "none", border: "none", color: T.textDim, cursor: "pointer", fontSize: 18, padding: 4, lineHeight: 1 }}>✕</button>
+          <h2 style={{ margin: 0, fontSize: 22, color: T.text, letterSpacing: "-0.02em", fontFamily: FONT, fontWeight: 600 }}>{cliente.nome}</h2>
+          <div style={{ display: "flex", gap: 20, marginTop: 12 }}>
+            <span style={{ fontSize: 12, color: T.textMid }}>
+              LTV: <b style={{ color: T.green, fontWeight: 700, fontFamily: FONT_MONO }}>{formatarReal(faturamentoTotal)}</b>
+            </span>
+            <span style={{ fontSize: 12, color: T.textMid }}>
+              Serviços: <b style={{ fontWeight: 700, fontFamily: FONT_MONO }}>{historico.length}</b>
+            </span>
+          </div>
+          <button onClick={onClose} style={{
+            position: "absolute", top: 24, right: 24,
+            width: 32, height: 32, borderRadius: 8,
+            background: "rgba(255,255,255,0.05)", border: `1px solid rgba(255,255,255,0.09)`,
+            color: T.textDim, cursor: "pointer", fontSize: 14,
+            display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1,
+          }}>✕</button>
         </div>
+
         <div style={{ padding: "24px 28px", overflowY: "auto", flex: 1 }}>
-          <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, textTransform: "uppercase", marginBottom: 16, letterSpacing: "0.12em" }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, textTransform: "uppercase", marginBottom: 16, letterSpacing: "0.14em" }}>
             Histórico de Vendas (via Assent Gestão)
           </div>
           {historico.map((v, i) => (
-            <div key={i} style={{ padding: "16px 18px", background: T.surfaceAlt, borderRadius: 12, marginBottom: 10, border: `1px solid ${T.borderAlt}` }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+            <div key={i} style={{
+              padding: "14px 18px", background: T.surfaceAlt, borderRadius: 12,
+              marginBottom: 8, border: `1px solid ${T.borderAlt}`,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                 <span style={{ fontSize: 11, color: T.textDim }}>{new Date(v.data).toLocaleDateString("pt-BR")}</span>
-                <span style={{ fontSize: 14, fontWeight: 700, color: T.gold, fontFamily: FONT_DISPLAY }}>{formatarReal(v.total)}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: T.gold, fontFamily: FONT_MONO }}>{formatarReal(v.total)}</span>
               </div>
-              <div style={{ fontSize: 13.5, color: T.text, fontWeight: 500 }}>
+              <div style={{ fontSize: 13, color: T.text, fontWeight: 500 }}>
                 {v.itens?.map((item) => item.nome || item.produto).join(", ") || "Serviço"}
               </div>
             </div>
@@ -549,12 +670,14 @@ function ModalHistoricoCRM({ cliente, vendas, T, onClose }) {
             </div>
           )}
         </div>
-        <div style={{ padding: "20px 28px", borderTop: `1px solid ${T.border}` }}>
+
+        <div style={{ padding: "18px 28px", borderTop: `1px solid rgba(255,255,255,0.07)` }}>
           <button style={{
-            width: "100%", padding: "12px", borderRadius: 10,
-            background: T.gold, color: "#000", border: "none",
+            width: "100%", padding: "13px", borderRadius: 10,
+            background: T.goldGradient, color: "#1a1100", border: "none",
             fontWeight: 600, cursor: "pointer", fontSize: 12,
-            textTransform: "uppercase", letterSpacing: "0.06em", fontFamily: FONT,
+            textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: FONT,
+            boxShadow: "0 4px 18px rgba(212,175,55,0.28)",
           }}>
             + Registrar Contato Manual
           </button>
@@ -578,14 +701,18 @@ function ClientesIgnorados({ ignorados, empresaId, T }) {
   return (
     <div style={{ fontFamily: FONT }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
-        <span style={{ fontSize: 9.5, fontWeight: 700, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+        <span style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.14em", textTransform: "uppercase" }}>
           Clientes ignorados ({ignorados.length})
         </span>
         <div style={{ flex: 1, height: 1, background: T.border }} />
       </div>
       {ignorados.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "36px 0", color: T.textDim, fontSize: 13, border: `1px dashed ${T.border}`, borderRadius: 14, fontWeight: 300 }}>
-          Nenhum cliente ignorado. Use o botão "Ignorar cliente" nos alertas do Radar.
+        <div style={{
+          textAlign: "center", padding: "36px 0",
+          color: T.textDim, fontSize: 13, border: `1px dashed ${T.border}`,
+          borderRadius: 14, fontWeight: 300,
+        }}>
+          Nenhum cliente ignorado. Use o botão "Ignorar" nos alertas do Radar.
         </div>
       ) : (
         ignorados.map((ig) => {
@@ -594,21 +721,22 @@ function ClientesIgnorados({ ignorados, empresaId, T }) {
           return (
             <div key={key} style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
-              gap: 12, padding: "13px 16px", marginBottom: 8,
+              gap: 12, padding: "14px 18px", marginBottom: 8,
               background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12,
+              transition: "border-color 0.15s",
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
                 <div style={{
-                  width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
+                  width: 36, height: 36, borderRadius: 10, flexShrink: 0,
                   background: T.surfaceAlt, color: T.textDim,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 11, fontWeight: 700,
+                  fontSize: 11, fontWeight: 700, fontFamily: FONT_MONO,
                 }}>
                   {(ig.nome || "?").split(" ").slice(0, 2).map(p => p[0]).join("").toUpperCase()}
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{ig.nome}</div>
-                  {ig.telefone && <div style={{ fontSize: 10, color: T.textDim, marginTop: 1 }}>{ig.telefone}</div>}
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>{ig.nome}</div>
+                  {ig.telefone && <div style={{ fontSize: 10, color: T.textDim, marginTop: 2, fontFamily: FONT_MONO }}>{ig.telefone}</div>}
                   {ig.ignoradoEm && (
                     <div style={{ fontSize: 10, color: T.textDim, marginTop: 1 }}>
                       Ignorado em {ig.ignoradoEm?.toDate
@@ -619,9 +747,9 @@ function ClientesIgnorados({ ignorados, empresaId, T }) {
                 </div>
               </div>
               <button onClick={() => handleReativar(ig)} disabled={isReativando} style={{
-                fontSize: 11.5, fontWeight: 600, padding: "7px 14px", borderRadius: 8,
-                background: isReativando ? T.surfaceAlt : "none",
-                border: `1px solid ${T.border}`,
+                fontSize: 11.5, fontWeight: 600, padding: "7px 16px", borderRadius: 9,
+                background: isReativando ? T.surfaceAlt : "transparent",
+                border: `1px solid ${isReativando ? T.border : T.greenBorder}`,
                 cursor: isReativando ? "not-allowed" : "pointer",
                 color: isReativando ? T.textDim : T.green,
                 letterSpacing: "0.04em", fontFamily: FONT,
@@ -644,16 +772,16 @@ const FASES_LABEL = {
   crescendo:        { label: "Em crescimento",        cor: "#3aad78" },
   retencao_critica: { label: "Atenção: retenção",     cor: "#e05252" },
   estagnado:        { label: "Atividade baixa",       cor: "#d4903a" },
-  escalonando:      { label: "Escalonando",           cor: "#c8a44a" },
+  escalonando:      { label: "Escalonando",           cor: "#d4af37" },
 };
 
 const CAT_COR = {
   "Captação":    "#4a8fd4",
   "Retenção":    "#e05252",
   "Fidelização": "#3aad78",
-  "Receita":     "#c8a44a",
+  "Receita":     "#d4af37",
   "Ativação":    "#d4903a",
-  "Operacional": "#7a7990",
+  "Operacional": "rgba(255,255,255,0.4)",
 };
 
 function InsightCrescimentoCard({ insight, idx, T }) {
@@ -665,29 +793,25 @@ function InsightCrescimentoCard({ insight, idx, T }) {
       onClick={() => setExpandido(v => !v)}
       style={{
         background: T.surface,
-        border: `1px solid ${expandido ? catCor + "40" : T.border}`,
-        borderRadius: 14, overflow: "hidden",
-        cursor: "pointer",
-        transition: "border-color 0.2s",
-        fontFamily: FONT,
+        border: `1px solid ${expandido ? `${catCor}40` : T.border}`,
+        borderRadius: 14, overflow: "hidden", cursor: "pointer",
+        transition: "border-color 0.2s", fontFamily: FONT,
       }}
     >
-      {/* Barra de categoria no topo */}
       <div style={{ height: 2, background: catCor, opacity: 0.9 }} />
 
       <div style={{ padding: "20px 22px" }}>
-        {/* Linha superior: categoria + métrica */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
           <span style={{
             fontSize: 9, fontWeight: 700, color: catCor,
-            letterSpacing: "0.12em", textTransform: "uppercase",
+            letterSpacing: "0.14em", textTransform: "uppercase",
           }}>
             {insight.categoria}
           </span>
           <div style={{ textAlign: "right" }}>
             <div style={{
-              fontSize: 22, fontWeight: 600, color: catCor,
-              fontFamily: FONT_DISPLAY, lineHeight: 1, letterSpacing: "-0.02em",
+              fontSize: 22, fontWeight: 700, color: catCor,
+              fontFamily: FONT_MONO, lineHeight: 1, letterSpacing: "-0.02em",
             }}>
               {insight.metrica.valor}
             </div>
@@ -706,45 +830,24 @@ function InsightCrescimentoCard({ insight, idx, T }) {
           {insight.titulo}
         </div>
 
-        {/* Diagnóstico — sempre visível, curto */}
-        <p style={{
-          fontSize: 12, color: T.textMid, lineHeight: 1.65,
-          margin: 0, fontWeight: 300,
-        }}>
+        <p style={{ fontSize: 12.5, color: T.textMid, lineHeight: 1.65, margin: 0, fontWeight: 300 }}>
           {insight.diagnostico}
         </p>
 
-        {/* Recomendação — expande ao clicar */}
-        <div style={{
-          maxHeight: expandido ? 200 : 0,
-          overflow: "hidden",
-          transition: "max-height 0.25s ease",
-        }}>
-          <div style={{
-            marginTop: 14, paddingTop: 14,
-            borderTop: `1px solid ${T.border}`,
-          }}>
-            <div style={{
-              fontSize: 9, fontWeight: 700, color: T.textDim,
-              letterSpacing: "0.10em", textTransform: "uppercase", marginBottom: 8,
-            }}>
+        <div style={{ maxHeight: expandido ? 200 : 0, overflow: "hidden", transition: "max-height 0.25s ease" }}>
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${T.border}` }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8 }}>
               Próximo passo
             </div>
-            <p style={{
-              fontSize: 12.5, color: T.text, lineHeight: 1.7,
-              margin: "0 0 16px", fontWeight: 300,
-            }}>
+            <p style={{ fontSize: 12.5, color: T.text, lineHeight: 1.7, margin: "0 0 16px", fontWeight: 300 }}>
               {insight.recomendacao}
             </p>
           </div>
         </div>
 
-        {/* Toggle hint */}
-        <div style={{
-          marginTop: 12, display: "flex", alignItems: "center", gap: 6,
-        }}>
+        <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6 }}>
           <div style={{ flex: 1, height: 1, background: T.border }} />
-          <span style={{ fontSize: 9, color: T.textDim, letterSpacing: "0.06em" }}>
+          <span style={{ fontSize: 9, color: T.textDim, letterSpacing: "0.08em" }}>
             {expandido ? "RECOLHER" : "VER RECOMENDAÇÃO"}
           </span>
           <div style={{ flex: 1, height: 1, background: T.border }} />
@@ -778,48 +881,52 @@ function CrescimentoPage({ crescimento, T, bp }) {
     </div>
   );
 
-  // Agrupar por categoria
   const categorias = [...new Set(ativos.map(a => a.categoria))];
 
   return (
     <div style={{ fontFamily: FONT }}>
-
-      {/* Diagnóstico do momento — card de contexto */}
+      {/* Diagnóstico do momento */}
       <div style={{
-        background: T.surface, border: `1px solid ${T.border}`,
+        background: T.surface,
+        border: `1px solid ${fase.cor}28`,
         borderLeft: `3px solid ${fase.cor}`,
-        borderRadius: 14, padding: "18px 22px", marginBottom: 24,
+        borderRadius: 14, padding: "20px 24px", marginBottom: 28,
+        position: "relative", overflow: "hidden",
       }}>
+        <div style={{
+          position: "absolute", top: -30, right: -30, width: 100, height: 100,
+          borderRadius: "50%", background: `${fase.cor}12`, filter: "blur(30px)",
+          pointerEvents: "none",
+        }} />
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
           <div>
-            <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>
+            <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 8 }}>
               Momento do negócio
             </div>
-            <div style={{ fontSize: 18, fontWeight: 600, color: fase.cor, fontFamily: FONT_DISPLAY, letterSpacing: "-0.01em" }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: fase.cor, letterSpacing: "-0.01em" }}>
               {fase.label}
             </div>
           </div>
-          <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
             {[
               { val: momento.totalClientes, label: "Clientes" },
               { val: momento.fieis,         label: "Fiéis" },
               { val: momento.emRisco,       label: "Em risco" },
             ].map(m => (
               <div key={m.label} style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 20, fontWeight: 600, color: T.text, fontFamily: FONT_DISPLAY, lineHeight: 1 }}>{m.val}</div>
-                <div style={{ fontSize: 9, color: T.textDim, marginTop: 3, letterSpacing: "0.06em", textTransform: "uppercase" }}>{m.label}</div>
+                <div style={{ fontSize: 22, fontWeight: 700, color: T.text, fontFamily: FONT_MONO, lineHeight: 1 }}>{m.val}</div>
+                <div style={{ fontSize: 9, color: T.textDim, marginTop: 4, letterSpacing: "0.08em", textTransform: "uppercase" }}>{m.label}</div>
               </div>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Insights agrupados por categoria */}
       {categorias.map(cat => (
         <div key={cat} style={{ marginBottom: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
             <div style={{ width: 3, height: 14, borderRadius: 2, background: CAT_COR[cat] || T.gold, flexShrink: 0 }} />
-            <span style={{ fontSize: 9, fontWeight: 700, color: CAT_COR[cat] || T.textDim, letterSpacing: "0.12em", textTransform: "uppercase" }}>
+            <span style={{ fontSize: 9, fontWeight: 700, color: CAT_COR[cat] || T.textDim, letterSpacing: "0.14em", textTransform: "uppercase" }}>
               {cat}
             </span>
             <div style={{ flex: 1, height: 1, background: T.border }} />
@@ -838,7 +945,6 @@ function CrescimentoPage({ crescimento, T, bp }) {
 
 // ═══════════════════════════════════════════════════════════════
 // CRMModule — componente principal
-// Recebe tenantUid, nomeEmpresa e onVoltar do AG (Dashboard.jsx)
 // ═══════════════════════════════════════════════════════════════
 export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onToggleTheme }) {
   const [aba,           setAba]          = useState("radar");
@@ -856,18 +962,16 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
     else setSidebarAberta(true);
   }, [bp.isMobile]);
 
-  // Hooks de dados — usam tenantUid diretamente (sem licencas lookup)
   const { clientes, insights, crescimento, metricas, dadosBrutos, ignorados } = useCRM(tenantUid);
   const leadsData = useLeads(tenantUid);
 
   const clientesFiltrados = clientes.filter((c) => {
-    const nomeLimpo   = (c.nome || "").toLowerCase();
-    const buscaLimpa  = busca.toLowerCase();
-    const telefone    = c.telefone || "";
+    const nomeLimpo  = (c.nome || "").toLowerCase();
+    const buscaLimpa = busca.toLowerCase();
+    const telefone   = c.telefone || "";
     return nomeLimpo.includes(buscaLimpa) || telefone.includes(buscaLimpa);
   });
 
-  // ── Abas ────────────────────────────────────────────────────────────────────
   const abas = [
     { id: "radar",       icon: "◈", label: "Radar",       labelFull: "Radar do dia",    badge: insights.length || null },
     { id: "clientes",    icon: "◉", label: "Clientes",    labelFull: "Clientes",         badge: null },
@@ -878,43 +982,87 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
     { id: "config",      icon: "⚙", label: "Config",       labelFull: "Configurações",   badge: null },
   ];
 
-  const sidebarWidth = bp.isMobile ? 0 : sidebarAberta ? 234 : 60;
+  const sidebarWidth = bp.isMobile ? 0 : sidebarAberta ? 240 : 60;
+  const isDark = tema === "dark";
 
   return (
     <div style={{
       display: "flex", height: "100%", fontFamily: FONT,
       background: T.bg, color: T.text, position: "relative", overflow: "hidden",
     }}>
-      {/* Pulse keyframe */}
-      <style>{`@keyframes crm-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.75)} }`}</style>
+      {/* Global keyframes + hover states */}
+      <style>{`
+        @keyframes crm-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.75)} }
+        .crm-nav-item:hover { background: rgba(212,175,55,0.05) !important; border-color: ${T.goldBorder} !important; }
+        .crm-nav-item:hover span { color: rgba(255,255,255,0.85) !important; }
+        .crm-card:hover { border-color: ${T.goldBorder} !important; }
+        .crm-suggestion-btn:hover { background: ${T.goldDim} !important; border-color: ${T.goldBorder} !important; }
+        .crm-secondary-btn:hover { border-color: rgba(255,255,255,0.20) !important; color: ${T.text} !important; }
+        .crm-table-row:hover { background: ${T.goldDim} !important; }
+      `}</style>
+
+      {/* Dark mode background grid */}
+      {isDark && (
+        <div style={{
+          position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0,
+          backgroundImage: [
+            "linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px)",
+            "linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px)",
+          ].join(", "),
+          backgroundSize: "56px 56px",
+          maskImage: "radial-gradient(ellipse at 30% 40%, black 20%, transparent 70%)",
+        }} />
+      )}
+
+      {/* Gold radial glow */}
+      {isDark && (
+        <div style={{
+          position: "absolute", top: "-15%", left: "30%",
+          width: "600px", height: "500px",
+          background: "radial-gradient(50% 50% at 50% 50%, rgba(212,175,55,0.10), transparent 70%)",
+          filter: "blur(40px)", pointerEvents: "none", zIndex: 0,
+        }} />
+      )}
 
       {/* Overlay mobile */}
       {bp.isMobile && sidebarAberta && (
-        <div onClick={() => setSidebarAberta(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", zIndex: 40, backdropFilter: "blur(2px)" }} />
+        <div onClick={() => setSidebarAberta(false)} style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.70)",
+          zIndex: 40, backdropFilter: "blur(3px)",
+        }} />
       )}
 
       {/* ── Sidebar ──────────────────────────────────────────────────────────── */}
       <div style={{
         position: bp.isMobile ? "fixed" : "relative",
         top: 0, left: 0, bottom: 0,
-        width: bp.isMobile ? 244 : sidebarWidth,
+        width: bp.isMobile ? 250 : sidebarWidth,
         zIndex: bp.isMobile ? 50 : 1,
-        background: T.surface, borderRight: `1px solid ${T.border}`,
+        background: isDark ? "rgba(5,5,5,0.96)" : T.surface,
+        backdropFilter: isDark ? "blur(20px)" : "none",
+        borderRight: `1px solid ${T.border}`,
         display: "flex", flexDirection: "column",
         transition: "width 0.22s ease, transform 0.22s ease",
         transform: bp.isMobile ? (sidebarAberta ? "translateX(0)" : "translateX(-100%)") : "none",
-        overflow: "hidden", flexShrink: 0,
+        overflow: "hidden", flexShrink: 0, position: "relative",
       }}>
-        {/* Logo + toggle */}
+        {/* Logo */}
         <div style={{
-          padding: "18px 16px", borderBottom: `1px solid ${T.border}`,
-          display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 60,
+          padding: "20px 16px", borderBottom: `1px solid ${T.border}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 64,
         }}>
           <div style={{ overflow: "hidden", opacity: sidebarAberta || bp.isMobile ? 1 : 0, transition: "opacity 0.15s ease", whiteSpace: "nowrap" }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, letterSpacing: "0.12em", color: T.gold, textTransform: "uppercase", fontFamily: FONT }}>
+            <div style={{
+              fontSize: 11, fontWeight: 600, letterSpacing: "0.18em", color: T.gold,
+              textTransform: "uppercase", fontFamily: FONT_BRAND,
+              background: isDark ? T.goldGradient : "none",
+              WebkitBackgroundClip: isDark ? "text" : "none",
+              WebkitTextFillColor: isDark ? "transparent" : T.gold,
+              backgroundClip: isDark ? "text" : "none",
+            }}>
               Assent CRM
             </div>
-            <div style={{ fontSize: 9.5, color: T.textDim, marginTop: 2, letterSpacing: "0.06em" }}>via Assent Gestão</div>
+            <div style={{ fontSize: 9.5, color: T.textDim, marginTop: 3, letterSpacing: "0.06em" }}>via Assent Gestão</div>
           </div>
           {!bp.isMobile && (
             <button
@@ -922,9 +1070,10 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
               title={sidebarAberta ? "Recolher menu" : "Expandir menu"}
               style={{
                 width: 28, height: 28, borderRadius: 7, border: `1px solid ${T.border}`,
-                background: T.surfaceAlt, cursor: "pointer", fontSize: 12,
+                background: "transparent", cursor: "pointer", fontSize: 11,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 color: T.textMid, flexShrink: 0, marginLeft: sidebarAberta ? 8 : "auto",
+                transition: "border-color 0.15s",
               }}
             >
               {sidebarAberta ? "←" : "→"}
@@ -933,61 +1082,84 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
         </div>
 
         {/* Nav */}
-        <nav style={{ flex: 1, padding: "10px 8px", overflowY: "auto" }}>
+        <nav style={{ flex: 1, padding: "10px 10px", overflowY: "auto" }}>
           {abas.map((a) => {
-            const ativo      = aba === a.id;
+            const ativo        = aba === a.id;
             const mostrarLabel = sidebarAberta || bp.isMobile;
             return (
               <button
                 key={a.id}
+                className="crm-nav-item"
                 onClick={() => { setAba(a.id); if (bp.isMobile) setSidebarAberta(false); }}
                 title={!mostrarLabel ? a.labelFull : undefined}
                 style={{
                   display: "flex", alignItems: "center",
                   gap: mostrarLabel ? 10 : 0,
                   justifyContent: mostrarLabel ? "flex-start" : "center",
-                  width: "100%", padding: mostrarLabel ? "9px 12px" : "10px",
+                  width: "100%", padding: mostrarLabel ? "10px 12px" : "10px",
                   borderRadius: 10, marginBottom: 2,
-                  border: ativo ? `1px solid ${T.goldBorder}` : "1px solid transparent",
-                  background: ativo ? T.goldGlow : "transparent",
+                  border: `1px solid ${ativo ? T.goldBorder : "transparent"}`,
+                  background: ativo
+                    ? "linear-gradient(140deg, rgba(212,175,55,0.12), rgba(212,175,55,0.03))"
+                    : "transparent",
                   color: ativo ? T.text : T.textMid,
                   fontSize: 12.5, cursor: "pointer", fontFamily: FONT,
                   fontWeight: ativo ? 500 : 400, transition: "all 0.15s ease",
                   position: "relative",
                 }}
               >
+                {/* left indicator */}
                 {ativo && (
-                  <div style={{ position: "absolute", left: 0, top: "22%", height: "56%", width: 2.5, background: T.gold, borderRadius: "0 2px 2px 0" }} />
+                  <div style={{
+                    position: "absolute", left: 0, top: "20%", height: "60%",
+                    width: 2.5, background: T.gold, borderRadius: "0 2px 2px 0",
+                    boxShadow: `0 0 8px ${T.gold}88`,
+                  }} />
                 )}
-                <span style={{ color: ativo ? T.gold : T.textDim, fontSize: 14, flexShrink: 0 }}>{a.icon}</span>
+                {/* Icon box */}
+                <div style={{
+                  width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: ativo ? T.goldDim : "transparent",
+                  border: `1px solid ${ativo ? T.goldBorder : "transparent"}`,
+                  fontSize: 13, color: ativo ? T.goldLight : T.textDim,
+                  transition: "all 0.15s",
+                }}>
+                  {a.icon}
+                </div>
                 {mostrarLabel && (
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.labelFull}</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                    {a.labelFull}
+                  </span>
                 )}
                 {a.badge && mostrarLabel ? (
-                  <span style={{ marginLeft: "auto", fontSize: 9.5, fontWeight: 700, background: T.red, color: "#fff", borderRadius: 999, padding: "1px 7px", flexShrink: 0 }}>{a.badge}</span>
+                  <span style={{
+                    fontSize: 9.5, fontWeight: 700, background: T.red, color: "#fff",
+                    borderRadius: 999, padding: "1px 7px", flexShrink: 0,
+                  }}>{a.badge}</span>
                 ) : a.badge && !mostrarLabel ? (
-                  <span style={{ position: "absolute", top: 5, right: 5, width: 7, height: 7, borderRadius: "50%", background: T.red }} />
+                  <span style={{ position: "absolute", top: 6, right: 6, width: 6, height: 6, borderRadius: "50%", background: T.red }} />
                 ) : null}
               </button>
             );
           })}
         </nav>
 
-        {/* Rodapé da sidebar — botão voltar ao AG */}
-        <div style={{ padding: "12px 14px", borderTop: `1px solid ${T.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
+        {/* Footer sidebar */}
+        <div style={{ padding: "14px 14px", borderTop: `1px solid ${T.border}`, display: "flex", flexDirection: "column", gap: 8 }}>
           {sidebarAberta || bp.isMobile ? (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{
-                  width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
-                  background: T.goldGlow, border: `1px solid ${T.goldBorder}`,
+                  width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+                  background: T.goldDim, border: `1px solid ${T.goldBorder}`,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 11, fontWeight: 700, color: T.gold, fontFamily: FONT,
+                  fontSize: 12, fontWeight: 700, color: T.gold, fontFamily: FONT_MONO,
                 }}>
                   {(nomeEmpresa || "E")[0].toUpperCase()}
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>
                     {nomeEmpresa || "Empresa"}
                   </div>
                   <div style={{ fontSize: 9.5, color: T.textDim }}>Assent CRM</div>
@@ -996,9 +1168,9 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
               <button
                 onClick={onVoltar}
                 style={{
-                  marginTop: 4, fontSize: 11, color: T.textMid,
-                  background: "none", border: `1px solid ${T.border}`,
-                  cursor: "pointer", padding: "6px 10px", borderRadius: 8,
+                  fontSize: 11, color: T.textDim,
+                  background: "transparent", border: `1px solid ${T.border}`,
+                  cursor: "pointer", padding: "7px 12px", borderRadius: 8,
                   fontFamily: FONT, alignSelf: "flex-start", letterSpacing: "0.03em",
                   transition: "color 0.15s, border-color 0.15s",
                 }}
@@ -1012,9 +1184,9 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
               title="Voltar ao Assent Gestão"
               style={{
                 width: 36, height: 36, borderRadius: 9, border: `1px solid ${T.border}`,
-                background: "none", cursor: "pointer", color: T.textMid,
+                background: "transparent", cursor: "pointer", color: T.textMid,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 14, margin: "0 auto",
+                fontSize: 14, margin: "0 auto", transition: "border-color 0.15s",
               }}
             >←</button>
           )}
@@ -1022,21 +1194,23 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
       </div>
 
       {/* ── Área principal ───────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0 }}>
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minWidth: 0, position: "relative", zIndex: 1 }}>
 
         {/* Header */}
         <div style={{
-          padding: bp.isMobile ? "12px 16px" : "14px 26px",
-          borderBottom: `1px solid ${T.border}`, background: T.surface,
+          padding: bp.isMobile ? "12px 16px" : "14px 28px",
+          borderBottom: `1px solid ${T.border}`,
+          background: isDark ? "rgba(7,7,7,0.88)" : T.surface,
+          backdropFilter: isDark ? "blur(20px)" : "none",
           display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12,
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
             {bp.isMobile && (
               <button
                 onClick={() => setSidebarAberta((v) => !v)}
                 style={{
-                  width: 34, height: 34, borderRadius: 9, border: `1px solid ${T.border}`,
-                  background: T.surfaceAlt, cursor: "pointer",
+                  width: 36, height: 36, borderRadius: 9, border: `1px solid ${T.border}`,
+                  background: "transparent", cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   color: T.textMid, fontSize: 16, flexShrink: 0,
                 }}
@@ -1044,14 +1218,14 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
             )}
             <div style={{ minWidth: 0 }}>
               <div style={{
-                fontSize: bp.isMobile ? 14 : 17, fontWeight: 600, color: T.text,
-                letterSpacing: "-0.01em", fontFamily: FONT_DISPLAY,
+                fontSize: bp.isMobile ? 14 : 18, fontWeight: 600, color: T.text,
+                letterSpacing: "-0.02em", fontFamily: FONT,
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               }}>
                 {abas.find((a) => a.id === aba)?.labelFull}
               </div>
               {!bp.isMobile && (
-                <div style={{ fontSize: 11, color: T.textDim, marginTop: 2, fontFamily: FONT, fontWeight: 300 }}>
+                <div style={{ fontSize: 11, color: T.textDim, marginTop: 2, fontFamily: FONT, fontWeight: 300, textTransform: "capitalize" }}>
                   {new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
                 </div>
               )}
@@ -1070,22 +1244,23 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
               onClick={onToggleTheme}
               title={tema === "dark" ? "Modo claro" : "Modo escuro"}
               style={{
-                width: 34, height: 34, borderRadius: 9,
-                border: `1px solid ${T.border}`, background: T.surfaceAlt,
-                cursor: "pointer", fontSize: 15,
+                width: 36, height: 36, borderRadius: 9,
+                border: `1px solid ${T.border}`, background: "transparent",
+                cursor: "pointer", fontSize: 14,
                 display: "flex", alignItems: "center", justifyContent: "center", color: T.textMid,
+                transition: "border-color 0.15s",
               }}
             >
-              {tema === "dark" ? "☀️" : "🌙"}
+              {tema === "dark" ? "☀" : "🌙"}
             </button>
             {!bp.isMobile && (
               <div style={{
                 display: "flex", alignItems: "center", gap: 6,
-                fontSize: 11, color: T.green, fontFamily: FONT, fontWeight: 500,
+                fontSize: 11, color: T.green, fontFamily: FONT, fontWeight: 600,
                 background: T.greenDim, border: `1px solid ${T.greenBorder}`,
-                borderRadius: 999, padding: "5px 12px",
+                borderRadius: 999, padding: "5px 14px",
               }}>
-                <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.green, display: "inline-block", animation: "crm-pulse 2.2s ease-in-out infinite" }} />
+                <span style={{ width: 5, height: 5, borderRadius: "50%", background: T.green, display: "inline-block", animation: "crm-pulse 2.2s ease-in-out infinite" }} />
                 sincronizado
               </div>
             )}
@@ -1093,67 +1268,92 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
         </div>
 
         {/* Conteúdo das abas */}
-        <div style={{ flex: 1, overflowY: "auto", padding: bp.isMobile ? "16px 14px" : "24px 26px", paddingBottom: bp.isMobile ? "72px" : "24px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: bp.isMobile ? "16px 14px" : "28px 28px", paddingBottom: bp.isMobile ? "80px" : "28px" }}>
 
           {/* ── Radar ── */}
           {aba === "radar" && (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: bp.isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 24 }}>
-                <MetricCard T={T} val={metricas?.emRisco || 0}                      label="Em risco alto"    color={T.red}    />
-                <MetricCard T={T} val={formatarReal(metricas?.receitaEmRisco || 0)} label="Receita em risco" color={T.yellow} />
-                <MetricCard T={T} val={metricas?.totalClientes || 0}                label="Clientes ativos"  color={T.green}  />
-                <MetricCard T={T} val={formatarReal(metricas?.ticketGeral || 0)}    label="Ticket médio"     color={T.gold}   />
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
-                <span style={{ fontSize: 9.5, fontWeight: 700, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase", whiteSpace: "nowrap", fontFamily: FONT }}>
-                  Ações prioritárias de hoje
-                </span>
+              {/* Label de seção estilo aplicativos */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  padding: "4px 12px", borderRadius: 999,
+                  background: T.goldDim, border: `1px solid ${T.goldBorder}`,
+                }}>
+                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: T.gold, display: "inline-block", animation: "crm-pulse 2.2s ease-in-out infinite" }} />
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: T.gold }}>
+                    Alertas ativos
+                  </span>
+                </div>
                 <div style={{ flex: 1, height: 1, background: T.border }} />
+                {!bp.isMobile && metricas && (
+                  <span style={{ fontSize: 11, color: T.textDim }}>
+                    {insights.length} {insights.length === 1 ? "cliente" : "clientes"} precisam de atenção
+                  </span>
+                )}
               </div>
-              {insights.length === 0
-                ? <div style={{ textAlign: "center", padding: "48px 0", color: T.textDim, fontSize: 13, border: `1px dashed ${T.border}`, borderRadius: 14, fontFamily: FONT, fontWeight: 300 }}>
-                    Nenhum insight gerado ainda.
-                  </div>
-                : insights.map((ins) => (
-                    <InsightCard key={ins.id} insight={ins} empresaNome={nomeEmpresa} empresaId={tenantUid} T={T} />
-                  ))
-              }
+
+              {/* Métricas */}
+              {metricas && (
+                <div style={{ display: "grid", gridTemplateColumns: bp.isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: 12, marginBottom: 28 }}>
+                  <MetricCard val={metricas.totalClientes}     label="Clientes ativos" color={null}   T={T} />
+                  <MetricCard val={metricas.emRisco}           label="Em risco"        color={T.red}  T={T} />
+                  <MetricCard val={metricas.dormentes}         label="Dormentes 60d+"  color={T.yellow} T={T} />
+                  <MetricCard val={metricas.fieis}             label="Clientes fiéis"  color={T.green} T={T} />
+                </div>
+              )}
+
+              {/* Insights */}
+              {insights.length === 0 ? (
+                <div style={{
+                  textAlign: "center", padding: "60px 0",
+                  color: T.textDim, fontSize: 13, fontFamily: FONT, fontWeight: 300,
+                  border: `1px dashed ${T.border}`, borderRadius: 16,
+                }}>
+                  {clientes.length === 0
+                    ? "Nenhum cliente importado ainda. Registre vendas no Assent Gestão para ativar o radar."
+                    : "✦ Tudo certo — sem alertas no radar hoje."}
+                </div>
+              ) : (
+                insights.map((ins, i) => (
+                  <InsightCard key={ins.clienteId || i} insight={ins} empresaNome={nomeEmpresa} empresaId={tenantUid} T={T} />
+                ))
+              )}
             </>
           )}
 
           {/* ── Clientes ── */}
           {aba === "clientes" && (
             <>
-              <div style={{ marginBottom: 18 }}>
+              {/* Label + busca */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+                    {clientesFiltrados.length} {clientesFiltrados.length === 1 ? "cliente" : "clientes"}
+                  </span>
+                  <div style={{ flex: 1, height: 1, background: T.border }} />
+                </div>
                 <input
-                  type="text"
-                  placeholder="Buscar por nome ou telefone..."
                   value={busca}
                   onChange={(e) => setBusca(e.target.value)}
+                  placeholder="Buscar por nome ou telefone..."
                   style={{
-                    width: "100%", padding: "12px 16px", borderRadius: 12,
-                    border: `1px solid ${T.border}`, background: T.surface,
-                    color: T.text, fontSize: 13.5, outline: "none",
-                    boxSizing: "border-box", fontFamily: FONT, fontWeight: 300,
-                    transition: "border-color 0.15s",
+                    width: "100%", maxWidth: 420, padding: "10px 14px", borderRadius: 10, fontSize: 13,
+                    border: `1px solid ${T.border}`, outline: "none",
+                    fontFamily: FONT, background: T.surface, color: T.text,
+                    boxSizing: "border-box", transition: "border-color 0.15s",
                   }}
-                  onFocus={(e) => (e.target.style.borderColor = T.gold)}
-                  onBlur={(e)  => (e.target.style.borderColor = T.border)}
                 />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: bp.isMobile ? "1fr" : "repeat(3, 1fr)", gap: 12, marginBottom: 18 }}>
-                <MetricCard T={T} val={clientesFiltrados.filter((c) => c.risco === "alto").length}  label="Risco alto" color={T.red}    />
-                <MetricCard T={T} val={clientesFiltrados.filter((c) => c.risco === "medio").length} label="Atenção"    color={T.yellow} />
-                <MetricCard T={T} val={clientesFiltrados.filter((c) => c.risco === "baixo").length} label="Fiéis"      color={T.green}  />
-              </div>
-              {bp.isMobile
-                ? <CardsClientes clientes={clientesFiltrados} T={T} onSelecionar={setClienteAtivo} />
-                : <TabelaClientes clientes={clientesFiltrados} T={T} onSelecionar={setClienteAtivo} />
-              }
-              {clientesFiltrados.length === 0 && busca && (
-                <div style={{ textAlign: "center", padding: "40px", color: T.textDim, fontFamily: FONT, fontWeight: 300 }}>
-                  Nenhum cliente encontrado com "{busca}".
+
+              {clientesFiltrados.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "60px 0", color: T.textDim, fontSize: 13, border: `1px dashed ${T.border}`, borderRadius: 16 }}>
+                  Nenhum cliente encontrado.
                 </div>
+              ) : bp.isDesktop ? (
+                <TabelaClientes clientes={clientesFiltrados} T={T} onSelecionar={setClienteAtivo} />
+              ) : (
+                <CardsClientes clientes={clientesFiltrados} T={T} onSelecionar={setClienteAtivo} />
               )}
             </>
           )}
@@ -1163,18 +1363,33 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
             <AssistenteIA metricas={metricas} clientes={clientes} empresaNome={nomeEmpresa} T={T} />
           )}
 
+          {/* ── Crescimento ── */}
+          {aba === "crescimento" && (
+            <CrescimentoPage crescimento={crescimento} T={T} bp={bp} />
+          )}
+
           {/* ── Painel ── */}
           {aba === "painel" && (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: bp.isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
-                <MetricCard T={T} val={metricas?.totalClientes || 0}                label="Clientes totais" />
-                <MetricCard T={T} val={metricas?.fieis || 0}                        label="Clientes fiéis"  color={T.green}  />
-                <MetricCard T={T} val={metricas?.dormentes || 0}                    label="Dormentes +60d"  color={T.yellow} />
-                <MetricCard T={T} val={formatarReal(metricas?.receitaRecente || 0)} label="Receita 30d"     color={T.gold}   />
+              {/* Label */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.14em", textTransform: "uppercase" }}>Visão geral</span>
+                <div style={{ flex: 1, height: 1, background: T.border }} />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: bp.isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
-                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 20 }}>
-                  <p style={{ fontSize: 9.5, fontWeight: 700, color: T.textDim, marginBottom: 16, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: FONT }}>Segmentos automáticos</p>
+
+              {metricas && (
+                <div style={{ display: "grid", gridTemplateColumns: bp.isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
+                  <MetricCard val={metricas.totalClientes}           label="Total clientes"   color={null}     T={T} />
+                  <MetricCard val={`${Math.round((metricas.fieis / Math.max(metricas.totalClientes,1))*100)}%`} label="Taxa de fidelidade" color={T.green} T={T} />
+                  <MetricCard val={metricas.emRisco}                 label="Em risco"         color={T.red}    T={T} />
+                  <MetricCard val={formatarReal(metricas.ticketGeral)} label="Ticket médio"   color={T.gold}   T={T} />
+                </div>
+              )}
+
+              <div style={{ display: "grid", gridTemplateColumns: bp.isMobile ? "1fr" : "1fr 1fr", gap: 14 }}>
+                {/* Segmentos */}
+                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 22 }}>
+                  <p style={{ fontSize: 9, fontWeight: 700, color: T.textDim, marginBottom: 18, letterSpacing: "0.14em", textTransform: "uppercase" }}>Segmentos automáticos</p>
                   {[
                     { label: "Fiéis",            val: metricas?.fieis || 0,     cor: T.green   },
                     { label: "Em risco",         val: metricas?.emRisco || 0,   cor: T.red     },
@@ -1182,22 +1397,24 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                     { label: "Alto valor",       val: clientes.filter((c) => (c.ticketMedio || 0) > 500).length, cor: T.gold },
                     { label: "Novos (1 compra)", val: metricas?.novos || 0,     cor: T.textMid },
                   ].map((s) => (
-                    <div key={s.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 0", borderBottom: `1px solid ${T.border}` }}>
+                    <div key={s.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 0", borderBottom: `1px solid ${T.border}` }}>
                       <span style={{ fontSize: 12.5, color: T.textMid, fontFamily: FONT, fontWeight: 300 }}>{s.label}</span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: s.cor, fontFamily: FONT_DISPLAY }}>{s.val}</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: s.cor, fontFamily: FONT_MONO }}>{s.val}</span>
                     </div>
                   ))}
                 </div>
-                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 20 }}>
-                  <p style={{ fontSize: 9.5, fontWeight: 700, color: T.textDim, marginBottom: 16, letterSpacing: "0.10em", textTransform: "uppercase", fontFamily: FONT }}>Resumo financeiro</p>
+
+                {/* Financeiro */}
+                <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: 22 }}>
+                  <p style={{ fontSize: 9, fontWeight: 700, color: T.textDim, marginBottom: 18, letterSpacing: "0.14em", textTransform: "uppercase" }}>Resumo financeiro</p>
                   {[
                     { label: "Ticket médio geral",  val: formatarReal(metricas?.ticketGeral),    color: T.gold  },
                     { label: "Receita em risco",    val: formatarReal(metricas?.receitaEmRisco), color: T.red   },
                     { label: "Receita últimos 30d", val: formatarReal(metricas?.receitaRecente), color: T.green },
                   ].map((s) => (
-                    <div key={s.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 0", borderBottom: `1px solid ${T.border}` }}>
+                    <div key={s.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "15px 0", borderBottom: `1px solid ${T.border}` }}>
                       <span style={{ fontSize: 12.5, color: T.textMid, fontFamily: FONT, fontWeight: 300 }}>{s.label}</span>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: s.color, fontFamily: FONT_DISPLAY }}>{s.val}</span>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: s.color, fontFamily: FONT_MONO }}>{s.val}</span>
                     </div>
                   ))}
                 </div>
@@ -1205,28 +1422,23 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
             </>
           )}
 
-          {/* ── Crescimento ── */}
-          {aba === "crescimento" && (
-            <CrescimentoPage crescimento={crescimento} T={T} bp={bp} />
-          )}
-
           {/* ── Leads ── */}
           {aba === "leads" && (
             <>
-              {/* Botão Funil de Leads */}
-              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 18 }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 20 }}>
                 <button
                   onClick={() => setFunilAberto(true)}
                   style={{
                     display: "flex", alignItems: "center", gap: 8,
-                    padding: "9px 18px", borderRadius: 10,
-                    background: T.goldGlow, border: `1px solid ${T.goldBorder}`,
+                    padding: "9px 20px", borderRadius: 10,
+                    background: T.goldDim, border: `1px solid ${T.goldBorder}`,
                     color: T.gold, cursor: "pointer",
-                    fontSize: 12.5, fontWeight: 600, letterSpacing: "0.05em",
+                    fontSize: 12, fontWeight: 600, letterSpacing: "0.06em",
                     fontFamily: FONT, transition: "all 0.16s",
+                    boxShadow: "none",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = T.gold; e.currentTarget.style.color = "#000"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = T.goldGlow; e.currentTarget.style.color = T.gold; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = T.goldGradient; e.currentTarget.style.color = "#1a1100"; e.currentTarget.style.boxShadow = "0 4px 18px rgba(212,175,55,0.28)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = T.goldDim; e.currentTarget.style.color = T.gold; e.currentTarget.style.boxShadow = "none"; }}
                 >
                   <span style={{ fontSize: 14 }}>◎</span>
                   Funil de leads
@@ -1235,38 +1447,33 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
 
               <LeadsPage T={T} bp={bp} empresaId={tenantUid} config={null} funilOculto={true} />
 
-              {/* Modal Funil de Leads */}
               {funilAberto && (
                 <div
                   onClick={(e) => { if (e.target === e.currentTarget) setFunilAberto(false); }}
                   style={{
                     position: "fixed", inset: 0,
-                    background: "rgba(0,0,0,0.80)",
-                    backdropFilter: "blur(6px)",
+                    background: "rgba(0,0,0,0.88)", backdropFilter: "blur(8px)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     zIndex: 999, padding: bp.isMobile ? "12px" : "28px",
                   }}
                 >
                   <div style={{
-                    background: T.surface,
-                    border: `1px solid ${T.border}`,
-                    borderRadius: 20,
-                    width: "100%", maxWidth: 860,
-                    maxHeight: "90vh",
+                    background: "#0f0f12", border: `1px solid rgba(255,255,255,0.09)`,
+                    borderRadius: 20, width: "100%", maxWidth: 860, maxHeight: "90vh",
                     display: "flex", flexDirection: "column",
-                    boxShadow: "0 28px 70px rgba(0,0,0,0.55)",
+                    boxShadow: "0 30px 80px rgba(0,0,0,0.8)",
                     fontFamily: FONT, overflow: "hidden",
                   }}>
                     <div style={{
-                      padding: "20px 26px",
-                      borderBottom: `1px solid ${T.border}`,
+                      padding: "20px 26px", borderBottom: `1px solid rgba(255,255,255,0.07)`,
                       display: "flex", alignItems: "center", justifyContent: "space-between",
+                      background: "rgba(212,175,55,0.04)",
                     }}>
                       <div>
-                        <div style={{ fontSize: 9, color: T.gold, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: 4 }}>
+                        <div style={{ fontSize: 9, color: T.gold, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.18em", marginBottom: 5 }}>
                           Gestão de Leads
                         </div>
-                        <h2 style={{ margin: 0, fontSize: 20, color: T.text, fontFamily: FONT_DISPLAY, fontWeight: 600, letterSpacing: "-0.01em" }}>
+                        <h2 style={{ margin: 0, fontSize: 20, color: T.text, fontFamily: FONT, fontWeight: 600, letterSpacing: "-0.02em" }}>
                           Funil de Leads
                         </h2>
                       </div>
@@ -1274,8 +1481,8 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                         onClick={() => setFunilAberto(false)}
                         style={{
                           width: 34, height: 34, borderRadius: 9,
-                          border: `1px solid ${T.border}`, background: T.surfaceAlt,
-                          cursor: "pointer", fontSize: 16, color: T.textMid,
+                          border: `1px solid rgba(255,255,255,0.09)`, background: "rgba(255,255,255,0.04)",
+                          cursor: "pointer", fontSize: 15, color: T.textMid,
                           display: "flex", alignItems: "center", justifyContent: "center",
                         }}
                       >✕</button>
@@ -1306,7 +1513,9 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
       {bp.isMobile && (
         <div style={{
           position: "fixed", bottom: 0, left: 0, right: 0,
-          background: T.surface, borderTop: `1px solid ${T.border}`,
+          background: isDark ? "rgba(5,5,5,0.96)" : T.surface,
+          backdropFilter: "blur(16px)",
+          borderTop: `1px solid ${T.border}`,
           display: "flex", zIndex: 30, paddingBottom: "env(safe-area-inset-bottom)",
         }}>
           {abas.map((a) => {
@@ -1314,12 +1523,19 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
             return (
               <button key={a.id} onClick={() => setAba(a.id)} style={{
                 flex: 1, padding: "10px 4px 8px",
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
                 background: "none", border: "none", cursor: "pointer", fontFamily: FONT, position: "relative",
               }}>
-                <span style={{ fontSize: 17, color: ativo ? T.gold : T.textDim, transition: "color 0.15s ease" }}>{a.icon}</span>
+                <div style={{
+                  width: 28, height: 28, borderRadius: 8,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: ativo ? T.goldDim : "transparent",
+                  border: `1px solid ${ativo ? T.goldBorder : "transparent"}`,
+                  fontSize: 14, color: ativo ? T.goldLight : T.textDim,
+                  transition: "all 0.15s",
+                }}>{a.icon}</div>
                 <span style={{ fontSize: 9, fontWeight: ativo ? 600 : 400, color: ativo ? T.text : T.textDim, letterSpacing: "0.04em", textTransform: "uppercase" }}>{a.label}</span>
-                {a.badge ? <span style={{ position: "absolute", top: 6, right: "calc(50% - 14px)", width: 7, height: 7, borderRadius: "50%", background: T.red }} /> : null}
+                {a.badge ? <span style={{ position: "absolute", top: 6, right: "calc(50% - 18px)", width: 6, height: 6, borderRadius: "50%", background: T.red }} /> : null}
               </button>
             );
           })}
