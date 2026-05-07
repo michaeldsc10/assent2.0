@@ -394,7 +394,7 @@ const CONFIG_DEFAULT = {
   horaInicio:"08:00",horaFim:"18:00",granularidadeMinutos:30,
   nomeEmpresa:"",descricao:"",
   bloqueiosRecorrentes:[], // [{id, motivo, inicio, fim}] — pausas fixas diárias (ex: almoço)
-  whatsappTemplate:"Olá [nome]! Sua reserva de [serv] foi confirmada. Clique para mais detalhes: [id]",
+  whatsappTemplate:"-*[id]*-\nOlá *[nome]*! \nSua reserva de *[serv]* foi confirmada. \nDia *[hora]h*\nTe aguardo aqui!",
 };
 
 // ─── useToast ─────────────────────────────────────────────────────────────────
