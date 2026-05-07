@@ -255,6 +255,35 @@ export function diagnosticarMomento(clientesComScore, vendas = []) {
     fase = "crescendo";
   }
 
+  // Nomes dos clientes sem compra (semVendas) — primeiros nomes para personalização
+  const nomesContatos = semVendas
+    .slice(0, 3)
+    .map(c => c.nome?.split(" ")[0])
+    .filter(Boolean);
+
+  // Nomes dos clientes em risco — para citar no diagnóstico
+  const nomesEmRisco = emRisco
+    .slice(0, 3)
+    .map(c => c.nome?.split(" ")[0])
+    .filter(Boolean);
+
+  // Nomes dos dormentes
+  const nomesDormentes = dormentes
+    .slice(0, 2)
+    .map(c => c.nome?.split(" ")[0])
+    .filter(Boolean);
+
+  // Nomes dos novos (1 compra)
+  const nomesNovos = novos
+    .slice(0, 3)
+    .map(c => c.nome?.split(" ")[0])
+    .filter(Boolean);
+
+  // Maior tempo ausente entre os em risco
+  const maxDiasRisco = emRisco.length
+    ? Math.max(...emRisco.map(c => c.diasAusente || 0))
+    : 0;
+
   return {
     fase,
     // métricas para uso nos insights
@@ -273,6 +302,12 @@ export function diagnosticarMomento(clientesComScore, vendas = []) {
     v7dLength: v7d.length,
     v30dLength: v30d.length,
     taxaRisco: comVendas.length ? emRisco.length / comVendas.length : 0,
+    // dados ricos para personalização
+    nomesContatos,
+    nomesEmRisco,
+    nomesDormentes,
+    nomesNovos,
+    maxDiasRisco,
   };
 }
 
@@ -296,8 +331,8 @@ const BANCO_INSIGHTS_CRESCIMENTO = [
     quando: (m) => m.fieis >= 2,
     metrica: (m) => ({ valor: m.fieis, label: "clientes fiéis" }),
     titulo: (m) => `${m.fieis} clientes prontos para indicar`,
-    diagnostico: (m) => `${m.nomePrimeiroFiel ? m.nomePrimeiroFiel.split(" ")[0] : "Seus clientes"} e outros ${m.fieis - 1} com mais de uma compra são sua fonte mais barata de aquisição.`,
-    recomendacao: () => `Entre em contato direto, mencione o trabalho feito e peça um nome. Um pedido personalizado converte 3× mais que qualquer campanha.`,
+    diagnostico: (m) => `${m.nomePrimeiroFiel ? m.nomePrimeiroFiel.split(" ")[0] : "Seus clientes fiéis"}${m.fieis > 1 ? ` e outros ${m.fieis - 1}` : ""} com mais de uma compra são sua fonte mais barata de aquisição.`,
+    recomendacao: (m) => `Entre em contato direto com ${m.nomePrimeiroFiel ? m.nomePrimeiroFiel.split(" ")[0] : "esses clientes"}, mencione o trabalho feito e peça um nome. Um pedido personalizado converte 3× mais que qualquer campanha.`,
   },
   {
     id: "igr-contatos-sem-historico",
@@ -306,8 +341,13 @@ const BANCO_INSIGHTS_CRESCIMENTO = [
     quando: (m) => m.semVendas > 0,
     metrica: (m) => ({ valor: m.semVendas, label: `contato${m.semVendas > 1 ? "s" : ""} sem compra` }),
     titulo: (m) => `${m.semVendas} contato${m.semVendas > 1 ? "s" : ""} cadastrado${m.semVendas > 1 ? "s" : ""} sem histórico`,
-    diagnostico: () => `Esses leads demonstraram interesse mas não fecharam. O calor da intenção inicial cai rápido — cada semana sem contato reduz a chance de conversão.`,
-    recomendacao: () => `Uma mensagem direta e curta esta semana — sem pitch, apenas verificando se a necessidade ainda existe — costuma converter 10–20%.`,
+    diagnostico: (m) => {
+      const lista = m.nomesContatos?.length
+        ? `${m.nomesContatos.join(", ")} ${m.semVendas > m.nomesContatos.length ? `e mais ${m.semVendas - m.nomesContatos.length}` : ""} demonstraram`
+        : `Esses ${m.semVendas} contatos demonstraram`;
+      return `${lista} interesse mas não fecharam. O calor da intenção inicial cai rápido — cada semana sem contato reduz a chance de conversão.`;
+    },
+    recomendacao: (m) => `Uma mensagem direta e curta para ${m.nomesContatos?.[0] || "cada um deles"} esta semana — sem pitch, apenas verificando se a necessidade ainda existe — costuma converter 10–20%.`,
   },
   {
     id: "igr-base-pequena-parceria",
@@ -327,7 +367,7 @@ const BANCO_INSIGHTS_CRESCIMENTO = [
     metrica: (m) => ({ valor: m.v30dLength, label: `venda${m.v30dLength > 1 ? "s" : ""} no último mês` }),
     titulo: () => "Nenhuma venda nos últimos 7 dias",
     diagnostico: (m) => `Você teve ${m.v30dLength} venda${m.v30dLength > 1 ? "s" : ""} no mês mas a semana está parada. Reativar quem já comprou custa 5× menos do que captar novo cliente.`,
-    recomendacao: () => `Selecione 3 clientes com compra recente e envie uma mensagem hoje. Não precisa de oferta — uma mensagem de acompanhamento já reabre o canal.`,
+    recomendacao: (m) => `Selecione ${m.nomesNovos?.length ? `${m.nomesNovos.slice(0,2).join(", ")} e mais 1 cliente` : "3 clientes"} com compra recente e envie uma mensagem hoje. Não precisa de oferta — uma mensagem de acompanhamento já reabre o canal.`,
   },
 
   // ── RETENÇÃO CRÍTICA ──────────────────────────────────────────────────────
@@ -338,8 +378,8 @@ const BANCO_INSIGHTS_CRESCIMENTO = [
     quando: (m) => m.emRisco >= 2,
     metrica: (m) => ({ valor: `${Math.round(m.taxaRisco * 100)}%`, label: "da base em risco" }),
     titulo: (m) => `${m.emRisco} clientes em risco — prioridade máxima`,
-    diagnostico: (m) => `Mais de ${Math.round(m.taxaRisco * 100)}% da sua base está fora do intervalo normal de retorno. Em negócios de serviço, essa taxa acima de 30% sinaliza problema sistêmico.`,
-    recomendacao: () => `Antes de captar novos clientes, recupere quem já conhece seu trabalho. Use o Radar para ver quem contatar hoje — o custo de inatividade é maior que o de qualquer campanha.`,
+    diagnostico: (m) => `Mais de ${Math.round(m.taxaRisco * 100)}% da sua base está fora do intervalo normal de retorno${m.nomesEmRisco?.length ? ` — inclui ${m.nomesEmRisco.join(", ")}` : ""}. Em negócios de serviço, essa taxa acima de 30% sinaliza problema sistêmico.`,
+    recomendacao: (m) => `Antes de captar novos clientes, recupere ${m.nomesEmRisco?.[0] || "quem"} e os demais que já conhecem seu trabalho. Use o Radar para ver quem contatar hoje — o custo de inatividade é maior que o de qualquer campanha.`,
   },
   {
     id: "igr-dormentes",
@@ -348,8 +388,8 @@ const BANCO_INSIGHTS_CRESCIMENTO = [
     quando: (m) => m.dormentes >= 2,
     metrica: (m) => ({ valor: m.dormentes, label: `cliente${m.dormentes > 1 ? "s" : ""} +60 dias` }),
     titulo: (m) => `${m.dormentes} clientes há mais de 60 dias sem comprar`,
-    diagnostico: () => `Clientes dormentes raramente voltam por conta própria — mas respondem bem a contato direto se a mensagem for personalizada e sem pressão de venda.`,
-    recomendacao: () => `Uma campanha de reativação focada em "você sumiu" — com algo de novo para mostrar — costuma trazer 15–25% de volta no primeiro mês.`,
+    diagnostico: (m) => `${m.nomesDormentes?.length ? `${m.nomesDormentes.join(", ")} ${m.dormentes > m.nomesDormentes.length ? `e outros ${m.dormentes - m.nomesDormentes.length}` : ""} estão` : `${m.dormentes} clientes estão`} há mais de 60 dias sem comprar — raramente voltam por conta própria, mas respondem bem a contato direto personalizado.`,
+    recomendacao: (m) => `Uma campanha de reativação focada em "você sumiu" — com algo de novo para mostrar ${m.topServico ? `como "${m.topServico}"` : ""} — costuma trazer 15–25% de volta no primeiro mês.`,
   },
 
   // ── CRESCIMENTO / CONSOLIDAÇÃO ────────────────────────────────────────────
@@ -360,8 +400,8 @@ const BANCO_INSIGHTS_CRESCIMENTO = [
     quando: (m) => m.novos >= 2,
     metrica: (m) => ({ valor: m.novos, label: `cliente${m.novos > 1 ? "s" : ""} com 1 compra` }),
     titulo: (m) => `${m.novos} clientes fizeram apenas 1 compra`,
-    diagnostico: () => `A segunda compra é o marco de fidelização. Clientes que voltam uma vez têm probabilidade 5× maior de se tornarem recorrentes do que quem comprou uma vez.`,
-    recomendacao: () => `Identifique quem comprou pela primeira vez nos últimos 30 dias e faça uma abordagem personalizada — com algo relacionado ao que já contratou.`,
+    diagnostico: (m) => `A segunda compra é o marco de fidelização. ${m.nomesNovos?.length ? `${m.nomesNovos.join(", ")} ${m.novos > m.nomesNovos.length ? `e mais ${m.novos - m.nomesNovos.length}` : ""} ainda` : `Esses ${m.novos} clientes ainda`} não voltaram — e têm 5× mais chance de se tornar recorrentes do que um novo contato.`,
+    recomendacao: (m) => `Identifique quem comprou pela primeira vez nos últimos 30 dias${m.nomesNovos?.length ? ` — ${m.nomesNovos[0]} é um bom ponto de partida` : ""} — e faça uma abordagem personalizada com algo relacionado ao que já contratou.`,
   },
   {
     id: "igr-pacote-top-servico",
@@ -380,7 +420,7 @@ const BANCO_INSIGHTS_CRESCIMENTO = [
     quando: (m) => m.totalClientes >= 4 && m.ticketMedio > 0,
     metrica: (m) => ({ valor: `R$ ${m.ticketMedio.toLocaleString("pt-BR")}`, label: "ticket médio atual" }),
     titulo: () => "Margem de reajuste de preço sem perder clientes",
-    diagnostico: (m) => `Com ${m.fieis} clientes fiéis e ticket médio de R$ ${m.ticketMedio.toLocaleString("pt-BR")}, um reajuste de 10–15% bem comunicado raramente gera cancelamentos — e aumenta a receita sem nenhuma captação nova.`,
+    diagnostico: (m) => `Com ${m.fieis} cliente${m.fieis !== 1 ? "s" : ""} fiel${m.fieis !== 1 ? "s" : ""}${m.nomePrimeiroFiel ? ` (${m.nomePrimeiroFiel.split(" ")[0]} entre eles)` : ""} e ticket médio de R$ ${m.ticketMedio.toLocaleString("pt-BR")}, um reajuste de 10–15% bem comunicado raramente gera cancelamentos — e aumenta a receita sem nenhuma captação nova.`,
     recomendacao: () => `Comunique antes, mostre o valor entregue, aplique para novos contratos primeiro. Clientes fiéis aceitam reajuste quando confiam no serviço.`,
   },
   {
@@ -402,8 +442,7 @@ const BANCO_INSIGHTS_CRESCIMENTO = [
     quando: (m) => m.totalClientes >= 10,
     metrica: (m) => ({ valor: m.totalClientes, label: "clientes na base" }),
     titulo: () => "Volume exige processos — antes de crescer mais",
-    diagnostico: (m) => `Com ${m.totalClientes} clientes, o gargalo muda de captação para operação. Negócios que crescem sem estrutura de atendimento perdem qualidade e aumentam o churn sem perceber.`,
-    recomendacao: () => `Documente o fluxo de atendimento, automatize confirmações e padronize a entrega. Processos permitem escalar sem depender da sua memória.`,
+    diagnostico: (m) => `Com ${m.totalClientes} clientes, o gargalo muda de captação para operação. Negócios que crescem sem estrutura de atendimento perdem qualidade e aumentam o churn sem perceber.`,    recomendacao: () => `Documente o fluxo de atendimento, automatize confirmações e padronize a entrega. Processos permitem escalar sem depender da sua memória.`,
   },
   {
     id: "igr-prova-social",
@@ -412,8 +451,8 @@ const BANCO_INSIGHTS_CRESCIMENTO = [
     quando: (m) => m.fieis >= 3,
     metrica: (m) => ({ valor: m.fieis, label: "clientes fiéis com histórico" }),
     titulo: () => "Depoimentos como ativo de captação",
-    diagnostico: (m) => `${m.fieis} clientes com histórico de retorno são prova social viva. Esse ativo é subutilizado — raramente documentado e quase nunca usado como material de captação.`,
-    recomendacao: () => `Peça um depoimento em texto ou vídeo de 30s para 2 clientes esta semana. Publicado no Instagram ou Google, aumenta a conversão de novos contatos em até 40%.`,
+    diagnostico: (m) => `${m.nomePrimeiroFiel ? `${m.nomePrimeiroFiel.split(" ")[0]} e outros ${m.fieis - 1} com` : `${m.fieis} clientes com`} histórico de retorno são prova social viva. Esse ativo é subutilizado — raramente documentado e quase nunca usado como material de captação.`,
+    recomendacao: (m) => `Peça um depoimento em texto ou vídeo de 30s para ${m.nomePrimeiroFiel ? m.nomePrimeiroFiel.split(" ")[0] : "2 clientes"} esta semana. Publicado no Instagram ou Google, aumenta a conversão de novos contatos em até 40%.`,
   },
 ];
 
