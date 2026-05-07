@@ -394,6 +394,7 @@ const CONFIG_DEFAULT = {
   horaInicio:"08:00",horaFim:"18:00",granularidadeMinutos:30,
   nomeEmpresa:"",descricao:"",
   bloqueiosRecorrentes:[], // [{id, motivo, inicio, fim}] — pausas fixas diárias (ex: almoço)
+  whatsappTemplate:"Olá [nome]! Sua reserva de [serv] foi confirmada. Clique para mais detalhes: [id]",
 };
 
 // ─── useToast ─────────────────────────────────────────────────────────────────
@@ -795,9 +796,36 @@ const IcR = {
   cal:     <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>,
   tag:     <svg width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><circle cx="7" cy="7" r="1.5" fill="currentColor" stroke="none"/></svg>,
   search:  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>,
+  wpp:     <svg width="13" height="13" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.67-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.076 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421-7.403h-.004a9.87 9.87 0 00-4.916 1.25c-.639.305-1.231.75-1.759 1.235L2.05 3.585a9.875 9.875 0 0113.401 13.401l-1.176-1.177a9.872 9.872 0 00-7.843-7.87z"/></svg>,
 };
 
-function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando, onAtualizar}){
+// Helper para WhatsApp
+function enviarWhatsApp(telefone, template, cliente_nome, servico_nome, id_sistema, dtInicio) {
+  const clean = telefone.replace(/\D/g, "");
+  const tel = clean.length === 11 ? clean : "55" + clean;
+  
+  let horaFormatada = "";
+  if (dtInicio) {
+    const dt = dtInicio.toDate ? dtInicio.toDate() : new Date(dtInicio);
+    horaFormatada = dt.toLocaleString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    }).replace(",", " às");
+  }
+  
+  const msg = (template || "")
+    .replace(/\[nome\]/g, cliente_nome || "Cliente")
+    .replace(/\[serv\]/g, servico_nome || "Serviço")
+    .replace(/\[hora\]/g, horaFormatada || "Horário agendado")
+    .replace(/\[id\]/g, id_sistema || "Sistema");
+  const url = `https://wa.me/${tel}?text=${encodeURIComponent(msg)}`;
+  window.open(url, "_blank");
+}
+
+function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando, onAtualizar, whatsappTemplate, tenantUid}){
   const {T, S} = useFlowTheme();
   const statusMap = getStatusAccent(T);
   const acc = statusMap[r.status] || statusMap.cancelado;
@@ -846,9 +874,20 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
             </div>
           )}
           {r.cliente_telefone&&(
-            <div style={{display:"flex",alignItems:"center",gap:5}}>
-              <span style={{color:T.text35,flexShrink:0}}>{IcR.phone}</span>
-              <span style={{fontSize:11,color:T.text35}}>{r.cliente_telefone}</span>
+            <div style={{display:"flex",alignItems:"center",gap:5,justifyContent:"space-between"}}>
+              <div style={{display:"flex",alignItems:"center",gap:5,flex:1}}>
+                <span style={{color:T.text35,flexShrink:0}}>{IcR.phone}</span>
+                <span style={{fontSize:11,color:T.text35}}>{r.cliente_telefone}</span>
+              </div>
+              {r.status==="confirmado"&&whatsappTemplate&&r.cliente_telefone&&(
+                <button 
+                  onClick={()=>enviarWhatsApp(r.cliente_telefone,whatsappTemplate,r.cliente_nome,r.servico_nome,r.id,dtInicio)}
+                  title="Enviar mensagem via WhatsApp"
+                  style={{padding:"4px 8px",borderRadius:6,border:`1px solid rgba(37,211,102,0.25)`,background:"rgba(37,211,102,0.08)",color:"#25d366",cursor:"pointer",transition:"all 0.2s",flexShrink:0,display:"flex",alignItems:"center",gap:3,fontSize:11,fontWeight:600}}
+                >
+                  {IcR.wpp}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -939,11 +978,22 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
   const [filtroP,setFiltroP]=useState(isAdmin?"todos":meuPrestadorId);
   const [atualizando,setAtualizando]=useState(null);
   const [t,showT]=useToast();
+  const [configs,setConfigs]=useState({});
   // Busca unificada: texto (nome + serviço) e data
   const [busca,setBusca]=useState("");
   const [buscarData,setBuscarData]=useState("");
   const [sortBy,setSortBy]=useState("data");
   const [sortDir,setSortDir]=useState("desc");
+
+  useEffect(()=>{
+    if(!tenantUid||!prestadores.length) return;
+    const ativos=prestadores.filter(p=>p.ativo);
+    const unsubs=ativos.map(p=>{
+      const ref=doc(db,"users",tenantUid,"agendamento_configuracoes",p.id);
+      return onSnapshot(ref,snap=>setConfigs(prev=>({...prev,[p.id]:snap.exists()?snap.data():null})));
+    });
+    return()=>unsubs.forEach(u=>u());
+  },[tenantUid,prestadores.length]);
 
   useEffect(()=>{
     if(!tenantUid) return;
@@ -1195,6 +1245,8 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
                   podeEditar={podeEditar}
                   atualizando={atualizando}
                   onAtualizar={atualizarStatus}
+                  whatsappTemplate={configs[r.prestadorId]?.whatsappTemplate}
+                  tenantUid={tenantUid}
                 />
               </div>
             );
@@ -1547,6 +1599,28 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
               <div><label style={S.label}>Descrição curta (opcional)</label><input style={S.input} value={novoS.descricao} onChange={e=>setNovoS(p=>({...p,descricao:e.target.value}))} placeholder="Breve descrição exibida para o cliente"/></div>
               <button onClick={addServico} disabled={!novoS.nome.trim()} style={{...S.btnPrimary,height:42,paddingLeft:18,paddingRight:18,opacity:novoS.nome.trim()?1:0.4}}>{Ic.plus} Adicionar</button>
             </div>
+          </div>
+        </div>
+
+        {/* Seção 4: Template WhatsApp */}
+        <div style={{background:T.cardBg,border:`1px solid ${T.line}`,borderRadius:14,padding:"20px 22px",backdropFilter:"blur(12px)"}}>
+          {secaoHeader(
+            <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.67-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.076 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421-7.403h-.004a9.87 9.87 0 00-4.916 1.25c-.639.305-1.231.75-1.759 1.235L2.05 3.585a9.875 9.875 0 0113.401 13.401l-1.176-1.177a9.872 9.872 0 00-7.843-7.87z"/></svg>,
+            "Mensagem WhatsApp",
+            "Template enviado ao cliente quando confirma a reserva. Use [nome], [serv], [hora] e [id] como variáveis."
+          )}
+          <div style={{display:"flex",gap:8,marginBottom:12}}>
+            {[{txt:"[nome]",desc:"Nome do cliente"},{txt:"[serv]",desc:"Serviço"},{txt:"[hora]",desc:"Data e hora"},{txt:"[id]",desc:"ID do sistema"}].map(v=>(
+              <button key={v.txt} onClick={()=>setConfig(c=>({...c,whatsappTemplate:c.whatsappTemplate+v.txt}))} title={v.desc} style={{padding:"6px 12px",fontSize:11,borderRadius:8,border:`1px solid ${T.line}`,background:T.text08,color:T.text65,cursor:"pointer",transition:"all 0.2s",fontFamily:"'JetBrains Mono', monospace",fontWeight:600}}>{v.txt}</button>
+            ))}
+          </div>
+          <textarea style={{...S.input,minHeight:80,fontFamily:"'JetBrains Mono', monospace",fontSize:11}} value={config.whatsappTemplate||""} onChange={e=>setConfig(p=>({...p,whatsappTemplate:e.target.value}))} placeholder="Customize sua mensagem de WhatsApp…"/>
+          <div style={{marginTop:10,padding:"10px 12px",background:T.rowAlt,border:`1px solid ${T.line}`,borderRadius:8,fontSize:11,color:T.text35,lineHeight:1.6}}>
+            <p style={{fontWeight:600,marginBottom:4,color:T.text65}}>Variáveis disponíveis:</p>
+            <p><strong>[nome]</strong> → nome do cliente</p>
+            <p><strong>[serv]</strong> → nome do serviço agendado</p>
+            <p><strong>[hora]</strong> → data e hora da reserva (ex: 15/05/2026 às 14:30)</p>
+            <p><strong>[id]</strong> → identificação pública do sistema</p>
           </div>
         </div>
 
