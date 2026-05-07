@@ -11,7 +11,7 @@ import {
   Filter, RefreshCw, Search, ChevronDown,
   Zap, Copy, ExternalLink, BookOpen, X, CheckCircle2,
   Wallet, ArrowRight, ServerCog, Wifi, WifiOff,
-  GraduationCap, Plus, Edit2, Trash2,
+  GraduationCap, Plus, Edit2, Trash2, FileText,
 } from "lucide-react";
 
 import { db, functions } from "../lib/firebase";
@@ -110,6 +110,7 @@ const NAV = [
   { id: "matriculas", label: "Matrículas",           icon: GraduationCap  },
   { id: "atalhos",    label: "Atalhos",              icon: Keyboard       },
   { id: "log",        label: "Log de Atividades",    icon: Activity       },
+  { id: "lgpd",       label: "Termos e LGPD",        icon: FileText       },
 ];
 
 /* ══════════════════════════════════════════════════════
@@ -2191,13 +2192,227 @@ function SecaoMatriculas({ tenantUid }) {
 }
 
 /* ══════════════════════════════════════════════════════
+   SEÇÃO LGPD
+   ══════════════════════════════════════════════════════ */
+function SecaoLGPD() {
+  return (
+    <div className="cfg-card">
+      <h3 className="cfg-card-title">
+        <FileText size={18} /> Termos de Responsabilidade e Conformidade LGPD
+      </h3>
+      
+      <div style={{ overflow: "auto", maxHeight: "calc(100vh - 300px)", paddingRight: 12 }} className="lgpd-content">
+        <style>{`
+          .lgpd-content {
+            font-family: Georgia, serif;
+            line-height: 1.7;
+            color: #333;
+          }
+          .lgpd-content h2 {
+            color: #050505;
+            font-family: Montserrat, sans-serif;
+            font-size: 16px;
+            margin-top: 24px;
+            margin-bottom: 12px;
+            border-left: 3px solid #D4AF37;
+            padding-left: 12px;
+          }
+          .lgpd-content h3 {
+            color: #050505;
+            font-family: Montserrat, sans-serif;
+            font-size: 14px;
+            margin-top: 16px;
+            margin-bottom: 8px;
+          }
+          .lgpd-content ul, .lgpd-content ol {
+            margin: 12px 0;
+            padding-left: 28px;
+          }
+          .lgpd-content li {
+            margin-bottom: 6px;
+            font-size: 14px;
+          }
+          .lgpd-content p {
+            margin: 10px 0;
+            font-size: 14px;
+          }
+          .contact-box {
+            background: #f5f5f5;
+            padding: 16px;
+            border-left: 3px solid #D4AF37;
+            margin-top: 20px;
+            border-radius: 4px;
+            font-size: 13px;
+          }
+          .contact-box p {
+            margin: 6px 0;
+          }
+          .contact-box strong {
+            color: #050505;
+          }
+        `}</style>
+
+        <h2>1. TERMOS DE RESPONSABILIDADE</h2>
+        
+        <h3>1.1 Aceitação dos Termos</h3>
+        <p>Ao utilizar ASSENT Gestão v2.0, você concorda com os termos apresentados neste documento. Se não concordar com qualquer disposição, não utilize o serviço.</p>
+
+        <h3>1.2 Responsabilidade da ASSENT</h3>
+        <p>A ASSENT Agência fornece ASSENT Gestão "NO ESTADO EM QUE SE ENCONTRA". Nós nos comprometemos em:</p>
+        <ul>
+          <li>Manter a disponibilidade do serviço com SLA de 99% (excetuando manutenções programadas)</li>
+          <li>Implementar controles de segurança para proteger dados pessoais conforme LGPD</li>
+          <li>Notificar você em caso de vazamento de dados em até 72 horas</li>
+          <li>Manter backups automatizados e redundância em infraestrutura</li>
+          <li>Fornecer suporte técnico durante horários comerciais</li>
+        </ul>
+
+        <h3>1.3 Limitações de Responsabilidade</h3>
+        <p>A ASSENT Agência <strong>NÃO SERÁ RESPONSÁVEL</strong> por:</p>
+        <ul>
+          <li>Perda de dados causada por ação do usuário (deleção, exportação incorreta)</li>
+          <li>Interrupções causadas por força maior (desastre natural, guerra, sabotagem)</li>
+          <li>Acesso não autorizado causado por credenciais compartilhadas ou senha fraca</li>
+          <li>Lucros cessantes, danos indiretos ou consequenciais</li>
+          <li>Uso do serviço em desconformidade com estes termos</li>
+          <li>Falhas causadas por software/hardware de terceiros</li>
+        </ul>
+
+        <h3>1.4 Responsabilidade do Usuário</h3>
+        <p>Você é responsável por:</p>
+        <ul>
+          <li>Manter confidencialidade de credenciais de acesso</li>
+          <li>Usar senhas fortes (mínimo 12 caracteres, com maiúsculas, minúsculas, números e símbolos)</li>
+          <li>Não compartilhar login entre usuários</li>
+          <li>Realizar backups frequentes de dados críticos</li>
+          <li>Não tentar contornar medidas de segurança</li>
+          <li>Informar imediatamente a ASSENT em caso de acesso não autorizado</li>
+        </ul>
+
+        <h2>2. CONFORMIDADE COM LEI LGPD</h2>
+
+        <h3>2.1 Escopo da LGPD</h3>
+        <p>ASSENT Gestão processa dados pessoais em conformidade com a Lei Geral de Proteção de Dados Pessoais (Lei n. 13.709/2018). Este documento explica como tratamos seus dados.</p>
+
+        <h3>2.2 Tipos de Dados Processados</h3>
+        <ul>
+          <li><strong>Dados de Identificação:</strong> nome, email, telefone, CNPJ/CPF</li>
+          <li><strong>Dados de Contato de Clientes:</strong> nomes, emails, telefones, endereços</li>
+          <li><strong>Dados de Vendas:</strong> histórico de transações, valores, datas</li>
+          <li><strong>Dados de Agendamento:</strong> datas, horários, serviços, prestadores</li>
+          <li><strong>Dados Técnicos:</strong> endereço IP, logs de acesso, cookies, informações de dispositivo</li>
+        </ul>
+
+        <h3>2.3 Base Legal para Processamento</h3>
+        <ul>
+          <li>Consentimento explícito do titular (quando aplicável)</li>
+          <li>Execução de contrato (para prestar ASSENT Gestão)</li>
+          <li>Obrigação legal (legislação fiscal, trabalhista, previdenciária)</li>
+          <li>Interesse legítimo da ASSENT (segurança, prevenção de fraude)</li>
+        </ul>
+
+        <h3>2.4 Compartilhamento de Dados</h3>
+        <p>Compartilhamos dados com:</p>
+        <ul>
+          <li>Google Cloud (armazenamento e autenticação)</li>
+          <li>Firebase (banco de dados, autenticação)</li>
+          <li>Fornecedores de segurança (para proteção contra ameaças)</li>
+          <li>Autoridades legais (quando obrigado por lei)</li>
+        </ul>
+
+        <h3>2.5 Retenção de Dados</h3>
+        <ul>
+          <li>Cumprir obrigações legais: 5 anos (obrigações fiscais e trabalhistas)</li>
+          <li>Resolver disputas: 6 meses após encerramento de contrato</li>
+          <li>Manter logs de segurança: 12 meses</li>
+          <li>Dados técnicos: 30 dias para logs, 60 dias para backups</li>
+        </ul>
+
+        <h3>2.6 Direitos do Titular</h3>
+        <p>Você tem direito de:</p>
+        <ul>
+          <li>Acessar seus dados pessoais</li>
+          <li>Solicitar correção de dados imprecisos</li>
+          <li>Solicitar exclusão de dados (direito ao esquecimento)</li>
+          <li>Solicitar portabilidade de dados em formato estruturado</li>
+          <li>Revogar consentimento a qualquer momento</li>
+          <li>Se opor ao processamento de dados para fins específicos</li>
+          <li>Solicitar revisão de decisões automatizadas</li>
+        </ul>
+
+        <h2>3. SEGURANÇA DE DADOS</h2>
+
+        <h3>3.1 Medidas de Segurança</h3>
+        <ul>
+          <li>Criptografia AES-256 para dados em repouso</li>
+          <li>TLS/HTTPS para dados em trânsito</li>
+          <li>Autenticação de dois fatores (2FA) opcional</li>
+          <li>Firestore Security Rules para controle de acesso</li>
+          <li>Sanitização de erros para evitar exposição de informações sensíveis</li>
+          <li>Monitoramento contínuo de tentativas de acesso não autorizado</li>
+          <li>Backups automáticos com redundância geográfica</li>
+        </ul>
+
+        <h3>3.2 Protocolo de Vazamento</h3>
+        <p>Em caso de suspeita de vazamento:</p>
+        <ol>
+          <li>ASSENT isola o acesso imediatamente</li>
+          <li>Inicia investigação forense em até 2 horas</li>
+          <li>Notifica titulares de dados em até 72 horas</li>
+          <li>Notifica autoridades (se obrigado por lei) em até 3 dias</li>
+        </ol>
+
+        <h2>4. USO PROIBIDO</h2>
+        <p>É proibido usar ASSENT Gestão para:</p>
+        <ul>
+          <li>Processar dados pessoais sem consentimento válido ou base legal</li>
+          <li>Qualquer atividade ilegal ou que viole direitos de terceiros</li>
+          <li>Ataques cibernéticos, engenharia social, phishing</li>
+          <li>Acesso não autorizado ou tentativa de contornar segurança</li>
+          <li>Venda ou compartilhamento de dados sem consentimento</li>
+          <li>Processar dados sensíveis (origem racial, religião, biométricos) sem consentimento explícito</li>
+        </ul>
+
+        <h2>5. SUSPENSÃO E ENCERRAMENTO</h2>
+
+        <h3>5.1 Suspensão Automática</h3>
+        <p>ASSENT pode suspender acesso imediatamente se:</p>
+        <ul>
+          <li>Detectar violação de segurança</li>
+          <li>Detectar processamento ilegal de dados</li>
+          <li>Pagamento em atraso (após 30 dias de notificação)</li>
+          <li>Violação reiterada destes termos</li>
+        </ul>
+
+        <h3>5.2 Encerramento</h3>
+        <ul>
+          <li>Exportar dados em formato estruturado (prazo: 30 dias)</li>
+          <li>ASSENT excluirá dados após 60 dias do encerramento</li>
+        </ul>
+
+        <h2>6. CONTATO</h2>
+        <div className="contact-box">
+          <p><strong>Empresa:</strong> ASSENT Agência Ltda</p>
+          <p><strong>Endereço:</strong> Goiânia, GO, Brasil</p>
+          <p><strong>Email:</strong> contato@assentagencia.com.br</p>
+          <p><strong>DPO (Data Protection Officer):</strong> dpo@assentagencia.com.br</p>
+        </div>
+      </div>
+
+      <div className="cfg-card-footer">
+        <span style={{ fontSize: 11, color: "var(--text-3)" }}>
+          Última atualização: {new Date().toLocaleDateString("pt-BR")}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════ */
-/* ─────────────────────────────────────────────
-   Seções visíveis por cargo
-───────────────────────────────────────────── */
 const SECOES_POR_CARGO = {
-  admin:       ["empresa", "seguranca", "financeiro", "pagamentos", "menu", "estoque", "matriculas", "atalhos", "log"],
+  admin:       ["empresa", "seguranca", "financeiro", "pagamentos", "menu", "estoque", "matriculas", "atalhos", "log", "lgpd"],
   financeiro:  ["seguranca", "financeiro", "atalhos"],
   comercial:   ["seguranca", "atalhos"],
   compras:     ["seguranca", "estoque", "atalhos"],
@@ -2247,6 +2462,7 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
       case "matriculas": return <SecaoMatriculas tenantUid={uid} />;
       case "atalhos":    return <SecaoAtalhos    menuVisivel={menuVisivelProp ?? config?.menuVisivel ?? {}} />;
       case "log":        return <SecaoLog        tenantUid={uid} />;
+      case "lgpd":       return <SecaoLGPD />;
       default:           return null;
     }
   };
@@ -2265,21 +2481,30 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
         <div className="cfg-body">
           <nav className="cfg-nav">
             <span className="cfg-nav-group-label">Configurações</span>
-            {navFiltrado.filter(n => n.id !== "log").map(({ id, label, icon: Icon }) => (
+            {navFiltrado.filter(n => n.id !== "log" && n.id !== "lgpd").map(({ id, label, icon: Icon }) => (
               <button key={id} className={`cfg-nav-item ${secao === id ? "active" : ""}`} onClick={() => setSecao(id)}>
                 <Icon size={15} className="cfg-nav-icon" />
                 <span className="cfg-nav-label">{label}</span>
                 {secao === id && <ChevronRight size={13} color="var(--text-3)" />}
               </button>
             ))}
-            {navFiltrado.some(n => n.id === "log") && (
+            {navFiltrado.some(n => n.id === "log" || n.id === "lgpd") && (
               <>
-                <span className="cfg-nav-group-label" style={{ marginTop: 14 }}>Auditoria</span>
-                <button className={`cfg-nav-item ${secao === "log" ? "active" : ""}`} onClick={() => setSecao("log")}>
-                  <Activity size={15} className="cfg-nav-icon" />
-                  <span className="cfg-nav-label">Log de Atividades</span>
-                  {secao === "log" && <ChevronRight size={13} color="var(--text-3)" />}
-                </button>
+                <span className="cfg-nav-group-label" style={{ marginTop: 14 }}>Auditoria e Conformidade</span>
+                {navFiltrado.some(n => n.id === "log") && (
+                  <button className={`cfg-nav-item ${secao === "log" ? "active" : ""}`} onClick={() => setSecao("log")}>
+                    <Activity size={15} className="cfg-nav-icon" />
+                    <span className="cfg-nav-label">Log de Atividades</span>
+                    {secao === "log" && <ChevronRight size={13} color="var(--text-3)" />}
+                  </button>
+                )}
+                {navFiltrado.some(n => n.id === "lgpd") && (
+                  <button className={`cfg-nav-item ${secao === "lgpd" ? "active" : ""}`} onClick={() => setSecao("lgpd")}>
+                    <FileText size={15} className="cfg-nav-icon" />
+                    <span className="cfg-nav-label">Termos e LGPD</span>
+                    {secao === "lgpd" && <ChevronRight size={13} color="var(--text-3)" />}
+                  </button>
+                )}
               </>
             )}
           </nav>
