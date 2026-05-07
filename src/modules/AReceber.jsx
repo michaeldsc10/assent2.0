@@ -35,6 +35,8 @@ import {
   getDoc,
   getDocs,
   increment,
+  query,
+  where,
 } from "firebase/firestore";
 
 /* ══════════════════════════════════════════════════
@@ -1130,6 +1132,26 @@ export default function AReceber() {
   const handleDeletar = useCallback(async () => {
     if (!tenantUid || !deletando) return;
     try {
+      /* 1. Deleta vendas sintéticas geradas por recebimentos desta conta */
+      const vendasSnap = await getDocs(
+        query(
+          collection(db, "users", tenantUid, "vendas"),
+          where("aReceberDocId", "==", deletando.id)
+        )
+      );
+      await Promise.all(vendasSnap.docs.map((d) => deleteDoc(d.ref)));
+
+      /* 2. Se era ligada a uma venda real, restaura o valorRestante */
+      if (deletando.origem === "venda" && deletando.referenciaId && deletando.valorPago > 0) {
+        try {
+          const vendaRef = doc(db, "users", tenantUid, "vendas", deletando.referenciaId);
+          await updateDoc(vendaRef, { valorRestante: increment(deletando.valorPago) });
+        } catch (errVenda) {
+          fsError(errVenda, "AReceber:restaurarVendaRestante");
+        }
+      }
+
+      /* 3. Deleta o a_receber */
       await deleteDoc(doc(db, "users", tenantUid, "a_receber", deletando.id));
       await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.A_RECEBER, descricao: montarDescricao("excluir", "Conta a Receber", deletando.clienteNome || deletando.descricao, deletando.id) });
       setDeletando(null);
