@@ -34,6 +34,7 @@ import {
   runTransaction,
   getDoc,
   getDocs,
+  increment,
 } from "firebase/firestore";
 
 /* ══════════════════════════════════════════════════
@@ -959,6 +960,17 @@ export default function AReceber() {
         status:          novoStatus,
         dataAtualizacao: agora,
       });
+
+      /* 1b. Regime de caixa: reduz valorRestante na venda original.
+             Garante que o Dashboard some apenas o que foi recebido. */
+      if (conta.origem === "venda" && conta.referenciaId) {
+        try {
+          const vendaRef = doc(db, "users", tenantUid, "vendas", conta.referenciaId);
+          await updateDoc(vendaRef, { valorRestante: increment(-valorRecebido) });
+        } catch (errVenda) {
+          fsError(errVenda, "AReceber:atualizarVendaRestante");
+        }
+      }
 
       /* 2. ── REGIME DE CAIXA: registrar entrada no Caixa ──────────────────
          Toda confirmação de pagamento gera uma entrada no Caixa.
