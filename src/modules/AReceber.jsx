@@ -1142,10 +1142,14 @@ export default function AReceber() {
       await Promise.all(vendasSnap.docs.map((d) => deleteDoc(d.ref)));
 
       /* 2. Se era ligada a uma venda real, restaura o valorRestante */
-      if (deletando.origem === "venda" && deletando.referenciaId && deletando.valorPago > 0) {
+      if (deletando.origem === "venda" && deletando.referenciaId) {
         try {
           const vendaRef = doc(db, "users", tenantUid, "vendas", deletando.referenciaId);
-          await updateDoc(vendaRef, { valorRestante: increment(deletando.valorPago) });
+          // Restaura o valorRestante original da conta (independente de ter sido pago ou não)
+          const valorARestaurar = deletando.valorPago > 0 ? deletando.valorPago : (deletando.valorRestante ?? deletando.valorTotal ?? 0);
+          if (valorARestaurar > 0) {
+            await updateDoc(vendaRef, { valorRestante: increment(valorARestaurar) });
+          }
         } catch (errVenda) {
           fsError(errVenda, "AReceber:restaurarVendaRestante");
         }
