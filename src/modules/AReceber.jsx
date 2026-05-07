@@ -1056,8 +1056,49 @@ export default function AReceber() {
           origemCaixa     = "venda";
           referenciaCaixa = novoIdVenda;
         } else {
-          origemCaixa     = "a_receber";
-          referenciaCaixa = conta.id;
+          /* Manual: cria venda sintética para entrar no faturamento */
+          const vendaManual = {
+            tipoVenda:      "a_receber",
+            categoria:      conta.categoria || "A Receber",
+            cliente:        conta.clienteNome || "—",
+            clienteNome:    conta.clienteNome || "—",
+            clienteId:      conta.clienteId   || null,
+            total:          valorRecebido,
+            valorRecebido,
+            itens: [{
+              nome:          conta.descricao || "Recebimento avulso",
+              produto:       conta.descricao || "Recebimento avulso",
+              qtd:           1,
+              quantidade:    1,
+              preco:         valorRecebido,
+              valorUnitario: valorRecebido,
+              total:         valorRecebido,
+              subtotal:      valorRecebido,
+              tipo:          "servico",
+              custo:         0,
+            }],
+            formaPagamento:  conta.formaPagamento || "A Receber",
+            data:            agora,
+            criadoEm:        agora,
+            origem:          "a_receber",
+            aReceberDocId:   conta.id,
+            descontos:       0,
+            valorTaxa:       0,
+          };
+          const novoIdVendaManual = await runTransaction(db, async (tx) => {
+            const userRef  = doc(db, "users", tenantUid);
+            const userSnap = await tx.get(userRef);
+            const currentCnt = userSnap.data()?.vendaIdCnt || 0;
+            const vendaId    = gerarIdVenda(currentCnt);
+            tx.set(doc(db, "users", tenantUid, "vendas", vendaId), {
+              ...vendaManual,
+              id: vendaId,
+            });
+            tx.set(userRef, { vendaIdCnt: currentCnt + 1 }, { merge: true });
+            return vendaId;
+          });
+          origemCaixa     = "venda";
+          referenciaCaixa = novoIdVendaManual;
         }
 
         await addDoc(collection(db, "users", tenantUid, "caixa"), {
