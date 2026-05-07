@@ -2401,8 +2401,8 @@ function SecaoLGPD() {
         <div className="contact-box">
           <p><strong>Empresa:</strong> ASSENT Agência Ltda</p>
           <p><strong>Endereço:</strong> Goiânia, GO, Brasil</p>
-          <p><strong>Email:</strong> contato@assentagencia.com.br</p>
-          <p><strong>DPO (Data Protection Officer):</strong> dpo@assentagencia.com.br</p>
+          <p><strong>Email:</strong> assent.ofc@gmail.com</p>
+          
         </div>
       </div>
 
