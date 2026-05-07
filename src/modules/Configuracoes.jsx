@@ -2205,50 +2205,57 @@ function SecaoLGPD() {
         <style>{`
           .lgpd-content {
             font-family: Georgia, serif;
-            line-height: 1.7;
-            color: #333;
+            line-height: 1.8;
+            color: var(--text-primary);
+            padding: 8px 0;
           }
           .lgpd-content h2 {
-            color: #050505;
+            color: var(--text-primary);
             font-family: Montserrat, sans-serif;
             font-size: 16px;
-            margin-top: 24px;
-            margin-bottom: 12px;
+            margin-top: 32px;
+            margin-bottom: 16px;
             border-left: 3px solid #D4AF37;
-            padding-left: 12px;
+            padding-left: 14px;
+            font-weight: 600;
           }
           .lgpd-content h3 {
-            color: #050505;
+            color: var(--text-primary);
             font-family: Montserrat, sans-serif;
             font-size: 14px;
-            margin-top: 16px;
-            margin-bottom: 8px;
+            margin-top: 20px;
+            margin-bottom: 12px;
+            font-weight: 500;
           }
           .lgpd-content ul, .lgpd-content ol {
-            margin: 12px 0;
-            padding-left: 28px;
+            margin: 14px 0;
+            padding-left: 32px;
           }
           .lgpd-content li {
-            margin-bottom: 6px;
+            margin-bottom: 8px;
             font-size: 14px;
+            color: var(--text-primary);
           }
           .lgpd-content p {
-            margin: 10px 0;
+            margin: 14px 0;
             font-size: 14px;
+            color: var(--text-primary);
           }
           .contact-box {
-            background: #f5f5f5;
-            padding: 16px;
+            background: var(--bg-secondary);
+            padding: 18px;
             border-left: 3px solid #D4AF37;
-            margin-top: 20px;
+            margin-top: 28px;
             border-radius: 4px;
             font-size: 13px;
+            color: var(--text-primary);
           }
           .contact-box p {
-            margin: 6px 0;
+            margin: 8px 0;
           }
           .contact-box strong {
-            color: #050505;
+            color: var(--text-primary);
+            font-weight: 600;
           }
         `}</style>
 
