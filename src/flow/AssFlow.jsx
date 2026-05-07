@@ -805,6 +805,8 @@ function enviarWhatsApp(telefone, template, cliente_nome, servico_nome, id_siste
   const tel = clean.length === 11 ? clean : "55" + clean;
   
   let horaFormatada = "";
+  let dataFormatada = "";
+  let horarioFormatado = "";
   if (dtInicio) {
     const dt = dtInicio.toDate ? dtInicio.toDate() : new Date(dtInicio);
     horaFormatada = dt.toLocaleString("pt-BR", {
@@ -814,18 +816,29 @@ function enviarWhatsApp(telefone, template, cliente_nome, servico_nome, id_siste
       hour: "2-digit",
       minute: "2-digit"
     }).replace(",", " às");
+    dataFormatada = dt.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric"
+    });
+    horarioFormatado = dt.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
   }
   
   const msg = (template || "")
     .replace(/\[nome\]/g, cliente_nome || "Cliente")
     .replace(/\[serv\]/g, servico_nome || "Serviço")
     .replace(/\[hora\]/g, horaFormatada || "Horário agendado")
+    .replace(/\[data\]/g, dataFormatada || "Data agendada")
+    .replace(/\[horario\]/g, horarioFormatado || "Horário agendado")
     .replace(/\[id\]/g, id_sistema || "Sistema");
   const url = `https://wa.me/${tel}?text=${encodeURIComponent(msg)}`;
   window.open(url, "_blank");
 }
 
-function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando, onAtualizar, whatsappTemplate, tenantUid}){
+function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando, onAtualizar, whatsappTemplate, nomeEmpresa, tenantUid}){
   const {T, S} = useFlowTheme();
   const statusMap = getStatusAccent(T);
   const acc = statusMap[r.status] || statusMap.cancelado;
@@ -881,7 +894,7 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
               </div>
               {r.status==="confirmado"&&whatsappTemplate&&r.cliente_telefone&&(
                 <button 
-                  onClick={()=>enviarWhatsApp(r.cliente_telefone,whatsappTemplate,r.cliente_nome,r.servico_nome,r.id,dtInicio)}
+                  onClick={()=>enviarWhatsApp(r.cliente_telefone,whatsappTemplate,r.cliente_nome,r.servico_nome,nomeEmpresa||r.id,dtInicio)}
                   title="Enviar mensagem via WhatsApp"
                   style={{padding:"4px 8px",borderRadius:6,border:`1px solid rgba(37,211,102,0.25)`,background:"rgba(37,211,102,0.08)",color:"#25d366",cursor:"pointer",transition:"all 0.2s",flexShrink:0,display:"flex",alignItems:"center",gap:3,fontSize:11,fontWeight:600}}
                 >
@@ -1246,6 +1259,7 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
                   atualizando={atualizando}
                   onAtualizar={atualizarStatus}
                   whatsappTemplate={configs[r.prestadorId]?.whatsappTemplate}
+                  nomeEmpresa={configs[r.prestadorId]?.nomeEmpresa}
                   tenantUid={tenantUid}
                 />
               </div>
@@ -1607,10 +1621,10 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
           {secaoHeader(
             <svg width="14" height="14" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.67-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.076 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421-7.403h-.004a9.87 9.87 0 00-4.916 1.25c-.639.305-1.231.75-1.759 1.235L2.05 3.585a9.875 9.875 0 0113.401 13.401l-1.176-1.177a9.872 9.872 0 00-7.843-7.87z"/></svg>,
             "Mensagem WhatsApp",
-            "Template enviado ao cliente quando confirma a reserva. Use [nome], [serv], [hora] e [id] como variáveis."
+            "Template enviado ao cliente quando confirma a reserva. Use [nome], [serv], [hora], [data], [horario] e [id] como variáveis."
           )}
           <div style={{display:"flex",gap:8,marginBottom:12}}>
-            {[{txt:"[nome]",desc:"Nome do cliente"},{txt:"[serv]",desc:"Serviço"},{txt:"[hora]",desc:"Data e hora"},{txt:"[id]",desc:"ID do sistema"}].map(v=>(
+            {[{txt:"[nome]",desc:"Nome do cliente"},{txt:"[serv]",desc:"Serviço"},{txt:"[hora]",desc:"Data e hora"},{txt:"[data]",desc:"Só a data"},{txt:"[horario]",desc:"Só o horário"},{txt:"[id]",desc:"Identidade pública (configurações)"}].map(v=>(
               <button key={v.txt} onClick={()=>setConfig(c=>({...c,whatsappTemplate:c.whatsappTemplate+v.txt}))} title={v.desc} style={{padding:"6px 12px",fontSize:11,borderRadius:8,border:`1px solid ${T.line}`,background:T.text08,color:T.text65,cursor:"pointer",transition:"all 0.2s",fontFamily:"'JetBrains Mono', monospace",fontWeight:600}}>{v.txt}</button>
             ))}
           </div>
@@ -1620,7 +1634,7 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
             <p><strong>[nome]</strong> → nome do cliente</p>
             <p><strong>[serv]</strong> → nome do serviço agendado</p>
             <p><strong>[hora]</strong> → data e hora da reserva (ex: 15/05/2026 às 14:30)</p>
-            <p><strong>[id]</strong> → identificação pública do sistema</p>
+            <p><strong>[id]</strong> → identidade pública definida em configurações</p>
           </div>
         </div>
 
