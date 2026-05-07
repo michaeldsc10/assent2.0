@@ -10,14 +10,12 @@ let swRegistration = null;
 
 export function initFCM() {
   if (!('serviceWorker' in navigator)) {
-    console.warn('[FCM] Service Workers não suportados');
     return null;
   }
   try {
     messagingInstance = getMessaging();
     return messagingInstance;
   } catch (err) {
-    console.error('[FCM] Erro ao inicializar:', err);
     return null;
   }
 }
@@ -30,10 +28,8 @@ async function getSwRegistration() {
     { scope: '/' }
   );
 
-  // Aguarda SW activated — não exige controller para getToken com registration explícito
   await navigator.serviceWorker.ready;
 
-  console.log('[FCM] SW pronto');
   return swRegistration;
 }
 
@@ -41,24 +37,15 @@ export async function obterTokenPush(vapidKey) {
   try {
     const msg = messagingInstance || getMessaging();
     if (!msg) {
-      console.error('[FCM] Messaging não disponível');
       return null;
     }
 
     const registration = await getSwRegistration();
 
-    console.log('[FCM] Obtendo token com VAPID:', vapidKey ? 'sim' : 'não');
     const token = await getToken(msg, { vapidKey, serviceWorkerRegistration: registration });
 
-    if (token) {
-      console.log('[FCM] Token obtido:', token.substring(0, 20) + '...');
-      return token;
-    }
-
-    console.warn('[FCM] getToken retornou vazio');
-    return null;
+    return token || null;
   } catch (err) {
-    console.error('[FCM] Erro ao obter token:', err.code, err.message);
     return null;
   }
 }
@@ -68,7 +55,6 @@ export function escutarNotificacoesAbertas(callback) {
   if (!messagingInstance) return () => {};
 
   return onMessage(messagingInstance, (payload) => {
-    console.log('[FCM] Notificação recebida (app aberta):', payload);
     callback(payload);
   });
 }
