@@ -27,9 +27,9 @@ const MAIL_PASS              = defineSecret("MAIL_PASS");
 
 /* Limites por plano — espelha o schema do atualizarPlano existente */
 const LIMITES_PLANO = {
-  trial:        { vendasMes: 500,  loginsExtras: 5,  alunos: 500  },
-  essencial:    { vendasMes: 500,  loginsExtras: 5,  alunos: 500  },
-  profissional: { vendasMes: 1500, loginsExtras: 15, alunos: 1000 },
+  trial:        { vendasMes: 500,  loginsExtras: 5,  alunos: 500,  reservas: 150  },
+  essencial:    { vendasMes: 500,  loginsExtras: 5,  alunos: 500,  reservas: 150  },
+  profissional: { vendasMes: 1500, loginsExtras: 15, alunos: 1000, reservas: 400 },
 };
 
 const FEATURES_PLANO = {
@@ -1213,7 +1213,7 @@ exports.stripeWebhook = onRequest(
           stripeSessionId:  session.id,
           limites,
           features:         FEATURES_PLANO[plano] ?? FEATURES_PLANO.essencial,
-          contagem:         { vendasMes: 0 },
+          contagem:         { vendasMes: 0, alunos: 0, reservas: 0 },
           dataInicio,
           dataVencimento,
           ativadoEm:        FieldValue.serverTimestamp(),
@@ -1284,7 +1284,7 @@ exports.stripeWebhook = onRequest(
             status:       "ativo",
             periodo,
             limites,
-            contagem:     { vendasMes: 0 },
+            contagem:     { vendasMes: 0, alunos: 0, reservas: 0 },
             atualizadoEm: FieldValue.serverTimestamp(),
           }, { merge: true });
 
@@ -1405,6 +1405,7 @@ exports.atualizarPlano = onCall(ADMIN_CALL_OPTIONS, async (request) => {
         slug:         newSlug,
         limites,
         features:     FEATURES_PLANO[newSlug] ?? FEATURES_PLANO.essencial,
+        contagem:     { vendasMes: 0, alunos: 0, reservas: 0 },
         atualizadoEm: ts,
       }, { merge: true });
 
