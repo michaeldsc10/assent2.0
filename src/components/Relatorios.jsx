@@ -1449,7 +1449,7 @@ function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], intervalo
       return s + taxa;
     }, 0);
 
-    const receitaLiquida = receitaBruta - descontosTotais - taxasCartao - custoMercadorias;
+    const receitaLiquida = receitaBruta - taxasCartao - custoMercadorias;
 
     /* ══════════════════════════════════════════════════════════════════
        COMISSÕES DE VENDEDORES
