@@ -188,9 +188,12 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
       : vendas;
 
     /* ── Receita & Vendas ── */
-    const receitaBruta = vendasPeriodo.reduce(
-      (s, v) => s + (Number(v.total) || 0), 0
-    );
+    // Caixa: só soma o que foi efetivamente recebido (total - restante a receber)
+    const receitaBruta = vendasPeriodo.reduce((s, v) => {
+      const total    = Number(v.total) || 0;
+      const restante = Number(v.valorRestante) || 0;
+      return s + (total - restante);
+    }, 0);
     const numVendas   = vendasPeriodo.length;
     const ticketMedio = numVendas > 0 ? receitaBruta / numVendas : 0;
 
@@ -257,7 +260,7 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
         const fim    = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, 59, 59, 999);
         const total  = vendas
           .filter((v) => { const dt = toDate(v.data); return dt && dt >= inicio && dt <= fim; })
-          .reduce((s, v) => s + (Number(v.total) || 0), 0);
+          .reduce((s, v) => s + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0)), 0);
         return { d: `${String(h).padStart(2, "0")}h`, v: total };
       });
     } else if (period === "Todos") {
@@ -268,7 +271,7 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
         const fim    = new Date(ref.getFullYear(), ref.getMonth() + 1, 0, 23, 59, 59, 999);
         const total  = vendas
           .filter((v) => { const dt = toDate(v.data); return dt && dt >= inicio && dt <= fim; })
-          .reduce((s, v) => s + (Number(v.total) || 0), 0);
+          .reduce((s, v) => s + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0)), 0);
         const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
         return { d: `${meses[ref.getMonth()]}/${String(ref.getFullYear()).slice(2)}`, v: total };
       });
@@ -281,7 +284,7 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
         const next = new Date(d.getTime() + 86_400_000);
         const total = vendas
           .filter((v) => { const dt = toDate(v.data); return dt && dt >= d && dt < next; })
-          .reduce((s, v) => s + (Number(v.total) || 0), 0);
+          .reduce((s, v) => s + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0)), 0);
         return {
           d: `${String(d.getDate()).padStart(2, "0")}/${d.getMonth() + 1}`,
           v: total,
@@ -298,7 +301,7 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
         const next = new Date(d.getTime() + 86_400_000);
         const total = vendas
           .filter((v) => { const dt = toDate(v.data); return dt && dt >= d && dt < next; })
-          .reduce((s, v) => s + (Number(v.total) || 0), 0);
+          .reduce((s, v) => s + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0)), 0);
         return {
           d: `${String(d.getDate()).padStart(2, "0")}/${d.getMonth() + 1}`,
           v: total,
@@ -352,7 +355,7 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
     const cliMap = {};
     vendasPeriodo.forEach((v) => {
       const k = v.cliente || "—";
-      cliMap[k] = (cliMap[k] || 0) + (Number(v.total) || 0);
+      cliMap[k] = (cliMap[k] || 0) + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0));
     });
     const topClientes = Object.entries(cliMap)
       .sort((a, b) => b[1] - a[1])
