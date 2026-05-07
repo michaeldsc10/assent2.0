@@ -664,9 +664,10 @@ function imprimirRecibo(venda, empresa) {
   const temParc = venda.parcelas > 1;
 
   /* Forma de pagamento — suporta múltiplos (pagamentos[]) ou campo simples */
+  const isSinal = venda.formaPagamento === "Sinal" && venda.valorPago != null;
   const pagamentos = venda.pagamentos && venda.pagamentos.length > 0
     ? venda.pagamentos
-    : [{ label: venda.formaPagamento || "—", valor: venda.total }];
+    : [{ label: venda.formaPagamento || "—", valor: isSinal ? venda.valorPago : venda.total }];
 
   const pgtoLinhas = pagamentos.map(p => {
     const label = temParc && pagamentos.length === 1
