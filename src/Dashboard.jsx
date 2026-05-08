@@ -2160,7 +2160,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       up: dash.receitaBruta > 0, accent: "var(--green)", sub: "no período selecionado",
     },
     {
-      label: "Custo Total", value: fmtR$(dash.custoTotal),
+      label: "Despesa total", value: fmtR$(dash.custoTotal),
       trend: dash.custoTotal === 0 ? "—" : `-${fmtR$(dash.custoTotal)}`,
       up: false, accent: "var(--red)", sub: "mercadorias e serviços",
     },
