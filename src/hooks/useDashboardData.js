@@ -216,13 +216,13 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
     /* Custo de mercadorias/serviços (campo `custo` por item) */
     const totalDespesasPeriodo = despesas
       .filter((d) => {
-        if (d.status !== "pago") return false;
+        if (d.status !== "pago" && d.status !== "parcial") return false;
         const dt = toDate(d.dataPagamentoTs) || parseVencimento(d.dataPagamento) || parseVencimento(d.vencimento);
         if (!dt) return false;
         if (periodStart && (dt < periodStart || dt > periodEnd)) return false;
         return true;
       })
-      .reduce((s, d) => s + (Number(d.valor) || 0), 0);
+      .reduce((s, d) => s + (d.status === "parcial" ? (Number(d.valorPago) || 0) : (Number(d.valor) || 0)), 0);
 
     const custoTotal = totalDespesasPeriodo;
     const lucroLiquido = receitaBruta - custoTotal;
@@ -250,9 +250,9 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
     const despesasPendentes = despesas.filter(
       (d) => d.status !== "pago" && d.status !== "cancelado"
     );
-    const despesasPagas = despesas.filter((d) => d.status === "pago");
+    const despesasPagas = despesas.filter((d) => d.status === "pago" || d.status === "parcial");
     const valorDespesasPagas = despesasPagas.reduce(
-      (s, d) => s + (Number(d.valor) || 0), 0
+      (s, d) => s + (d.status === "parcial" ? (Number(d.valorPago) || 0) : (Number(d.valor) || 0)), 0
     );
 
     /* ── A Receber ── */
