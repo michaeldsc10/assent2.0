@@ -196,12 +196,13 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
     }, 0);
 
     /* Receitas manuais do a_receber (não vinculadas a vendas) — regime de caixa */
+    /* Receitas manuais do a_receber (não vinculadas a vendas) — regime de caixa */
     const receitaAReceberManual = aReceber
       .filter((r) => {
         if (r.origem === "venda") return false;
-        const pago = Number(r.valorPago || 0);
-        if (pago <= 0) return false;
-        const dt = toDate(r.dataPagamento);
+        if (Number(r.valorPago || 0) <= 0) return false;
+        /* dataPagamento é null quando criado já pago — fallback para dataCriacao */
+        const dt = toDate(r.dataPagamento) || toDate(r.dataCriacao);
         if (!dt) return false;
         if (periodStart && (dt < periodStart || dt > periodEnd)) return false;
         return true;
@@ -213,7 +214,7 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
     const ticketMedio = numVendas > 0 ? receitaBruta / numVendas : 0;
 
     /* Custo de mercadorias/serviços (campo `custo` por item) */
-    const custoTotal = vendasPeriodo.reduce(
+    const custoMercadorias = vendasPeriodo.reduce(
       (s, v) =>
         s +
         (v.itens || []).reduce(
@@ -223,6 +224,17 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
       0
     );
 
+    const totalDespesasPeriodo = despesas
+      .filter((d) => {
+        if (d.status !== "pago") return false;
+        const dt = toDate(d.dataPagamentoTs) || parseVencimento(d.dataPagamento) || parseVencimento(d.vencimento);
+        if (!dt) return false;
+        if (periodStart && (dt < periodStart || dt > periodEnd)) return false;
+        return true;
+      })
+      .reduce((s, d) => s + (Number(d.valor) || 0), 0);
+
+    const custoTotal = custoMercadorias + totalDespesasPeriodo;
     const lucroLiquido = receitaBruta - custoTotal;
     const margem =
       receitaBruta > 0 ? (lucroLiquido / receitaBruta) * 100 : 0;
