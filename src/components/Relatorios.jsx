@@ -1444,11 +1444,7 @@ function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], aReceber 
     /* Descontos */
     const descontosTotais = todasVendasReceita.reduce((s, v) => s + Number(v.descontos || 0), 0);
 
-    /* CMV — Custo de Mercadorias/Serviços Vendidos */
-    const custoMercadorias = todasVendasReceita.reduce((s, v) =>
-      s + (v.itens || []).reduce((si, i) => si + (Number(i.custo) || 0) * (Number(i.qtd) || 1), 0),
-    0);
-
+    
     /* Taxas de cartão */
     const taxasCartao = todasVendasReceita.reduce((s, v) => {
       const taxa = v.valorTaxa != null
@@ -1457,7 +1453,7 @@ function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], aReceber 
       return s + taxa;
     }, 0);
 
-    const receitaLiquida = receitaBruta - taxasCartao - custoMercadorias;
+    const receitaLiquida = receitaBruta - taxasCartao;
 
     /* ══════════════════════════════════════════════════════════════════
        COMISSÕES DE VENDEDORES
@@ -1503,7 +1499,7 @@ function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], aReceber 
 
     return {
       receitaBruta, receitaLiquida, descontosTotais,
-      taxasCartao, custoMercadorias, lucroBruto,
+      taxasCartao, lucroBruto,
       totalDespesas, totalComissoes, comissaoPorVendedor,
       lucroLiquido, margem,
       qtdeVendas: todasVendasReceita.length,
@@ -1526,7 +1522,7 @@ function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], aReceber 
       dados: [
         ["Receita Bruta (Vendas)", dados.receitaBruta.toFixed(2), pct(dados.receitaBruta)],
         ["(-) Taxas de Cartão",   `-${dados.taxasCartao.toFixed(2)}`, pct(dados.taxasCartao)],
-        ["(-) CMV",               `-${dados.custoMercadorias.toFixed(2)}`, pct(dados.custoMercadorias)],
+        
         ["= Receita Líquida",     dados.receitaLiquida.toFixed(2), pct(dados.receitaLiquida)],
         ["(-) Despesas Totais",    `-${dados.totalDespesas.toFixed(2)}`, pct(dados.totalDespesas)],
         ...Object.entries(dados.porCategoria).map(([k, v]) => [`  · ${k}`, `-${v.toFixed(2)}`, pct(v)]),
@@ -1617,14 +1613,7 @@ function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], aReceber 
             <span className="dre-pct">{pct(dados.taxasCartao)}</span>
           </div>
         )}
-        {dados.custoMercadorias > 0 && (
-          <div className="dre-row">
-            <span className="dre-sub-label">(-) Custo de Mercadorias/Serviços (CMV)</span>
-            <span className="dre-val dre-negativo">- {fmtR$(dados.custoMercadorias)}</span>
-            <span className="dre-pct">{pct(dados.custoMercadorias)}</span>
-          </div>
-        )}
-        {(dados.taxasCartao > 0 || dados.custoMercadorias > 0) && (
+        {dados.taxasCartao > 0 && (
           <div className="dre-row" style={{ background: "rgba(0,0,0,0.08)" }}>
             <span className="dre-label">= Receita Líquida</span>
             <span className="dre-val dre-positivo">{fmtR$(dados.receitaLiquida)}</span>
