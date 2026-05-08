@@ -1374,8 +1374,12 @@ function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], aReceber 
     //   2. dataPagamento   → string "YYYY-MM-DD" (documentos antigos sem Ts)
     //   3. vencimento      → fallback final
     const dFiltradas = despesas.filter((d) =>
-      d.status === "pago" &&
+      (d.status === "pago" || d.status === "parcial") &&
       dentroDoIntervalo(parseDate(d.dataPagamentoTs || d.dataPagamento || d.vencimento), intervalo));
+
+    // Regime de caixa: pago → usa d.valor; parcial → usa d.valorPago (o que saiu do caixa de fato)
+    const valorEfetivoDespesa = (d) =>
+      d.status === "parcial" ? Number(d.valorPago || 0) : Number(d.valor || 0);
 
     /* ══════════════════════════════════════════════════════════════════
        REGIME DE CAIXA PURO — RECEITA
@@ -1489,7 +1493,7 @@ function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], aReceber 
     });
 
     const lucroBruto    = receitaLiquida;
-    const totalDespesas = dFiltradas.reduce((s, d) => s + Number(d.valor || 0), 0);
+    const totalDespesas = dFiltradas.reduce((s, d) => s + valorEfetivoDespesa(d), 0);
     const lucroLiquido  = lucroBruto - totalDespesas - totalComissoes;
     const margem        = receitaBruta > 0 ? (lucroLiquido / receitaBruta) * 100 : 0;
 
@@ -1497,7 +1501,7 @@ function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], aReceber 
     const porCategoria = {};
     dFiltradas.forEach((d) => {
       const cat = d.categoria || "Sem categoria";
-      porCategoria[cat] = (porCategoria[cat] || 0) + Number(d.valor || 0);
+      porCategoria[cat] = (porCategoria[cat] || 0) + valorEfetivoDespesa(d);
     });
 
 
@@ -1726,9 +1730,10 @@ function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], aR
     );
 
     const despesasPagas = despesas.filter((d) =>
-      d.status === "pago" &&
+      (d.status === "pago" || d.status === "parcial") &&
       dentroDoIntervalo(parseDate(d.dataPagamentoTs || d.dataPagamento || d.vencimento), intervalo)
     );
+    const _valDesp = (d) => d.status === "parcial" ? Number(d.valorPago || 0) : Number(d.valor || 0);
 
     const aReceberManuais = aReceber.filter((r) => {
       if (r.origem === "venda") return false;
@@ -1740,7 +1745,7 @@ function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], aR
     const totalAReceberManual = aReceberManuais.reduce((s, r) => s + Number(r.valorPago || 0), 0);
     const totalEntradas    = totalEntradasCaixa + totalAReceberManual;
     const totalSaidasCaixa = saidasCaixa.reduce((s, c) => s + Number(c.valor || 0), 0);
-    const totalDespesas    = despesasPagas.reduce((s, d) => s + Number(d.valor || 0), 0);
+    const totalDespesas    = despesasPagas.reduce((s, d) => s + _valDesp(d), 0);
     const totalSaidas      = totalSaidasCaixa + totalDespesas;
     const saldo            = totalEntradas - totalSaidas;
 
