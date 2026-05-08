@@ -1334,7 +1334,7 @@ function SortTh({ label, sortKey: sk, currentKey, currentDir, onSort, align = "l
   );
 }
 
-function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], intervalo, uid }) {
+function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], aReceber = [], intervalo, uid }) {
   /* Estado para guardar taxas do Firestore (config/geral) — usadas só como fallback */
   const [configTaxas, setConfigTaxas] = useState(null);
 
@@ -1410,7 +1410,15 @@ function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], intervalo
     /* Receita real recebida no período */
     const receitaCaixa   = caixaVendas.reduce((s, c) => s + Number(c.valor || 0), 0);
     const receitaLegados = vendasLegadas.reduce((s, v) => s + Number(v.total || 0), 0);
-    const receitaBruta   = receitaCaixa + receitaLegados;
+    /* Receitas manuais do a_receber (não vinculadas a vendas) — regime de caixa */
+    const aReceberPagos = aReceber.filter((r) =>
+      r.origem !== "venda" &&
+      Number(r.valorPago || 0) > 0 &&
+      dentroDoIntervalo(r.dataPagamento || r.dataVencimento, intervalo)
+    );
+    const receitaAReceber = aReceberPagos.reduce((s, r) => s + Number(r.valorPago || 0), 0);
+
+    const receitaBruta   = receitaCaixa + receitaLegados + receitaAReceber;
 
     /* ══════════════════════════════════════════════════════════════════
        CUSTOS — vinculados às vendas que geraram receita
@@ -6343,7 +6351,7 @@ export default function Relatorios() {
       );
     }
     switch (ativo) {
-      case "dre":        return <RelatorioDRE vendas={vendas} despesas={despesas} caixa={caixa} vendedores={vendedores} intervalo={intervalo} uid={tenantUid} />;
+      case "dre":        return <RelatorioDRE vendas={vendas} despesas={despesas} caixa={caixa} vendedores={vendedores} aReceber={aReceber} intervalo={intervalo} uid={tenantUid} />;
       case "financeiro": return <RelatorioFinanceiro caixa={caixa} despesas={despesas} vendas={vendas} vendedores={vendedores} intervalo={intervalo} />;
       case "vendas":     return <RelatorioVendas vendas={vendas} intervalo={intervalo} />;
       case "clientes":   return <RelatorioClientes clientes={clientes} vendas={vendas} intervalo={intervalo} aReceber={aReceber} />;
