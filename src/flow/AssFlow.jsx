@@ -1284,6 +1284,9 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
   const [novoB,setNovoB]=useState({data:"",diaTodo:true,inicio:"08:00",fim:"09:00",motivo:""});
   const [salvandoB,setSalvandoB]=useState(false);
   const [t,showT]=useToast();
+  // Pagamento antecipado — lido/salvo em config/geral (tenant-level, só admin)
+  const [adiantamentoPct,setAdiantamentoPct]=useState(0);
+  const [pagarAtivo,setPagarAtivo]=useState(false);
 
   useEffect(()=>{ if(prestadorFoco) setPrestadorId(prestadorFoco); },[prestadorFoco]);
 
@@ -1296,6 +1299,17 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
     });
     return()=>u();
   },[tenantUid,prestadorId]);
+
+  // Carrega adiantamentoPct de config/geral (só admin)
+  useEffect(()=>{
+    if(!tenantUid||!isAdmin) return;
+    const u=onSnapshot(doc(db,"users",tenantUid,"config","geral"),snap=>{
+      const pct=snap.data()?.reservas?.adiantamentoPct;
+      if(pct!=null&&pct>0){ setAdiantamentoPct(Math.round(pct*100)); setPagarAtivo(true); }
+      else { setAdiantamentoPct(30); setPagarAtivo(false); }
+    });
+    return()=>u();
+  },[tenantUid,isAdmin]);
 
   // Listener de bloqueios por data
   useEffect(()=>{
@@ -1316,6 +1330,13 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
     setSalvando(true);
     try {
       await setDoc(doc(db,"users",tenantUid,"agendamento_configuracoes",prestadorId),{...config,atualizadoEm:serverTimestamp()},{merge:true});
+      // Admin: salva percentual de adiantamento em config/geral (lido pela Cloud Function)
+      if(isAdmin){
+        const pctDecimal=pagarAtivo&&adiantamentoPct>0 ? adiantamentoPct/100 : 0;
+        await setDoc(doc(db,"users",tenantUid,"config","geral"),{
+          reservas:{ adiantamentoPct: pctDecimal }
+        },{merge:true});
+      }
       showT("Configurações salvas!");
     } catch { showT("Erro ao salvar.","error"); }
     setSalvando(false);
@@ -1637,6 +1658,82 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
             <p><strong>[id]</strong> → identidade pública definida em configurações</p>
           </div>
         </div>
+
+
+        {/* Seção 5: Pagamento Antecipado — somente admin */}
+        {isAdmin&&(
+          <div style={{background:T.cardBg,border:`1px solid ${T.line}`,borderRadius:14,padding:"20px 22px",backdropFilter:"blur(12px)"}}>
+            {secaoHeader(
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/></svg>,
+              "Pagamento Antecipado",
+              "Cobrar um percentual do serviço no ato do agendamento. A reserva é confirmada automaticamente após o pagamento."
+            )}
+
+            {/* Toggle ativo/inativo */}
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:pagarAtivo?20:0,padding:"14px 16px",background:pagarAtivo?T.goldA06:T.rowAlt,border:`1px solid ${pagarAtivo?T.goldA22:T.line}`,borderRadius:12,transition:"all 0.25s"}}>
+              <div>
+                <p style={{fontSize:13,fontWeight:700,color:T.text100,marginBottom:2}}>
+                  {pagarAtivo?"Pagamento antecipado ativo":"Pagamento antecipado desativado"}
+                </p>
+                <p style={{fontSize:11.5,color:T.text35}}>
+                  {pagarAtivo?`Cliente paga ${adiantamentoPct}% ao agendar — reserva confirmada automaticamente`:"Fluxo padrão: reserva fica pendente até confirmação manual"}
+                </p>
+              </div>
+              <button onClick={()=>setPagarAtivo(v=>!v)} style={{background:"none",border:"none",cursor:"pointer",padding:0,flexShrink:0}}>
+                {pagarAtivo?Ic.toggle_on:Ic.toggle_off}
+              </button>
+            </div>
+
+            {/* Configuração do percentual — só quando ativo */}
+            {pagarAtivo&&(
+              <div style={{display:"flex",flexDirection:"column",gap:16}}>
+                <div>
+                  <label style={S.label}>Percentual de adiantamento</label>
+                  <div style={{display:"flex",alignItems:"center",gap:12}}>
+                    <input
+                      type="range" min="10" max="100" step="5"
+                      value={adiantamentoPct}
+                      onChange={e=>setAdiantamentoPct(Number(e.target.value))}
+                      style={{flex:1,accentColor:T.gold,cursor:"pointer"}}
+                    />
+                    <div style={{
+                      minWidth:64,padding:"8px 14px",
+                      background:T.goldA12,border:`1px solid ${T.goldA38}`,
+                      borderRadius:10,textAlign:"center",
+                      fontSize:16,fontWeight:800,color:T.gold,
+                    }}>{adiantamentoPct}%</div>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:10.5,color:T.text18,marginTop:4}}>
+                    <span>10% (mínimo)</span><span>50% (recomendado)</span><span>100% (total)</span>
+                  </div>
+                </div>
+
+                {/* Preview com valor de exemplo */}
+                <div style={{padding:"14px 16px",background:T.emeraldA10,border:`1px solid ${T.emeraldA22}`,borderRadius:12}}>
+                  <p style={{fontSize:12,fontWeight:700,color:T.emerald,marginBottom:6}}>Exemplo de cobrança</p>
+                  <div style={{display:"flex",flexDirection:"column",gap:4}}>
+                    {[{nome:"Manicure",preco:80},{nome:"Corte",preco:120},{nome:"Coloração",preco:250}].map(s=>(
+                      <div key={s.nome} style={{display:"flex",justifyContent:"space-between",fontSize:12,color:T.text65}}>
+                        <span>{s.nome} (R$ {s.preco.toFixed(2)})</span>
+                        <span style={{fontWeight:700,color:T.emerald}}>
+                          Cobra R$ {(s.preco*adiantamentoPct/100).toFixed(2)} agora
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{padding:"12px 14px",background:T.goldA06,border:`1px solid ${T.goldA12}`,borderRadius:10,fontSize:11.5,color:T.text35,lineHeight:1.65,display:"flex",gap:8,alignItems:"flex-start"}}>
+                  <span style={{flexShrink:0,marginTop:1}}>⚡</span>
+                  <span>
+                    Serviços <strong style={{color:T.text65}}>gratuitos (R$ 0,00)</strong> pulam o pagamento automaticamente.
+                    A cobrança funciona via Mercado Pago — configure as credenciais em <strong style={{color:T.gold}}>Configurações → Pagamentos Online</strong> do AG Gestão.
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div style={{display:"flex",justifyContent:"flex-end",paddingBottom:8}}>
           <button onClick={salvar} disabled={salvando} style={{...S.btnPrimary,padding:"11px 32px",fontSize:14,boxShadow:"0 4px 20px rgba(192,155,82,0.30)"}}>
