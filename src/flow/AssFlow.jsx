@@ -2100,7 +2100,7 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
     ...(isAdmin?[{key:"equipe",label:"Equipe",icon:Ic.users}]:[]),
     {key:"reservas",      label:"Reservas",       icon:Ic.list},
     {key:"configuracoes", label:"Configurações",  icon:Ic.settings},
-    {key:"link",          label:"Link Público",   icon:Ic.link},
+    {key:"link",          label:"Meus Links",   icon:Ic.link},
   ];
   const titulos={overview:"Visão Geral",equipe:"Equipe no Flow",reservas:"Reservas",configuracoes:"Configurações",link:"Link Público"};
 
