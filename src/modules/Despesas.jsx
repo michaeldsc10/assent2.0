@@ -1071,7 +1071,7 @@ function ModalConfirmDelete({ despesa, onConfirm, onClose }) {
           </button>
           {isParcelada && (
             <button className="btn-danger" onClick={() => handleConfirm(true)} disabled={excluindo}>
-              {excluindo ? "Cancelando..." : "Cancelar todas as parcelas"}
+              {excluindo ? "Excluindo..." : "Excluir parcelas pendentes"}
             </button>
           )}
         </div>
@@ -1588,15 +1588,22 @@ export default function Despesas({ isPro = false }) {
     if (!tenantUid || !deletando) return;
 
     if (cancelarGrupo && deletando.grupoId) {
-      // Cancela todas as parcelas pendentes/vencidas do grupo em "despesas"
-      const parcelas = despesas.filter(
-        d => d.grupoId === deletando.grupoId && d.status !== "pago" && d.status !== "cancelado"
+      // Busca todas as parcelas do grupo direto no Firestore (não depende do estado local)
+      const snapParcelas = await getDocs(
+        query(
+          collection(db, "users", tenantUid, "despesas"),
+          where("grupoId", "==", deletando.grupoId)
+        )
       );
 
       const batch = writeBatch(db);
 
-      parcelas.forEach(p => {
-        batch.update(doc(db, "users", tenantUid, "despesas", p.id), { status: "cancelado" });
+      snapParcelas.forEach(d => {
+        const status = d.data().status;
+        // Deleta pendentes e vencidas; mantém pagas intactas
+        if (status !== "pago") {
+          batch.delete(doc(db, "users", tenantUid, "despesas", d.id));
+        }
       });
 
       // Cancela entradas correspondentes em a_receber com o mesmo grupoId
@@ -1609,7 +1616,7 @@ export default function Despesas({ isPro = false }) {
         );
         snapAR.forEach(d => {
           if (d.data().status !== "pago") {
-            batch.update(doc(db, "users", tenantUid, "a_receber", d.id), { status: "cancelado" });
+            batch.delete(doc(db, "users", tenantUid, "a_receber", d.id));
           }
         });
       } catch (err) {
