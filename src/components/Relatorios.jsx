@@ -1719,7 +1719,7 @@ function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], aReceber 
 /* ══════════════════════════════════════════════════════
    RELATÓRIO: FINANCEIRO (CAIXA)
    ══════════════════════════════════════════════════════ */
-function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], intervalo }) {
+function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], aReceber = [], intervalo }) {
   const [filtroTipo, setFiltroTipo] = useState(null); // null | "entrada" | "saida"
 
   const dados = useMemo(() => {
@@ -1737,7 +1737,15 @@ function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], in
       dentroDoIntervalo(d.dataPagamentoTs || d.dataPagamento || d.vencimento, intervalo)
     );
 
-    const totalEntradas    = entradasCaixa.reduce((s, c) => s + Number(c.valor || 0), 0);
+    const aReceberManuais = aReceber.filter((r) => {
+      if (r.origem === "venda") return false;
+      if (Number(r.valorPago || 0) <= 0) return false;
+      return dentroDoIntervalo(r.dataPagamento || r.dataCriacao, intervalo);
+    });
+
+    const totalEntradasCaixa = entradasCaixa.reduce((s, c) => s + Number(c.valor || 0), 0);
+    const totalAReceberManual = aReceberManuais.reduce((s, r) => s + Number(r.valorPago || 0), 0);
+    const totalEntradas    = totalEntradasCaixa + totalAReceberManual;
     const totalSaidasCaixa = saidasCaixa.reduce((s, c) => s + Number(c.valor || 0), 0);
     const totalDespesas    = despesasPagas.reduce((s, d) => s + Number(d.valor || 0), 0);
     const totalSaidas      = totalSaidasCaixa + totalDespesas;
@@ -1801,6 +1809,19 @@ function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], in
         descricao: partes.join(" · "),
         entrada: 0,
         saida: Number(d.valor || 0),
+      });
+    });
+
+  
+      const rawDate = r.dataPagamento || r.dataCriacao;
+      transacoes.push({
+        _id: `ar-${r.id}`,
+        data: rawDate,
+        dataTs: parseDate(rawDate),
+        tipo: "entrada",
+        descricao: `A Receber · ${r.clienteNome || r.descricao || "Recebimento manual"}`,
+        entrada: Number(r.valorPago || 0),
+        saida: 0,
       });
     });
 
@@ -6352,7 +6373,7 @@ export default function Relatorios() {
     }
     switch (ativo) {
       case "dre":        return <RelatorioDRE vendas={vendas} despesas={despesas} caixa={caixa} vendedores={vendedores} aReceber={aReceber} intervalo={intervalo} uid={tenantUid} />;
-      case "financeiro": return <RelatorioFinanceiro caixa={caixa} despesas={despesas} vendas={vendas} vendedores={vendedores} intervalo={intervalo} />;
+      case "financeiro": return <RelatorioFinanceiro caixa={caixa} despesas={despesas} vendas={vendas} vendedores={vendedores} aReceber={aReceber} intervalo={intervalo} />;
       case "vendas":     return <RelatorioVendas vendas={vendas} intervalo={intervalo} />;
       case "clientes":   return <RelatorioClientes clientes={clientes} vendas={vendas} intervalo={intervalo} aReceber={aReceber} />;
       case "alunos":       return <RelatorioAlunos alunos={alunos} aReceber={aReceber} vendas={vendas} intervalo={intervalo} />;  
