@@ -1343,7 +1343,7 @@ function ModalTutorialPagamento({ onClose }) {
     },
     {
       titulo: "Use as Credenciais de Produção",
-      desc: <>Dentro da sua aplicação, acesse a aba <strong>"Credenciais de produção"</strong>. <br/><br/>⚠️ <strong>Não use credenciais de teste</strong> (sandbox) — elas não processam pagamentos reais. Somente credenciais de <strong>produção</strong> funcionam no PDV.</>,
+      desc: <>Dentro da sua aplicação, acesse a aba <strong>"Credenciais de produção"</strong>. Copie o <strong>Access Token</strong> e a <strong>Public Key</strong> — ambos são necessários. <br/><br/>⚠️ <strong>Não use credenciais de teste</strong> (sandbox) — elas não processam pagamentos reais.</>,
     },
     {
       titulo: "Copie o Access Token",
@@ -1430,6 +1430,7 @@ function ModalTutorialPagamento({ onClose }) {
    ══════════════════════════════════════════════════════ */
 function SecaoPagamentos({ config, onSave }) {
   const [token,        setToken]        = useState(config?.pagamentos?.mercadopago?.accessToken || "");
+  const [publicKey,    setPublicKey]    = useState(config?.pagamentos?.mercadopago?.publicKey || "");
   const [ativo,        setAtivo]        = useState(config?.pagamentos?.mercadopago?.ativo ?? false);
   const [showToken,    setShowToken]    = useState(false);
   const [salvando,     setSalvando]     = useState(false);
@@ -1440,12 +1441,14 @@ function SecaoPagamentos({ config, onSave }) {
 
   useEffect(() => {
     setToken(config?.pagamentos?.mercadopago?.accessToken || "");
+    setPublicKey(config?.pagamentos?.mercadopago?.publicKey || "");
     setAtivo(config?.pagamentos?.mercadopago?.ativo ?? false);
     setTesteOk(null);
   }, [config]);
 
   const handleSalvar = async () => {
     if (!token.trim()) { alert("Informe o Access Token antes de salvar."); return; }
+    if (ativo && !publicKey.trim()) { alert("Informe a Public Key para ativar os pagamentos."); return; }
     setSalvando(true);
     setTesteOk(null);
     try {
@@ -1453,6 +1456,7 @@ function SecaoPagamentos({ config, onSave }) {
         pagamentos: {
           mercadopago: {
             accessToken:  token.trim(),
+            publicKey:    publicKey.trim(),
             ativo,
             atualizadoEm: new Date().toISOString(),
           }
@@ -1552,7 +1556,7 @@ function SecaoPagamentos({ config, onSave }) {
               <div className="pag-toggle-row">
                 <div>
                   <div className="pag-toggle-label">Aceitar pagamentos PIX</div>
-                  <div className="pag-toggle-sub">Habilita o QR Code PIX no PDV</div>
+                  <div className="pag-toggle-sub">Habilita PIX no PDV e adiantamento nas reservas do Flow</div>
                 </div>
                 <Toggle checked={ativo} onChange={setAtivo} />
               </div>
@@ -1574,6 +1578,23 @@ function SecaoPagamentos({ config, onSave }) {
                       {showToken ? <EyeOff size={13} /> : <Eye size={13} />}
                     </button>
                   </div>
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0, marginTop: 14 }}>
+                  <label className="form-label">
+                    Public Key de Produção <span className="form-label-req">*</span>
+                    <span style={{ fontWeight: 400, fontSize: 10, color: "var(--text-3)", marginLeft: 6 }}>
+                      (usada no checkout de cartão — diferente do Access Token)
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    value={publicKey}
+                    onChange={e => setPublicKey(e.target.value)}
+                    placeholder="APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                    autoComplete="off"
+                  />
                 </div>
 
                 <div className="pag-actions">
@@ -1648,7 +1669,7 @@ function SecaoPagamentos({ config, onSave }) {
         </div>
 
         <div className="cfg-card-footer">
-          <button className="btn-primary" onClick={handleSalvar} disabled={salvando || !token.trim()}>
+          <button className="btn-primary" onClick={handleSalvar} disabled={salvando || !token.trim() || (ativo && !publicKey.trim())}>
             {salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar</>}
           </button>
         </div>
