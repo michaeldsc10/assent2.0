@@ -189,11 +189,26 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
 
     /* ── Receita & Vendas ── */
     // Caixa: só soma o que foi efetivamente recebido (total - restante a receber)
-    const receitaBruta = vendasPeriodo.reduce((s, v) => {
+    const receitaVendas = vendasPeriodo.reduce((s, v) => {
       const total    = Number(v.total) || 0;
       const restante = Number(v.valorRestante) || 0;
       return s + (total - restante);
     }, 0);
+
+    /* Receitas manuais do a_receber (não vinculadas a vendas) — regime de caixa */
+    const receitaAReceberManual = aReceber
+      .filter((r) => {
+        if (r.origem === "venda") return false;
+        const pago = Number(r.valorPago || 0);
+        if (pago <= 0) return false;
+        const dt = toDate(r.dataPagamento);
+        if (!dt) return false;
+        if (periodStart && (dt < periodStart || dt > periodEnd)) return false;
+        return true;
+      })
+      .reduce((s, r) => s + Number(r.valorPago || 0), 0);
+
+    const receitaBruta = receitaVendas + receitaAReceberManual;
     const numVendas   = vendasPeriodo.length;
     const ticketMedio = numVendas > 0 ? receitaBruta / numVendas : 0;
 
