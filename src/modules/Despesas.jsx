@@ -676,6 +676,7 @@ function ModalNovaDespesa({ despesa, despesas, categorias, onCriarCategoria, onD
     dataFim:        despesa?.dataFim        || "",
     parcelado:      despesa?.parcelado      || false,
     totalParcelas:  despesa?.totalParcelas  || 2,
+    tipoValor:      "total",
     observacao:     despesa?.observacao     || "",
   });
   const [erros, setErros] = useState({});
@@ -701,6 +702,7 @@ function ModalNovaDespesa({ despesa, despesas, categorias, onCriarCategoria, onD
     await onSave({
       descricao:       form.descricao.trim(),
       valor:           Number(form.valor),
+      tipoValor:       form.parcelado && !isEdit ? form.tipoValor : undefined,
       vencimento:      form.vencimento,
       categoria:       form.categoria,
       centroCusto:     form.centroCusto.trim(),
@@ -750,7 +752,12 @@ function ModalNovaDespesa({ despesa, despesas, categorias, onCriarCategoria, onD
           {/* Valor + Vencimento + Forma Pagamento */}
           <div className="form-row-3">
             <div className="form-group form-group-0">
-              <label className="form-label">Valor (R$) <span className="form-label-req">*</span></label>
+              <label className="form-label">
+                {form.parcelado && !isEdit
+                  ? (form.tipoValor === "total" ? "Valor total (R$)" : "Valor por parcela (R$)")
+                  : "Valor (R$)"
+                } <span className="form-label-req">*</span>
+              </label>
               <input
                 className={`form-input ${erros.valor ? "err" : ""}`}
                 type="number" min="0" step="0.01"
@@ -759,6 +766,15 @@ function ModalNovaDespesa({ despesa, despesas, categorias, onCriarCategoria, onD
                 placeholder="0,00"
               />
               {erros.valor && <div className="form-error">{erros.valor}</div>}
+              {/* Preview parcela */}
+              {form.parcelado && !isEdit && form.valor && Number(form.valor) > 0 && Number(form.totalParcelas) > 1 && (
+                <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 5 }}>
+                  {form.tipoValor === "total"
+                    ? `${fmtR$(Number(form.valor) / Number(form.totalParcelas))} / parcela`
+                    : `Total: ${fmtR$(Number(form.valor) * Number(form.totalParcelas))}`
+                  }
+                </div>
+              )}
             </div>
             <div className="form-group form-group-0">
               <label className="form-label">Vencimento <span className="form-label-req">*</span></label>
@@ -904,13 +920,30 @@ function ModalNovaDespesa({ despesa, despesas, categorias, onCriarCategoria, onD
                 </label>
               </div>
               {form.parcelado && !form.recorrente && (
-                <div style={{ maxWidth: 160 }}>
-                  <label className="form-label">Número de parcelas</label>
-                  <input
-                    type="number" min="2" max="60" className="form-input"
-                    value={form.totalParcelas}
-                    onChange={e => set("totalParcelas", e.target.value)}
-                  />
+                <div style={{ display: "flex", gap: 14, alignItems: "flex-end" }}>
+                  <div style={{ maxWidth: 160 }}>
+                    <label className="form-label">Número de parcelas</label>
+                    <input
+                      type="number" min="2" max="60" className="form-input"
+                      value={form.totalParcelas}
+                      onChange={e => set("totalParcelas", e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Valor informado é</label>
+                    <div className="chip-group">
+                      <button
+                        type="button"
+                        className={`chip ${form.tipoValor === "total" ? "active" : ""}`}
+                        onClick={() => set("tipoValor", "total")}
+                      >Total</button>
+                      <button
+                        type="button"
+                        className={`chip ${form.tipoValor === "parcela" ? "active" : ""}`}
+                        onClick={() => set("tipoValor", "parcela")}
+                      >Por parcela</button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -1454,7 +1487,9 @@ export default function Despesas({ isPro = false }) {
       const batch = writeBatch(db);
       const baseNum = cnt; // número sequencial desse grupo
 
-      const valorTotal   = Number(form.valor);
+      const valorTotal   = form.tipoValor === "parcela"
+        ? parseFloat((Number(form.valor) * form.totalParcelas).toFixed(2))
+        : Number(form.valor);
       const valorParcela = parseFloat((valorTotal / form.totalParcelas).toFixed(2));
 
       for (let i = 0; i < form.totalParcelas; i++) {
