@@ -230,20 +230,17 @@ const CSS = `
   }
   .ar-kpi {
     background: var(--s1); border: 1px solid var(--border);
-    border-radius: 12px; padding: 16px 18px;
+    border-radius: 12px; padding: 14px 16px;
   }
-  .ar-kpi-label {
-    font-size: 10px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: .07em; color: var(--text-3); margin-bottom: 8px;
-  }
+  .ar-kpi-label { font-size: 11px; color: var(--text-2); font-weight: 500; }
   .ar-kpi-val {
-    font-family: 'Sora', sans-serif; font-size: 20px; font-weight: 700;
-    color: var(--text);
+    font-family: 'Sora', sans-serif;
+    font-size: 20px; font-weight: 700; color: var(--text); margin: 7px 0;
   }
-  .ar-kpi-val.green { color: var(--green); }
   .ar-kpi-val.gold  { color: var(--gold); }
+  .ar-kpi-val.green { color: var(--green); }
   .ar-kpi-val.red   { color: var(--red); }
-  .ar-kpi-sub { font-size: 11px; color: var(--text-3); margin-top: 4px; }
+  .ar-kpi-sub { font-size: 10px; color: var(--text-3); }
 
   /* Tabela */
   .ar-table-wrap {
@@ -251,304 +248,403 @@ const CSS = `
     border-radius: 12px; overflow: hidden;
   }
   .ar-table-header {
-    padding: 13px 18px;
-    border-bottom: 1px solid var(--border);
+    padding: 12px 22px; border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
   }
   .ar-table-title {
-    font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600;
-    color: var(--text);
+    font-size: 13px; font-weight: 600; color: var(--text);
   }
   .ar-count-badge {
-    font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 600;
-    background: var(--s3); border: 1px solid var(--border-h);
-    color: var(--text-2); padding: 2px 10px; border-radius: 20px;
+    font-size: 10px; background: var(--s3); color: var(--text-2);
+    padding: 3px 8px; border-radius: 4px;
   }
 
-  /* grid: cliente | descrição | valor restante | vencimento | status | ações */
   .ar-row {
     display: grid;
-    grid-template-columns: 160px 1fr 130px 120px 110px 90px;
-    padding: 11px 18px; gap: 8px;
-    border-bottom: 1px solid var(--border);
-    align-items: center; font-size: 12px; color: var(--text-2);
+    grid-template-columns: 1.2fr 1.5fr 0.9fr 1fr 0.8fr 1fr;
+    gap: 12px; padding: 12px 22px; border-bottom: 1px solid var(--border);
+    align-items: center; transition: background .13s; cursor: pointer;
   }
   .ar-row:last-child { border-bottom: none; }
-  .ar-row:hover { background: rgba(255,255,255,0.02); }
-  .ar-row-head { background: var(--s2); }
-  .ar-row-head span {
-    font-size: 10px; font-weight: 500; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--text-3);
+  .ar-row:hover { background: var(--s2); }
+  .ar-row-head {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    color: var(--text-2); background: var(--s2); cursor: default;
   }
+  .ar-row-head:hover { background: var(--s2); }
 
-  .ar-cliente { color: var(--text); font-size: 13px; font-weight: 500; }
-  .ar-desc    { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ar-valor   { font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; }
+  .ar-cliente {
+    font-weight: 500; color: var(--text); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ar-desc {
+    color: var(--text-2); font-size: 12px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ar-valor {
+    font-weight: 600; font-family: 'Sora', sans-serif;
+  }
+  .ar-valor.pago   { color: var(--green); }
   .ar-valor.pendente { color: var(--gold); }
   .ar-valor.vencido  { color: var(--red); }
-  .ar-valor.pago     { color: var(--green); }
-  .ar-venc    { font-size: 12px; color: var(--text-2); }
-  .ar-venc.vencido { color: var(--red); }
-  .ar-actions { display: flex; align-items: center; gap: 5px; justify-content: flex-end; }
 
-  .ar-empty, .ar-loading {
-    padding: 56px 20px; text-align: center; color: var(--text-3);
-    font-size: 13px;
+  .ar-venc {
+    font-size: 12px; color: var(--text-2);
+  }
+  .ar-venc.vencido { color: var(--red); font-weight: 600; }
+
+  .ar-actions {
+    display: flex; justify-content: flex-end; gap: 4px;
+  }
+
+  .ar-loading, .ar-empty {
+    padding: 40px 22px; text-align: center;
+    color: var(--text-2); font-size: 13px;
+  }
+
+  /* Cliente dropdown (ModalFormConta) */
+  .cliente-wrap { position: relative; }
+  .cliente-tag {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--green); background: rgba(72,199,142,0.1);
+    border: 1px solid rgba(72,199,142,0.3); border-radius: 6px;
+    padding: 5px 8px; margin-top: 7px;
+  }
+  .cliente-tag button {
+    background: none; border: none; cursor: pointer; padding: 0;
+    transition: transform .1s;
+  }
+  .cliente-tag button:hover { transform: scale(1.15); }
+
+  .cliente-dropdown {
+    position: absolute; top: 100%; left: 0; right: 0; margin-top: 6px;
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 8px; z-index: 50; max-height: 200px; overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  }
+  .cliente-option {
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background .1s;
+  }
+  .cliente-option:last-child { border-bottom: none; }
+  .cliente-option:hover { background: var(--s2); }
+  .cliente-option-nome { font-size: 12px; font-weight: 500; color: var(--text); }
+  .cliente-option-sub { font-size: 10px; color: var(--text-3); margin-top: 2px; }
+
+  /* Pagamento info */
+  .pag-info-box {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px; margin-bottom: 16px;
+  }
+  .pag-info-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; padding: 6px 0;
+  }
+  .pag-info-row strong { color: var(--text); }
+  .pag-divider {
+    height: 1px; background: var(--border); border: none; margin: 8px 0;
+  }
+  .pag-info-row .gold { color: var(--gold); font-weight: 600; }
+  .pag-info-row .green { color: var(--green); font-weight: 600; }
+  .pag-info-row .red { color: var(--red); font-weight: 600; }
+
+  /* Confirm */
+  .confirm-body {
+    padding: 24px 22px;
+    text-align: center;
+  }
+  .confirm-icon {
+    font-size: 40px; margin-bottom: 12px;
+  }
+  .confirm-body p {
+    font-size: 13px; color: var(--text-2); line-height: 1.5;
   }
 
   /* Status badge */
   .status-badge {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 3px 9px; border-radius: 20px;
-    font-size: 10px; font-weight: 600; letter-spacing: .04em;
-    text-transform: uppercase; white-space: nowrap;
-  }
-  .status-badge.pendente {
-    background: rgba(200,165,94,0.12); border: 1px solid rgba(200,165,94,.3);
-    color: var(--gold);
-  }
-  .status-badge.vencido {
-    background: var(--red-d); border: 1px solid rgba(224,82,82,.25);
-    color: var(--red);
+    display: inline-block; font-size: 10px; font-weight: 600;
+    text-transform: uppercase; padding: 4px 8px; border-radius: 5px;
   }
   .status-badge.pago {
-    background: rgba(72,199,142,0.10); border: 1px solid rgba(72,199,142,.25);
-    color: var(--green);
+    background: rgba(72,199,142,0.15); color: var(--green);
+    border: 1px solid rgba(72,199,142,0.3);
+  }
+  .status-badge.pendente {
+    background: rgba(200,165,94,0.15); color: var(--gold);
+    border: 1px solid rgba(200,165,94,0.3);
+  }
+  .status-badge.vencido {
+    background: rgba(224,82,82,0.15); color: var(--red);
+    border: 1px solid rgba(224,82,82,0.3);
   }
 
-  /* Modal pagamento info box */
-  .pag-info-box {
+  /* Detalhe Modal */
+  .detalhe-info-group {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;
+  }
+  .detalhe-info-field {
     background: var(--s2); border: 1px solid var(--border);
-    border-radius: 9px; padding: 14px 16px; margin-bottom: 18px;
+    border-radius: 8px; padding: 12px;
   }
-  .pag-info-row {
-    display: flex; justify-content: space-between; align-items: center;
-    font-size: 12px; color: var(--text-2); margin-bottom: 6px;
+  .detalhe-info-label {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    color: var(--text-2); margin-bottom: 6px;
   }
-  .pag-info-row:last-child { margin-bottom: 0; }
-  .pag-info-row strong { color: var(--text); }
-  .pag-info-row .green { color: var(--green); font-family: 'Sora', sans-serif; font-weight: 600; }
-  .pag-info-row .gold  { color: var(--gold);  font-family: 'Sora', sans-serif; font-weight: 600; }
-  .pag-info-row .red   { color: var(--red);   font-family: 'Sora', sans-serif; font-weight: 600; }
-
-  .pag-divider {
-    border: none; border-top: 1px solid var(--border); margin: 12px 0;
+  .detalhe-info-value {
+    font-size: 13px; color: var(--text); font-weight: 500;
   }
-
-  /* Cliente autocomplete */
-  .cliente-wrap { position: relative; }
-  .cliente-dropdown {
-    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 9999;
-    background: var(--s1); border: 1px solid var(--border-h);
-    border-radius: 9px; overflow: hidden;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-    max-height: 200px; overflow-y: auto;
+  .detalhe-info-full {
+    grid-column: 1 / -1;
   }
-  .cliente-dropdown::-webkit-scrollbar { width: 3px; }
-  .cliente-dropdown::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
-  .cliente-option {
-    padding: 9px 13px; cursor: pointer;
-    border-bottom: 1px solid var(--border);
-    transition: background .1s;
+  .detalhe-section-title {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    color: var(--text-2); margin-top: 16px; margin-bottom: 10px;
   }
-  .cliente-option:last-child { border-bottom: none; }
-  .cliente-option:hover { background: var(--s2); }
-  .cliente-option-nome { font-size: 13px; color: var(--text); }
-  .cliente-option-sub  { font-size: 11px; color: var(--text-3); margin-top: 2px; }
-  .cliente-tag {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: rgba(200,165,94,0.12); border: 1px solid rgba(200,165,94,.3);
-    border-radius: 6px; padding: 2px 8px; margin-top: 6px;
-    font-size: 11px; color: var(--gold);
-  }
-  .cliente-tag button {
-    background: none; border: none; cursor: pointer;
-    color: var(--gold); padding: 0; line-height: 1; display: flex;
-  }
-
-  /* Confirm body */
-  .confirm-body {
-    padding: 28px 22px; text-align: center;
-    font-size: 13px; color: var(--text-2); line-height: 1.6;
-  }
-  .confirm-icon { font-size: 32px; margin-bottom: 12px; }
-  .confirm-body strong { color: var(--text); }
 `;
 
 /* ══════════════════════════════════════════════════
-   HELPERS
+   UTILIDADES
    ══════════════════════════════════════════════════ */
+const fmtR$ = (val) => {
+  if (typeof val !== "number" || isNaN(val)) return "R$ 0,00";
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(val);
+};
 
-/** Formata valor monetário em BRL */
-const fmtR$ = (v) =>
-  `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+const fmtData = (dateStr) => {
+  if (!dateStr) return "—";
+  const d = new Date(dateStr + "T00:00:00");
+  if (isNaN(d)) return "—";
+  return new Intl.DateTimeFormat("pt-BR").format(d);
+};
 
-/** Formata string de data ISO (YYYY-MM-DD) para pt-BR */
-const fmtData = (d) => {
-  if (!d) return "—";
-  try {
-    // Força parse local para evitar offset UTC
-    const [ano, mes, dia] = String(d).split("-");
-    return `${dia}/${mes}/${ano}`;
-  } catch {
-    return String(d);
+const fmtDataCompleta = (timestamp) => {
+  if (!timestamp) return "—";
+  let d;
+  if (typeof timestamp === "string") {
+    d = new Date(timestamp);
+  } else if (timestamp.toDate) {
+    d = timestamp.toDate();
+  } else {
+    d = new Date(timestamp);
   }
+  if (isNaN(d)) return "—";
+  return new Intl.DateTimeFormat("pt-BR", { 
+    year: "numeric", 
+    month: "2-digit", 
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(d);
 };
 
-/** Data de hoje no formato YYYY-MM-DD (local) */
-const hojeISO = () => {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-};
-
-/**
- * Calcula o status correto com base nos valores e data de vencimento.
- * REGRA CRÍTICA: nunca confiar apenas no status salvo.
- */
-const calcStatus = (valorRestante, dataVencimento) => {
-  const restante = Number(valorRestante || 0);
-  if (restante <= 0) return "pago";
-  const hoje = hojeISO();
-  if (dataVencimento && dataVencimento < hoje) return "vencido";
-  return "pendente";
-};
-
-/** Garante consistência dos campos financeiros de um documento */
-const normalizarConta = (conta) => {
-  const valorTotal  = Number(conta.valorTotal  || 0);
-  const valorPago   = Number(conta.valorPago   || 0);
-  const valorRestante = Math.max(0, valorTotal - valorPago);
-  const status = calcStatus(valorRestante, conta.dataVencimento);
-  return { ...conta, valorTotal, valorPago, valorRestante, status };
-};
-
-/* Gera ID sequencial de venda — espelha o padrão de Vendas.jsx */
-const gerarIdVenda = (cnt) => `V${String(cnt + 1).padStart(4, "0")}`;
-
-const FILTROS_STATUS = ["Todos", "pendente", "vencido", "pago"];
+const FILTROS_STATUS = ["Todos", "pago", "pendente", "vencido"];
 
 const LABEL_STATUS = {
-  Todos:    "Todos",
+  Todos: "Todos",
+  pago: "Pago",
   pendente: "Pendente",
-  vencido:  "Vencido",
-  pago:     "Pago",
+  vencido: "Vencido"
+};
+
+const LABEL_ORIGEM = {
+  venda: "Venda",
+  manual: "Manual",
+  outro: "Outro"
 };
 
 /* ══════════════════════════════════════════════════
-   COMPONENTE: StatusBadge
+   FUNÇÕES AUXILIARES
    ══════════════════════════════════════════════════ */
-function StatusBadge({ status }) {
-  const icon = {
-    pendente: <Clock     size={10} />,
-    vencido:  <AlertCircle size={10} />,
-    pago:     <CheckCircle size={10} />,
-  }[status] || null;
+const normalizarConta = (doc) => {
+  return {
+    ...doc,
+    valorTotal: doc.valorTotal || 0,
+    valorPago: doc.valorPago || 0,
+    valorRestante: (doc.valorTotal || 0) - (doc.valorPago || 0)
+  };
+};
 
+const calcStatus = (valorRestante, dataVencimento) => {
+  if (valorRestante <= 0) return "pago";
+  const hoje = new Date();
+  const venc = new Date(dataVencimento + "T00:00:00");
+  if (venc < hoje) return "vencido";
+  return "pendente";
+};
+
+const StatusBadge = ({ status }) => (
+  <div className={`status-badge ${status}`}>{LABEL_STATUS[status]}</div>
+);
+
+/* ══════════════════════════════════════════════════
+   MODAL: Detalhes Completo
+   ══════════════════════════════════════════════════ */
+function ModalDetalhes({ conta, onClose }) {
+  const status = calcStatus(conta.valorRestante, conta.dataVencimento);
+  
   return (
-    <span className={`status-badge ${status}`}>
-      {icon}
-      {LABEL_STATUS[status] || status}
-    </span>
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box">
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">Detalhes da Conta</div>
+            <div className="modal-sub">{conta.clienteNome}</div>
+          </div>
+          <button className="modal-close" onClick={onClose}>
+            <X size={14} color="var(--text-2)" />
+          </button>
+        </div>
+
+        <div className="modal-body">
+          {/* Descrição e Status */}
+          <div className="detalhe-info-group">
+            <div className="detalhe-info-field detalhe-info-full">
+              <div className="detalhe-info-label">Descrição</div>
+              <div className="detalhe-info-value">{conta.descricao || "—"}</div>
+            </div>
+          </div>
+
+          {/* Valores */}
+          <div className="detalhe-section-title">Financeiro</div>
+          <div className="detalhe-info-group">
+            <div className="detalhe-info-field">
+              <div className="detalhe-info-label">Valor Total</div>
+              <div className="detalhe-info-value" style={{ color: "var(--gold)" }}>
+                {fmtR$(conta.valorTotal)}
+              </div>
+            </div>
+            <div className="detalhe-info-field">
+              <div className="detalhe-info-label">Já Recebido</div>
+              <div className="detalhe-info-value" style={{ color: "var(--green)" }}>
+                {fmtR$(conta.valorPago)}
+              </div>
+            </div>
+            <div className="detalhe-info-field">
+              <div className="detalhe-info-label">Restante</div>
+              <div className="detalhe-info-value" style={{ color: status === "vencido" ? "var(--red)" : "var(--text)" }}>
+                {fmtR$(conta.valorRestante)}
+              </div>
+            </div>
+            <div className="detalhe-info-field">
+              <div className="detalhe-info-label">Status</div>
+              <div style={{ marginTop: "4px" }}>
+                <StatusBadge status={status} />
+              </div>
+            </div>
+          </div>
+
+          {/* Datas */}
+          <div className="detalhe-section-title">Datas</div>
+          <div className="detalhe-info-group">
+            <div className="detalhe-info-field">
+              <div className="detalhe-info-label">Vencimento</div>
+              <div className="detalhe-info-value">{fmtData(conta.dataVencimento)}</div>
+            </div>
+            <div className="detalhe-info-field">
+              <div className="detalhe-info-label">Criado em</div>
+              <div className="detalhe-info-value">{fmtDataCompleta(conta.dataCriacao)}</div>
+            </div>
+          </div>
+
+          {/* Origem e Pagamento */}
+          <div className="detalhe-section-title">Informações</div>
+          <div className="detalhe-info-group">
+            <div className="detalhe-info-field">
+              <div className="detalhe-info-label">Origem</div>
+              <div className="detalhe-info-value">
+                {LABEL_ORIGEM[conta.origem] || conta.origem || "—"}
+              </div>
+            </div>
+            <div className="detalhe-info-field">
+              <div className="detalhe-info-label">Forma de Pagamento</div>
+              <div className="detalhe-info-value">{conta.formaPagamento || "—"}</div>
+            </div>
+          </div>
+
+          {/* Observações */}
+          {conta.observacoes && (
+            <>
+              <div className="detalhe-section-title">Observações</div>
+              <div className="detalhe-info-field detalhe-info-full" style={{ minHeight: "70px" }}>
+                <div className="detalhe-info-value" style={{ whiteSpace: "pre-wrap", lineHeight: "1.5" }}>
+                  {conta.observacoes}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Fechar</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
 /* ══════════════════════════════════════════════════
-   MODAL: Novo / Editar Conta a Receber
+   MODAL: Formulário (Criar/Editar)
    ══════════════════════════════════════════════════ */
 function ModalFormConta({ conta, onSave, onClose }) {
-  const isEdit = !!conta;
-  const { tenantUid } = useAuth();
-
-  /* ── Form state ── */
-  const [form, setForm] = useState({
-    clienteNome:    conta?.clienteNome    || "",
-    clienteId:      conta?.clienteId      || null,
-    descricao:      conta?.descricao      || "",
-    valorTotal:     conta?.valorTotal     != null ? String(conta.valorTotal) : "",
-    valorPago:      conta?.valorPago      != null ? String(conta.valorPago)  : "0",
-    dataVencimento: conta?.dataVencimento || "",
-    observacoes:    conta?.observacoes    || "",
-  });
-  const [erros, setErros]       = useState({});
-  const [salvando, setSalvando] = useState(false);
-
-  /* ── Autocomplete state ── */
-  const [clientes, setClientes]         = useState([]);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [clienteVinculado, setClienteVinculado] = useState(
-    conta?.clienteId ? { id: conta.clienteId, nome: conta.clienteNome } : null
+  const [form, setForm] = useState(
+    conta || {
+      clienteNome: "",
+      clienteId: null,
+      descricao: "",
+      valorTotal: "",
+      valorPago: "0",
+      formaPagamento: "dinheiro",
+      dataVencimento: "",
+      observacoes: "",
+      origem: "manual"
+    }
   );
+
+  const [erros, setErros] = useState({});
+  const [salvando, setSalvando] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [clientes, setClientes] = useState([]);
+  const [clienteVinculado, setClienteVinculado] = useState(conta?.clienteId ? { id: conta.clienteId } : null);
+  const { tenantUid } = useAuth();
   const inputRef = useRef(null);
 
-  /* ── Busca clientes uma vez ao montar ── */
   useEffect(() => {
     if (!tenantUid) return;
-    getDocs(collection(db, "users", tenantUid, "clientes"))
-      .then(snap => {
-        setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      })
-      .catch(err => fsError(err, "AReceber:ModalFormConta:clientes"));
+    const col = collection(db, "users", tenantUid, "clientes");
+    const unsub = onSnapshot(col, (snap) => {
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setClientes(docs);
+    });
+    return unsub;
   }, [tenantUid]);
 
-  /* ── Filtra clientes pelo que foi digitado ── */
-  const clientesFiltrados = useMemo(() => {
-    const q = form.clienteNome.trim().toLowerCase();
-    if (!q) return clientes.slice(0, 8);
-    return clientes
-      .filter(c => (c.nome || c.nomeFantasia || "").toLowerCase().includes(q))
-      .slice(0, 8);
-  }, [clientes, form.clienteNome]);
+  const clientesFiltrados = clientes.filter(c => {
+    const q = form.clienteNome.toLowerCase();
+    const nome = (c.nome || c.nomeFantasia || "").toLowerCase();
+    return nome.includes(q);
+  });
 
-  /* ── Fecha dropdown ao clicar fora ── */
-  useEffect(() => {
-    if (!dropdownOpen) return;
-    const handler = (e) => {
-      if (inputRef.current && !inputRef.current.closest(".cliente-wrap").contains(e.target)) {
-        setDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [dropdownOpen]);
+  const set = (key, val) => setForm(f => ({ ...f, [key]: val }));
 
-  const set = useCallback((campo, valor) => {
-    setForm(f => ({ ...f, [campo]: valor }));
-    setErros(e => ({ ...e, [campo]: "" }));
-  }, []);
-
-  /* ── Selecionar cliente do dropdown ── */
   const selecionarCliente = (c) => {
-    const nome = c.nome || c.nomeFantasia || "";
-    setForm(f => ({ ...f, clienteNome: nome, clienteId: c.id }));
-    setClienteVinculado({ id: c.id, nome });
-    setErros(e => ({ ...e, clienteNome: "" }));
+    set("clienteNome", c.nome || c.nomeFantasia || "");
+    set("clienteId", c.id);
+    setClienteVinculado(c);
     setDropdownOpen(false);
   };
 
-  /* ── Desvincular cliente (volta a free text) ── */
   const desvincularCliente = () => {
-    setForm(f => ({ ...f, clienteId: null }));
     setClienteVinculado(null);
-    setTimeout(() => inputRef.current?.focus(), 0);
+    set("clienteId", null);
   };
 
   const validar = () => {
     const e = {};
-    if (!form.clienteNome.trim())    e.clienteNome    = "Nome do cliente é obrigatório.";
-    if (!form.descricao.trim())      e.descricao      = "Descrição é obrigatória.";
-    if (!form.dataVencimento)        e.dataVencimento = "Data de vencimento é obrigatória.";
-
-    const vTotal = parseFloat(form.valorTotal.replace(",", "."));
-    if (isNaN(vTotal) || vTotal <= 0) e.valorTotal = "Valor total deve ser maior que zero.";
-
-    const vPago = parseFloat(form.valorPago.replace(",", "."));
-    if (isNaN(vPago) || vPago < 0)    e.valorPago  = "Valor pago não pode ser negativo.";
-    if (!isNaN(vTotal) && !isNaN(vPago) && vPago > vTotal)
-      e.valorPago = "Valor pago não pode ser maior que o valor total.";
-
+    if (!form.clienteNome?.trim()) e.clienteNome = "Cliente é obrigatório";
+    if (!form.descricao?.trim()) e.descricao = "Descrição é obrigatória";
+    const vt = parseFloat((form.valorTotal || "").replace(",", "."));
+    if (isNaN(vt) || vt <= 0) e.valorTotal = "Informe um valor maior que zero";
+    if (!form.dataVencimento?.trim()) e.dataVencimento = "Data é obrigatória";
     setErros(e);
     return Object.keys(e).length === 0;
   };
@@ -556,41 +652,24 @@ function ModalFormConta({ conta, onSave, onClose }) {
   const handleSalvar = async () => {
     if (!validar()) return;
     setSalvando(true);
-
-    try {
-      const valorTotal    = parseFloat(form.valorTotal.replace(",", "."));
-      const valorPago     = parseFloat(form.valorPago.replace(",", "."));
-      const valorRestante = Math.max(0, valorTotal - valorPago);
-      const status        = calcStatus(valorRestante, form.dataVencimento);
-
-      await onSave({
-        clienteNome:    form.clienteNome.trim(),
-        clienteId:      form.clienteId || null,
-        descricao:      form.descricao.trim(),
-        valorTotal,
-        valorPago,
-        valorRestante,
-        dataVencimento: form.dataVencimento,
-        observacoes:    form.observacoes.trim(),
-        status,
-        origem:         isEdit ? (conta.origem || "manual") : "manual",
-        referenciaId:   isEdit ? (conta.referenciaId || null) : null,
-      });
-    } finally {
-      setSalvando(false);
-    }
+    const vt = parseFloat((form.valorTotal || "").replace(",", "."));
+    const vp = parseFloat((form.valorPago || "").replace(",", ".")) || 0;
+    await onSave({
+      ...form,
+      valorTotal: vt,
+      valorPago: Math.min(vp, vt),
+      valorRestante: Math.max(vt - vp, 0)
+    });
+    setSalvando(false);
   };
+
+  const isEdit = !!conta;
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal-box">
         <div className="modal-header">
-          <div>
-            <div className="modal-title">{isEdit ? "Editar Conta" : "Nova Conta a Receber"}</div>
-            <div className="modal-sub">
-              {isEdit ? `Editando: ${conta.clienteNome}` : "Preencha os dados da conta"}
-            </div>
-          </div>
+          <div className="modal-title">{isEdit ? "Editar Conta" : "Nova Conta"}</div>
           <button className="modal-close" onClick={onClose}>
             <X size={14} color="var(--text-2)" />
           </button>
@@ -611,7 +690,6 @@ function ModalFormConta({ conta, onSave, onClose }) {
                 disabled={!!clienteVinculado}
                 onChange={e => {
                   set("clienteNome", e.target.value);
-                  // Se o usuário editou o texto, desvincula o cliente
                   if (clienteVinculado) {
                     setClienteVinculado(null);
                     setForm(f => ({ ...f, clienteId: null }));
@@ -622,7 +700,6 @@ function ModalFormConta({ conta, onSave, onClose }) {
                 autoComplete="off"
               />
 
-              {/* Tag de cliente vinculado */}
               {clienteVinculado && (
                 <div className="cliente-tag">
                   <CheckCircle size={11} />
@@ -633,7 +710,6 @@ function ModalFormConta({ conta, onSave, onClose }) {
                 </div>
               )}
 
-              {/* Dropdown */}
               {dropdownOpen && !clienteVinculado && clientesFiltrados.length > 0 && (
                 <div className="cliente-dropdown">
                   {clientesFiltrados.map(c => {
@@ -697,6 +773,25 @@ function ModalFormConta({ conta, onSave, onClose }) {
               />
               {erros.valorPago && <div className="form-error">{erros.valorPago}</div>}
             </div>
+          </div>
+
+          {/* Forma de pagamento */}
+          <div className="form-group">
+            <label className="form-label">Forma de Pagamento</label>
+            <select
+              className="form-input"
+              value={form.formaPagamento}
+              onChange={e => set("formaPagamento", e.target.value)}
+            >
+              <option value="dinheiro">Dinheiro</option>
+              <option value="cartao_credito">Cartão de Crédito</option>
+              <option value="cartao_debito">Cartão de Débito</option>
+              <option value="boleto">Boleto</option>
+              <option value="transferencia">Transferência</option>
+              <option value="pix">PIX</option>
+              <option value="cheque">Cheque</option>
+              <option value="outro">Outro</option>
+            </select>
           </div>
 
           {/* Data de vencimento */}
@@ -882,8 +977,8 @@ export default function AReceber() {
   const [editando, setEditando]     = useState(null);
   const [deletando, setDeletando]   = useState(null);
   const [pagamento, setPagamento]   = useState(null);
+  const [detalhes, setDetalhes]     = useState(null);
 
-  /* ── Auth ── */
   /* ── Firestore — listener em tempo real ── */
   useEffect(() => {
     if (!tenantUid) {
@@ -901,7 +996,7 @@ export default function AReceber() {
         setLoading(false);
       },
       (err) => {
-        fsError(err, "AReceber:contas");
+        fsError(err, "AReceber:listener");
         setLoading(false);
       }
     );
@@ -909,256 +1004,105 @@ export default function AReceber() {
     return unsub;
   }, [tenantUid]);
 
-  /* ── Handler: Criar nova conta ── */
+  /* ── Criar ── */
   const handleCriar = useCallback(async (dados) => {
     if (!tenantUid) return;
     try {
-      const now = new Date().toISOString();
-      const arRef = await addDoc(collection(db, "users", tenantUid, "a_receber"), {
+      const col = collection(db, "users", tenantUid, "a_receber");
+      await addDoc(col, {
         ...dados,
-        dataCriacao:     now,
-        dataAtualizacao: now,
+        origem: dados.origem || "manual",
+        dataCriacao: serverTimestamp(),
+        dataPagamento: null
       });
-      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.A_RECEBER, descricao: montarDescricao("criar", "Conta a Receber", dados.clienteNome || dados.descricao, arRef.id) });
       setModalNovo(false);
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.A_RECEBER, descricao: montarDescricao("criar", "Conta a Receber", dados.clienteNome || dados.descricao) });
     } catch (err) {
       fsError(err, "AReceber:criar");
       alert("Erro ao criar conta. Tente novamente.");
     }
-  }, [tenantUid]);
+  }, [tenantUid, nomeUsuario, cargo]);
 
-  /* ── Handler: Editar conta ── */
+  /* ── Editar ── */
   const handleEditar = useCallback(async (dados) => {
-    if (!tenantUid || !editando) return;
+    if (!tenantUid || !editando?.id) return;
     try {
       const ref = doc(db, "users", tenantUid, "a_receber", editando.id);
       await updateDoc(ref, {
-        ...dados,
-        dataAtualizacao: new Date().toISOString(),
+        clienteNome: dados.clienteNome,
+        clienteId: dados.clienteId,
+        descricao: dados.descricao,
+        valorTotal: dados.valorTotal,
+        valorPago: dados.valorPago,
+        valorRestante: dados.valorRestante,
+        formaPagamento: dados.formaPagamento,
+        dataVencimento: dados.dataVencimento,
+        observacoes: dados.observacoes
       });
-      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.A_RECEBER, descricao: montarDescricao("editar", "Conta a Receber", dados.clienteNome || dados.descricao || editando.clienteNome, editando.id) });
       setEditando(null);
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.A_RECEBER, descricao: montarDescricao("editar", "Conta a Receber", dados.clienteNome || dados.descricao, editando.id) });
     } catch (err) {
       fsError(err, "AReceber:editar");
-      alert("Erro ao salvar alterações. Tente novamente.");
+      alert("Erro ao editar conta. Tente novamente.");
     }
-  }, [tenantUid, editando]);
+  }, [tenantUid, editando?.id, nomeUsuario, cargo]);
 
-  /* ── Handler: Registrar pagamento ── */
-  const handlePagamento = useCallback(async (valorRecebido) => {
-    if (!tenantUid || !pagamento) return;
+  /* ── Pagamento ── */
+  const handlePagamento = useCallback(async (valor) => {
+    if (!tenantUid || !pagamento?.id) return;
     try {
-      const conta = pagamento;
-      const novoValorPago     = Number((conta.valorPago + valorRecebido).toFixed(2));
-      const novoValorRestante = Math.max(0, Number((conta.valorTotal - novoValorPago).toFixed(2)));
-      const novoStatus        = calcStatus(novoValorRestante, conta.dataVencimento);
-      const agora             = new Date().toISOString();
+      await runTransaction(db, async (t) => {
+        const ref = doc(db, "users", tenantUid, "a_receber", pagamento.id);
+        const snap = await t.get(ref);
+        if (!snap.exists()) throw new Error("Conta não encontrada");
 
-      /* 1. Atualiza o documento em a_receber (comportamento existente) */
-      const ref = doc(db, "users", tenantUid, "a_receber", conta.id);
-      await updateDoc(ref, {
-        valorPago:       novoValorPago,
-        valorRestante:   novoValorRestante,
-        status:          novoStatus,
-        dataAtualizacao: agora,
-      });
+        const contaAtual = snap.data();
+        const novoValorPago = (contaAtual.valorPago || 0) + valor;
+        const novoValorRestante = Math.max((contaAtual.valorTotal || 0) - novoValorPago, 0);
 
-      /* 1b. Regime de caixa: reduz valorRestante na venda original.
-             Garante que o Dashboard some apenas o que foi recebido. */
-      if (conta.origem === "venda" && conta.referenciaId) {
-        try {
-          const vendaRef = doc(db, "users", tenantUid, "vendas", conta.referenciaId);
-          await updateDoc(vendaRef, { valorRestante: increment(-valorRecebido) });
-        } catch (errVenda) {
-          fsError(errVenda, "AReceber:atualizarVendaRestante");
-        }
-      }
-
-      /* 2. ── REGIME DE CAIXA: registrar entrada no Caixa ──────────────────
-         Toda confirmação de pagamento gera uma entrada no Caixa.
-         · Se a conta veio de uma venda (origem === "venda"), usa o referenciaId
-           da venda para que o DRE consiga somar o valor recebido agora.
-         · Se for conta manual (origem !== "venda"), ainda registra no Caixa
-           mas com origem "a_receber" — o DRE não contabiliza essas entradas
-           como receita de venda, mantendo a consistência atual.
-         Garantia anti-duplicação: cada chamada a handlePagamento representa
-         um evento de pagamento distinto (data e valor diferentes do sinal
-         original), nunca é a mesma operação executada duas vezes. */  
-
-       
-       try {
-        /* ─── REGIME DE CAIXA ─────────────────────────────────────────────
-           Determina origem da entrada de caixa conforme o tipo da conta:
-             · origem "venda"       → entrada no caixa linkada à venda original
-             · origem "mensalidade" → cria venda sintética (categoria "Mensalidade")
-                                      e linka caixa a ela para fluir ao DRE
-             · origem manual        → caixa com origem "a_receber"
-                                      (DRE ignora — mantém comportamento atual)
-        ───────────────────────────────────────────────────────────────────── */
-        const ehVenda       = conta.origem === "venda";
-        const ehMensalidade = conta.origem === "mensalidade";
-
-        let origemCaixa;
-        let referenciaCaixa;
-
-        if (ehVenda) {
-          origemCaixa     = "venda";
-          referenciaCaixa = conta.referenciaId || null;
-        } else if (ehMensalidade) {
-          /* Cria venda sintética para que mensalidade recebida apareça em
-             /vendas (Relatório de Vendas) e seja reconhecida pelo DRE via
-             caixa origem="venda" + referenciaId existente. */
-          const vendaMensalidade = {
-            tipoVenda:       "mensalidade",
-            categoria:       "Mensalidade",
-            cliente:         conta.clienteNome || "—",
-            clienteNome:     conta.clienteNome || "—",
-            clienteId:       conta.clienteId   || null,
-            clienteIdSeq:    conta.clienteIdSeq ?? null,
-            mesReferencia:   conta.mesReferencia || null,
-            total:           valorRecebido,
-            valorRecebido,
-            itens: [{
-              nome:          `Mensalidade ${conta.mesReferencia || ""} — ${conta.clienteNome || ""}`.trim(),
-              produto:       "Mensalidade",
-              qtd:           1,
-              quantidade:    1,
-              preco:         valorRecebido,
-              valorUnitario: valorRecebido,
-              total:         valorRecebido,
-              subtotal:      valorRecebido,
-              tipo:          "mensalidade",
-              custo:         0,
-            }],
-            formaPagamento:   "Mensalidade",
-            data:             agora,
-            criadoEm:         agora,
-            origem:           "mensalidade",
-            referenciaCliente: conta.clienteId || null,
-            /* ── Link de volta ao a_receber que originou esta venda sintética.
-               Usado por Vendas.jsx para reverter o pagamento ao cancelar/excluir. ── */
-            aReceberDocId:    conta.id,
-            descontos:        0,
-            valorTaxa:        0,
-          };
-          /* Gera ID sequencial (V0001…) atômico via transaction —
-             mesmo padrão de Vendas.jsx para manter consistência visual */
-          const novoIdVenda = await runTransaction(db, async (tx) => {
-            const userRef  = doc(db, "users", tenantUid);
-            const userSnap = await tx.get(userRef);
-            const currentCnt = userSnap.data()?.vendaIdCnt || 0;
-            const vendaId    = gerarIdVenda(currentCnt);
-            tx.set(doc(db, "users", tenantUid, "vendas", vendaId), {
-              ...vendaMensalidade,
-              id: vendaId,
-            });
-            tx.set(userRef, { vendaIdCnt: currentCnt + 1 }, { merge: true });
-            return vendaId;
-          });
-          origemCaixa     = "venda";
-          referenciaCaixa = novoIdVenda;
-        } else {
-          /* Manual: cria venda sintética para entrar no faturamento */
-          const vendaManual = {
-            tipoVenda:      "a_receber",
-            categoria:      conta.categoria || "A Receber",
-            cliente:        conta.clienteNome || "—",
-            clienteNome:    conta.clienteNome || "—",
-            clienteId:      conta.clienteId   || null,
-            total:          valorRecebido,
-            valorRecebido,
-            itens: [{
-              nome:          conta.descricao || "Recebimento avulso",
-              produto:       conta.descricao || "Recebimento avulso",
-              qtd:           1,
-              quantidade:    1,
-              preco:         valorRecebido,
-              valorUnitario: valorRecebido,
-              total:         valorRecebido,
-              subtotal:      valorRecebido,
-              tipo:          "servico",
-              custo:         0,
-            }],
-            formaPagamento:  conta.formaPagamento || "A Receber",
-            data:            agora,
-            criadoEm:        agora,
-            origem:          "a_receber",
-            aReceberDocId:   conta.id,
-            descontos:       0,
-            valorTaxa:       0,
-          };
-          const novoIdVendaManual = await runTransaction(db, async (tx) => {
-            const userRef  = doc(db, "users", tenantUid);
-            const userSnap = await tx.get(userRef);
-            const currentCnt = userSnap.data()?.vendaIdCnt || 0;
-            const vendaId    = gerarIdVenda(currentCnt);
-            tx.set(doc(db, "users", tenantUid, "vendas", vendaId), {
-              ...vendaManual,
-              id: vendaId,
-            });
-            tx.set(userRef, { vendaIdCnt: currentCnt + 1 }, { merge: true });
-            return vendaId;
-          });
-          origemCaixa     = "venda";
-          referenciaCaixa = novoIdVendaManual;
-        }
-
-        await addDoc(collection(db, "users", tenantUid, "caixa"), {
-          tipo:         "entrada",
-          origem:       origemCaixa,
-          referenciaId: referenciaCaixa,
-          valor:        valorRecebido,
-          descricao:    ehMensalidade
-            ? `Mensalidade recebida — ${conta.clienteNome || ""}${conta.mesReferencia ? ` · ${conta.mesReferencia}` : ""}`
-            : `Recebimento — ${conta.clienteNome || ""}${conta.descricao ? ` · ${conta.descricao}` : ""}`,
-          categoria:    ehMensalidade ? "Mensalidade" : (ehVenda ? "Venda" : "A Receber"),
-          data:         agora,
-          criadoEm:     agora,
+        t.update(ref, {
+          valorPago: novoValorPago,
+          valorRestante: novoValorRestante,
+          dataPagamento: serverTimestamp()
         });
-      } catch (errCaixa) {
-        /* O a_receber já foi atualizado. O Caixa falhou isoladamente.
-           Não reverte o pagamento — exibe aviso discreto no console. */
-        fsError(errCaixa, "AReceber:lancarCaixa");
-      }
 
+        // Sincroniza com venda se origem for "venda"
+        if (contaAtual.origem === "venda" && contaAtual.referenciaId) {
+          const vendaRef = doc(db, "users", tenantUid, "vendas", contaAtual.referenciaId);
+          t.update(vendaRef, { valorRestante: novoValorRestante });
+        }
+      });
       setPagamento(null);
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.A_RECEBER, descricao: montarDescricao("pagar", "Conta a Receber", pagamento.clienteNome || pagamento.descricao, pagamento.id) });
     } catch (err) {
-      fsError(err, "AReceber:pagamento");
+      fsError(err, "AReceber:registrarPagamento");
       alert("Erro ao registrar pagamento. Tente novamente.");
     }
-  }, [tenantUid, pagamento]);
+  }, [tenantUid, pagamento, nomeUsuario, cargo]);
 
-  /* ── Handler: Excluir conta ── */
+  /* ── Deletar ── */
   const handleDeletar = useCallback(async () => {
-    if (!tenantUid || !deletando) return;
+    if (!tenantUid || !deletando?.id) return;
     try {
-      /* 1. Deleta vendas sintéticas geradas por recebimentos desta conta */
-      const vendasSnap = await getDocs(
-        query(
-          collection(db, "users", tenantUid, "vendas"),
-          where("aReceberDocId", "==", deletando.id)
-        )
-      );
-      await Promise.all(vendasSnap.docs.map((d) => deleteDoc(d.ref)));
+      await runTransaction(db, async (t) => {
+        // 1. Usa a transação para garantir segurança
+        t.delete(doc(db, "users", tenantUid, "a_receber", deletando.id));
 
-      /* 2. Se era ligada a uma venda real, restaura o valorRestante */
-      if (deletando.origem === "venda" && deletando.referenciaId) {
-        try {
-          const vendaRef = doc(db, "users", tenantUid, "vendas", deletando.referenciaId);
-          // Restaura o valorRestante original da conta (independente de ter sido pago ou não)
-          const valorARestaurar = deletando.valorPago > 0 ? deletando.valorPago : (deletando.valorRestante ?? deletando.valorTotal ?? 0);
-          if (valorARestaurar > 0) {
-            await updateDoc(vendaRef, { valorRestante: increment(valorARestaurar) });
+        // 2. Se de venda, restaura o valorRestante
+        if (deletando.origem === "venda" && deletando.referenciaId) {
+          try {
+            const vendaRef = doc(db, "users", tenantUid, "vendas", deletando.referenciaId);
+            const valorARestaurar = deletando.valorPago > 0 ? deletando.valorPago : (deletando.valorRestante ?? deletando.valorTotal ?? 0);
+            if (valorARestaurar > 0) {
+              t.update(vendaRef, { valorRestante: increment(valorARestaurar) });
+            }
+          } catch (errVenda) {
+            fsError(errVenda, "AReceber:restaurarVendaRestante");
           }
-        } catch (errVenda) {
-          fsError(errVenda, "AReceber:restaurarVendaRestante");
         }
-      }
-
-      /* 3. Deleta o a_receber */
-      await deleteDoc(doc(db, "users", tenantUid, "a_receber", deletando.id));
-      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.A_RECEBER, descricao: montarDescricao("excluir", "Conta a Receber", deletando.clienteNome || deletando.descricao, deletando.id) });
+      });
       setDeletando(null);
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.A_RECEBER, descricao: montarDescricao("excluir", "Conta a Receber", deletando.clienteNome || deletando.descricao, deletando.id) });
     } catch (err) {
       fsError(err, "AReceber:excluir");
       alert("Erro ao excluir conta. Tente novamente.");
@@ -1197,9 +1141,6 @@ export default function AReceber() {
 
     return { totalPendente, totalVencido, totalRecebido };
   }, [contas]);
-
-  /* ── Guard ── */
-  // App.jsx bloqueia render enquanto loadingAuth||!tenantUid
 
   return (
     <>
@@ -1297,9 +1238,13 @@ export default function AReceber() {
               const vencida    = statusCalc === "vencido";
 
               return (
-                <div key={c.id} className="ar-row">
+                <div 
+                  key={c.id} 
+                  className="ar-row"
+                  onClick={() => setDetalhes(c)}
+                >
                   <span className="ar-cliente">{c.clienteNome || "—"}</span>
-                  <span className="ar-desc"    title={c.descricao}>{c.descricao || "—"}</span>
+                  <span className="ar-desc" title={c.descricao}>{c.descricao || "—"}</span>
                   <span className={`ar-valor ${statusCalc}`}>
                     {fmtR$(c.valorRestante)}
                   </span>
@@ -1307,7 +1252,7 @@ export default function AReceber() {
                     {fmtData(c.dataVencimento)}
                   </span>
                   <StatusBadge status={statusCalc} />
-                  <div className="ar-actions">
+                  <div className="ar-actions" onClick={e => e.stopPropagation()}>
                     {/* Registrar pagamento — só se ainda há saldo */}
                     {statusCalc !== "pago" && (
                       <button
@@ -1366,6 +1311,12 @@ export default function AReceber() {
           conta={deletando}
           onConfirm={handleDeletar}
           onClose={() => setDeletando(null)}
+        />
+      )}
+      {detalhes && (
+        <ModalDetalhes
+          conta={detalhes}
+          onClose={() => setDetalhes(null)}
         />
       )}
     </>
