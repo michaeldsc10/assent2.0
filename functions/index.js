@@ -458,7 +458,7 @@ exports.pagamentoCartao = onRequest(
         criadoEm: FieldValue.serverTimestamp(),
         ...(confirmado ? { confirmadoEm: FieldValue.serverTimestamp() } : {}),
       },
-      ...(confirmado ? { confirmado: true, confirmadoEm: FieldValue.serverTimestamp() } : {}),
+      ...(confirmado ? { confirmado: true, status: "confirmado", confirmadoEm: FieldValue.serverTimestamp() } : {}),
     };
 
     const batch = db.batch();
@@ -548,6 +548,7 @@ exports.mpWebhook = onRequest(
     await db.doc(`users/${tenantUid}/agendamento_reservas/${reservaId}`).set({
       confirmado:   true,
       confirmadoEm: FieldValue.serverTimestamp(),
+      status:       "confirmado",
       pagamento: {
         status:       "confirmado",
         confirmadoEm: FieldValue.serverTimestamp(),
