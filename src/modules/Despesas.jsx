@@ -2039,7 +2039,14 @@ export default function Despesas({ isPro = false }) {
             <span className="cat-badge">{d.categoria || "—"}</span>
 
             {/* Valor */}
-            <span className="desp-valor">{fmtR$(d.valor)}</span>
+            <div>
+              <span className="desp-valor">{fmtR$(d.valor)}</span>
+              {d.status === "parcial" && d.valorPago > 0 && (
+                <div style={{ fontSize: 11, color: "var(--blue)", marginTop: 2 }}>
+                  resta {fmtR$(d.valor - d.valorPago)}
+                </div>
+              )}
+            </div>
 
             {/* Vencimento */}
             <span>{fmtData(d.vencimento)}</span>
