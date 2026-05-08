@@ -383,8 +383,8 @@ function formatDateShort(ts) {
   const d = ts.toDate ? ts.toDate() : new Date(ts);
   return d.toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
 }
-function statusColor(s){ return s==="confirmado"?"green":s==="pendente"?"yellow":s==="cancelado"?"red":"gray"; }
-function statusLabel(s){ return s==="confirmado"?"Confirmado":s==="pendente"?"Pendente":s==="cancelado"?"Cancelado":s; }
+function statusColor(s){ return s==="confirmado"?"green":s==="pendente"?"yellow":s==="cancelado"?"red":s==="pendente_pagamento"?"blue":"gray"; }
+function statusLabel(s){ return s==="confirmado"?"Confirmado":s==="pendente"?"Pendente":s==="cancelado"?"Cancelado":s==="pendente_pagamento"?"Aguard. Pagamento":s; }
 function initials(nome){ return (nome||"?").split(" ").slice(0,2).map(w=>w[0]).join("").toUpperCase(); }
 function formatDuracao(min){ if(min<60) return `${min} min`; const h=Math.floor(min/60),m=min%60; return m===0?`${h}h`:`${h}h${m}min`; }
 function cargoLabel(c){ const map={financeiro:"Financeiro",comercial:"Comercial",compras:"Compras",operacional:"Operacional",vendedor:"Vendedor",suporte:"Suporte",admin:"Administrador"}; return map[c]||c; }
@@ -477,9 +477,10 @@ function CheckItem({ok,label}){
 // ─── STATUS_ACCENT Global ──────────────────────────────────────────────────────
 function getStatusAccent(T) {
   return {
-    confirmado: { color:T.emerald, glow:T.emeraldA10, label:"Confirmado" },
-    pendente:   { color:T.goldHi, glow:T.goldA12,  label:"Pendente"   },
-    cancelado:  { color:"rgba(239,68,68,0.75)", glow:"rgba(239,68,68,0.10)", label:"Cancelado" },
+    confirmado:         { color:T.emerald,  glow:T.emeraldA10, label:"Confirmado" },
+    pendente:           { color:T.goldHi,   glow:T.goldA12,    label:"Pendente"   },
+    cancelado:          { color:"rgba(239,68,68,0.75)", glow:"rgba(239,68,68,0.10)", label:"Cancelado" },
+    pendente_pagamento: { color:T.blue,     glow:T.blueA10,    label:"Aguard. Pagamento" },
   };
 }
 
