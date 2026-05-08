@@ -544,7 +544,10 @@ const gerarIdShow = (cnt, parcelaAtual = null, totalParcelas = null) => {
   if (parcelaAtual && totalParcelas && totalParcelas > 1) return `${base}-${parcelaAtual}`;
   return base;
 };
-
+const limparUndefined = (obj) =>
+  Object.fromEntries(
+    Object.entries(obj).filter(([_, v]) => v !== undefined)
+  );
 const proximaData = (dataBase, tipo, intervalo = 1) => {
   const d = parseDate(dataBase);
   if (!d) return null;
@@ -699,23 +702,30 @@ function ModalNovaDespesa({ despesa, despesas, categorias, onCriarCategoria, onD
   const handleSalvar = async () => {
     if (!validar()) return;
     setSalvando(true);
-    await onSave({
-      descricao:       form.descricao.trim(),
-      valor:           Number(form.valor),
-      tipoValor:       form.parcelado && !isEdit ? form.tipoValor : undefined,
-      vencimento:      form.vencimento,
-      categoria:       form.categoria,
-      centroCusto:     form.centroCusto.trim(),
-      fornecedor:      form.fornecedor.trim(),
-      formaPagamento:  form.formaPagamento,
-      recorrente:      form.recorrente,
-      tipoRecorrencia: form.recorrente ? form.tipoRecorrencia : null,
-      intervalo:       form.recorrente ? Number(form.intervalo) : null,
-      dataFim:         form.recorrente && form.dataFim ? form.dataFim : null,
-      parcelado:       form.parcelado && !isEdit,
-      totalParcelas:   form.parcelado && !isEdit ? Number(form.totalParcelas) : null,
-      observacao:      form.observacao.trim(),
-    });
+    const dados = {
+  descricao:       form.descricao.trim(),
+  valor:           Number(form.valor),
+  vencimento:      form.vencimento,
+  categoria:       form.categoria,
+  centroCusto:     form.centroCusto.trim(),
+  fornecedor:      form.fornecedor.trim(),
+  formaPagamento:  form.formaPagamento,
+  recorrente:      form.recorrente,
+  tipoRecorrencia: form.recorrente ? form.tipoRecorrencia : null,
+  intervalo:       form.recorrente ? Number(form.intervalo) : null,
+  dataFim:         form.recorrente && form.dataFim ? form.dataFim : null,
+  parcelado:       form.parcelado && !isEdit,
+  totalParcelas:   form.parcelado && !isEdit ? Number(form.totalParcelas) : null,
+  observacao:      form.observacao.trim(),
+};
+
+// só adiciona se realmente existir
+if (form.parcelado && !isEdit) {
+  dados.tipoValor = form.tipoValor;
+}
+
+await onSave(dados);
+     
     setSalvando(false);
   };
 
@@ -1531,9 +1541,15 @@ export default function Despesas({ isPro = false }) {
       const idShow = gerarIdShow(cnt);
       const status = calcularStatus(form.vencimento, "pendente");
 
-      await setDoc(doc(db, "users", tenantUid, "despesas", newDocId), {
-        ...form, status, idShow, dataCriacao: new Date().toISOString(),
-      });
+    await setDoc(
+  doc(db, "users", tenantUid, "despesas", newDocId),
+  limparUndefined({
+    ...form,
+    status,
+    idShow,
+    dataCriacao: new Date().toISOString(),
+  })
+);
       await setDoc(doc(db, "users", tenantUid), { despesaIdCnt: cnt + 1 }, { merge: true });
     }
 
