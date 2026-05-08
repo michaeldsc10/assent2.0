@@ -1156,6 +1156,70 @@ exports.limparInsightsVelhos = onSchedule(
 );
 
 
+
+/* ═══════════════════════════════════════════════════════════════
+   FUNÇÃO: limparReservasSemPagamento
+   Roda a cada 5 min — cancela reservas pendente_pagamento com
+   mais de 10 min sem confirmação e libera o slot travado.
+═══════════════════════════════════════════════════════════════ */
+exports.limparReservasSemPagamento = onSchedule(
+  {
+    schedule:  "*/5 * * * *",   // a cada 5 minutos
+    timeZone:  "America/Sao_Paulo",
+    memory:    "256MiB",
+  },
+  async () => {
+    const db     = getFirestore();
+    const agora  = new Date();
+    const limite = new Date(agora.getTime() - 10 * 60 * 1000); // 10 min atrás
+
+    // collectionGroup varre todos os tenants
+    const snap = await db
+      .collectionGroup("agendamento_reservas")
+      .where("status", "==", "pendente_pagamento")
+      .where("criadoEm", "<", limite)
+      .get();
+
+    if (snap.empty) return;
+
+    await Promise.allSettled(
+      snap.docs.map(async (reservaDoc) => {
+        try {
+          const reserva   = reservaDoc.data();
+          const reservaRef = reservaDoc.ref;
+
+          // Extrai tenantUid do path: users/{tenantUid}/agendamento_reservas/{id}
+          const tenantUid = reservaRef.parent.parent.id;
+
+          const batch = db.batch();
+
+          // 1. Cancela a reserva
+          batch.update(reservaRef, {
+            status:       "cancelado",
+            canceladoEm:  FieldValue.serverTimestamp(),
+            canceladoMotivo: "pagamento_nao_realizado",
+          });
+
+          // 2. Libera o slot travado
+          if (reserva.slotKey) {
+            const slotRef = db
+              .collection("users").doc(tenantUid)
+              .collection("agendamento_slots").doc(reserva.slotKey);
+            batch.delete(slotRef);
+          }
+
+          await batch.commit();
+          console.log(`[limparReservas] cancelada: ${reservaDoc.id} — tenant: ${tenantUid}`);
+        } catch (err) {
+          console.error(`[limparReservas] erro em ${reservaDoc.id}:`, err);
+        }
+      })
+    );
+
+    console.log(`[limparReservas] processadas: ${snap.size}`);
+  }
+);
+
 /* ═══════════════════════════════════════════════════════════════
    LICENÇAS & PLANOS — Controle de limites e trial
 ═══════════════════════════════════════════════════════════════ */
