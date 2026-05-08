@@ -1802,6 +1802,7 @@ function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], aR
     });
 
   
+      aReceberManuais.forEach((r) => {
       const rawDate = r.dataPagamento || r.dataCriacao;
       transacoes.push({
         _id: `ar-${r.id}`,
