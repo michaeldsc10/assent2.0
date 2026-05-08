@@ -274,7 +274,7 @@ const CSS = `
   .ar-row-head:hover { background: var(--s2); }
 
   .ar-cliente {
-    font-weight: 500; color: var(--text); overflow: hidden;
+    font-weight: 300; color: var(--text); overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap;
   }
   .ar-desc {
