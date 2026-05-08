@@ -214,16 +214,6 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
     const ticketMedio = numVendas > 0 ? receitaBruta / numVendas : 0;
 
     /* Custo de mercadorias/serviços (campo `custo` por item) */
-    const custoMercadorias = vendasPeriodo.reduce(
-      (s, v) =>
-        s +
-        (v.itens || []).reduce(
-          (si, i) => si + (Number(i.custo) || 0) * (Number(i.qtd) || 1),
-          0
-        ),
-      0
-    );
-
     const totalDespesasPeriodo = despesas
       .filter((d) => {
         if (d.status !== "pago") return false;
@@ -234,7 +224,7 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
       })
       .reduce((s, d) => s + (Number(d.valor) || 0), 0);
 
-    const custoTotal = custoMercadorias + totalDespesasPeriodo;
+    const custoTotal = totalDespesasPeriodo;
     const lucroLiquido = receitaBruta - custoTotal;
     const margem =
       receitaBruta > 0 ? (lucroLiquido / receitaBruta) * 100 : 0;
