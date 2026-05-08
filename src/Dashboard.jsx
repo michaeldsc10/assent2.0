@@ -1439,6 +1439,7 @@ export default function Dashboard() {
   );
   const [notifDespesas, setNotifDespesas] = useState([]);
   const [notifInsights, setNotifInsights] = useState([]);
+  const [notifAReceber, setNotifAReceber] = useState([]);
   const [anuncioModal,  setAnuncioModal]  = useState(null);  // { id, titulo, mensagem, imageUrl, btnTexto, btnUrl }
   const notifRef = useRef(null);
   const [theme, setTheme] = useState(
@@ -1702,6 +1703,69 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     return unsub;
   }, [uid]);
 
+  /* ── Notificações automáticas de A Receber — vence hoje e amanhã ── */
+  useEffect(() => {
+    if (!uid) return;
+    const q = query(
+      collection(db, "users", uid, "a_receber"),
+      orderBy("dataVencimento", "asc")
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+
+      const alertas = [];
+      snap.docs.forEach((docSnap) => {
+        const d = { id: docSnap.id, ...docSnap.data() };
+
+        if (d.status === "pago" || d.status === "cancelado") return;
+        if ((d.valorRestante ?? 0) <= 0) return;
+        if (!d.dataVencimento) return;
+
+        let venc;
+        if (d.dataVencimento?.toDate) {
+          venc = d.dataVencimento.toDate();
+        } else if (typeof d.dataVencimento === "string") {
+          const [y, m, dia] = d.dataVencimento.split("-").map(Number);
+          venc = new Date(y, m - 1, dia);
+        } else {
+          return;
+        }
+        venc.setHours(0, 0, 0, 0);
+
+        const diffMs   = venc - hoje;
+        const diffDias = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+        // Apenas vence hoje (0) ou amanhã (1)
+        if (diffDias !== 0 && diffDias !== 1) return;
+
+        const fmtValorAR = (v) =>
+          v != null
+            ? v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
+            : "—";
+
+        const cliente = d.clienteNome || d.descricao || "Cliente";
+        const valor   = fmtValorAR(d.valorRestante);
+        const urgencia = diffDias === 0 ? "hoje" : "amanha";
+
+        alertas.push({
+          id:          `ar-${d.id}-${urgencia}`,
+          titulo:      diffDias === 0 ? "💰 A Receber — vence hoje" : "🔔 A Receber — vence amanhã",
+          mensagem:    `${cliente} · ${valor}`,
+          diffDias,
+          urgencia,
+          tipo:        "a_receber",
+          clienteNome: cliente,
+          valor,
+        });
+      });
+
+      alertas.sort((a, b) => a.diffDias - b.diffDias);
+      setNotifAReceber(alertas);
+    }, fsSnapshotError("Dashboard:aReceberNotif"));
+    return unsub;
+  }, [uid]);
+
   /* ── Insights automáticos de negócio — gerados pela Cloud Function diária ── */
   useEffect(() => {
     if (!uid) return;
@@ -1755,8 +1819,14 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       _ts: n.criadoEm?.toDate ? n.criadoEm.toDate().getTime() : Date.now(),
     }));
 
+  /* Normaliza alertas de A Receber: urgência primeiro (hoje > amanhã) */
+  const notifAReceberNorm = notifAReceber.map((n) => ({
+    ...n,
+    _ts: Date.now() - n.diffDias * 86400000,
+  }));
+
   /* Merge cronológico: mais recente/urgente primeiro */
-  const todasNotif = [...notifDespesasNorm, ...notifSistemaNorm, ...notifInsightsNorm, ...notifReservasNorm]
+  const todasNotif = [...notifDespesasNorm, ...notifAReceberNorm, ...notifSistemaNorm, ...notifInsightsNorm, ...notifReservasNorm]
     .sort((a, b) => b._ts - a._ts);
 
   const notifNaoLidas = todasNotif.filter((n) => !notifLidas.includes(n.id)).length;
@@ -3202,6 +3272,45 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                             </div>
                             <div style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
                               Despesa {n.titulo.split("—")[1]?.trim() || ""} · Ir para Despesas →
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      /* ── Alerta de A Receber próximo do vencimento ── */
+                      if (n.tipo === "a_receber") {
+                        const corUrgencia =
+                          n.diffDias === 0 ? "var(--green)"  :
+                                            "var(--amber)";
+                        const bgUrgencia =
+                          n.diffDias === 0 ? "rgba(62,207,142,0.07)"  :
+                                            "rgba(245,158,11,0.07)";
+                        const labelUrgencia =
+                          n.diffDias === 0 ? "Vence hoje" : "Amanhã";
+
+                        return (
+                          <div
+                            key={n.id}
+                            className="ag-notif-item"
+                            style={{
+                              cursor: "pointer",
+                              background: bgUrgencia,
+                              borderLeft: `2px solid ${corUrgencia}`,
+                              paddingLeft: 14,
+                            }}
+                            onClick={() => { setModule("A Receber"); setNotifOpen(false); }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 2 }}>
+                              <div className="ag-notif-item-title" style={{ fontSize: 12 }}>{n.clienteNome}</div>
+                              <span style={{
+                                fontSize: 9, fontWeight: 700, letterSpacing: "0.06em",
+                                textTransform: "uppercase", color: corUrgencia,
+                                background: bgUrgencia, border: `1px solid ${corUrgencia}40`,
+                                borderRadius: 20, padding: "2px 7px", flexShrink: 0,
+                              }}>{labelUrgencia}</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
+                              A Receber · {n.valor} · Ir para A Receber →
                             </div>
                           </div>
                         );
