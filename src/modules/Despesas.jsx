@@ -383,6 +383,11 @@ const CSS = `
   .status-pendente{ background: rgba(200,165,94,.1);   color: var(--gold);  border: 1px solid rgba(200,165,94,.2); }
   .status-vencido { background: rgba(224,82,82,.1);    color: var(--red);   border: 1px solid rgba(224,82,82,.2); }
   .status-cancelado{ background: var(--s3);            color: var(--text-3);border: 1px solid var(--border); }
+  .status-parcial { background: rgba(91,142,240,.1);   color: var(--blue);  border: 1px solid rgba(91,142,240,.2); }
+
+  /* Barra de progresso pagamento parcial */
+  .parcial-bar-wrap { height: 3px; background: var(--s3); border-radius: 2px; margin-top: 4px; width: 100%; }
+  .parcial-bar      { height: 3px; background: var(--blue); border-radius: 2px; transition: width .3s; }
 
   /* Categoria badge */
   .cat-badge {
@@ -531,7 +536,7 @@ const parseDate = (d) => {
 };
 
 const calcularStatus = (vencimento, statusAtual) => {
-  if (statusAtual === "pago" || statusAtual === "cancelado") return statusAtual;
+  if (statusAtual === "pago" || statusAtual === "cancelado" || statusAtual === "parcial") return statusAtual;
   const venc = parseDate(vencimento);
   if (!venc) return "pendente";
   return venc < hoje() ? "vencido" : "pendente";
@@ -989,18 +994,21 @@ await onSave(dados);
 function ModalPagar({ despesa, onConfirm, onClose }) {
   const [formaPag, setFormaPag] = useState(despesa.formaPagamento || "pix");
   const [pagando, setPagando] = useState(false);
+  const valorRestante = despesa.valor - (despesa.valorPago || 0);
 
-  // toISOString() retorna UTC — em Brasília pode virar o dia anterior.
-  // Usar getFullYear/Month/Date garante a data LOCAL do usuário.
   const [dataPag, setDataPag] = useState(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
 
+  const [valorParcial, setValorParcial] = useState(String(valorRestante.toFixed(2)));
+  const valorNum = Math.max(0, parseFloat(valorParcial) || 0);
+  const isParcial = valorNum < valorRestante - 0.001;
+
   const handlePagar = async () => {
-    if (!dataPag) return;
+    if (!dataPag || valorNum <= 0) return;
     setPagando(true);
-    await onConfirm(formaPag, dataPag);
+    await onConfirm(formaPag, dataPag, valorNum);
     setPagando(false);
   };
 
@@ -1018,8 +1026,18 @@ function ModalPagar({ despesa, onConfirm, onClose }) {
         <div className="modal-body">
           <div className="pay-info">
             <div className="pay-info-row">
-              <span>Valor</span>
-              <span className="pay-info-val" style={{ color: "var(--green)" }}>{fmtR$(despesa.valor)}</span>
+              <span>Valor total</span>
+              <span className="pay-info-val">{fmtR$(despesa.valor)}</span>
+            </div>
+            {despesa.valorPago > 0 && (
+              <div className="pay-info-row">
+                <span>Já pago</span>
+                <span className="pay-info-val" style={{ color: "var(--blue)" }}>{fmtR$(despesa.valorPago)}</span>
+              </div>
+            )}
+            <div className="pay-info-row">
+              <span>Restante</span>
+              <span className="pay-info-val" style={{ color: "var(--green)" }}>{fmtR$(valorRestante)}</span>
             </div>
             <div className="pay-info-row">
               <span>Vencimento</span>
@@ -1029,6 +1047,21 @@ function ModalPagar({ despesa, onConfirm, onClose }) {
               <div className="pay-info-row">
                 <span>Categoria</span>
                 <span className="pay-info-val">{despesa.categoria}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="form-group" style={{ marginBottom: 16 }}>
+            <label className="form-label">Valor a pagar agora <span className="form-label-req">*</span></label>
+            <input
+              className="form-input"
+              type="number" min="0.01" step="0.01" max={valorRestante}
+              value={valorParcial}
+              onChange={e => setValorParcial(e.target.value)}
+            />
+            {isParcial && valorNum > 0 && (
+              <div style={{ fontSize: 11, color: "var(--blue)", marginTop: 5 }}>
+                Pagamento parcial — restará {fmtR$(valorRestante - valorNum)} em aberto
               </div>
             )}
           </div>
@@ -1063,8 +1096,8 @@ function ModalPagar({ despesa, onConfirm, onClose }) {
 
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-success" onClick={handlePagar} disabled={pagando || !dataPag}>
-            {pagando ? "Registrando..." : "Confirmar Pagamento"}
+          <button className="btn-success" onClick={handlePagar} disabled={pagando || !dataPag || valorNum <= 0}>
+            {pagando ? "Registrando..." : isParcial ? "Registrar Pagamento Parcial" : "Confirmar Pagamento"}
           </button>
         </div>
       </div>
@@ -1252,18 +1285,20 @@ function ModalDetalhes({ despesa, onEditar, onPagar, onDesfazer, onDeletar, pode
 /* ════════════════════════════════════════
    STATUS BADGE
    ════════════════════════════════════════ */
-function StatusBadge({ status }) {
+function StatusBadge({ status, valorPago, valor }) {
   const map = {
     pago:      { cls: "status-pago",     Icon: CheckCircle, label: "Pago" },
     pendente:  { cls: "status-pendente", Icon: Clock,       label: "Pendente" },
     vencido:   { cls: "status-vencido",  Icon: AlertCircle, label: "Vencido" },
     cancelado: { cls: "status-cancelado",Icon: X,           label: "Cancelado" },
+    parcial:   { cls: "status-parcial",  Icon: TrendingUp,  label: "Parcial" },
   };
   const s = map[status] || map.pendente;
+  const pct = status === "parcial" && valor > 0 ? Math.min(100, Math.round((valorPago / valor) * 100)) : null;
   return (
-    <span className={`status-badge ${s.cls}`}>
+    <span className={`status-badge ${s.cls}`} title={pct != null ? `${fmtR$(valorPago)} de ${fmtR$(valor)} pago` : undefined}>
       <s.Icon size={10} />
-      {s.label}
+      {s.label}{pct != null ? ` ${pct}%` : ""}
     </span>
   );
 }
@@ -1567,27 +1602,36 @@ export default function Despesas({ isPro = false }) {
   };
 
   /* ── Pagar ── */
-  const handlePagar = async (formaPagamento, dataPagamento) => {
+  const handlePagar = async (formaPagamento, dataPagamento, valorPago) => {
     if (!tenantUid || !pagando) return;
     const ref = doc(db, "users", tenantUid, "despesas", pagando.id);
 
-    // dataPagamento: string "YYYY-MM-DD" para exibição
-    // dataPagamentoTs: Date JS com horário local ao meio-dia → Firestore salva como Timestamp
-    //   ↳ evita o bug de timezone: new Date("2026-04-22") = UTC midnight = ontem às 21h em Brasília
-    //   ↳ dentroDoIntervalo (FiltroPeriodo) funciona corretamente com Timestamp, não com string
     const dataEfetiva = dataPagamento || (() => {
       const d = new Date();
       return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     })();
-    const dtTs = new Date(dataEfetiva + "T12:00:00"); // meio-dia local → sem ambiguidade de fuso
+    const dtTs = new Date(dataEfetiva + "T12:00:00");
+
+    const valorJaPago   = pagando.valorPago || 0;
+    const novoValorPago = parseFloat((valorJaPago + valorPago).toFixed(2));
+    const isPago        = novoValorPago >= pagando.valor - 0.001;
+    const novoStatus    = isPago ? "pago" : "parcial";
 
     await setDoc(ref, {
-      status:          "pago",
+      status:          novoStatus,
       formaPagamento,
-      dataPagamento:   dataEfetiva,          // string para display
-      dataPagamentoTs: dtTs,                 // Timestamp para filtros do DRE
-      mesPagamento:    dtTs.getMonth() + 1,  // 1–12
-      anoPagamento:    dtTs.getFullYear(),
+      valorPago:       novoValorPago,
+      dataPagamento:   isPago ? dataEfetiva : (pagando.dataPagamento || dataEfetiva),
+      dataPagamentoTs: isPago ? dtTs : (pagando.dataPagamentoTs || dtTs),
+      mesPagamento:    isPago ? (dtTs.getMonth() + 1) : (pagando.mesPagamento || null),
+      anoPagamento:    isPago ? dtTs.getFullYear()    : (pagando.anoPagamento || null),
+      // histórico de pagamentos parciais
+      pagamentos: [...(pagando.pagamentos || []), {
+        valor:          valorPago,
+        data:           dataEfetiva,
+        formaPagamento,
+        ts:             dtTs.toISOString(),
+      }],
     }, { merge: true });
 
     // Recorrência: gerar próximo lançamento
@@ -1631,6 +1675,7 @@ export default function Despesas({ isPro = false }) {
     const status = calcularStatus(despesa.vencimento, "pendente");
     await setDoc(doc(db, "users", tenantUid, "despesas", despesa.id), {
       status, dataPagamento: null, dataPagamentoTs: null, mesPagamento: null, anoPagamento: null,
+      valorPago: 0, pagamentos: [],
     }, { merge: true });
   };
 
@@ -1770,10 +1815,12 @@ export default function Despesas({ isPro = false }) {
       const diff = (dt - hoje()) / (1000 * 60 * 60 * 24);
       return diff >= 0 && diff <= 3;
     }).length;
-    const totalPendente = base.filter(d => d.status === "pendente" || d.status === "vencido")
-      .reduce((s, d) => s + (d.valor || 0), 0);
-    const totalPago = base.filter(d => d.status === "pago")
-      .reduce((s, d) => s + (d.valor || 0), 0);
+    const totalPendente = base
+      .filter(d => d.status === "pendente" || d.status === "vencido" || d.status === "parcial")
+      .reduce((s, d) => s + Math.max(0, (d.valor || 0) - (d.valorPago || 0)), 0);
+    const totalPago = base
+      .filter(d => d.status === "pago" || d.status === "parcial")
+      .reduce((s, d) => s + (d.status === "parcial" ? (d.valorPago || 0) : (d.valor || 0)), 0);
     return { vencidas, em3dias, totalPendente, totalPago };
   }, [despesas, despesasFiltradas, filtroPeriodo]);
 
@@ -1889,6 +1936,7 @@ export default function Despesas({ isPro = false }) {
           { value: "pendente", label: "Pendentes" },
           { value: "em3dias",  label: "Em 3 dias" },
           { value: "vencido",  label: "Vencidas" },
+          { value: "parcial",  label: "Parciais" },
           { value: "pago",     label: "Pagas" },
         ].map(f => (
           <button
@@ -1997,7 +2045,7 @@ export default function Despesas({ isPro = false }) {
             <span>{fmtData(d.vencimento)}</span>
 
             {/* Status */}
-            <StatusBadge status={d.status} />
+            <StatusBadge status={d.status} valorPago={d.valorPago} valor={d.valor} />
 
             {/* Fornecedor */}
             <span style={{ color: "var(--text-2)", fontSize: 12 }}>{d.fornecedor || "—"}</span>
@@ -2012,13 +2060,13 @@ export default function Despesas({ isPro = false }) {
               {d.status !== "pago" && d.status !== "cancelado" && (
                 <button
                   className="btn-icon btn-icon-pay"
-                  title="Registrar pagamento"
+                  title={d.status === "parcial" ? "Continuar pagamento" : "Registrar pagamento"}
                   onClick={() => setPagando(d)}
                 >
                   <CheckCircle size={13} />
                 </button>
               )}
-              {d.status === "pago" && (
+              {(d.status === "pago" || d.status === "parcial") && (
                 <button
                   className="btn-icon btn-icon-undo"
                   title="Desfazer pagamento"
