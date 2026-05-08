@@ -1831,7 +1831,7 @@ function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], aR
       transacoes,
       qtde: filtrado.length + despesasPagas.length,
     };
-  }, [caixa, despesas, vendas, vendedores, intervalo]);
+  }, [caixa, despesas, vendas, vendedores, aReceber, intervalo]);
 
   const handleCardClick = (tipo) =>
     setFiltroTipo((prev) => (prev === tipo ? null : tipo));
