@@ -75,6 +75,9 @@ const PIX_ORIGINS = new Set([
   "https://assent2-0.vercel.app",
   "http://localhost:5173",
   "http://localhost:3000",
+  "https://flow.assentagencia.com.br",
+  "http://localhost:5500",
+  "http://127.0.0.1:5500",
 ]);
 
 /* Helper: aplica CORS e retorna false se for preflight já respondido */
@@ -235,6 +238,324 @@ exports.consultarPagamento = onRequest(
     } catch { /* doc pode não existir ainda */ }
 
     res.status(200).json({ status: novoStatus, statusDetail: mpData.status_detail || null });
+  }
+);
+
+
+/* ─────────────────────────────────────────────
+   FLOW ORIGINS — página pública de agendamento
+───────────────────────────────────────────── */
+const FLOW_ORIGINS = [
+  "https://flow.assentagencia.com.br",
+  "http://localhost:5500",
+  "http://127.0.0.1:5500",
+  "http://localhost:3000",
+];
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO: getFlowPublicConfig  (sem auth — expõe só campos públicos)
+───────────────────────────────────────────── */
+exports.getFlowPublicConfig = onRequest(
+  { region: "us-central1", cors: FLOW_ORIGINS },
+  async (req, res) => {
+    if (req.method !== "POST") { res.status(405).send("Method Not Allowed"); return; }
+    const { tenantUid } = req.body || {};
+    if (!tenantUid) { res.status(400).json({ error: "tenantUid obrigatório." }); return; }
+
+    try {
+      const snap = await db.doc(`users/${tenantUid}/config/geral`).get();
+      if (!snap.exists) { res.status(404).json({ error: "Config não encontrada." }); return; }
+      const cfg = snap.data();
+      const mp  = cfg?.pagamentos?.mercadopago || {};
+      res.status(200).json({
+        ativo:           mp.ativo      || false,
+        publicKey:       mp.publicKey  || null,
+        adiantamentoPct: cfg?.reservas?.adiantamentoPct || 0.30,
+      });
+    } catch (err) {
+      console.error("[getFlowPublicConfig]", err);
+      res.status(500).json({ error: "Erro interno." });
+    }
+  }
+);
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO: pagamentoPix  (sem auth — página pública)
+   Cria pagamento PIX no MP e vincula à reserva.
+───────────────────────────────────────────── */
+exports.pagamentoPix = onRequest(
+  { region: "us-central1", cors: FLOW_ORIGINS },
+  async (req, res) => {
+    if (req.method !== "POST") { res.status(405).send("Method Not Allowed"); return; }
+
+    const { tenantUid, reservaId } = req.body || {};
+    if (!tenantUid || !reservaId) {
+      res.status(400).json({ error: "tenantUid e reservaId são obrigatórios." }); return;
+    }
+
+    const [configSnap, reservaSnap] = await Promise.all([
+      db.doc(`users/${tenantUid}/config/geral`).get(),
+      db.doc(`users/${tenantUid}/agendamento_reservas/${reservaId}`).get(),
+    ]);
+
+    if (!reservaSnap.exists) { res.status(404).json({ error: "Reserva não encontrada." }); return; }
+
+    const reserva  = reservaSnap.data();
+    // Idempotência: retorna QR já gerado se existir
+    if (reserva.pagamento?.paymentId && reserva.pagamento?.qrCodeBase64) {
+      return res.status(200).json({
+        paymentId:    reserva.pagamento.paymentId,
+        qrCodeBase64: reserva.pagamento.qrCodeBase64,
+        qrCode:       reserva.pagamento.qrCode,
+      });
+    }
+
+    const mpConfig = configSnap.data()?.pagamentos?.mercadopago;
+    if (!mpConfig?.ativo || !mpConfig?.accessToken) {
+      res.status(400).json({ error: "Pagamentos não ativados." }); return;
+    }
+
+    const adiantamentoPct = configSnap.data()?.reservas?.adiantamentoPct || 0.30;
+    const valor           = parseFloat((reserva.servico_preco * adiantamentoPct).toFixed(2));
+    const idempotencyKey  = `flow-pix-${tenantUid}-${reservaId}`;
+
+    let mpData;
+    try {
+      const mpRes = await fetch("https://api.mercadopago.com/v1/payments", {
+        method:  "POST",
+        headers: {
+          Authorization:       `Bearer ${mpConfig.accessToken}`,
+          "Content-Type":      "application/json",
+          "X-Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({
+          transaction_amount: valor,
+          description:        `Adiantamento — ${reserva.servico_nome}`,
+          payment_method_id:  "pix",
+          payer: {
+            email:      reserva.cliente_email,
+            first_name: reserva.cliente_nome.split(" ")[0],
+            last_name:  reserva.cliente_nome.split(" ").slice(1).join(" ") || "—",
+          },
+          notification_url:   WEBHOOK_URL,
+          external_reference: `${tenantUid}|${reservaId}`,
+        }),
+      });
+      mpData = await mpRes.json();
+      if (!mpRes.ok) {
+        res.status(502).json({ error: mpData?.message || `Erro MP ${mpRes.status}` }); return;
+      }
+    } catch (err) {
+      console.error("[pagamentoPix] fetch:", err);
+      res.status(502).json({ error: "Falha ao conectar com Mercado Pago." }); return;
+    }
+
+    const txData = mpData?.point_of_interaction?.transaction_data;
+    if (!txData?.qr_code_base64 || !txData?.qr_code) {
+      res.status(502).json({ error: "QR Code não retornado pelo Mercado Pago." }); return;
+    }
+
+    const batch = db.batch();
+    // Atualiza reserva com dados do pagamento
+    batch.update(db.doc(`users/${tenantUid}/agendamento_reservas/${reservaId}`), {
+      pagamento: {
+        metodo:       "pix",
+        paymentId:    mpData.id,
+        status:       "pendente",
+        valor,
+        qrCodeBase64: txData.qr_code_base64,
+        qrCode:       txData.qr_code,
+        criadoEm:     FieldValue.serverTimestamp(),
+      },
+    });
+    // Lookup global para webhook
+    batch.set(db.doc(`webhookLookup/${mpData.id}`), {
+      tenantUid,
+      reservaId,
+      tipo:      "reserva",
+      criadoEm: FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+
+    console.log(`[pagamentoPix] ${mpData.id} — tenant: ${tenantUid} — reserva: ${reservaId}`);
+    res.status(200).json({
+      paymentId:    mpData.id,
+      qrCodeBase64: txData.qr_code_base64,
+      qrCode:       txData.qr_code,
+    });
+  }
+);
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO: pagamentoCartao  (sem auth — página pública)
+   Recebe token MP do frontend e processa pagamento.
+───────────────────────────────────────────── */
+exports.pagamentoCartao = onRequest(
+  { region: "us-central1", cors: FLOW_ORIGINS },
+  async (req, res) => {
+    if (req.method !== "POST") { res.status(405).send("Method Not Allowed"); return; }
+
+    const { tenantUid, reservaId, cardToken, installments = 1, payerEmail } = req.body || {};
+    if (!tenantUid || !reservaId || !cardToken) {
+      res.status(400).json({ error: "tenantUid, reservaId e cardToken são obrigatórios." }); return;
+    }
+
+    const [configSnap, reservaSnap] = await Promise.all([
+      db.doc(`users/${tenantUid}/config/geral`).get(),
+      db.doc(`users/${tenantUid}/agendamento_reservas/${reservaId}`).get(),
+    ]);
+
+    if (!reservaSnap.exists) { res.status(404).json({ error: "Reserva não encontrada." }); return; }
+
+    const reserva  = reservaSnap.data();
+    const mpConfig = configSnap.data()?.pagamentos?.mercadopago;
+    if (!mpConfig?.ativo || !mpConfig?.accessToken) {
+      res.status(400).json({ error: "Pagamentos não ativados." }); return;
+    }
+
+    const adiantamentoPct = configSnap.data()?.reservas?.adiantamentoPct || 0.30;
+    const valor           = parseFloat((reserva.servico_preco * adiantamentoPct).toFixed(2));
+    const idempotencyKey  = `flow-cartao-${tenantUid}-${reservaId}`;
+
+    let mpData;
+    try {
+      const mpRes = await fetch("https://api.mercadopago.com/v1/payments", {
+        method:  "POST",
+        headers: {
+          Authorization:       `Bearer ${mpConfig.accessToken}`,
+          "Content-Type":      "application/json",
+          "X-Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({
+          transaction_amount: valor,
+          description:        `Adiantamento — ${reserva.servico_nome}`,
+          token:              cardToken,
+          installments:       parseInt(installments, 10) || 1,
+          payer:              { email: payerEmail || reserva.cliente_email },
+          notification_url:   WEBHOOK_URL,
+          external_reference: `${tenantUid}|${reservaId}`,
+        }),
+      });
+      mpData = await mpRes.json();
+      if (!mpRes.ok) {
+        res.status(502).json({ error: mpData?.message || `Erro MP ${mpRes.status}` }); return;
+      }
+    } catch (err) {
+      console.error("[pagamentoCartao] fetch:", err);
+      res.status(502).json({ error: "Falha ao conectar com Mercado Pago." }); return;
+    }
+
+    const status     = mpData.status; // "approved" | "pending" | "rejected"
+    const confirmado = status === "approved";
+
+    const updateData = {
+      pagamento: {
+        metodo:    "cartao",
+        paymentId: mpData.id,
+        status:    confirmado ? "confirmado" : status === "rejected" ? "falhou" : "pendente",
+        parcelas:  parseInt(installments, 10) || 1,
+        valor,
+        criadoEm: FieldValue.serverTimestamp(),
+        ...(confirmado ? { confirmadoEm: FieldValue.serverTimestamp() } : {}),
+      },
+      ...(confirmado ? { confirmado: true, confirmadoEm: FieldValue.serverTimestamp() } : {}),
+    };
+
+    const batch = db.batch();
+    batch.update(db.doc(`users/${tenantUid}/agendamento_reservas/${reservaId}`), updateData);
+    batch.set(db.doc(`webhookLookup/${mpData.id}`), {
+      tenantUid,
+      reservaId,
+      tipo:      "reserva",
+      criadoEm: FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+
+    console.log(`[pagamentoCartao] ${mpData.id} — status: ${status} — tenant: ${tenantUid}`);
+    res.status(200).json({ paymentId: mpData.id, status });
+  }
+);
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO: consultarPagamentoReserva  (sem auth — polling do frontend)
+───────────────────────────────────────────── */
+exports.consultarPagamentoReserva = onRequest(
+  { region: "us-central1", cors: FLOW_ORIGINS },
+  async (req, res) => {
+    if (req.method !== "POST") { res.status(405).send("Method Not Allowed"); return; }
+    const { tenantUid, reservaId } = req.body || {};
+    if (!tenantUid || !reservaId) {
+      res.status(400).json({ error: "tenantUid e reservaId são obrigatórios." }); return;
+    }
+    const snap = await db.doc(`users/${tenantUid}/agendamento_reservas/${reservaId}`).get();
+    if (!snap.exists) { res.status(404).json({ error: "Reserva não encontrada." }); return; }
+    const d = snap.data();
+    res.status(200).json({
+      confirmado: d.confirmado || false,
+      status:     d.pagamento?.status || "pendente",
+      metodo:     d.pagamento?.metodo || null,
+      paymentId:  d.pagamento?.paymentId || null,
+    });
+  }
+);
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO: mpWebhook  (HTTP — Mercado Pago → Cloud Function)
+   Registrar no painel MP > Webhooks > Pagamentos:
+   https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook
+───────────────────────────────────────────── */
+exports.mpWebhook = onRequest(
+  { region: "us-central1" },
+  async (req, res) => {
+    // MP envia GET com ?id=<paymentId>&type=payment  
+    // ou POST com body { data: { id }, type }
+    const type      = req.query?.type || req.body?.type;
+    const paymentId = String(req.query?.["data.id"] || req.query?.id || req.body?.data?.id || "");
+
+    if (type !== "payment" || !paymentId) {
+      res.status(200).send("OK"); return;
+    }
+
+    // Lookup: qual tenant/reserva criou este pagamento?
+    const lookupSnap = await db.doc(`webhookLookup/${paymentId}`).get();
+    if (!lookupSnap.exists || lookupSnap.data()?.tipo !== "reserva") {
+      res.status(200).send("OK"); return; // PDV ou desconhecido
+    }
+
+    const { tenantUid, reservaId } = lookupSnap.data();
+
+    // Lê token do tenant para verificar com MP
+    const configSnap = await db.doc(`users/${tenantUid}/config/geral`).get();
+    const token      = configSnap.data()?.pagamentos?.mercadopago?.accessToken;
+    if (!token) { res.status(200).send("OK"); return; }
+
+    // Verifica status real com MP
+    let mpStatus;
+    try {
+      const mpRes  = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const mpData = await mpRes.json();
+      mpStatus     = mpData.status;
+    } catch (err) {
+      console.error("[mpWebhook] verify error:", err);
+      res.status(200).send("OK"); return;
+    }
+
+    if (mpStatus !== "approved") { res.status(200).send("OK"); return; }
+
+    // Confirma reserva — merge:true garante idempotência
+    await db.doc(`users/${tenantUid}/agendamento_reservas/${reservaId}`).set({
+      confirmado:   true,
+      confirmadoEm: FieldValue.serverTimestamp(),
+      pagamento: {
+        status:       "confirmado",
+        confirmadoEm: FieldValue.serverTimestamp(),
+      },
+    }, { merge: true });
+
+    console.log(`[mpWebhook] reserva ${reservaId} confirmada — tenant: ${tenantUid}`);
+    res.status(200).send("OK");
   }
 );
 
