@@ -1199,7 +1199,11 @@ const fmtPct = (v) =>
 const parseDate = (d) => {
   if (!d) return null;
   try {
-    const dt = d?.toDate ? d.toDate() : new Date(d);
+    const dt = d?.toDate
+      ? d.toDate()
+      : typeof d === "string"
+        ? new Date(d.includes("T") ? d : d + "T12:00:00")
+        : new Date(d);
     return isNaN(dt.getTime()) ? null : dt;
   } catch { return null; }
 };
@@ -1371,7 +1375,7 @@ function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], aReceber 
     //   3. vencimento      → fallback final
     const dFiltradas = despesas.filter((d) =>
       d.status === "pago" &&
-      dentroDoIntervalo(d.dataPagamentoTs || d.dataPagamento || d.vencimento, intervalo));
+      dentroDoIntervalo(parseDate(d.dataPagamentoTs || d.dataPagamento || d.vencimento), intervalo));
 
     /* ══════════════════════════════════════════════════════════════════
        REGIME DE CAIXA PURO — RECEITA
@@ -1723,7 +1727,7 @@ function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], aR
 
     const despesasPagas = despesas.filter((d) =>
       d.status === "pago" &&
-      dentroDoIntervalo(d.dataPagamentoTs || d.dataPagamento || d.vencimento, intervalo)
+      dentroDoIntervalo(parseDate(d.dataPagamentoTs || d.dataPagamento || d.vencimento), intervalo)
     );
 
     const aReceberManuais = aReceber.filter((r) => {
@@ -2044,7 +2048,7 @@ function RelatorioDespesas({ despesas, intervalo }) {
 
     // Todas dentro do período — enriquece status vencido
     const noPeriodo = despesas
-      .filter((d) => dentroDoIntervalo(dataRefDespesa(d), intervalo))
+      .filter((d) => dentroDoIntervalo(parseDate(dataRefDespesa(d)), intervalo))
       .map((d) => {
         const statusEfetivo =
           d.status === "pago" ? "pago" :
