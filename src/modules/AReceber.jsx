@@ -39,11 +39,7 @@ import {
   where,
 } from "firebase/firestore";
 
-/* ══════════════════════════════════════════════════
-   CSS — padrão visual ASSENT v2.0
-   ══════════════════════════════════════════════════ */
 const CSS = `
-  /* ── Modal ── */
   .modal-overlay {
     position: fixed; inset: 0; z-index: 1000;
     background: rgba(0,0,0,0.78);
@@ -97,7 +93,6 @@ const CSS = `
     display: flex; justify-content: flex-end; gap: 10px;
   }
 
-  /* Form */
   .form-group { margin-bottom: 16px; }
   .form-label {
     display: block; font-size: 10px; font-weight: 600;
@@ -128,7 +123,6 @@ const CSS = `
   }
   .form-textarea:focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(200,165,94,0.1); }
 
-  /* Buttons */
   .btn-primary {
     padding: 9px 20px; border-radius: 9px;
     background: var(--gold); color: #0a0808;
@@ -184,7 +178,6 @@ const CSS = `
   }
   .btn-novo-ar:hover  { opacity: .88; }
 
-  /* Topbar */
   .ar-topbar {
     padding: 14px 22px;
     background: var(--s1); border-bottom: 1px solid var(--border);
@@ -223,7 +216,6 @@ const CSS = `
     color: var(--gold);
   }
 
-  /* KPIs */
   .ar-kpis {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
     margin-bottom: 20px;
@@ -242,7 +234,6 @@ const CSS = `
   .ar-kpi-val.red   { color: var(--red); }
   .ar-kpi-sub { font-size: 10px; color: var(--text-3); }
 
-  /* Tabela */
   .ar-table-wrap {
     background: var(--s1); border: 1px solid var(--border);
     border-radius: 12px; overflow: hidden;
@@ -272,9 +263,11 @@ const CSS = `
     color: var(--text-2); background: var(--s2); cursor: default;
   }
   .ar-row-head:hover { background: var(--s2); }
+  .ar-row-head span[data-sortable] { cursor: pointer; }
+  .ar-row-head span[data-sortable]:hover { color: var(--text); }
 
   .ar-cliente {
-    font-weight: 500; color: var(--text); overflow: hidden;
+    font-weight: 500; font-size: 12px; color: var(--text); overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap;
   }
   .ar-desc {
@@ -302,7 +295,6 @@ const CSS = `
     color: var(--text-2); font-size: 13px;
   }
 
-  /* Cliente dropdown (ModalFormConta) */
   .cliente-wrap { position: relative; }
   .cliente-tag {
     display: inline-flex; align-items: center; gap: 5px;
@@ -331,7 +323,6 @@ const CSS = `
   .cliente-option-nome { font-size: 12px; font-weight: 500; color: var(--text); }
   .cliente-option-sub { font-size: 10px; color: var(--text-3); margin-top: 2px; }
 
-  /* Pagamento info */
   .pag-info-box {
     background: var(--s2); border: 1px solid var(--border);
     border-radius: 8px; padding: 12px; margin-bottom: 16px;
@@ -348,7 +339,6 @@ const CSS = `
   .pag-info-row .green { color: var(--green); font-weight: 600; }
   .pag-info-row .red { color: var(--red); font-weight: 600; }
 
-  /* Confirm */
   .confirm-body {
     padding: 24px 22px;
     text-align: center;
@@ -360,7 +350,6 @@ const CSS = `
     font-size: 13px; color: var(--text-2); line-height: 1.5;
   }
 
-  /* Status badge */
   .status-badge {
     display: inline-block; font-size: 10px; font-weight: 600;
     text-transform: uppercase; padding: 4px 8px; border-radius: 5px;
@@ -378,7 +367,6 @@ const CSS = `
     border: 1px solid rgba(224,82,82,0.3);
   }
 
-  /* Detalhe Modal */
   .detalhe-info-group {
     display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;
   }
@@ -496,7 +484,6 @@ function ModalDetalhes({ conta, onClose }) {
         </div>
 
         <div className="modal-body">
-          {/* Descrição e Status */}
           <div className="detalhe-info-group">
             <div className="detalhe-info-field detalhe-info-full">
               <div className="detalhe-info-label">Descrição</div>
@@ -504,7 +491,6 @@ function ModalDetalhes({ conta, onClose }) {
             </div>
           </div>
 
-          {/* Valores */}
           <div className="detalhe-section-title">Financeiro</div>
           <div className="detalhe-info-group">
             <div className="detalhe-info-field">
@@ -533,7 +519,6 @@ function ModalDetalhes({ conta, onClose }) {
             </div>
           </div>
 
-          {/* Datas */}
           <div className="detalhe-section-title">Datas</div>
           <div className="detalhe-info-group">
             <div className="detalhe-info-field">
@@ -546,7 +531,6 @@ function ModalDetalhes({ conta, onClose }) {
             </div>
           </div>
 
-          {/* Origem e Pagamento */}
           <div className="detalhe-section-title">Informações</div>
           <div className="detalhe-info-group">
             <div className="detalhe-info-field">
@@ -561,7 +545,6 @@ function ModalDetalhes({ conta, onClose }) {
             </div>
           </div>
 
-          {/* Observações */}
           {conta.observacoes && (
             <>
               <div className="detalhe-section-title">Observações</div>
@@ -676,7 +659,6 @@ function ModalFormConta({ conta, onSave, onClose }) {
         </div>
 
         <div className="modal-body">
-          {/* Cliente */}
           <div className="form-group">
             <label className="form-label">
               Cliente <span className="form-label-req">*</span>
@@ -732,7 +714,6 @@ function ModalFormConta({ conta, onSave, onClose }) {
             {erros.clienteNome && <div className="form-error">{erros.clienteNome}</div>}
           </div>
 
-          {/* Descrição */}
           <div className="form-group">
             <label className="form-label">
               Descrição <span className="form-label-req">*</span>
@@ -746,7 +727,6 @@ function ModalFormConta({ conta, onSave, onClose }) {
             {erros.descricao && <div className="form-error">{erros.descricao}</div>}
           </div>
 
-          {/* Valores */}
           <div className="form-row">
             <div className="form-group">
               <label className="form-label">
@@ -775,7 +755,6 @@ function ModalFormConta({ conta, onSave, onClose }) {
             </div>
           </div>
 
-          {/* Forma de pagamento */}
           <div className="form-group">
             <label className="form-label">Forma de Pagamento</label>
             <select
@@ -794,7 +773,6 @@ function ModalFormConta({ conta, onSave, onClose }) {
             </select>
           </div>
 
-          {/* Data de vencimento */}
           <div className="form-group">
             <label className="form-label">
               Data de Vencimento <span className="form-label-req">*</span>
@@ -808,7 +786,6 @@ function ModalFormConta({ conta, onSave, onClose }) {
             {erros.dataVencimento && <div className="form-error">{erros.dataVencimento}</div>}
           </div>
 
-          {/* Observações */}
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">Observações</label>
             <textarea
@@ -870,7 +847,6 @@ function ModalPagamento({ conta, onConfirm, onClose }) {
         </div>
 
         <div className="modal-body">
-          {/* Resumo financeiro */}
           <div className="pag-info-box">
             <div className="pag-info-row">
               <span>Valor Total</span>
@@ -887,7 +863,6 @@ function ModalPagamento({ conta, onConfirm, onClose }) {
             </div>
           </div>
 
-          {/* Valor a registrar */}
           <div className="form-group" style={{ marginBottom: 0 }}>
             <label className="form-label">
               Valor Recebido (R$) <span className="form-label-req">*</span>
@@ -962,13 +937,13 @@ export default function AReceber() {
   const [contas, setContas]   = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [search, setSearch]           = useState("");
+  const [search, setSearch]             = useState("");
   const [filtroStatus, setFiltroStatus] = useState("Todos");
+  const [sortKey, setSortKey]           = useState(null);
+  const [sortDir, setSortDir]           = useState("asc");
 
-  // ── Multi-tenant ──
   const { tenantUid, cargo, nomeUsuario, podeCriar, podeEditar, podeExcluir } = useAuth();
 
-  // ── Flags de permissão ──
   const podeCriarV   = podeCriar("aReceber");
   const podeEditarV  = podeEditar("aReceber");
   const podeExcluirV = podeExcluir("aReceber");
@@ -978,6 +953,11 @@ export default function AReceber() {
   const [deletando, setDeletando]   = useState(null);
   const [pagamento, setPagamento]   = useState(null);
   const [detalhes, setDetalhes]     = useState(null);
+
+  const toggleSort = (key) => {
+    setSortDir(d => sortKey === key ? (d === "asc" ? "desc" : "asc") : "asc");
+    setSortKey(key);
+  };
 
   /* ── Firestore — listener em tempo real ── */
   useEffect(() => {
@@ -1066,7 +1046,6 @@ export default function AReceber() {
           dataPagamento: serverTimestamp()
         });
 
-        // Sincroniza com venda se origem for "venda"
         if (contaAtual.origem === "venda" && contaAtual.referenciaId) {
           const vendaRef = doc(db, "users", tenantUid, "vendas", contaAtual.referenciaId);
           t.update(vendaRef, { valorRestante: novoValorRestante });
@@ -1085,10 +1064,8 @@ export default function AReceber() {
     if (!tenantUid || !deletando?.id) return;
     try {
       await runTransaction(db, async (t) => {
-        // 1. Usa a transação para garantir segurança
         t.delete(doc(db, "users", tenantUid, "a_receber", deletando.id));
 
-        // 2. Se de venda, restaura o valorRestante
         if (deletando.origem === "venda" && deletando.referenciaId) {
           try {
             const vendaRef = doc(db, "users", tenantUid, "vendas", deletando.referenciaId);
@@ -1109,22 +1086,34 @@ export default function AReceber() {
     }
   }, [tenantUid, deletando]);
 
-  /* ── Filtragem + busca (memoizado) ── */
+  /* ── Filtragem + busca + ordenação (memoizado) ── */
   const contasFiltradas = useMemo(() => {
     const q = search.trim().toLowerCase();
 
-    return contas.filter(c => {
-      const passaStatus =
-        filtroStatus === "Todos" || c.status === filtroStatus;
-
-      const passaBusca =
-        !q ||
-        c.clienteNome?.toLowerCase().includes(q) ||
-        c.descricao?.toLowerCase().includes(q);
-
-      return passaStatus && passaBusca;
-    });
-  }, [contas, search, filtroStatus]);
+    return contas
+      .filter(c => {
+        const passaStatus = filtroStatus === "Todos" || c.status === filtroStatus;
+        const passaBusca  = !q || c.clienteNome?.toLowerCase().includes(q) || c.descricao?.toLowerCase().includes(q);
+        return passaStatus && passaBusca;
+      })
+      .sort((a, b) => {
+        if (!sortKey) return 0;
+        let va, vb;
+        if (sortKey === "status") {
+          va = calcStatus(a.valorRestante, a.dataVencimento);
+          vb = calcStatus(b.valorRestante, b.dataVencimento);
+        } else {
+          va = a[sortKey] ?? "";
+          vb = b[sortKey] ?? "";
+          if (sortKey === "dataVencimento") {
+            va = va || "9999-99-99";
+            vb = vb || "9999-99-99";
+          }
+        }
+        const cmp = String(va).localeCompare(String(vb), "pt-BR", { numeric: true });
+        return sortDir === "asc" ? cmp : -cmp;
+      });
+  }, [contas, search, filtroStatus, sortKey, sortDir]);
 
   /* ── KPIs (memoizado) ── */
   const kpis = useMemo(() => {
@@ -1142,11 +1131,18 @@ export default function AReceber() {
     return { totalPendente, totalVencido, totalRecebido };
   }, [contas]);
 
+  const COLUNAS_HEAD = [
+    { key: "clienteNome",    label: "Cliente" },
+    { key: "descricao",      label: "Descrição" },
+    { key: null,             label: "Restante" },
+    { key: "dataVencimento", label: "Vencimento" },
+    { key: "status",         label: "Status" },
+  ];
+
   return (
     <>
       <style>{CSS}</style>
 
-      {/* Topbar */}
       <header className="ar-topbar">
         <div className="ar-topbar-title">
           <h1>A Receber</h1>
@@ -1162,7 +1158,6 @@ export default function AReceber() {
           />
         </div>
 
-        {/* Filtros de status */}
         <div className="ar-filter-group">
           <Filter size={12} color="var(--text-3)" />
           {FILTROS_STATUS.map(f => (
@@ -1182,7 +1177,6 @@ export default function AReceber() {
       </header>
 
       <div className="ag-content">
-        {/* KPIs */}
         <div className="ar-kpis">
           <div className="ar-kpi">
             <div className="ar-kpi-label">Total a Receber</div>
@@ -1207,20 +1201,26 @@ export default function AReceber() {
           </div>
         </div>
 
-        {/* Tabela */}
         <div className="ar-table-wrap">
           <div className="ar-table-header">
             <span className="ar-table-title">Contas a Receber</span>
             <span className="ar-count-badge">{contasFiltradas.length}</span>
           </div>
 
-          {/* Cabeçalho */}
           <div className="ar-row ar-row-head">
-            <span>Cliente</span>
-            <span>Descrição</span>
-            <span>Restante</span>
-            <span>Vencimento</span>
-            <span>Status</span>
+            {COLUNAS_HEAD.map(({ key, label }) => (
+              <span
+                key={label}
+                data-sortable={key ? true : undefined}
+                onClick={() => key && toggleSort(key)}
+                style={{ display: "flex", alignItems: "center", gap: 4 }}
+              >
+                {label}
+                {key && sortKey === key && (
+                  <span style={{ fontSize: 10 }}>{sortDir === "asc" ? "↑" : "↓"}</span>
+                )}
+              </span>
+            ))}
             <span style={{ textAlign: "right" }}>Ações</span>
           </div>
 
@@ -1253,7 +1253,6 @@ export default function AReceber() {
                   </span>
                   <StatusBadge status={statusCalc} />
                   <div className="ar-actions" onClick={e => e.stopPropagation()}>
-                    {/* Registrar pagamento — só se ainda há saldo */}
                     {statusCalc !== "pago" && (
                       <button
                         className="btn-icon btn-icon-pay"
@@ -1285,7 +1284,6 @@ export default function AReceber() {
         </div>
       </div>
 
-      {/* ── Modais ── */}
       {modalNovo && podeCriarV && (
         <ModalFormConta
           onSave={handleCriar}
