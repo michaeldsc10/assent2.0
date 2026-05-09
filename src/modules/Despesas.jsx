@@ -15,8 +15,7 @@ import { db } from "../lib/firebase";
 import { fsError, fsSnapshotError } from "../utils/firestoreError";
 import { useAuth } from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
-import {  LIMITES_FREE } from "../hooks/useLicenca";
-import { BannerLimite } from "../hooks/LicencaUI";
+
 import {
   collection, doc, setDoc, deleteDoc, onSnapshot,
   query, orderBy, writeBatch, addDoc, serverTimestamp,
@@ -1451,7 +1450,7 @@ function ModalCategorias({ categorias, onCriar, onRenomear, onDesativar, onClose
 /* ════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ════════════════════════════════════════ */
-export default function Despesas({ isPro = false }) {
+export default function Despesas() {
   const [despesas, setDespesas] = useState([]);
   const [despesaIdCnt, setDespesaIdCnt] = useState(0);
   const [search, setSearch] = useState("");
@@ -1858,8 +1857,8 @@ export default function Despesas({ isPro = false }) {
           <button
             className="btn-nova-desp"
             onClick={() => setModalNovo(true)}
-            disabled={!podeCriarV || (!isPro && despesas.length >= LIMITES_FREE.despesas)}
-            title={!isPro && despesas.length >= LIMITES_FREE.despesas ? `Limite de ${LIMITES_FREE.despesas} despesas atingido no plano Free` : undefined}
+            disabled={!podeCriarV}
+            title={undefined}
           >
             <Plus size={14} /> Nova Despesa
           </button>
@@ -1867,7 +1866,6 @@ export default function Despesas({ isPro = false }) {
       </header>
 
       {/* Cards de métricas */}
-      <BannerLimite total={despesas.length} limite={LIMITES_FREE.despesas} tipo="despesas" isPro={isPro} />
       <div className="desp-metrics">
         <div
           className={`metric-card metric-card-red clickable ${filtroStatus === "vencido" ? "active" : ""}`}
