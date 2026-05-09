@@ -13,8 +13,7 @@ import { fsError, fsSnapshotError } from "../utils/firestoreError";
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useAuth } from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
-import { LIMITES_FREE } from "../hooks/useLicenca";
-import {BannerLimite} from "../hooks/LicencaUI.jsx";
+
 import {
   collection,
   doc,
@@ -862,7 +861,7 @@ function ModalConfirmDelete({ produto, vendasComProduto, onConfirm, onClose }) {
 /* ══════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════ */
-export default function Produtos({ isPro = false }) {
+export default function Produtos() {
   const [produtos, setProdutos] = useState([]);
   const [vendas,   setVendas]   = useState([]);
   // ── Multi-tenant ──
@@ -1006,8 +1005,6 @@ export default function Produtos({ isPro = false }) {
         <button
           className="btn-novo-pd"
           onClick={() => setModalNovo(true)}
-          disabled={!isPro && produtos.length >= LIMITES_FREE.produtos}
-          title={!isPro && produtos.length >= LIMITES_FREE.produtos ? `Limite de ${LIMITES_FREE.produtos} produtos atingido no plano Free` : undefined}
         >
           <Package size={14} /> + Novo Produto
         </button>
@@ -1016,7 +1013,7 @@ export default function Produtos({ isPro = false }) {
 
       {/* ── Conteúdo ── */}
       <div className="ag-content">
-        <BannerLimite total={produtos.length} limite={LIMITES_FREE.produtos} tipo="produtos" isPro={isPro} />
+
         <div className="pd-table-wrap">
           <div className="pd-table-header">
             <span className="pd-table-title">Produtos cadastrados</span>
