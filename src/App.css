@@ -114,11 +114,17 @@
   align-items: center;
   padding: 2rem;
   background-color: var(--color-black);
+  /* garante scroll se conteúdo não couber na altura */
+  overflow-y: auto;
 }
 
 @media (max-width: 768px) {
   .login-left { display: none; }
-  .login-right { flex: 1; }
+  .login-right {
+    flex: 1;
+    padding: 1.5rem 1rem;
+    justify-content: center;
+  }
 }
 
 /* ══════════════════════════════════════════════════
@@ -128,6 +134,7 @@
 .login-card-wrap {
   position: relative;
   width: 400px;
+  max-width: 100%;          /* ← nunca ultrapassa a tela */
   animation: cardIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
@@ -165,6 +172,18 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
+/* ← padding reduzido em mobile */
+@media (max-width: 480px) {
+  .login-form-card {
+    padding: 44px 24px 40px;
+    border-radius: 16px;
+  }
+
+  .login-card-border {
+    border-radius: 17px;
+  }
+}
+
 .card-light {
   position: absolute;
   top: -1px;
@@ -184,6 +203,10 @@
   margin-bottom: 48px;
 }
 
+@media (max-width: 480px) {
+  .logo-area { margin-bottom: 32px; }
+}
+
 /* ✦ white-space: nowrap impede quebra de linha */
 .logo-text {
   font-family: 'Cinzel', serif;
@@ -193,6 +216,10 @@
   line-height: 1;
   margin-bottom: 10px;
   white-space: nowrap;
+}
+
+@media (max-width: 360px) {
+  .logo-text { font-size: 24px; }
 }
 
 .logo-assent {
@@ -246,6 +273,8 @@
   color: rgba(255, 255, 255, 0.85);
   outline: none;
   transition: border-color 0.25s, background 0.25s, box-shadow 0.25s;
+  /* evita zoom automático no iOS (font-size < 16px dispara zoom) */
+  font-size: max(16px, 14px);
 }
 
 .field input::placeholder { color: rgba(255, 255, 255, 0.14); }
@@ -270,6 +299,10 @@
   display: flex;
   align-items: center;
   transition: color 0.2s;
+  /* área de toque mínima para mobile */
+  min-width: 44px;
+  min-height: 44px;
+  justify-content: center;
 }
 
 .eye-toggle:hover {
@@ -312,6 +345,8 @@
     box-shadow   0.3s ease,
     transform    0.15s ease,
     border-color 0.3s ease;
+  /* área de toque mínima */
+  min-height: 48px;
 }
 
 /* Span fica acima do shimmer */
@@ -392,6 +427,10 @@
   text-underline-offset: 2px;
   padding: 0;
   transition: color 0.2s;
+  /* área de toque */
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .forgot-link:hover {
@@ -439,9 +478,10 @@
   background: rgba(255, 255, 255, 0.03);
   color: rgba(255, 255, 255, 0.85);
   font-family: 'Montserrat', sans-serif;
-  font-size: 14px;
+  font-size: max(16px, 14px); /* evita zoom iOS */
   font-weight: 300;
   outline: none;
+  width: 100%;
   transition: border-color 0.25s, background 0.25s, box-shadow 0.25s;
 }
 
@@ -457,6 +497,7 @@
 .btn-submit {
   width: 100%;
   padding: 13px;
+  min-height: 48px;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.06);
   color: rgba(255, 255, 255, 0.8);
@@ -481,6 +522,15 @@
 }
 
 .btn-submit:active { transform: translateY(0); }
+
+/* modal recuperação — responsivo */
+@media (max-width: 480px) {
+  /* o modal inline no JSX usa style={{ maxWidth: 400 }} — em telas < 480 adiciona margem lateral */
+  .login-container + div > div,        /* fallback */
+  [style*="maxWidth: 400"] {
+    margin: 0 1rem !important;
+  }
+}
 
 /* ══════════════════════════════════════════════════
    BRAND OVERLAY TEXT (login-left)
