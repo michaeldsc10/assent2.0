@@ -371,8 +371,10 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
     /* ── Top Clientes ── */
     const cliMap = {};
     vendasPeriodo.forEach((v) => {
-      const k = v.cliente || "—";
-      cliMap[k] = (cliMap[k] || 0) + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0));
+      const nome = (v.cliente || "").trim();
+      // Exclui vendas sem cliente (PDV anônimo) e mesas
+      if (!nome || nome === "—" || nome === "-" || /^mesa\s/i.test(nome)) return;
+      cliMap[nome] = (cliMap[nome] || 0) + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0));
     });
     const topClientes = Object.entries(cliMap)
       .sort((a, b) => b[1] - a[1])
