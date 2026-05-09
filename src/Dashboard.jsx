@@ -691,34 +691,90 @@ const CSS = `
 .ag-notif-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
 .ag-notif-item {
-  padding: 14px 16px;
+  padding: 13px 14px 12px;
   border-radius: 14px;
   border: 1px solid var(--border);
-  border-left: 3px solid rgba(255,255,255,0.07);
-  background: linear-gradient(135deg, var(--s2) 0%, rgba(20,20,28,0.9) 100%);
-  display: flex; flex-direction: column; gap: 4px;
+  background: linear-gradient(135deg, rgba(22,22,30,0.95) 0%, rgba(16,16,22,0.95) 100%);
+  display: flex; flex-direction: column; gap: 0;
   transition: border-color .18s, transform .18s, box-shadow .18s;
   cursor: default;
+  position: relative;
+  overflow: hidden;
+}
+.ag-notif-item::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.07) 50%, transparent 100%);
 }
 .ag-notif-item:hover {
-  border-color: var(--border-h);
-  border-left-color: var(--gold);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.22), 0 0 0 1px rgba(200,165,94,0.05) inset;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+
+/* linha de acento esquerda via var */
+.ag-notif-item-accent {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  border-radius: 14px 0 0 14px;
+}
+
+/* linha topo do card (row com ícone + categoria + fechar) */
+.ag-notif-row-top {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 9px;
+}
+
+/* ícone circular */
+.ag-notif-icon {
+  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid rgba(255,255,255,0.07);
+  position: relative;
+}
+.ag-notif-icon::after {
+  content: ""; position: absolute; inset: 0; border-radius: 9px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+/* categoria / subtipo */
+.ag-notif-categoria {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.10em;
+  text-transform: uppercase; flex: 1; line-height: 1.3;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+/* badge urgência (VENCE HOJE / AMANHÃ) */
+.ag-notif-urgencia {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; padding: 2px 8px; border-radius: 20px;
+  border: 1px solid; flex-shrink: 0;
+}
+
+/* conteúdo principal */
+.ag-notif-row-body {
+  padding-left: 46px;
+}
+
+/* footer com dot + time */
+.ag-notif-row-footer {
+  display: flex; align-items: center; gap: 6px;
+  padding-left: 46px; margin-top: 6px;
+}
+.ag-notif-dot {
+  width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
 }
 
 .ag-notif-item-title {
   font-size: 13px; font-weight: 600; color: var(--text);
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif; line-height: 1.4;
 }
 .ag-notif-item-body {
   font-size: 12px; color: var(--text-2); line-height: 1.55;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif; margin-top: 4px;
 }
 .ag-notif-item-meta {
   font-size: 10px; color: var(--text-3);
-  font-family: 'Inter', system-ui, sans-serif;
-  margin-top: 3px;
+  font-family: 'JetBrains Mono', monospace;
 }
 
 .ag-notif-empty {
@@ -904,8 +960,9 @@ const CSS = `
     display: flex; align-items: center; gap: 16px; flex-shrink: 0;
   }
   .ag-topbar-title h1 {
-    font-family: var(--font-display); font-size: 22px; font-weight: 700;
-    color: var(--gold-brand); line-height: 1.15; letter-spacing: 0.01em;
+    font-family: 'Inter', system-ui, sans-serif; font-size: 20px; font-weight: 800;
+    color: var(--gold-brand); line-height: 1.15;
+    letter-spacing: 0.12em; text-transform: uppercase;
     background: linear-gradient(135deg, #D4AF37 10%, #f0d060 55%, #c8a55e 100%);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
   }
@@ -3225,151 +3282,115 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     <div className="ag-notif-empty">Nenhuma notificação no momento</div>
                   ) : (
                     todasNotif.map((n) => {
+
+                      /* ── helper: tempo relativo ── */
+                      const tempoRel = (ts) => {
+                        const d = ts?.toDate ? ts.toDate() : null;
+                        if (!d) return "—";
+                        const diff = Date.now() - d.getTime();
+                        const m = Math.floor(diff / 60000);
+                        const h = Math.floor(diff / 3600000);
+                        const dy = Math.floor(diff / 86400000);
+                        if (dy >= 1) return `há ${dy} dia${dy > 1 ? "s" : ""}`;
+                        if (h  >= 1) return `há ${h}h`;
+                        if (m  >= 1) return `há ${m} min`;
+                        return "agora";
+                      };
+
                       /* ── Insight de negócio ── */
                       if (n.tipo === "insight") {
                         const INSIGHT_PALETTE = {
-                          faturamento_alta:     { cor: "var(--green)",  bg: "rgba(62,207,142,0.07)",  badge: "#2daa70" },
-                          produto_destaque:     { cor: "var(--green)",  bg: "rgba(62,207,142,0.07)",  badge: "#2daa70" },
-                          ticket_alta:          { cor: "var(--green)",  bg: "rgba(62,207,142,0.07)",  badge: "#2daa70" },
-                          matriculas_alta:      { cor: "var(--blue)",   bg: "rgba(91,142,240,0.07)",  badge: "#4a7de0" },
-                          faturamento_queda:    { cor: "var(--red)",    bg: "rgba(224,82,82,0.07)",   badge: "#c04040" },
-                          ticket_queda:         { cor: "var(--amber)",  bg: "rgba(245,158,11,0.07)",  badge: "#c07800" },
-                          cancelamentos_alerta: { cor: "var(--red)",    bg: "rgba(224,82,82,0.08)",   badge: "#c04040" },
-                          matriculas_queda:     { cor: "var(--amber)",  bg: "rgba(245,158,11,0.07)",  badge: "#c07800" },
-                          matriculas_zero:      { cor: "var(--amber)",  bg: "rgba(245,158,11,0.07)",  badge: "#c07800" },
+                          faturamento_alta:     { cor: "#3ecf8e", bg: "rgba(62,207,142,0.10)" },
+                          produto_destaque:     { cor: "#3ecf8e", bg: "rgba(62,207,142,0.10)" },
+                          ticket_alta:          { cor: "#3ecf8e", bg: "rgba(62,207,142,0.10)" },
+                          matriculas_alta:      { cor: "#5b8ef0", bg: "rgba(91,142,240,0.10)" },
+                          faturamento_queda:    { cor: "#e05252", bg: "rgba(224,82,82,0.10)"  },
+                          ticket_queda:         { cor: "#f59e0b", bg: "rgba(245,158,11,0.10)" },
+                          cancelamentos_alerta: { cor: "#e05252", bg: "rgba(224,82,82,0.10)"  },
+                          matriculas_queda:     { cor: "#f59e0b", bg: "rgba(245,158,11,0.10)" },
+                          matriculas_zero:      { cor: "#f59e0b", bg: "rgba(245,158,11,0.10)" },
                         };
-                        const paleta = INSIGHT_PALETTE[n.tipo] || {
-                          cor: "var(--purple)", bg: "rgba(167,139,250,0.07)", badge: "#8b6ef0",
-                        };
-                        const dataInsight = n.criadoEm?.toDate ? n.criadoEm.toDate() : null;
-                        const tempoRelativo = (() => {
-                          if (!dataInsight) return "—";
-                          const diff = Date.now() - dataInsight.getTime();
-                          const d = Math.floor(diff / 86400000);
-                          const h = Math.floor(diff / 3600000);
-                          if (d >= 1) return `há ${d} dia${d > 1 ? "s" : ""}`;
-                          if (h >= 1) return `há ${h}h`;
-                          return "agora";
-                        })();
+                        const p = INSIGHT_PALETTE[n.subtipo] || { cor: "#a78bfa", bg: "rgba(167,139,250,0.10)" };
                         return (
-                          <div
-                            key={n.id}
-                            className="ag-notif-item"
-                            style={{
-                              background: paleta.bg,
-                              borderLeft: `2px solid ${paleta.cor}`,
-                              paddingLeft: 14,
-                            }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
-                              <span style={{
-                                fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
-                                textTransform: "uppercase", color: "#fff",
-                                background: paleta.badge,
-                                borderRadius: 20, padding: "2px 8px", flexShrink: 0,
-                              }}>
-                                Insight
-                              </span>
-                              <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
-                                {tempoRelativo}
+                          <div key={n.id} className="ag-notif-item" style={{ border: `1px solid ${p.cor}22` }}>
+                            <div className="ag-notif-item-accent" style={{ background: p.cor }} />
+                            <div className="ag-notif-row-top">
+                              <div className="ag-notif-icon" style={{ background: p.bg }}>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={p.cor} strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                              </div>
+                              <span className="ag-notif-categoria" style={{ color: p.cor }}>
+                                Sistema · IA Insight
                               </span>
                               {n.prioridade === "high" && (
-                                <span style={{
-                                  fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
-                                  textTransform: "uppercase", color: paleta.cor,
-                                  background: paleta.bg, border: `1px solid ${paleta.cor}40`,
-                                  borderRadius: 20, padding: "2px 7px", marginLeft: "auto", flexShrink: 0,
-                                }}>
+                                <span className="ag-notif-urgencia" style={{ color: p.cor, borderColor: `${p.cor}40`, background: p.bg }}>
                                   atenção
                                 </span>
                               )}
                             </div>
-                            <div className="ag-notif-item-title" style={{ fontSize: 13, lineHeight: 1.4 }}>
-                              {n.titulo}
+                            <div className="ag-notif-row-body">
+                              <div className="ag-notif-item-title">{n.titulo}</div>
+                              <div className="ag-notif-item-body">{n.mensagem}</div>
                             </div>
-                            <div className="ag-notif-item-body" style={{ marginTop: 5, fontSize: 12, lineHeight: 1.55 }}>
-                              {n.mensagem}
+                            <div className="ag-notif-row-footer">
+                              <span className="ag-notif-dot" style={{ background: p.cor }} />
+                              <span className="ag-notif-item-meta">{tempoRel(n.criadoEm)}</span>
                             </div>
                           </div>
                         );
                       }
 
-                      /* ── Alerta de despesa próxima do vencimento ── */
+                      /* ── Despesa próxima do vencimento ── */
                       if (n.tipo === "despesa") {
-                        const corUrgencia =
-                          n.diffDias === 0 ? "var(--red)"   :
-                          n.diffDias === 1 ? "var(--amber)" :
-                                            "var(--blue)";
-                        const bgUrgencia =
-                          n.diffDias === 0 ? "rgba(224,82,82,0.07)"   :
-                          n.diffDias === 1 ? "rgba(245,158,11,0.07)"  :
-                                            "rgba(91,142,240,0.05)";
-                        const labelUrgencia =
-                          n.diffDias === 0 ? "Vence hoje"   :
-                          n.diffDias === 1 ? "Amanhã"       :
-                          `${n.diffDias} dias`;
+                        const cor = n.diffDias === 0 ? "#e05252" : n.diffDias === 1 ? "#f59e0b" : "#5b8ef0";
+                        const bg  = n.diffDias === 0 ? "rgba(224,82,82,0.10)" : n.diffDias === 1 ? "rgba(245,158,11,0.10)" : "rgba(91,142,240,0.08)";
+                        const labelUrg = n.diffDias === 0 ? "Vence hoje" : n.diffDias === 1 ? "Amanhã" : `${n.diffDias} dias`;
+                        const idShow = n.titulo?.split("—")[1]?.trim() || "";
                         return (
-                          <div
-                            key={n.id}
-                            className="ag-notif-item"
-                            style={{
-                              cursor: "pointer",
-                              background: bgUrgencia,
-                              borderLeft: `2px solid ${corUrgencia}`,
-                              paddingLeft: 14,
-                            }}
-                            onClick={() => { setModule("Despesas"); setNotifOpen(false); }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 2 }}>
-                              <div className="ag-notif-item-title" style={{ fontSize: 12 }}>{n.mensagem}</div>
-                              <span style={{
-                                fontSize: 9, fontWeight: 700, letterSpacing: "0.06em",
-                                textTransform: "uppercase", color: corUrgencia,
-                                background: bgUrgencia, border: `1px solid ${corUrgencia}40`,
-                                borderRadius: 20, padding: "2px 7px", flexShrink: 0,
-                              }}>{labelUrgencia}</span>
+                          <div key={n.id} className="ag-notif-item" style={{ border: `1px solid ${cor}22`, cursor: "pointer" }}
+                            onClick={() => { setModule("Despesas"); setNotifOpen(false); }}>
+                            <div className="ag-notif-item-accent" style={{ background: cor }} />
+                            <div className="ag-notif-row-top">
+                              <div className="ag-notif-icon" style={{ background: bg }}>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={cor} strokeWidth="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                              </div>
+                              <span className="ag-notif-categoria" style={{ color: cor }}>Atenção · Despesa</span>
+                              <span className="ag-notif-urgencia" style={{ color: cor, borderColor: `${cor}40`, background: bg }}>{labelUrg}</span>
                             </div>
-                            <div style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
-                              Despesa {n.titulo.split("—")[1]?.trim() || ""} · Ir para Despesas →
+                            <div className="ag-notif-row-body">
+                              <div className="ag-notif-item-title">{n.mensagem}</div>
+                              <div className="ag-notif-item-body">{idShow} · <span style={{ color: cor }}>Ir para Despesas →</span></div>
+                            </div>
+                            <div className="ag-notif-row-footer">
+                              <span className="ag-notif-dot" style={{ background: cor }} />
+                              <span className="ag-notif-item-meta">{tempoRel(n._ts ? { toDate: () => new Date(n._ts) } : null)}</span>
                             </div>
                           </div>
                         );
                       }
 
-                      /* ── Alerta de A Receber próximo do vencimento ── */
+                      /* ── A Receber próximo do vencimento ── */
                       if (n.tipo === "a_receber") {
-                        const corUrgencia =
-                          n.diffDias === 0 ? "var(--green)"  :
-                                            "var(--amber)";
-                        const bgUrgencia =
-                          n.diffDias === 0 ? "rgba(62,207,142,0.07)"  :
-                                            "rgba(245,158,11,0.07)";
-                        const labelUrgencia =
-                          n.diffDias === 0 ? "Vence hoje" : "Amanhã";
-
+                        const cor = n.diffDias === 0 ? "#3ecf8e" : "#f59e0b";
+                        const bg  = n.diffDias === 0 ? "rgba(62,207,142,0.10)" : "rgba(245,158,11,0.10)";
+                        const labelUrg = n.diffDias === 0 ? "Vence hoje" : "Amanhã";
                         return (
-                          <div
-                            key={n.id}
-                            className="ag-notif-item"
-                            style={{
-                              cursor: "pointer",
-                              background: bgUrgencia,
-                              borderLeft: `2px solid ${corUrgencia}`,
-                              paddingLeft: 14,
-                            }}
-                            onClick={() => { setModule("A Receber"); setNotifOpen(false); }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 2 }}>
-                              <div className="ag-notif-item-title" style={{ fontSize: 12 }}>{n.clienteNome}</div>
-                              <span style={{
-                                fontSize: 9, fontWeight: 700, letterSpacing: "0.06em",
-                                textTransform: "uppercase", color: corUrgencia,
-                                background: bgUrgencia, border: `1px solid ${corUrgencia}40`,
-                                borderRadius: 20, padding: "2px 7px", flexShrink: 0,
-                              }}>{labelUrgencia}</span>
+                          <div key={n.id} className="ag-notif-item" style={{ border: `1px solid ${cor}22`, cursor: "pointer" }}
+                            onClick={() => { setModule("A Receber"); setNotifOpen(false); }}>
+                            <div className="ag-notif-item-accent" style={{ background: cor }} />
+                            <div className="ag-notif-row-top">
+                              <div className="ag-notif-icon" style={{ background: bg }}>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={cor} strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                              </div>
+                              <span className="ag-notif-categoria" style={{ color: cor }}>Financeiro · A Receber</span>
+                              <span className="ag-notif-urgencia" style={{ color: cor, borderColor: `${cor}40`, background: bg }}>{labelUrg}</span>
                             </div>
-                            <div style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
-                              A Receber · {n.valor} · Ir para A Receber →
+                            <div className="ag-notif-row-body">
+                              <div className="ag-notif-item-title">{n.clienteNome}</div>
+                              <div className="ag-notif-item-body">{n.valor} · <span style={{ color: cor }}>Ir para A Receber →</span></div>
+                            </div>
+                            <div className="ag-notif-row-footer">
+                              <span className="ag-notif-dot" style={{ background: cor }} />
+                              <span className="ag-notif-item-meta">{tempoRel(n._ts ? { toDate: () => new Date(n._ts) } : null)}</span>
                             </div>
                           </div>
                         );
@@ -3377,80 +3398,66 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
                       /* ── Nova reserva AssFlow ── */
                       if (n.tipo === "nova_reserva") {
+                        const cor = "#c8a55e";
+                        const bg  = "rgba(200,165,94,0.10)";
                         return (
-                          <div
-                            key={n.id}
-                            className="ag-notif-item"
-                            style={{
-                              cursor: "pointer",
-                              background: "rgba(192,155,82,0.05)",
-                              borderLeft: "2px solid var(--gold)",
-                              paddingLeft: 14,
-                            }}
-                            onClick={() => {
-                              marcarReservaLida(n.id);
-                              setFlowInitialTab("reservas");
-                              setSistemaAtivo("flow");
-                              setNotifOpen(false);
-                            }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
-                              <span style={{
-                                fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
-                                textTransform: "uppercase", color: "var(--ink, #040408)",
-                                background: "var(--gold)", borderRadius: 20,
-                                padding: "2px 8px", flexShrink: 0,
-                              }}>Reserva</span>
-                              <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
-                                {n.criadoEm?.toDate
-                                  ? n.criadoEm.toDate().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-                                  : "—"}
-                              </span>
+                          <div key={n.id} className="ag-notif-item" style={{ border: `1px solid ${cor}22`, cursor: "pointer" }}
+                            onClick={() => { marcarReservaLida(n.id); setFlowInitialTab("reservas"); setSistemaAtivo("flow"); setNotifOpen(false); }}>
+                            <div className="ag-notif-item-accent" style={{ background: cor }} />
+                            <div className="ag-notif-row-top">
+                              <div className="ag-notif-icon" style={{ background: bg }}>
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={cor} strokeWidth="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                              </div>
+                              <span className="ag-notif-categoria" style={{ color: cor }}>Flow · Nova Reserva</span>
                             </div>
-                            <div className="ag-notif-item-title" style={{ fontSize: 12, marginBottom: 4 }}>
-                              Nova reserva recebida
+                            <div className="ag-notif-row-body">
+                              <div className="ag-notif-item-title">{n.payload?.cliente || "Nova reserva recebida"}</div>
+                              <div className="ag-notif-item-body">
+                                {n.payload?.servico} · {n.payload?.data} {n.payload?.hora && `às ${n.payload.hora}`}
+                              </div>
+                              <div className="ag-notif-item-body" style={{ marginTop: 2 }}>
+                                <span style={{ color: cor }}>Ir para Reservas →</span>
+                              </div>
                             </div>
-                            <div className="ag-notif-item-body" style={{ fontSize: 11, lineHeight: 1.55 }}>
-                              <span style={{ color: "var(--text-2)" }}>Cliente:</span> {n.payload?.cliente || "—"}<br />
-                              <span style={{ color: "var(--text-2)" }}>Serviço:</span> {n.payload?.servico || "—"}<br />
-                              <span style={{ color: "var(--text-2)" }}>Data:</span> {n.payload?.data || "—"} às {n.payload?.hora || "—"}
-                            </div>
-                            <div style={{ fontSize: 10, color: "var(--gold)", marginTop: 5, fontFamily: "'JetBrains Mono', monospace" }}>
-                              Ir para Reservas →
+                            <div className="ag-notif-row-footer">
+                              <span className="ag-notif-dot" style={{ background: cor }} />
+                              <span className="ag-notif-item-meta">{tempoRel(n.criadoEm)}</span>
                             </div>
                           </div>
                         );
                       }
 
-                      /* ── Anúncio do sistema ── */
+                      /* ── Sistema / default ── */
+                      const cor = "#c8a55e";
+                      const bg  = "rgba(200,165,94,0.08)";
                       return (
-                        <div key={n.id} className="ag-notif-item">
-                          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
-                            <span style={{
-                              fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
-                              textTransform: "uppercase", color: "var(--gold)",
-                              background: "var(--gold-d)", border: "1px solid rgba(200,165,94,0.2)",
-                              borderRadius: 20, padding: "2px 8px", flexShrink: 0,
-                            }}>Sistema</span>
-                            <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
+                        <div key={n.id} className="ag-notif-item" style={{ border: `1px solid ${cor}18` }}>
+                          <div className="ag-notif-item-accent" style={{ background: cor }} />
+                          <div className="ag-notif-row-top">
+                            <div className="ag-notif-icon" style={{ background: bg }}>
+                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={cor} strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                            </div>
+                            <span className="ag-notif-categoria" style={{ color: cor }}>Sistema</span>
+                            <span className="ag-notif-item-meta" style={{ marginLeft: "auto" }}>
                               {n.criadoEm?.toDate
-                                ? n.criadoEm.toDate().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+                                ? n.criadoEm.toDate().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
                                 : "—"}
                             </span>
                           </div>
-                          <div className="ag-notif-item-title">{n.titulo}</div>
-                          <div className="ag-notif-item-body" style={{ marginTop: 4 }}>{n.mensagem}</div>
-                          {n.btnUrl && (
-                            <a
-                              href={n.btnUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="ag-notif-cta"
-                            >
-                              {n.btnTexto || "Ver mais"}
-                              <span className="ag-notif-cta-arrow" aria-hidden="true">↗</span>
-                            </a>
-                          )}
+                          <div className="ag-notif-row-body">
+                            <div className="ag-notif-item-title">{n.titulo}</div>
+                            <div className="ag-notif-item-body" style={{ marginTop: 4 }}>{n.mensagem}</div>
+                            {n.btnUrl && (
+                              <a href={n.btnUrl} target="_blank" rel="noopener noreferrer" className="ag-notif-cta">
+                                {n.btnTexto || "Ver mais"}
+                                <span className="ag-notif-cta-arrow" aria-hidden="true">↗</span>
+                              </a>
+                            )}
+                          </div>
+                          <div className="ag-notif-row-footer">
+                            <span className="ag-notif-dot" style={{ background: cor }} />
+                            <span className="ag-notif-item-meta">{tempoRel(n.criadoEm)}</span>
+                          </div>
                         </div>
                       );
                     })
