@@ -1467,175 +1467,6 @@ const CSS = `
 @media (max-width: 480px) {
   .ag-saudacao-card { top: 68px; left: 12px; max-width: calc(100vw - 24px); }
 }
-
-/* ══ 3D BAR CHART ══ */
-@keyframes bar3d-rise {
-  from { opacity: 0; transform: scaleY(0.05); }
-  to   { opacity: 1; transform: scaleY(1); }
-}
-
-.chart3d-toggle {
-  display: flex;
-  background: var(--s2);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 3px;
-  gap: 2px;
-}
-.chart3d-toggle-btn {
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  font-family: 'Inter', system-ui, sans-serif;
-  transition: all .15s;
-}
-.chart3d-toggle-btn.active {
-  background: linear-gradient(135deg, #B8860B, #D4AF37);
-  color: #050505;
-}
-.chart3d-toggle-btn:not(.active) {
-  background: transparent;
-  color: var(--text-3);
-}
-
-.chart3d-wrap {
-  padding: 4px 0 0;
-}
-.chart3d-inner {
-  display: flex;
-  align-items: flex-end;
-  gap: 0;
-  height: 170px;
-}
-.chart3d-yaxis {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: flex-end;
-  padding-right: 10px;
-  height: 100%;
-  flex-shrink: 0;
-  font-size: 9px;
-  color: var(--text-3);
-  font-family: 'JetBrains Mono', monospace;
-  line-height: 1;
-  padding-bottom: 20px;
-}
-.chart3d-stage {
-  flex: 1;
-  height: 100%;
-  position: relative;
-  overflow: visible;
-}
-.chart3d-floor {
-  position: absolute;
-  bottom: 20px; left: 0; right: 0; height: 1px;
-  background: rgba(200,165,94,0.14);
-}
-.chart3d-grid-lines {
-  position: absolute;
-  bottom: 20px; left: 0; right: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  pointer-events: none;
-  top: 0;
-}
-.chart3d-grid-line {
-  width: 100%;
-  height: 1px;
-  background: rgba(200,165,94,0.04);
-}
-.chart3d-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 4px;
-  height: calc(100% - 20px);
-  padding: 0 2px;
-}
-.bar3d-wrap {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  height: 100%;
-}
-.bar3d {
-  position: relative;
-  width: 66%;
-  max-width: 26px;
-  transform-origin: bottom center;
-  animation: bar3d-rise 0.45s cubic-bezier(0.34,1.4,0.64,1) var(--d,0s) both;
-}
-.bar3d-front {
-  position: absolute; inset: 0;
-  background: linear-gradient(180deg, #f0d060 0%, #d4a020 25%, #a87018 70%, #7a4c08 100%);
-  border-top: 1px solid rgba(255,235,100,0.55);
-}
-.bar3d-glow {
-  position: absolute;
-  bottom: -6px; left: -8px; right: -8px; height: 14px;
-  background: radial-gradient(ellipse at center, rgba(200,165,94,0.5) 0%, transparent 70%);
-  filter: blur(5px);
-  pointer-events: none; z-index: -1;
-}
-.bar3d-side {
-  position: absolute;
-  left: calc(100%);
-  top: -5px;
-  width: 7px;
-  height: calc(100% + 5px);
-  background: linear-gradient(180deg, #7a4c08 0%, #3a2404 100%);
-  clip-path: polygon(0 5px, 7px 0, 7px calc(100% - 5px), 0 100%);
-}
-.bar3d-top {
-  position: absolute;
-  top: -5px;
-  left: 0;
-  width: calc(100% + 7px);
-  height: 5px;
-  background: linear-gradient(90deg, #fff890 0%, #e8cc40 50%, #c89020 100%);
-  clip-path: polygon(7px 0, calc(100%) 0, calc(100% - 7px) 5px, 0 5px);
-}
-.bar3d-label {
-  font-size: 9px;
-  color: var(--text-3);
-  font-family: 'JetBrains Mono', monospace;
-  margin-top: 5px;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  width: 100%;
-  text-overflow: ellipsis;
-}
-.chart3d-legend {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 14px;
-  font-size: 11px;
-}
-.chart3d-legend-left {
-  display: flex; align-items: center; gap: 7px; color: var(--text-2);
-}
-.chart3d-legend-dot {
-  width: 8px; height: 8px; border-radius: 2px;
-  background: #c8a55e;
-}
-.chart3d-legend-right {
-  display: flex; align-items: center; gap: 8px; color: var(--text-2);
-}
-.chart3d-legend-right b {
-  color: var(--gold);
-  font-family: 'JetBrains Mono', monospace;
-  font-weight: 700; font-size: 13px;
-}
 `;
 
 /* ══════════════════════════════════════════════════════
@@ -1672,79 +1503,6 @@ function CustomTooltip({ active, payload, label }) {
 function Val({ v, loading, prefix = "", suffix = "" }) {
   if (loading) return <span className="ag-skeleton" style={{ width: 80 }} />;
   return <>{prefix}{v}{suffix}</>;
-}
-
-/* ── Toggle 3D / LINHA ── */
-function ChartToggle({ value, onChange }) {
-  return (
-    <div className="chart3d-toggle">
-      {[["3d","3D BARS"],["flat","LINHA"]].map(([mode, label]) => (
-        <button
-          key={mode}
-          className={`chart3d-toggle-btn ${value === mode ? "active" : ""}`}
-          onClick={() => onChange(mode)}
-        >{label}</button>
-      ))}
-    </div>
-  );
-}
-
-/* ── Chart 3D Bars ── */
-function Chart3DBars({ data, period, height = 170 }) {
-  if (!data || data.length === 0) return (
-    <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-3)", fontSize: 12 }}>
-      Nenhum dado no período
-    </div>
-  );
-  const max = Math.max(...data.map(d => d.v || 0), 1);
-  const total = data.reduce((a, b) => a + (b.v || 0), 0);
-  const CONTAINER_H = height - 40; // espaço para labels + legend
-  return (
-    <div className="chart3d-wrap">
-      <div className="chart3d-inner" style={{ height }}>
-        <div className="chart3d-yaxis">
-          {[1, 0.66, 0.33, 0].map((r, i) => (
-            <span key={i}>R$ {Math.round(max * r).toLocaleString("pt-BR")}</span>
-          ))}
-        </div>
-        <div className="chart3d-stage">
-          <div className="chart3d-floor" />
-          {[0.33, 0.66, 1].map(r => (
-            <div key={r} style={{
-              position: "absolute", bottom: `calc(20px + ${r * 100}%)`, left: 0, right: 0,
-              height: 1, background: "rgba(200,165,94,0.04)", pointerEvents: "none"
-            }} />
-          ))}
-          <div className="chart3d-bars">
-            {data.map((d, i) => {
-              const barH = Math.max(6, ((d.v || 0) / max) * (CONTAINER_H - 10));
-              return (
-                <div className="bar3d-wrap" key={i}>
-                  <div className="bar3d" style={{ height: `${barH}px`, "--d": `${i * 0.04}s` }}>
-                    <div className="bar3d-glow" />
-                    <div className="bar3d-front" />
-                    <div className="bar3d-side" />
-                    <div className="bar3d-top" />
-                  </div>
-                  <div className="bar3d-label">{d.d || d.l || ""}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-      <div className="chart3d-legend">
-        <div className="chart3d-legend-left">
-          <span className="chart3d-legend-dot" />
-          <span>Receita líquida</span>
-        </div>
-        <div className="chart3d-legend-right">
-          <span>{period}</span>
-          <b>R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</b>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 /* ══════════════════════════════════════════════════════
@@ -1901,8 +1659,6 @@ export default function Dashboard() {
     () => localStorage.getItem("ag_theme") || "dark"
   );
   const [dashView, setDashView] = useState("overview"); // "overview" | "charts"
-  const [faturMode, setFaturMode] = useState("flat");        // "flat" | "3d"
-  const [chartsBarMode, setChartsBarMode] = useState("flat"); // para renderChartsView
   const [searchQuery, setSearchQuery]     = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -3003,26 +2759,17 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         <div className="g21">
           <div className="ag-card">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <div className="ag-card-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--gold)", display: "inline-block" }} />
-                Faturamento por período
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{
-                  fontSize: 10, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase",
-                  color: "var(--gold)", background: "var(--gold-d)", padding: "3px 9px",
-                  borderRadius: 20, border: "1px solid rgba(200,165,94,0.2)",
-                }}>
-                  {period === "Personalizado" && customRange.from && customRange.to
-                    ? `${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")}`
-                    : period === "Personalizado" ? "Selecione o intervalo" : period}
-                </span>
-                <ChartToggle value={faturMode} onChange={setFaturMode} />
-              </div>
+              <div className="ag-card-title">Faturamento por período</div>
+              <span style={{
+                fontSize: 10, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase",
+                color: "var(--gold)", background: "var(--gold-d)", padding: "3px 9px",
+                borderRadius: 20, border: "1px solid rgba(200,165,94,0.2)",
+              }}>
+                {period === "Personalizado" && customRange.from && customRange.to
+                  ? `${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")}`
+                  : period === "Personalizado" ? "Selecione o intervalo" : period}
+              </span>
             </div>
-            {faturMode === "3d" ? (
-              <Chart3DBars data={dash.loading ? [] : dash.faturamentoPorDia} period={period} height={200} />
-            ) : (
             <ResponsiveContainer width="100%" height={180}>
               <AreaChart data={dash.loading ? [] : dash.faturamentoPorDia} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
                 <defs>
@@ -3042,7 +2789,6 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   activeDot={{ r: 5, fill: "#c8a55e", stroke: "rgba(200,165,94,0.3)", strokeWidth: 6, filter: "url(#glowGoldMain)" }} />
               </AreaChart>
             </ResponsiveContainer>
-            )}
           </div>
 
           <div className="ag-card" style={{ display: "flex", flexDirection: "column" }}>
@@ -3242,18 +2988,15 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     const semDados = !dash.loading && faturDia.every(pt => pt.v === 0);
     const semProdutos = !dash.loading && produtosPie.length === 0;
 
-    const Card = ({ children, title, subtitle, style = {}, headerRight }) => (
+    const Card = ({ children, title, subtitle, style = {} }) => (
       <div style={{
         background: "var(--s1)", border: "1px solid var(--border)",
         borderRadius: 14, padding: "20px 20px 16px", ...style,
       }}>
-        {(title || subtitle || headerRight) && (
-          <div style={{ marginBottom: 16, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
-            <div>
-              {title && <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", letterSpacing: "0.01em" }}>{title}</div>}
-              {subtitle && <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3 }}>{subtitle}</div>}
-            </div>
-            {headerRight && <div style={{ flexShrink: 0 }}>{headerRight}</div>}
+        {(title || subtitle) && (
+          <div style={{ marginBottom: 16 }}>
+            {title && <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", letterSpacing: "0.01em" }}>{title}</div>}
+            {subtitle && <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3 }}>{subtitle}</div>}
           </div>
         )}
         {children}
@@ -3309,16 +3052,13 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     return (
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, padding: 4 }}>
 
-        {/* 1. Faturamento vs Custo — BarChart / 3D */}
+        {/* 1. Faturamento vs Custo — BarChart */}
         <Card
           title="Faturamento vs Custo"
           subtitle={`Período: ${period}${period === "Personalizado" && customRange.from && customRange.to ? ` (${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")})` : ""}`}
           style={{ gridColumn: "1 / 2" }}
-          headerRight={<ChartToggle value={chartsBarMode} onChange={setChartsBarMode} />}
         >
-          {semDados ? <EmptyState /> : chartsBarMode === "3d" ? (
-            <Chart3DBars data={faturDia} period={period} height={240} />
-          ) : (
+          {semDados ? <EmptyState /> : (
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={dash.loading ? [] : receitaData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barSize={14} barGap={3}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
