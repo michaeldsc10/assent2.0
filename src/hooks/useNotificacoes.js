@@ -13,9 +13,12 @@ import {
   doc,
   updateDoc,
   setDoc,
+  Timestamp,
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { initFCM, obterTokenPush, escutarNotificacoesAbertas } from '../lib/fcm';
+
+const UM_DIA_MS = 24 * 60 * 60 * 1000;
 
 let sharedAudioCtx = null;
 
@@ -65,7 +68,6 @@ function tocarSomNotificacao() {
   }
 }
 
-// Salva token no array fcmTokens (arrayUnion = sem duplicatas)
 async function salvarTokenFCM(uid, vapidKey) {
   try {
     const token = await obterTokenPush(vapidKey);
@@ -90,6 +92,8 @@ export function useNotificacoes(tenantUid, user) {
   const [notificacoes, setNotificacoes] = useState([]);
   const idsConhecidosRef = useRef(null);
   const unsubFcmRef = useRef(null);
+  // Mantém mapa id→doc de ambas as queries
+  const mapaDocsRef = useRef({});
 
   const initAudio = useCallback(() => {
     initAudioContext();
@@ -119,7 +123,6 @@ export function useNotificacoes(tenantUid, user) {
 
     setupToken();
 
-    // SW atualizado → adiciona novo token ao array
     const handleControllerChange = () => {
       console.log('[FCM] SW trocado — renovando token');
       salvarTokenFCM(user.uid, vapidKey);
@@ -136,45 +139,76 @@ export function useNotificacoes(tenantUid, user) {
     };
   }, [tenantUid, user?.uid]);
 
-  // Listener Firestore
+  // Listener Firestore — duas queries mescladas
   useEffect(() => {
     if (!tenantUid || !user?.uid) {
       setNotificacoes([]);
       idsConhecidosRef.current = null;
+      mapaDocsRef.current = {};
       return;
     }
 
-    const q = query(
-      collection(db, 'users', tenantUid, 'notificacoes'),
-      where('destinatarioUid', '==', user.uid),
+    const colRef = collection(db, 'users', tenantUid, 'notificacoes');
+    const uid = user.uid;
+
+    // Query 1: não lidas
+    const qNaoLidas = query(
+      colRef,
+      where('destinatarioUid', '==', uid),
       where('lida', '==', false),
       orderBy('criadoEm', 'desc')
     );
 
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        const idsAtuais = new Set(docs.map((d) => d.id));
-
-        if (idsConhecidosRef.current === null) {
-          idsConhecidosRef.current = idsAtuais;
-        } else {
-          const novos = docs.filter((d) => !idsConhecidosRef.current.has(d.id));
-          if (novos.length > 0) tocarSomNotificacao();
-          idsConhecidosRef.current = idsAtuais;
-        }
-
-        setNotificacoes(docs);
-      },
-      (err) => {
-        console.error('[useNotificacoes] erro:', err.code, err.message);
-      }
+    // Query 2: lidas há menos de 1 dia
+    const lidaEm1DiaAtras = Timestamp.fromDate(new Date(Date.now() - UM_DIA_MS));
+    const qLidasRecentes = query(
+      colRef,
+      where('destinatarioUid', '==', uid),
+      where('lida', '==', true),
+      where('lidaEm', '>=', lidaEm1DiaAtras),
+      orderBy('lidaEm', 'desc')
     );
 
+    const flush = () => {
+      const docs = Object.values(mapaDocsRef.current).sort(
+        (a, b) => (b.criadoEm?.toMillis?.() ?? 0) - (a.criadoEm?.toMillis?.() ?? 0)
+      );
+      const idsAtuais = new Set(docs.map((d) => d.id));
+
+      if (idsConhecidosRef.current === null) {
+        idsConhecidosRef.current = idsAtuais;
+      } else {
+        const novos = docs.filter((d) => !idsConhecidosRef.current.has(d.id));
+        if (novos.length > 0) tocarSomNotificacao();
+        idsConhecidosRef.current = idsAtuais;
+      }
+
+      setNotificacoes(docs);
+    };
+
+    const handleSnap = (snap) => {
+      snap.docChanges().forEach((change) => {
+        if (change.type === 'removed') {
+          delete mapaDocsRef.current[change.doc.id];
+        } else {
+          mapaDocsRef.current[change.doc.id] = { id: change.doc.id, ...change.doc.data() };
+        }
+      });
+      flush();
+    };
+
+    const handleErr = (err) => {
+      console.error('[useNotificacoes] erro:', err.code, err.message);
+    };
+
+    const unsub1 = onSnapshot(qNaoLidas, handleSnap, handleErr);
+    const unsub2 = onSnapshot(qLidasRecentes, handleSnap, handleErr);
+
     return () => {
-      unsub();
+      unsub1();
+      unsub2();
       idsConhecidosRef.current = null;
+      mapaDocsRef.current = {};
     };
   }, [tenantUid, user?.uid]);
 
@@ -184,6 +218,7 @@ export function useNotificacoes(tenantUid, user) {
       try {
         await updateDoc(doc(db, 'users', tenantUid, 'notificacoes', notifId), {
           lida: true,
+          lidaEm: Timestamp.now(), // ← timestamp para controle de expiração
         });
       } catch (err) {
         console.error('[useNotificacoes] marcarLida erro:', err.code, err.message);
