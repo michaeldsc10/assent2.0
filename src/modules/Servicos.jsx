@@ -12,8 +12,7 @@ import { db } from "../lib/firebase";
 import { fsSnapshotError } from "../utils/firestoreError";
 import { useAuth } from "../contexts/AuthContext";
 import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
-import {LIMITES_FREE } from "../hooks/useLicenca";
-import {  BannerLimite  } from  "../hooks/LicencaUI.jsx";
+
 import {
   collection,
   doc,
@@ -796,7 +795,7 @@ function ModalConfirmDelete({ servico, vendas, onConfirm, onClose }) {
 /* ════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ════════════════════════════════════════════════════ */
-export default function Servicos({ isPro = false }) {
+export default function Servicos() {
   // ── Multi-tenant ──
   const { tenantUid, cargo, nomeUsuario, podeCriar, podeEditar, podeExcluir } = useAuth();
 
@@ -945,8 +944,7 @@ export default function Servicos({ isPro = false }) {
           <button
             className="btn-novo-sv"
             onClick={() => setModalNovo(true)}
-            disabled={!podeCriarV || (!isPro && servicos.length >= LIMITES_FREE.servicos)}
-            title={!isPro && servicos.length >= LIMITES_FREE.servicos ? `Limite de ${LIMITES_FREE.servicos} serviços atingido no plano Free` : undefined}
+            disabled={!podeCriarV}
           >
             <Plus size={14} /> Novo Serviço
           </button>
@@ -955,7 +953,7 @@ export default function Servicos({ isPro = false }) {
 
       {/* Conteúdo */}
       <div className="ag-content">
-        <BannerLimite total={servicos.length} limite={LIMITES_FREE.servicos} tipo="serviços" isPro={isPro} />
+
         <div className="sv-table-wrap">
           <div className="sv-table-header">
             <span className="sv-table-title">Serviços cadastrados</span>
