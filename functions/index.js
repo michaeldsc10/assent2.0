@@ -1813,7 +1813,7 @@ exports.stripeWebhook = onRequest(
           stripeSessionId:  session.id,
           limites,
           features:         FEATURES_PLANO[plano] ?? FEATURES_PLANO.essencial,
-          contagem:         { vendasMes: 0, alunos: 0, reservas: 0 },
+          contagem:         { vendasMes: 0, alunos: 0, reservas: 0, loginsExtras: 0 },
           dataInicio,
           dataVencimento,
           ativadoEm:        FieldValue.serverTimestamp(),
@@ -1884,7 +1884,6 @@ exports.stripeWebhook = onRequest(
             status:       "ativo",
             periodo,
             limites,
-            contagem:     { vendasMes: 0, alunos: 0, reservas: 0 },
             atualizadoEm: FieldValue.serverTimestamp(),
           }, { merge: true });
 
@@ -1989,6 +1988,12 @@ exports.atualizarPlano = onCall(ADMIN_CALL_OPTIONS, async (request) => {
     const currentSlug = licRootSnap.data()?.plano;
     const limites     = LIMITES_PLANO[newSlug] ?? LIMITES_PLANO.essencial;
 
+    // Conta usuários extras ativos reais (para inicializar loginsExtras corretamente)
+    const usuariosSnap = await db.collection(`users/${targetUid}/usuarios`).get();
+    const loginsExtrasAtual = usuariosSnap.docs.filter(d =>
+      d.data().ativo !== false && d.id !== targetUid
+    ).length;
+
     // Desativa subdoc antigo
     if (currentSlug && currentSlug !== newSlug) {
       await db.collection("licencas").doc(targetUid)
@@ -1996,7 +2001,12 @@ exports.atualizarPlano = onCall(ADMIN_CALL_OPTIONS, async (request) => {
         .set({ ativo: false, atualizadoEm: ts }, { merge: true });
     }
 
-    // Cria/ativa subdoc novo
+    // Lê contagem atual do subdoc novo (pode já existir se é re-ativação)
+    const novoSubdocSnap = await db.collection("licencas").doc(targetUid)
+      .collection("plano").doc(newSlug).get();
+    const contagemExistente = novoSubdocSnap.data()?.contagem ?? {};
+
+    // Cria/ativa subdoc novo — preserva vendasMes/alunos/reservas existentes, força loginsExtras real
     await db.collection("licencas").doc(targetUid)
       .collection("plano").doc(newSlug)
       .set({
@@ -2005,7 +2015,12 @@ exports.atualizarPlano = onCall(ADMIN_CALL_OPTIONS, async (request) => {
         slug:         newSlug,
         limites,
         features:     FEATURES_PLANO[newSlug] ?? FEATURES_PLANO.essencial,
-        contagem:     { vendasMes: 0, alunos: 0, reservas: 0 },
+        contagem: {
+          vendasMes:    contagemExistente.vendasMes    ?? 0,
+          alunos:       contagemExistente.alunos       ?? 0,
+          reservas:     contagemExistente.reservas     ?? 0,
+          loginsExtras: loginsExtrasAtual,
+        },
         atualizadoEm: ts,
       }, { merge: true });
 
