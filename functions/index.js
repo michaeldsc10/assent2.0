@@ -5,7 +5,8 @@
    + CORS restrito ao domínio da Vercel
    ═══════════════════════════════════════════════════ */
 const { onSchedule }              = require("firebase-functions/v2/scheduler");
-const { onDocumentCreated }       = require("firebase-functions/v2/firestore");
+const { onDocumentCreated,
+        onDocumentDeleted }       = require("firebase-functions/v2/firestore");
 const { onCall, onRequest,
         HttpsError }              = require("firebase-functions/v2/https");
 const { getFirestore,
@@ -27,9 +28,9 @@ const MAIL_PASS              = defineSecret("MAIL_PASS");
 
 /* Limites por plano — espelha o schema do atualizarPlano existente */
 const LIMITES_PLANO = {
-  trial:        { vendasMes: 500,  loginsExtras: 5,  alunos: 500,  reservas: 150  },
-  essencial:    { vendasMes: 500,  loginsExtras: 5,  alunos: 500,  reservas: 150  },
-  profissional: { vendasMes: 1500, loginsExtras: 15, alunos: 1000, reservas: 400 },
+  trial:        { vendasMes: 500,  loginsExtras: 5,  alunos: 500,  reservas: 250  },
+  essencial:    { vendasMes: 500,  loginsExtras: 5,  alunos: 500,  reservas: 250  },
+  profissional: { vendasMes: 1500, loginsExtras: 15, alunos: 1000, reservas: 500 },
 };
 
 const FEATURES_PLANO = {
@@ -1273,6 +1274,219 @@ exports.onVendaCreated = onDocumentCreated(
         "contagem.vendasMes": FieldValue.increment(1),
       });
     });
+  }
+);
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO: onAlunoCreated
+   Dispara quando um aluno é criado.
+   Incrementa contagem.alunos no plano ativo.
+───────────────────────────────────────────── */
+exports.onAlunoCreated = onDocumentCreated(
+  "users/{tenantUid}/alunos/{alunoId}",
+  async (event) => {
+    const { tenantUid } = event.params;
+
+    const licencaRef  = db.doc(`licencas/${tenantUid}`);
+    const licencaSnap = await licencaRef.get();
+
+    if (!licencaSnap.exists) {
+      console.error(`[onAlunoCreated] Licença não encontrada para tenant: ${tenantUid}`);
+      return;
+    }
+
+    const { plano, ativo } = licencaSnap.data();
+    if (!ativo) return;
+
+    const planoRef = db.doc(`licencas/${tenantUid}/plano/${plano}`);
+
+    await db.runTransaction(async (tx) => {
+      const planoSnap = await tx.get(planoRef);
+      if (!planoSnap.exists) {
+        console.error(`[onAlunoCreated] Subdoc "${plano}" não encontrado para tenant: ${tenantUid}`);
+        return;
+      }
+
+      const { contagem, limites } = planoSnap.data();
+      const alunos      = contagem?.alunos ?? 0;
+      const limiteAluno = limites?.alunos  ?? 500;
+
+      if (alunos >= limiteAluno) {
+        console.warn(`[onAlunoCreated] Limite de alunos atingido: ${tenantUid} (${alunos}/${limiteAluno})`);
+        return;
+      }
+
+      tx.update(planoRef, { "contagem.alunos": FieldValue.increment(1) });
+    });
+  }
+);
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO: onAlunoDeleted
+   Decrementa contagem.alunos quando aluno é excluído.
+───────────────────────────────────────────── */
+exports.onAlunoDeleted = onDocumentDeleted(
+    "users/{tenantUid}/alunos/{alunoId}",
+    async (event) => {
+      const { tenantUid } = event.params;
+
+      const licencaSnap = await db.doc(`licencas/${tenantUid}`).get();
+      if (!licencaSnap.exists) return;
+
+      const { plano, ativo } = licencaSnap.data();
+      if (!ativo) return;
+
+      const planoRef  = db.doc(`licencas/${tenantUid}/plano/${plano}`);
+      const planoSnap = await planoRef.get();
+      if (!planoSnap.exists) return;
+
+      const atual = planoSnap.data()?.contagem?.alunos ?? 0;
+      if (atual <= 0) return;
+
+      await planoRef.update({ "contagem.alunos": FieldValue.increment(-1) });
+    }
+  );
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO: onUsuarioCreated
+   Dispara quando usuário extra é criado.
+   Incrementa contagem.loginsExtras no plano ativo.
+───────────────────────────────────────────── */
+exports.onUsuarioCreated = onDocumentCreated(
+  "users/{tenantUid}/usuarios/{usuarioId}",
+  async (event) => {
+    const { tenantUid } = event.params;
+
+    // Ignora se o doc criado é o próprio admin (tenantUid == usuarioId)
+    if (event.params.usuarioId === tenantUid) return;
+
+    const licencaRef  = db.doc(`licencas/${tenantUid}`);
+    const licencaSnap = await licencaRef.get();
+
+    if (!licencaSnap.exists) {
+      console.error(`[onUsuarioCreated] Licença não encontrada para tenant: ${tenantUid}`);
+      return;
+    }
+
+    const { plano, ativo } = licencaSnap.data();
+    if (!ativo) return;
+
+    const planoRef = db.doc(`licencas/${tenantUid}/plano/${plano}`);
+
+    await db.runTransaction(async (tx) => {
+      const planoSnap = await tx.get(planoRef);
+      if (!planoSnap.exists) {
+        console.error(`[onUsuarioCreated] Subdoc "${plano}" não encontrado para tenant: ${tenantUid}`);
+        return;
+      }
+
+      const { contagem, limites } = planoSnap.data();
+      const extras      = contagem?.loginsExtras ?? 0;
+      const limiteExtra = limites?.loginsExtras  ?? 5;
+
+      if (extras >= limiteExtra) {
+        console.warn(`[onUsuarioCreated] Limite de loginsExtras atingido: ${tenantUid} (${extras}/${limiteExtra})`);
+        return;
+      }
+
+      tx.update(planoRef, { "contagem.loginsExtras": FieldValue.increment(1) });
+    });
+  }
+);
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO: onUsuarioDeleted
+   Decrementa contagem.loginsExtras quando usuário é excluído.
+───────────────────────────────────────────── */
+exports.onUsuarioDeleted = onDocumentDeleted(
+    "users/{tenantUid}/usuarios/{usuarioId}",
+    async (event) => {
+      const { tenantUid } = event.params;
+      if (event.params.usuarioId === tenantUid) return;
+
+      const licencaSnap = await db.doc(`licencas/${tenantUid}`).get();
+      if (!licencaSnap.exists) return;
+
+      const { plano, ativo } = licencaSnap.data();
+      if (!ativo) return;
+
+      const planoRef  = db.doc(`licencas/${tenantUid}/plano/${plano}`);
+      const planoSnap = await planoRef.get();
+      if (!planoSnap.exists) return;
+
+      const atual = planoSnap.data()?.contagem?.loginsExtras ?? 0;
+      if (atual <= 0) return;
+
+      await planoRef.update({ "contagem.loginsExtras": FieldValue.increment(-1) });
+    }
+  );
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO: onReservaCreated
+   Incrementa contagem.reservas no plano ativo.
+───────────────────────────────────────────── */
+exports.onReservaCreated = onDocumentCreated(
+  "users/{tenantUid}/agendamento_reservas/{reservaId}",
+  async (event) => {
+    const { tenantUid } = event.params;
+
+    const licencaRef  = db.doc(`licencas/${tenantUid}`);
+    const licencaSnap = await licencaRef.get();
+
+    if (!licencaSnap.exists) {
+      console.error(`[onReservaCreated] Licença não encontrada para tenant: ${tenantUid}`);
+      return;
+    }
+
+    const { plano, ativo } = licencaSnap.data();
+    if (!ativo) return;
+
+    const planoRef = db.doc(`licencas/${tenantUid}/plano/${plano}`);
+
+    await db.runTransaction(async (tx) => {
+      const planoSnap = await tx.get(planoRef);
+      if (!planoSnap.exists) {
+        console.error(`[onReservaCreated] Subdoc "${plano}" não encontrado para tenant: ${tenantUid}`);
+        return;
+      }
+
+      const { contagem, limites } = planoSnap.data();
+      const reservas      = contagem?.reservas ?? 0;
+      const limiteReserva = limites?.reservas  ?? 250;
+
+      if (reservas >= limiteReserva) {
+        console.warn(`[onReservaCreated] Limite de reservas atingido: ${tenantUid} (${reservas}/${limiteReserva})`);
+        return;
+      }
+
+      tx.update(planoRef, { "contagem.reservas": FieldValue.increment(1) });
+    });
+  }
+);
+
+/* ─────────────────────────────────────────────
+   FUNÇÃO: onReservaDeleted
+   Decrementa contagem.reservas quando reserva é excluída.
+───────────────────────────────────────────── */
+exports.onReservaDeleted = onDocumentDeleted(
+  "users/{tenantUid}/agendamento_reservas/{reservaId}",
+  async (event) => {
+    const { tenantUid } = event.params;
+
+    const licencaSnap = await db.doc(`licencas/${tenantUid}`).get();
+    if (!licencaSnap.exists) return;
+
+    const { plano, ativo } = licencaSnap.data();
+    if (!ativo) return;
+
+    const planoRef  = db.doc(`licencas/${tenantUid}/plano/${plano}`);
+    const planoSnap = await planoRef.get();
+    if (!planoSnap.exists) return;
+
+    const atual = planoSnap.data()?.contagem?.reservas ?? 0;
+    if (atual <= 0) return;
+
+    await planoRef.update({ "contagem.reservas": FieldValue.increment(-1) });
   }
 );
 
