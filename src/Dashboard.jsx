@@ -528,35 +528,40 @@ const CSS = `
   html, body, #root { height: 100%; width: 100%; margin: 0; padding: 0; }
 
   :root {
-    --bg:           #09090c;
-    --s1:           #0f0f13;
-    --s2:           #141419;
-    --s3:           #1a1a22;
-    --border:       rgba(255,255,255,0.07);
-    --border-h:     rgba(255,255,255,0.13);
+    --bg:           #07070a;
+    --s1:           #0d0d11;
+    --s2:           #121217;
+    --s3:           #18181f;
+    --border:       rgba(255,255,255,0.065);
+    --border-h:     rgba(255,255,255,0.12);
     --gold:         #c8a55e;
     --gold-l:       #dfc07c;
-    --gold-d:       rgba(200,165,94,0.12);
+    --gold-d:       rgba(200,165,94,0.10);
     --gold-brand:   #D4AF37;
     --text:         #edeae3;
-    --text-2:       #a09caa;
-    --text-3:       #f6f5fa;
+    --text-2:       #9895a3;
+    --text-3:       rgba(255,255,255,0.28);
     --green:        #3ecf8e;
-    --green-d:      rgba(62,207,142,0.1);
+    --green-d:      rgba(62,207,142,0.09);
     --red:          #e05252;
-    --red-d:        rgba(224,82,82,0.1);
+    --red-d:        rgba(224,82,82,0.09);
     --blue:         #5b8ef0;
-    --blue-d:       rgba(91,142,240,0.1);
+    --blue-d:       rgba(91,142,240,0.09);
     --purple:       #a78bfa;
-    --purple-d:     rgba(167,139,250,0.1);
+    --purple-d:     rgba(167,139,250,0.09);
     --amber:        #f59e0b;
-    --amber-d:      rgba(245,158,11,0.1);
+    --amber-d:      rgba(245,158,11,0.09);
     --sidebar-w:    220px;
     --sidebar-w-sm: 64px;
     --header-h:     62px;
     --sidebar-transition: width 0.22s cubic-bezier(0.4,0,0.2,1);
+    /* tech tokens */
+    --glow-gold:    0 0 24px rgba(200,165,94,0.07);
+    --glow-card:    0 2px 12px rgba(0,0,0,0.4);
+    --grid-line:    rgba(200,165,94,0.025);
     font-family: 'Inter', system-ui, sans-serif;
     --font-display: 'Inter', system-ui, sans-serif;
+    --font-mono:    'JetBrains Mono', monospace;
     color-scheme: dark;
   }
 
@@ -565,8 +570,12 @@ const CSS = `
     display: flex;
     flex-direction: column;
     height: 100vh;
-    height: 100dvh; /* mobile: exclui barra do browser */
-    background: var(--bg);
+    height: 100dvh;
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+      var(--bg);
+    background-size: 48px 48px;
     color: var(--text);
     overflow: hidden;
   }
@@ -575,8 +584,11 @@ const CSS = `
   .ag-global-header {
     height: var(--header-h);
     flex-shrink: 0;
-    background: var(--s1);
+    background: rgba(13,13,17,0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 0 rgba(200,165,94,0.06), 0 4px 24px rgba(0,0,0,0.4);
     display: flex;
     align-items: center;
     padding: 0 16px 0 0;
@@ -650,8 +662,11 @@ const CSS = `
 .ag-notif-panel {
   position: absolute; top: calc(100% + 10px); right: 0;
   width: 400px; max-height: 580px;
-  background: var(--s1); border: 1px solid var(--border);
-  border-radius: 20px; box-shadow: 0 20px 56px rgba(0,0,0,.38);
+  background: rgba(13,13,17,0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(200,165,94,0.10);
+  border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,.50), 0 0 0 1px rgba(255,255,255,0.03) inset;
   z-index: 200; overflow: hidden; display: flex; flex-direction: column;
 }
 
@@ -679,15 +694,17 @@ const CSS = `
   padding: 14px 16px;
   border-radius: 14px;
   border: 1px solid var(--border);
-  background: var(--s2);
+  border-left: 3px solid rgba(255,255,255,0.07);
+  background: linear-gradient(135deg, var(--s2) 0%, rgba(20,20,28,0.9) 100%);
   display: flex; flex-direction: column; gap: 4px;
   transition: border-color .18s, transform .18s, box-shadow .18s;
   cursor: default;
 }
 .ag-notif-item:hover {
   border-color: var(--border-h);
+  border-left-color: var(--gold);
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0,0,0,.18);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.22), 0 0 0 1px rgba(200,165,94,0.05) inset;
 }
 
 .ag-notif-item-title {
@@ -803,7 +820,8 @@ const CSS = `
   /* ══ SIDEBAR ══ */
   .ag-sidebar {
     width: var(--sidebar-w); flex-shrink: 0;
-    background: var(--s1); border-right: 1px solid var(--border);
+    background: rgba(13,13,17,0.97);
+    border-right: 1px solid var(--border);
     display: flex; flex-direction: column;
     overflow: hidden; transition: var(--sidebar-transition);
   }
@@ -832,8 +850,12 @@ const CSS = `
     transition: background .12s, color .12s, border-color .12s, padding .22s;
     white-space: nowrap; overflow: hidden; position: relative;
   }
-  .ag-nav-item:hover  { background: rgba(255,255,255,0.03); color: var(--text); }
-  .ag-nav-item.active { background: var(--gold-d); color: var(--gold); border-left-color: var(--gold); }
+  .ag-nav-item:hover  { background: rgba(255,255,255,0.025); color: var(--text); }
+  .ag-nav-item.active {
+    background: linear-gradient(90deg, rgba(200,165,94,0.12) 0%, rgba(200,165,94,0.04) 100%);
+    color: var(--gold); border-left-color: var(--gold);
+    box-shadow: inset 0 0 20px rgba(200,165,94,0.04);
+  }
   .ag-nav-item.active svg { color: var(--gold); }
 
   .ag-nav-item span {
@@ -874,17 +896,30 @@ const CSS = `
   .acesso-negado__spinner { width: 2rem; height: 2rem; border: 3px solid var(--border); border-top-color: var(--gold-brand); border-radius: 50%; animation: spin 0.7s linear infinite; }
 
   .ag-topbar {
-    padding: 14px 24px; background: var(--s1);
+    padding: 14px 24px;
+    background: rgba(13,13,17,0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border);
     display: flex; align-items: center; gap: 16px; flex-shrink: 0;
   }
   .ag-topbar-title h1 {
-    font-family: var(--font-display); font-size: 26px; font-weight: 600;
+    font-family: var(--font-display); font-size: 22px; font-weight: 700;
     color: var(--gold-brand); line-height: 1.15; letter-spacing: 0.01em;
-    background: linear-gradient(135deg, #D4AF37 10%, #e8ca60 55%, #c8a55e 100%);
+    background: linear-gradient(135deg, #D4AF37 10%, #f0d060 55%, #c8a55e 100%);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
   }
-  .ag-topbar-title p { font-size: 11px; color: var(--text-3); margin-top: 3px; letter-spacing: 0.02em; }
+  .ag-topbar-title p { font-size: 11px; color: var(--text-3); margin-top: 3px; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 500; }
+
+  @keyframes ag-pulse-dot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(62,207,142,0.5); }
+    50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(62,207,142,0); }
+  }
+  .ag-live-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green); display: inline-block;
+    animation: ag-pulse-dot 2s infinite; margin-right: 6px; flex-shrink: 0;
+  }
 
   .ag-search {
     display: flex; align-items: center; gap: 8px;
@@ -907,8 +942,13 @@ const CSS = `
     background: transparent; color: var(--text-2);
     font-family: 'Inter', system-ui, sans-serif; transition: all .13s;
   }
-  .ag-period-btn:hover  { background: var(--s2); color: var(--text); }
-  .ag-period-btn.active { background: var(--gold-d); border-color: rgba(200,165,94,.3); color: var(--gold); }
+  .ag-period-btn:hover  { background: rgba(255,255,255,0.04); color: var(--text); }
+  .ag-period-btn.active {
+    background: rgba(200,165,94,0.08);
+    border-color: rgba(200,165,94,0.28);
+    color: var(--gold);
+    box-shadow: 0 0 12px rgba(200,165,94,0.08);
+  }
 
   /* ══ CONTENT ══ */
   .ag-content { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px 36px; -webkit-overflow-scrolling: touch; }
@@ -917,31 +957,35 @@ const CSS = `
 
   /* ══ CARDS ══ */
   .ag-card {
-    background: var(--s1); border: 1px solid var(--border);
+    background: linear-gradient(145deg, var(--s1) 0%, rgba(18,18,25,0.95) 100%);
+    border: 1px solid var(--border);
     border-radius: 14px; padding: 20px;
+    box-shadow: var(--glow-card), inset 0 1px 0 rgba(255,255,255,0.025);
     transition: border-color .2s, box-shadow .2s, transform .2s;
   }
   .ag-card:hover {
     border-color: var(--border-h);
-    box-shadow: 0 6px 28px rgba(0,0,0,0.3);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
     transform: translateY(-2px);
   }
   .ag-card-click { cursor: pointer; }
   .ag-card-click:hover {
-    border-color: rgba(200,165,94,0.25);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+    border-color: rgba(200,165,94,0.22);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(200,165,94,0.08), inset 0 1px 0 rgba(200,165,94,0.06);
     transform: translateY(-3px);
   }
   .ag-card-click:active { transform: translateY(-1px); }
 
   .ag-card-bare {
-    background: var(--s1); border: 1px solid var(--border);
+    background: linear-gradient(145deg, var(--s1) 0%, rgba(18,18,25,0.95) 100%);
+    border: 1px solid var(--border);
     border-radius: 14px; overflow: hidden;
+    box-shadow: var(--glow-card), inset 0 1px 0 rgba(255,255,255,0.025);
     transition: border-color .2s, box-shadow .2s, transform .2s;
   }
   .ag-card-bare:hover {
     border-color: var(--border-h);
-    box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.4);
     transform: translateY(-1px);
   }
 
@@ -971,15 +1015,16 @@ const CSS = `
   .ag-mini-icon {
     width: 44px; height: 44px; border-radius: 11px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
   }
-  .ag-mini-val { font-family: 'Inter', system-ui, sans-serif; font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
+  .ag-mini-val { font-family: var(--font-mono); font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: -0.02em; }
   .ag-mini-lbl { font-size: 11px; color: var(--text-2); margin-top: 4px; }
 
   /* ══ KPI CARDS ══ */
-  .ag-kpi-label { font-size: 10px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; color: var(--text-2); margin-bottom: 10px; }
-  .ag-kpi-val   { font-family: 'Inter', system-ui, sans-serif; font-size: 24px; font-weight: 700; color: var(--text); line-height: 1; }
+  .ag-kpi-label { font-size: 10px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--text-2); margin-bottom: 10px; }
+  .ag-kpi-val   { font-family: var(--font-mono); font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: -0.02em; }
   .ag-kpi-meta  { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-  .ag-trend     { font-size: 11px; font-weight: 500; display: flex; align-items: center; gap: 2px; }
+  .ag-trend     { font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 2px; }
   .ag-sub       { font-size: 11px; color: var(--text-3); }
 
   /* ══ TABELAS ══ */
@@ -996,9 +1041,10 @@ const CSS = `
 
   /* ══ RESUMO DESPESAS ══ */
   .ag-despesa-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; padding: 18px; }
-  .ag-despesa-card { border-radius: 10px; padding: 15px; }
-  .ag-despesa-label { font-size: 9px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; margin-bottom: 8px; }
-  .ag-despesa-count { font-family: 'Inter', system-ui, sans-serif; font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
+  .ag-despesa-card { border-radius: 12px; padding: 15px; backdrop-filter: blur(4px); transition: transform .15s; }
+  .ag-despesa-card:hover { transform: translateY(-2px); }
+  .ag-despesa-label { font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; margin-bottom: 8px; }
+  .ag-despesa-count { font-family: var(--font-mono); font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: -0.02em; }
   .ag-despesa-val   { font-size: 11px; color: var(--text-2); margin-top: 6px; }
 
   /* ══ FILTRO PERSONALIZADO ══ */
@@ -1022,12 +1068,12 @@ const CSS = `
 
   /* ══ LOADING SKELETON ══ */
   @keyframes ag-shimmer {
-    0%   { background-position: -400px 0; }
-    100% { background-position:  400px 0; }
+    0%   { background-position: -600px 0; }
+    100% { background-position:  600px 0; }
   }
   .ag-skeleton {
-    background: linear-gradient(90deg, var(--s2) 25%, var(--s3) 50%, var(--s2) 75%);
-    background-size: 800px 100%; animation: ag-shimmer 1.4s infinite;
+    background: linear-gradient(90deg, var(--s2) 25%, rgba(200,165,94,0.04) 50%, var(--s2) 75%);
+    background-size: 1200px 100%; animation: ag-shimmer 1.6s ease-in-out infinite;
     border-radius: 6px; height: 1em; display: inline-block; width: 100%;
   }
 
@@ -2316,7 +2362,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       <header className="ag-topbar">
         <div className="ag-topbar-title">
           <h1>Dashboard</h1>
-          <p>Visão geral do negócio</p>
+          <p><span className="ag-live-dot" />Visão geral do negócio</p>
         </div>
 
         {/* Toggle Visão */}
@@ -2518,7 +2564,10 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         {/* KPI Principal */}
         <div className="g3">
           {kpiMain.map((k) => (
-            <div key={k.label} className="ag-card" style={{ borderTop: `2px solid ${k.accent}` }}>
+            <div key={k.label} className="ag-card" style={{
+              borderTop: `2px solid ${k.accent}`,
+              boxShadow: `0 2px 16px rgba(0,0,0,0.4), 0 0 40px ${k.accent}0d`,
+            }}>
               <div className="ag-kpi-label">{k.label}</div>
               <div className="ag-kpi-val"><Val v={k.value} loading={dash.loading} /></div>
               <div className="ag-kpi-meta">
@@ -2535,7 +2584,10 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         {/* KPI Secundário */}
         <div className="g3">
           {kpiSec.map((k) => (
-            <div key={k.label} className="ag-card" style={{ borderTop: `2px solid ${k.accent}` }}>
+            <div key={k.label} className="ag-card" style={{
+              borderTop: `2px solid ${k.accent}`,
+              boxShadow: `0 2px 16px rgba(0,0,0,0.4), 0 0 40px ${k.accent}0d`,
+            }}>
               <div className="ag-kpi-label">{k.label}</div>
               <div className="ag-kpi-val"><Val v={k.value} loading={dash.loading} /></div>
               <div className="ag-kpi-meta"><span className="ag-sub">{k.sub}</span></div>
