@@ -669,6 +669,11 @@ function ModalNovaDespesa({ despesa, despesas, categorias, onCriarCategoria, onD
 
   const primeiraCategoria = categorias[0]?.nome || "";
 
+  const hojeStr = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
+
   const [form, setForm] = useState({
     descricao:      despesa?.descricao      || "",
     valor:          despesa?.valor          || "",
@@ -685,6 +690,8 @@ function ModalNovaDespesa({ despesa, despesas, categorias, onCriarCategoria, onD
     totalParcelas:  despesa?.totalParcelas  || 2,
     tipoValor:      "total",
     observacao:     despesa?.observacao     || "",
+    jaPago:         false,
+    dataPagamento:  hojeStr,
   });
   const [erros, setErros] = useState({});
   const [salvando, setSalvando] = useState(false);
@@ -699,6 +706,7 @@ function ModalNovaDespesa({ despesa, despesas, categorias, onCriarCategoria, onD
     if (!form.descricao.trim()) e.descricao = "Descrição é obrigatória.";
     if (!form.valor || isNaN(Number(form.valor)) || Number(form.valor) <= 0) e.valor = "Valor inválido.";
     if (!form.vencimento) e.vencimento = "Data de vencimento é obrigatória.";
+    if (!isEdit && !form.parcelado && form.jaPago && !form.dataPagamento) e.dataPagamento = "Informe a data do pagamento.";
     setErros(e);
     return Object.keys(e).length === 0;
   };
@@ -721,6 +729,8 @@ function ModalNovaDespesa({ despesa, despesas, categorias, onCriarCategoria, onD
   parcelado:       form.parcelado && !isEdit,
   totalParcelas:   form.parcelado && !isEdit ? Number(form.totalParcelas) : null,
   observacao:      form.observacao.trim(),
+  jaPago:          !isEdit && !form.parcelado ? form.jaPago : false,
+  dataPagamento:   !isEdit && !form.parcelado && form.jaPago ? form.dataPagamento : null,
 };
 
 // só adiciona se realmente existir
@@ -973,6 +983,59 @@ await onSave(dados);
               placeholder="Opcional"
             />
           </div>
+
+          {/* Já foi paga — apenas despesa simples nova */}
+          {!isEdit && !form.parcelado && (
+            <div style={{ marginTop: 16, padding: "14px 16px", background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 10 }}>
+              <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", userSelect: "none" }}>
+                <input
+                  type="checkbox"
+                  checked={form.jaPago}
+                  onChange={e => set("jaPago", e.target.checked)}
+                  style={{ accentColor: "var(--green)", width: 15, height: 15 }}
+                />
+                <div>
+                  <span className="form-label" style={{ marginBottom: 0, color: form.jaPago ? "var(--green)" : "var(--text-2)" }}>
+                    Despesa já foi paga
+                  </span>
+                  <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
+                    Registra diretamente como paga, sem etapa adicional
+                  </div>
+                </div>
+              </label>
+
+              {form.jaPago && (
+                <div className="form-row" style={{ marginTop: 14 }}>
+                  <div className="form-group form-group-0">
+                    <label className="form-label">Data do pagamento <span className="form-label-req">*</span></label>
+                    <input
+                      className={`form-input ${erros.dataPagamento ? "err" : ""}`}
+                      type="date"
+                      value={form.dataPagamento}
+                      onChange={e => set("dataPagamento", e.target.value)}
+                    />
+                    {erros.dataPagamento && <div className="form-error">{erros.dataPagamento}</div>}
+                  </div>
+                  <div className="form-group form-group-0">
+                    <label className="form-label">Forma de pagamento</label>
+                    <div className="chip-group" style={{ marginTop: 2 }}>
+                      {FORMAS_PAG.map(fp => (
+                        <button
+                          key={fp.value}
+                          className={`chip ${form.formaPagamento === fp.value ? "active" : ""}`}
+                          onClick={() => set("formaPagamento", fp.value)}
+                          type="button"
+                        >
+                          <fp.Icon size={11} style={{ display: "inline", marginRight: 4, verticalAlign: "middle" }} />
+                          {fp.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
         </div>
 
@@ -1552,9 +1615,11 @@ export default function Despesas() {
           ? parseFloat((valorTotal - valorParcela * (form.totalParcelas - 1)).toFixed(2))
           : valorParcela;
 
-        batch.set(doc(db, "users", tenantUid, "despesas", newDocId), {
+        batch.set(doc(db, "users", tenantUid, "despesas", newDocId), limparUndefined({
           ...form,
-          valor:      valorEsta,
+          jaPago:        undefined,
+          dataPagamento: undefined,
+          valor:         valorEsta,
           valorTotal,
           parcelado:  true,
           grupoId,
@@ -1563,7 +1628,7 @@ export default function Despesas() {
           vencimento: dataVenc,
           status,
           dataCriacao: new Date().toISOString(),
-        });
+        }));
       }
       cnt++; // grupo inteiro consome apenas 1 número sequencial
 
@@ -1573,15 +1638,37 @@ export default function Despesas() {
       // Despesa única
       const newDocId = `${gerarIdBase(cnt)}-${Date.now()}`;
       const idShow = gerarIdShow(cnt);
-      const status = calcularStatus(form.vencimento, "pendente");
+      const statusBase = form.jaPago ? "pago" : calcularStatus(form.vencimento, "pendente");
+
+      const pagamentoFields = form.jaPago ? (() => {
+        const dtTs = new Date(form.dataPagamento + "T12:00:00");
+        const valor = Number(form.valor);
+        return {
+          valorPago:       valor,
+          dataPagamento:   form.dataPagamento,
+          dataPagamentoTs: dtTs,
+          mesPagamento:    dtTs.getMonth() + 1,
+          anoPagamento:    dtTs.getFullYear(),
+          pagamentos: [{
+            valor,
+            data:           form.dataPagamento,
+            formaPagamento: form.formaPagamento,
+            ts:             dtTs.toISOString(),
+          }],
+        };
+      })() : {};
+
+      // jaPago é flag de UI, não persiste no Firestore
+      const { jaPago, ...formSemFlag } = form;
 
     await setDoc(
   doc(db, "users", tenantUid, "despesas", newDocId),
   limparUndefined({
-    ...form,
-    status,
+    ...formSemFlag,
+    status: statusBase,
     idShow,
     dataCriacao: new Date().toISOString(),
+    ...pagamentoFields,
   })
 );
       await setDoc(doc(db, "users", tenantUid), { despesaIdCnt: cnt + 1 }, { merge: true });
