@@ -372,7 +372,6 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
     const cliMap = {};
     vendasPeriodo.forEach((v) => {
       const k = v.cliente || "—";
-      if (k === "—" || /^mesa\b/i.test(k)) return;
       cliMap[k] = (cliMap[k] || 0) + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0));
     });
     const topClientes = Object.entries(cliMap)
