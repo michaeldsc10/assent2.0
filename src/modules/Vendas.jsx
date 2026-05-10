@@ -800,13 +800,13 @@ function escaparCSV(valor) {
 function exportarCSV(vendas) {
   const header = "ID,Cliente,Data,Pagamento,Vendedor,Itens,Total\n";
   const rows = vendas.map(v =>
-    `${escaparCSV(v.id)},${escaparCSV(v.cliente || "")},${escaparCSV(fmtData(v.data))},${escaparCSV(v.formaPagamento || "")},${escaparCSV(v.vendedor || "")},${v.itens?.length || 0},${v.total || 0}`
+    `${escaparCSV(v.idVenda || v.id)},${escaparCSV(v.cliente || "")},${escaparCSV(fmtData(v.data))},${escaparCSV(v.formaPagamento || "")},${escaparCSV(v.vendedor || "")},${v.itens?.length || 0},${escaparCSV(String(Number(v.total) || 0))}`
   ).join("\n");
   const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = "vendas.csv"; a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 100);
 }
 
 
@@ -893,6 +893,8 @@ function ModalQrPixVendas({ valor, descricao, tenantUid, onPago, onClose }) {
         if (status === "approved") confirmarPagamento();
         if (status === "rejected" || status === "cancelled") {
           unsubRef.current?.();
+          clearInterval(pollingRef.current);
+          clearInterval(countRef.current);
           if (mountedRef.current) {
             setErrMsg("Pagamento recusado ou cancelado pelo Mercado Pago.");
             setFase("erro");
@@ -1377,16 +1379,15 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
     return Object.keys(e).length === 0;
   };
 
-  const handleSalvar = async () => {
-    if (!validar() || isSaving) return;
-    setIsSaving(true);
-    setSalvando(true);
-
-    const payload = {
+  /* Monta o payload da venda — usado tanto em handleSalvar quanto no onPago do QR Pix.
+     Retorna null se a validação falhar (não deve ocorrer quando chamado via onPago,
+     pois validar() já foi executado antes de abrir o QR). */
+  const buildPayload = () => {
+    const base = {
       cliente: clienteSearch.trim(),
       data: new Date(dataVenda + "T12:00:00"),
       vendedor:   vendedor.trim(),
-      vendedorId: vendedorIdSel || "",   // ID do cadastro — base para relatórios
+      vendedorId: vendedorIdSel || "",
       vendedorCargo: vendedorCargo.trim(),
       formaPagamento: formaPgto,
       observacao: observacao.trim(),
@@ -1395,20 +1396,13 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
       subtotal: calculos.subtotal,
       descontos: calculos.descontos,
       custoTotal: calculos.custo,
-      /* Taxa é custo operacional — lucro já deduz a taxa */
       lucroEstimado: taxaInfo.lucroReal,
-      /* ── Taxa de cartão (0 quando não é cartão — compatível com dados antigos) ── */
       parcelas:       taxaInfo.parcelas,
       taxaPercentual: taxaInfo.taxaPercentual,
       valorTaxa:      taxaInfo.valorTaxa,
-      /* ── Sinal (null quando não é sinal — compatível com dados antigos) ── */
-      valorPago:      sinalInfo.ativo ? sinalInfo.valorPagoNum    : null,
-      valorRestante:  sinalInfo.ativo ? sinalInfo.valorRestante   : null,
-      dataVencSinal:  sinalInfo.ativo ? dataVencSinal             : null,
-      /* ── Controle de recebimento — regime de caixa puro ──
-         statusPagamento: "recebido" | "parcial" | "pendente"
-         valorRecebido  : valor que efetivamente entrou no caixa neste momento.
-         Vendas antigas sem este campo são tratadas como "recebido" (fallback). */
+      valorPago:      sinalInfo.ativo ? sinalInfo.valorPagoNum  : null,
+      valorRestante:  sinalInfo.ativo ? sinalInfo.valorRestante : null,
+      dataVencSinal:  sinalInfo.ativo ? dataVencSinal           : null,
       statusPagamento: sinalInfo.ativo
         ? (sinalInfo.valorPagoNum > 0 ? "parcial" : "pendente")
         : "recebido",
@@ -1416,8 +1410,7 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
         ? sinalInfo.valorPagoNum
         : calculos.total,
     };
-
-    payload.itens = itens.map(i => ({
+    base.itens = itens.map(i => ({
       produtoId: i.produtoId || null,
       nome: i.nome,
       qtd: parseInt(i.qtd) || 1,
@@ -1426,6 +1419,15 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
       desconto: parseFloat(i.desconto) || 0,
       tipo,
     }));
+    return base;
+  };
+
+  const handleSalvar = async () => {
+    if (!validar() || isSaving) return;
+    setIsSaving(true);
+    setSalvando(true);
+
+    const payload = buildPayload();
 
     /* ── Validação de estoque (apenas produtos, não serviços) ── */
     if (tipo === "produto") {
@@ -1454,9 +1456,12 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
       }
     }
 
-    await onSave(payload, isEdit ? venda : null);
-    setSalvando(false);
-    setIsSaving(false);
+    try {
+      await onSave(payload, isEdit ? venda : null);
+    } finally {
+      setSalvando(false);
+      setIsSaving(false);
+    }
   };
 
   /* Autocomplete clientes */
@@ -1712,9 +1717,9 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
                     />
                     {itemAC === idx && (
                       <div className="nv-ac-list">
-                        {catalogoFiltrado(itemSearches[idx] || "", idx).length === 0
+                        {catalogoFiltrado(itemSearches[idx] || "").length === 0
                           ? <div className="nv-ac-empty">Nenhum item encontrado</div>
-                          : catalogoFiltrado(itemSearches[idx] || "", idx).map(p => (
+                          : catalogoFiltrado(itemSearches[idx] || "").map(p => (
                               <div 
                                 key={p.id} 
                                 className="nv-ac-item" 
@@ -1890,9 +1895,18 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
         descricao={`Venda — ${itens.length} item(ns) — ${clienteSearch || "Cliente"}`}
         tenantUid={uid}
         onPago={async () => {
+          /* Constrói payload diretamente — não chama handleSalvar para evitar double-save.
+             isSaving pode ser false neste momento se o primeiro ciclo já terminou. */
           setShowQrPix(false);
-          /* Dispara o salvamento normal da venda ao confirmar pagamento Pix */
-          await handleSalvar();
+          setSalvando(true);
+          setIsSaving(true);
+          try {
+            const payload = buildPayload();
+            if (payload) await onSave(payload, null);
+          } finally {
+            setSalvando(false);
+            setIsSaving(false);
+          }
         }}
         onClose={() => setShowQrPix(false)}
       />
@@ -2739,13 +2753,20 @@ useEffect(() => {
     try {
       /* 1. Marcar como cancelada + restaurar estoque (atômico) */
       await runTransaction(db, async (tx) => {
-        for (const item of (deletando.itens || [])) {
-          if (item.produtoId && item.tipo === "produto") {
-            const ref = doc(db, "users", tenantUid, "produtos", item.produtoId);
-            tx.update(ref, { estoque: increment(item.qtd || 1) });
-          }
-        }
-        tx.update(doc(db, "users", tenantUid, "vendas", vendaId), {
+        /* Lê o doc atual para garantir que ainda não está cancelada (guard contra race condition) */
+        const vendaRef  = doc(db, "users", tenantUid, "vendas", vendaId);
+        const vendaSnap = await tx.get(vendaRef);
+        if (!vendaSnap.exists() || vendaSnap.data()?.status === "cancelada") return;
+
+        const itensComProduto = (deletando.itens || []).filter(i => i.produtoId && i.tipo === "produto");
+        const refs = itensComProduto.map(i => doc(db, "users", tenantUid, "produtos", i.produtoId));
+        /* Reads first (obrigatório no SDK web modular) */
+        if (refs.length > 0) await Promise.all(refs.map(r => tx.get(r)));
+        /* Writes after */
+        itensComProduto.forEach((item, idx) => {
+          tx.update(refs[idx], { estoque: increment(item.qtd || 1) });
+        });
+        tx.update(vendaRef, {
           status: "cancelada",
           canceladaEm: serverTimestamp(),
           canceladaPor: { uid: user?.uid, nome: nomeUsuario || user?.displayName || user?.email || "—", cargo },
@@ -2801,12 +2822,15 @@ useEffect(() => {
             Number(ar.valorTotal || 0),
             Number(((ar.valorRestante || 0) + valorRevertido).toFixed(2))
           );
+          /* Ao reverter um pagamento, o status nunca deve ser "pago".
+             Se novoValorRestante <= 0 é uma anomalia (valorRevertido era 0),
+             mantemos "pendente" ou "vencido" como estado seguro. */
           const novoStatus =
-            novoValorRestante <= 0
-              ? "pago"
-              : new Date(ar.dataVencimento) < new Date()
-                ? "vencido"
-                : "pendente";
+            novoValorRestante > 0 && new Date(ar.dataVencimento) < new Date()
+              ? "vencido"
+              : novoValorRestante > 0
+                ? "pendente"
+                : "pago"; // só ocorre se valorRevertido era 0 — não muda nada
           await updateDoc(arRef, {
             valorPago:       novoValorPago,
             valorRestante:   novoValorRestante,
@@ -2832,13 +2856,19 @@ useEffect(() => {
     try {
       /* 1. Deletar venda + restaurar estoque (atômico) */
       await runTransaction(db, async (tx) => {
-        for (const item of (excluindoDef.itens || [])) {
-          if (item.produtoId && item.tipo === "produto") {
-            const ref = doc(db, "users", tenantUid, "produtos", item.produtoId);
-            tx.update(ref, { estoque: increment(item.qtd || 1) });
-          }
-        }
-        tx.delete(doc(db, "users", tenantUid, "vendas", vendaId));
+        const vendaRef  = doc(db, "users", tenantUid, "vendas", vendaId);
+        const vendaSnap = await tx.get(vendaRef);
+        if (!vendaSnap.exists()) return; // já excluída — não restaura estoque
+
+        const itensComProduto = (excluindoDef.itens || []).filter(i => i.produtoId && i.tipo === "produto");
+        const refs = itensComProduto.map(i => doc(db, "users", tenantUid, "produtos", i.produtoId));
+        /* Reads first (obrigatório no SDK web modular) */
+        if (refs.length > 0) await Promise.all(refs.map(r => tx.get(r)));
+        /* Writes after */
+        itensComProduto.forEach((item, idx) => {
+          tx.update(refs[idx], { estoque: increment(item.qtd || 1) });
+        });
+        tx.delete(vendaRef);
       });
     } catch (err) {
       fsError(err, "Vendas:excluirTransacao");
@@ -2890,11 +2920,11 @@ useEffect(() => {
             Number(((ar.valorRestante || 0) + valorRevertido).toFixed(2))
           );
           const novoStatus =
-            novoValorRestante <= 0
-              ? "pago"
-              : new Date(ar.dataVencimento) < new Date()
-                ? "vencido"
-                : "pendente";
+            novoValorRestante > 0 && new Date(ar.dataVencimento) < new Date()
+              ? "vencido"
+              : novoValorRestante > 0
+                ? "pendente"
+                : "pago";
           await updateDoc(arRef, {
             valorPago:       novoValorPago,
             valorRestante:   novoValorRestante,
