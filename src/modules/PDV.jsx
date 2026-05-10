@@ -6,10 +6,10 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Search, ShoppingCart, Trash2, Plus, Minus,
+  Search, ShoppingCart, Plus, Minus,
   CheckCircle, X, AlertCircle, Barcode, User,
   CreditCard, Banknote, QrCode, Package, ArrowLeft,
-  Receipt, Loader2, ChevronDown, Printer, PlusCircle, Trash2 as TrashIcon,
+  Receipt, Loader2, ChevronDown, Printer, PlusCircle,
   Copy, Eye, EyeOff,
 } from "lucide-react";
 
@@ -51,6 +51,10 @@ const fmtNum = (v) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+
+/* ── Formata moeda BRL para recibos/cupom ── */
+const fmtR$PDV = (v) =>
+  `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
 /* ══════════════════════════════════════════════════════
    MODAL PAGAMENTO PARCIAL
@@ -252,6 +256,11 @@ function ModalPagamento({ restante, taxas, onConfirm, onClose }) {
                 Troco: {fmt(troco)}
               </div>
             )}
+            {troco !== null && troco < 0 && (
+              <div style={{ marginTop:6, fontSize:13, color:"#e05555", fontWeight:600 }}>
+                ⚠ Valor insuficiente ({fmt(Math.abs(troco))} a menos)
+              </div>
+            )}
           </div>
         )}
 
@@ -302,7 +311,7 @@ function ModalCupom({ venda, troco, empresa, onClose }) {
     dinheiro: "Dinheiro",
     cartao:   "Débito",
     pix:      "Pix",
-    credito:  `Crédito ${venda.parcelas}x`,
+    credito:  `Crédito ${(venda.pagamentos?.find(p => p.forma === "credito")?.parcelas) || venda.parcelas || 1}x`,
   };
 
   const imprimir = () => {
@@ -474,6 +483,7 @@ function ModalQrPix({ valor, descricao, tenantUid, onPago, onClose }) {
 
   /* Helper — chama Cloud Function via fetch com token Firebase Auth */
   const callCF = async (nome, body) => {
+    if (!auth.currentUser) throw new Error("Sessão expirada. Faça login novamente.");
     const token = await getIdToken(auth.currentUser);
     const res   = await fetch(`${CF_BASE}/${nome}`, {
       method:  "POST",
@@ -939,10 +949,6 @@ function ModalSenhaCancelar({ senhaCadastrada, onConfirm, onClose }) {
    COMPONENTE PRINCIPAL
    ═══════════════════════════════════════════════════ */
 
-/* ── Recibo de impressão — mesmo modelo de Vendas.jsx ── */
-const fmtR$PDV = (v) =>
-  `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
-
 function imprimirRecibo(venda, empresa) {
   const el = document.getElementById("recibo-print-root");
   if (!el) return;
@@ -1089,8 +1095,6 @@ export default function PDV({ onVoltar }) {
   const [buscaModalLoading, setBuscaModalLoading] = useState(false);
   const buscaModalInputRef = useRef(null);
 
-  const buscaRef = useRef(null);
-
   /* ─── Busca nome do operador em licencas/{tenantUid} ─── */
   useEffect(() => {
     if (!tenantUid) return;
@@ -1143,14 +1147,6 @@ export default function PDV({ onVoltar }) {
     }
   }, [showBuscaModal]);
 
-  /* ─── Mapeamento forma → label ─── */
-  const FORMA_LABEL = {
-    dinheiro: "Dinheiro",
-    cartao:   "Cartão de Débito",
-    pix:      "Pix",
-    credito:  "Cartão de Crédito",
-  };
-
   /* ─── Total do carrinho ─── */
   const total    = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
   const pago     = pagamentos.reduce((acc, p) => acc + p.valor, 0);
@@ -1192,7 +1188,7 @@ export default function PDV({ onVoltar }) {
         setBuscando(false);
       }
     },
-    [tenantUid]
+    [tenantUid, adicionarAoCarrinho]
   );
 
   /* ══════════════════════════════════
@@ -1215,8 +1211,7 @@ export default function PDV({ onVoltar }) {
           .filter(
             (p) =>
               p.nome?.toLowerCase().includes(termo) ||
-              p.codigoBarras?.includes(termo) ||
-              p.codigo?.includes(termo)
+              p.codigoBarras?.includes(termo)
           )
           .slice(0, 8);
         setProdutosFiltrados(resultados);
@@ -1324,7 +1319,7 @@ export default function PDV({ onVoltar }) {
   /* ══════════════════════════════════
      FINALIZAR VENDA
      ══════════════════════════════════ */
-  const finalizarVenda = async (extraPagamento = null) => {
+  const finalizarVenda = useCallback(async (extraPagamento = null) => {
     if (!tenantUid) return;
     if (carrinho.length === 0) {
       setErro("Adicione pelo menos um produto ao carrinho.");
@@ -1410,7 +1405,8 @@ export default function PDV({ onVoltar }) {
     } finally {
       setFinalizando(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantUid, carrinho, pagamentos, total, cliente, vendedorId, nomeOperador, operadorDisplay]);
 
   /* ── Atalhos de teclado globais ── */
   /* Inserido APÓS todas as declarações que referencia (vencido, finalizando, carrinho, finalizarVenda) */
@@ -1794,7 +1790,6 @@ export default function PDV({ onVoltar }) {
             <div className="pdv-search-box">
               <Search size={15} className="pdv-search-icon" />
               <input
-                ref={buscaRef}
                 type="text"
                 className="pdv-search-input"
                 placeholder="Buscar produto por nome..."
