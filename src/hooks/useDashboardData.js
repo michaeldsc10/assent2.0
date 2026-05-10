@@ -125,10 +125,11 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
     }
 
     let loaded = 0;
+    let desmontado = false;
     const TOTAL = 6;
     const markDone = () => {
       loaded++;
-      if (loaded >= TOTAL) setLoading(false);
+      if (!desmontado && loaded >= TOTAL) setLoading(false);
     };
 
     /* Mapeia: [nome da coleção, chave no estado raw] */
@@ -158,7 +159,10 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
       )
     );
 
-    return () => unsubs.forEach((u) => u());
+    return () => {
+      desmontado = true;
+      unsubs.forEach((u) => u());
+    };
   }, [uid]);
 
   /* ── Métricas computadas (memoizadas) ─────────── */
@@ -196,11 +200,10 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
     }, 0);
 
     /* Receitas manuais do a_receber (não vinculadas a vendas) — regime de caixa */
-    /* Receitas manuais do a_receber (não vinculadas a vendas) — regime de caixa */
     const receitaAReceberManual = aReceber
       .filter((r) => r.origem !== "venda")
       .reduce((s, r) => {
-        /* Com histórico: soma só as entradas dentro do período */
+        /* Com histórico: soma cada entrada individualmente pelo período */
         if (Array.isArray(r.historicoPagamentos) && r.historicoPagamentos.length > 0) {
           return s + r.historicoPagamentos.reduce((acc, p) => {
             const dt = toDate(p.data);
@@ -209,7 +212,7 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
             return acc + Number(p.valor || 0);
           }, 0);
         }
-        /* Legado: sem histórico */
+        /* Legado: sem histórico — filtra pela data do pagamento */
         if (Number(r.valorPago || 0) <= 0) return s;
         const dt = toDate(r.dataPagamento) || toDate(r.dataCriacao);
         if (!dt) return s;
@@ -264,16 +267,11 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
     );
 
     /* ── A Receber ── */
-    const totalAReceber = aReceber
-      .filter((a) => a.status !== "pago")
-      .reduce(
-        (s, a) =>
-          s +
-          (Number(a.valorRestante) ||
-            Math.max(0, Number(a.valorTotal) - Number(a.valorPago)) ||
-            0),
-        0
-      );
+    // Não depende do campo status (não gravado no Firestore) — usa valorRestante real
+    const totalAReceber = aReceber.reduce((s, a) => {
+      const restante = Number(a.valorRestante) ?? Math.max(0, Number(a.valorTotal || 0) - Number(a.valorPago || 0));
+      return s + (restante > 0 ? restante : 0);
+    }, 0);
 
     /* ── Faturamento por período (respeita o filtro ativo) ── */
     let faturamentoPorDia = [];
