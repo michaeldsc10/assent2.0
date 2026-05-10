@@ -19,7 +19,7 @@ import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logActi
 import {
   collection, doc, setDoc, deleteDoc, onSnapshot,
   query, orderBy, writeBatch, addDoc, serverTimestamp,
-  getDocs, where,
+  getDocs, getDoc, where,
 } from "firebase/firestore";
 
 /* ── CSS ── */
@@ -1063,7 +1063,7 @@ function ModalPagar({ despesa, onConfirm, onClose }) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   });
 
-  const [valorParcial, setValorParcial] = useState(String(valorRestante.toFixed(2)));
+  const [valorParcial, setValorParcial] = useState(String(Math.max(0, valorRestante).toFixed(2)));
   const valorNum = Math.max(0, parseFloat(valorParcial) || 0);
   const isParcial = valorNum < valorRestante - 0.001;
 
@@ -1176,8 +1176,12 @@ function ModalConfirmDelete({ despesa, onConfirm, onClose }) {
 
   const handleConfirm = async (cancelarGrupo = false) => {
     setExcluindo(true);
-    await onConfirm(cancelarGrupo);
-    setExcluindo(false);
+    try {
+      await onConfirm(cancelarGrupo);
+      // nao chama setExcluindo(false): onConfirm fecha o modal (unmount)
+    } catch {
+      setExcluindo(false);
+    }
   };
 
   return (
@@ -1223,7 +1227,7 @@ function ModalConfirmDelete({ despesa, onConfirm, onClose }) {
    ════════════════════════════════════════ */
 function ModalDetalhes({ despesa, onEditar, onPagar, onDesfazer, onDeletar, podeEditar, podeExcluir, onClose }) {
   const d = despesa;
-  const FORMAS_LABEL = { dinheiro: "Dinheiro", pix: "Pix", cartão: "Cartão" };
+  const FORMAS_LABEL = { dinheiro: "Dinheiro", pix: "Pix", cartao: "Cartão", debito: "Débito", credito: "Crédito" };
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -1319,7 +1323,7 @@ function ModalDetalhes({ despesa, onEditar, onPagar, onDesfazer, onDeletar, pode
                 Registrar Pagamento
               </button>
             )}
-            {d.status === "pago" && (
+            {(d.status === "pago" || d.status === "parcial") && (
               <button className="btn-secondary" onClick={() => { onClose(); onDesfazer(d); }}>
                 <RotateCcw size={13} style={{ display: "inline", marginRight: 6, verticalAlign: "middle" }} />
                 Desfazer Pagamento
@@ -1573,7 +1577,7 @@ export default function Despesas() {
           mudou = true;
         }
       });
-      if (mudou) batch.commit();
+      if (mudou) batch.commit().catch(err => fsError(err, "Despesas:statusBatch"));
 
       setDespesas(docs.map(d => ({ ...d, status: calcularStatus(d.vencimento, d.status) })));
       setLoading(false);
@@ -1682,7 +1686,10 @@ export default function Despesas() {
   const handleEdit = async (form) => {
     if (!tenantUid || !editando) return;
     const status = calcularStatus(form.vencimento, editando.status);
-    await setDoc(doc(db, "users", tenantUid, "despesas", editando.id), { ...form, status }, { merge: true });
+    // Remove campos de UI que nao devem sobrescrever dados reais de pagamento
+    // eslint-disable-next-line no-unused-vars
+    const { jaPago, tipoValor, dataPagamento: _dp, ...formLimpo } = form;
+    await setDoc(doc(db, "users", tenantUid, "despesas", editando.id), { ...formLimpo, status }, { merge: true });
     await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.DESPESAS, descricao: montarDescricao("editar", "Despesa", form.descricao, editando.id) });
     setEditando(null);
   };
@@ -1726,7 +1733,9 @@ export default function Despesas() {
       if (dataFimOk) {
         const novaData = proximaData(pagando.vencimento, pagando.tipoRecorrencia, pagando.intervalo || 1);
         if (novaData) {
-          const cnt = despesaIdCnt;
+          // Lê o contador diretamente do Firestore para evitar race condition com valor stale do estado React
+          const userSnap = await getDoc(doc(db, "users", tenantUid));
+          const cnt = (userSnap.exists() ? userSnap.data().despesaIdCnt : null) ?? despesaIdCnt;
           const newDocId = `${gerarIdBase(cnt)}-${Date.now()}`;
           const idShow = gerarIdShow(cnt);
           const novoStatus = calcularStatus(novaData, "pendente");
@@ -1824,10 +1833,9 @@ export default function Despesas() {
   };
 
   /* ── Filtros e métricas ── */
-  const mesAtual = new Date().getMonth();
-  const anoAtual = new Date().getFullYear();
-
   const despesasFiltradas = useMemo(() => {
+    const mesAtual = new Date().getMonth();
+    const anoAtual = new Date().getFullYear();
     let lista = [...despesas];
 
     // Regime de caixa: despesas pagas usam dataPagamento como referência,
@@ -1889,7 +1897,7 @@ export default function Despesas() {
     }
 
     return lista;
-  }, [despesas, filtroStatus, filtroCategoria, filtroPeriodo, periodoCustom, search, mesAtual, anoAtual]);
+  }, [despesas, filtroStatus, filtroCategoria, filtroPeriodo, periodoCustom, search]);
 
   const metricas = useMemo(() => {
     const base = filtroPeriodo === "todas" ? despesas : despesasFiltradas;
