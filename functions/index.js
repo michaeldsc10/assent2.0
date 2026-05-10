@@ -26,6 +26,9 @@ const STRIPE_TEST_WEBHOOK    = defineSecret("STRIPE_TEST_WEBHOOK_SECRET");
 const MAIL_USER              = defineSecret("MAIL_USER");
 const MAIL_PASS              = defineSecret("MAIL_PASS");
 
+/* URL do webhook MP — definida aqui para evitar uso antes da declaração */
+const WEBHOOK_URL = "https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook";
+
 /* Limites por plano — espelha o schema do atualizarPlano existente */
 const LIMITES_PLANO = {
   trial:        { vendasMes: 500,  loginsExtras: 5,  alunos: 500,  reservas: 250  },
@@ -70,28 +73,7 @@ const ADMIN_CALL_OPTIONS = {
   ],
 };
 
-/* Opções para as funções PIX — onRequest com CORS manual */
-const PIX_ORIGINS = new Set([
-  "https://ag.assentagencia.com.br",
-  "https://assent2-0.vercel.app",
-  "http://localhost:5173",
-  "http://localhost:3000",
-  "https://flow.assentagencia.com.br",
-  "http://localhost:5500",
-  "http://127.0.0.1:5500",
-]);
-
-/* Helper: aplica CORS e retorna false se for preflight já respondido */
-function applyCors(req, res) {
-  const origin = req.headers.origin || "";
-  const allowed = PIX_ORIGINS.has(origin) ? origin : [...PIX_ORIGINS][0];
-  res.set("Access-Control-Allow-Origin",  allowed);
-  res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.set("Access-Control-Max-Age",       "3600");
-  if (req.method === "OPTIONS") { res.status(204).send(""); return false; }
-  return true;
-}
+/* Opções para as funções PIX — onRequest com CORS nativo */
 
 /* Helper: verifica token Firebase Auth e retorna uid */
 async function verificarAuth(req) {
@@ -127,6 +109,14 @@ exports.gerarPixQr = onRequest(
     if (!tenantUid || valor == null) {
       res.status(400).json({ error: "tenantUid e valor são obrigatórios." });
       return;
+    }
+
+    // Garante que o caller só opera na própria conta ou em uma conta onde é usuário registrado
+    if (uid !== tenantUid) {
+      const idxSnap = await db.doc(`userIndex/${uid}`).get();
+      if (!idxSnap.exists || idxSnap.data()?.tenantUid !== tenantUid) {
+        res.status(403).json({ error: "Acesso negado." }); return;
+      }
     }
 
     const configSnap = await db.doc(`users/${tenantUid}/config/geral`).get();
@@ -218,6 +208,14 @@ exports.consultarPagamento = onRequest(
     if (!tenantUid || !paymentId) {
       res.status(400).json({ error: "tenantUid e paymentId são obrigatórios." });
       return;
+    }
+
+    // Garante que o caller é owner ou usuário registrado no tenant
+    if (uid !== tenantUid) {
+      const idxSnap = await db.doc(`userIndex/${uid}`).get();
+      if (!idxSnap.exists || idxSnap.data()?.tenantUid !== tenantUid) {
+        res.status(403).json({ error: "Acesso negado." }); return;
+      }
     }
 
     const configSnap = await db.doc(`users/${tenantUid}/config/geral`).get();
@@ -752,9 +750,6 @@ exports.excluirUsuario = onCall(CALL_OPTIONS, async (request) => {
      allow write: if false; // só o Admin SDK escreve
    }
 ═══════════════════════════════════════════════════════════════ */
-
-const WEBHOOK_URL = "https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook";
-
 
 /** Variação percentual entre dois valores. Retorna null se base for 0. */
 function varPct(atual, anterior) {
@@ -1759,14 +1754,13 @@ exports.stripeWebhook = onRequest(
         // Detecta trial
         let isTrial     = false;
         let planoRaiz   = plano;
-        let trialExpira = null;
+        let subData     = null;
 
         if (session.mode === "subscription" && session.subscription) {
-          const sub = await stripe.subscriptions.retrieve(session.subscription);
-          if (sub.status === "trialing") {
-            isTrial     = true;
-            planoRaiz   = "trial";  // onTrialExpiry usa esse valor para query
-            trialExpira = FieldValue.serverTimestamp(); // veja abaixo — usamos Date
+          subData = await stripe.subscriptions.retrieve(session.subscription);
+          if (subData.status === "trialing") {
+            isTrial   = true;
+            planoRaiz = "trial";  // onTrialExpiry usa esse valor para query
           }
         }
 
@@ -1787,17 +1781,14 @@ exports.stripeWebhook = onRequest(
         const subdocPlano = planoRaiz; // "trial" | "essencial" | "profissional"
         const limites     = LIMITES_PLANO[plano] ?? LIMITES_PLANO.essencial;
 
-        // dataVencimento vem do current_period_end da subscription
+        // dataVencimento vem do current_period_end da subscription já recuperada acima
         let dataVencimento = null;
         let dataInicio     = null;
-        if (session.mode === "subscription" && session.subscription) {
-          try {
-            const subData = await stripe.subscriptions.retrieve(session.subscription);
-            dataInicio     = subData.current_period_start
-              ? Timestamp.fromDate(new Date(subData.current_period_start * 1000)) : null;
-            dataVencimento = subData.current_period_end
-              ? Timestamp.fromDate(new Date(subData.current_period_end  * 1000)) : null;
-          } catch (_) {}
+        if (subData) {
+          dataInicio     = subData.current_period_start
+            ? Timestamp.fromDate(new Date(subData.current_period_start * 1000)) : null;
+          dataVencimento = subData.current_period_end
+            ? Timestamp.fromDate(new Date(subData.current_period_end  * 1000)) : null;
         }
         if (!dataVencimento && isTrial) {
           dataVencimento = Timestamp.fromDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
