@@ -1024,7 +1024,7 @@ export default function Produtos() {
           onClick={() => setModalNovo(true)}
           title="Novo Produto (N)"
         >
-          <Package size={14} /> <span style={{ borderBottom: "1.5px solid currentColor" }}>N</span>ovo Produto
+          <Package size={14} /><span><span style={{ borderBottom: "1.5px solid currentColor" }}>N</span>ovo Produto</span>
         </button>
         )}
       </header>
