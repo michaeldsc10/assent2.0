@@ -184,6 +184,17 @@ function gerarESCPOS({ mesa, itens, clienteNome, isAdicional = false, horario })
 }
 
 /* ─────────────────────────────────────────────────────
+   UTILITÁRIO — escaping HTML para innerHTML seguro
+───────────────────────────────────────────────────── */
+function esc(s) {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/* ─────────────────────────────────────────────────────
    RECIBO DE VENDA — mesmo modelo de Vendas.jsx
    Assinatura: imprimirRecibo(venda, empresa)
 ───────────────────────────────────────────────────── */
@@ -202,8 +213,8 @@ function imprimirRecibo(venda, empresa) {
 
   const pgtoLinhas = pagamentos.map(p => {
     const label = temParc && pagamentos.length === 1
-      ? `${p.label} — ${venda.parcelas}x de ${fmtR$(venda.total / venda.parcelas)}`
-      : p.label;
+      ? `${esc(p.label)} — ${venda.parcelas}x de ${fmtR$(venda.total / venda.parcelas)}`
+      : esc(p.label);
     return `
       <div style="display:flex;justify-content:space-between;font-size:12px;">
         <span>${label}</span>
@@ -213,17 +224,17 @@ function imprimirRecibo(venda, empresa) {
 
   const logoHtml = empresa?.logo
     ? `<div style="text-align:center;margin-bottom:6px;">
-         <img src="${empresa.logo}" alt="Logo" style="max-height:60px;max-width:180px;filter:grayscale(100%);object-fit:contain;" />
+         <img src="${esc(empresa.logo)}" alt="Logo" style="max-height:60px;max-width:180px;filter:grayscale(100%);object-fit:contain;" />
        </div>`
     : "";
   const nomeEmpresa = empresa?.nomeEmpresa
-    ? `<div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:3px;">${empresa.nomeEmpresa}</div>`
+    ? `<div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:3px;">${esc(empresa.nomeEmpresa)}</div>`
     : `<div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:3px;">ASSENT</div>`;
   const cnpjHtml = empresa?.cnpj
-    ? `<div style="text-align:center;font-size:10px;margin-bottom:2px;">CNPJ: ${empresa.cnpj}</div>`
+    ? `<div style="text-align:center;font-size:10px;margin-bottom:2px;">CNPJ: ${esc(empresa.cnpj)}</div>`
     : "";
   const enderecoHtml = empresa?.endereco
-    ? `<div style="text-align:center;font-size:10px;margin-bottom:2px;">${empresa.endereco}</div>`
+    ? `<div style="text-align:center;font-size:10px;margin-bottom:2px;">${esc(empresa.endereco)}</div>`
     : "";
 
   el.innerHTML = `
@@ -235,11 +246,11 @@ function imprimirRecibo(venda, empresa) {
       <div style="text-align:center;font-size:11px;margin:6px 0 10px;">Recibo de Consumo</div>
       <div style="border-top:1px dashed #000;margin:6px 0;"></div>
 
-      <div style="font-size:12px;"><strong>ID:</strong> ${venda.idVenda || venda.id}</div>
+      <div style="font-size:12px;"><strong>ID:</strong> ${esc(venda.idVenda || venda.id)}</div>
       <div style="font-size:12px;"><strong>Data:</strong> ${venda.data ? new Date(venda.data).toLocaleDateString("pt-BR") : new Date().toLocaleDateString("pt-BR")}</div>
-      ${venda.mesa ? `<div style="font-size:12px;"><strong>Mesa:</strong> ${venda.mesa}</div>` : ""}
-      ${venda.cliente ? `<div style="font-size:12px;"><strong>Cliente:</strong> ${venda.cliente}</div>` : ""}
-      ${venda.vendedor ? `<div style="font-size:12px;"><strong>Operador:</strong> ${venda.vendedor}</div>` : ""}
+      ${venda.mesa ? `<div style="font-size:12px;"><strong>Mesa:</strong> ${esc(venda.mesa)}</div>` : ""}
+      ${venda.cliente ? `<div style="font-size:12px;"><strong>Cliente:</strong> ${esc(venda.cliente)}</div>` : ""}
+      ${venda.vendedor ? `<div style="font-size:12px;"><strong>Operador:</strong> ${esc(venda.vendedor)}</div>` : ""}
 
       <div style="border-top:1px dashed #000;margin:8px 0;"></div>
 
@@ -252,8 +263,8 @@ function imprimirRecibo(venda, empresa) {
         const totalItem = (i.preco || 0) * (i.qtd || 1) - (i.desconto || 0);
         return `
           <div style="display:grid;grid-template-columns:1fr auto auto;gap:1px 8px;font-size:11px;margin-bottom:5px;">
-            <span style="font-weight:bold;">${i.nome || "Item livre"}</span>
-            <span style="text-align:right;font-weight:bold;">${i.qtd}x</span>
+            <span style="font-weight:bold;">${esc(i.nome || "Item livre")}</span>
+            <span style="text-align:right;font-weight:bold;">${esc(i.qtd)}x</span>
             <span style="text-align:right;font-weight:bold;">${fmtR$(totalItem)}</span>
             <span style="font-size:10px;color:#444;grid-column:1/-1;">Unitário: ${fmtR$(i.preco)}</span>
             ${i.desconto > 0 ? `<span style="font-size:10px;color:#444;grid-column:1/-1;">Desconto: -${fmtR$(i.desconto)}</span>` : ""}
@@ -281,7 +292,7 @@ function imprimirRecibo(venda, empresa) {
 
       ${venda.observacao ? `
         <div style="border-top:1px dashed #000;margin:8px 0;"></div>
-        <div style="font-size:11px;"><strong>Obs:</strong> ${venda.observacao}</div>` : ""}
+        <div style="font-size:11px;"><strong>Obs:</strong> ${esc(venda.observacao)}</div>` : ""}
 
       <div style="text-align:center;font-size:10px;margin-top:14px;">Obrigado!</div>
     </div>
@@ -301,15 +312,15 @@ function imprimirTicketCozinhaFallback({ mesa, itens, clienteNome, isAdicional }
   el.innerHTML = `
     <div class="coz-ticket-print">
       <div class="coz-topo">${isAdicional ? "*** ADICIONAL ***" : "*** COZINHA ***"}</div>
-      <div class="coz-mesa">MESA ${mesa}</div>
-      <div class="coz-hora">${hora}</div>
-      ${clienteNome ? `<div class="coz-cliente">Cliente: ${clienteNome}</div>` : ""}
+      <div class="coz-mesa">MESA ${esc(mesa)}</div>
+      <div class="coz-hora">${esc(hora)}</div>
+      ${clienteNome ? `<div class="coz-cliente">Cliente: ${esc(clienteNome)}</div>` : ""}
       <div class="coz-sep">--------------------------------</div>
       <div class="coz-itens">
         ${itens.map(i => `
           <div class="coz-item">
-            <span class="coz-qtd">${i._adicional ? "[+] " : ""}${i.qtd}x</span>
-            <span class="coz-nome">${i.nome}</span>
+            <span class="coz-qtd">${i._adicional ? "[+] " : ""}${esc(i.qtd)}x</span>
+            <span class="coz-nome">${esc(i.nome)}</span>
           </div>
         `).join("")}
       </div>
@@ -1078,6 +1089,14 @@ function ModalPixQr({ valor, tenantUid, descricao, onClose, onPago }) {
     return () => { cancelled = true; };
   }, []);
 
+  const onPagoTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (onPagoTimerRef.current) clearTimeout(onPagoTimerRef.current);
+    };
+  }, []);
+
   useEffect(() => {
     if (fase !== "aguardando" || !paymentId) return;
     const poll = async () => {
@@ -1093,7 +1112,7 @@ function ModalPixQr({ valor, tenantUid, descricao, onClose, onPago }) {
           clearInterval(pollingRef.current);
           setFase("pago");
           // Aguarda 1.5s para o operador ver a confirmação antes de fechar a mesa
-          if (onPago) setTimeout(onPago, 1500);
+          if (onPago) onPagoTimerRef.current = setTimeout(onPago, 1500);
         }
       } catch { /* ignora falha pontual */ }
     };
@@ -1507,6 +1526,7 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
       }
 
       await logAction({ tenantUid: uid, nomeUsuario, cargo, acao: "criar", modulo: "Mesas", descricao: `Fechou Mesa ${mesa.numero} — Venda ${novoId} — R$ ${total.toFixed(2)}` });
+      setFechando(false);
       onVendaSalva({
         id:             novoId,
         idVenda:        novoId,
@@ -1608,6 +1628,7 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
         modulo: "Mesas",
         descricao: `Cancelou comanda — Mesa ${mesa.numero} — Motivo: ${motivoCancelamento.trim()}`,
       });
+      setCancelando(false);
       onVendaSalva(null);
       onClose();
     } catch (err) {
@@ -1927,7 +1948,7 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
               <div style={{ fontSize: 24, marginBottom: 10, textAlign: "center" }}>🧾</div>
               <div style={{ textAlign: "center", marginBottom: 14 }}>
                 {clienteNome
-                  ? `Cliente: <strong>${clienteNome}</strong>`
+                  ? <>Cliente: <strong>{clienteNome}</strong></>
                   : `Será salvo como Mesa ${mesa.numero}`}
               </div>
               <div className="cmd-totals">
@@ -2043,7 +2064,7 @@ function ModalMesa({ mesa, comanda, produtos, servicos, taxas, uid, cargo, nomeU
 /* ═══════════════════════════════════════════════════
    MODAL: CONFIGURAR MESAS
    ═══════════════════════════════════════════════════ */
-function ModalConfigMesas({ uid, mesas, onClose, nomeUsuario, cargo }) {
+function ModalConfigMesas({ uid, mesas, comandas, onClose, nomeUsuario, cargo }) {
   const [qtd, setQtd] = useState(String(mesas.length || 1));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState("");
@@ -2075,9 +2096,10 @@ function ModalConfigMesas({ uid, mesas, onClose, nomeUsuario, cargo }) {
         }
       }
 
-      /* Desativar mesas extras */
+      /* Desativar mesas extras — nunca remove mesa com comanda ativa */
       for (const m of mesas) {
         if (m.numero > n) {
+          if (comandas && comandas[m.id]) continue; // comanda ativa — não remove
           await deleteDoc(doc(db, "users", uid, "mesas", m.id));
         }
       }
@@ -2241,17 +2263,10 @@ export default function Mesas() {
   useEffect(() => {
     if (!uid) { setLoading(false); return; }
 
-    const userRef = doc(db, "users", uid);
-    const mesasCol = collection(db, "users", uid, "mesas");
+    const mesasCol    = collection(db, "users", uid, "mesas");
     const comandasCol = collection(db, "users", uid, "comandas");
     const produtosCol = collection(db, "users", uid, "produtos");
     const servicosCol = collection(db, "users", uid, "servicos");
-
-    const u1 = onSnapshot(userRef, (_snap) => {
-      /* Listener mantido para manter a conexão com o doc do usuário ativa,
-         mas o vendaIdCnt não é mais lido do estado React — sempre lemos
-         direto do Firestore dentro das transações. */
-    }, fsSnapshotError("Mesas:userRef"));
 
     const u2 = onSnapshot(mesasCol, snap => {
       const arr = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -2291,7 +2306,7 @@ export default function Mesas() {
       }
     }).catch(() => {});
 
-    return () => { u1(); u2(); u3(); u4(); u5(); u6(); };
+    return () => { u2(); u3(); u4(); u5(); u6(); };
   }, [uid]);
 
   /* ── Stats ── */
@@ -2502,6 +2517,7 @@ export default function Mesas() {
         <ModalConfigMesas
           uid={uid}
           mesas={mesas}
+          comandas={comandas}
           onClose={() => setConfigModal(false)}
           nomeUsuario={nomeUsuario}
           cargo={cargo}
