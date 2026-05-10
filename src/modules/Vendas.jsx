@@ -687,13 +687,13 @@ function imprimirRecibo(venda, empresa) {
        </div>`
     : "";
   const nomeEmpresa = empresa?.nomeEmpresa
-    ? `<div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:3px;">${empresa.nomeEmpresa}</div>`
+    ? `<div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:3px;">${escapeHtml(empresa.nomeEmpresa)}</div>`
     : `<div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:3px;">ASSENT</div>`;
   const cnpjHtml = empresa?.cnpj
-    ? `<div style="text-align:center;font-size:10px;margin-bottom:2px;">CNPJ: ${empresa.cnpj}</div>`
+    ? `<div style="text-align:center;font-size:10px;margin-bottom:2px;">CNPJ: ${escapeHtml(empresa.cnpj)}</div>`
     : "";
   const enderecoHtml = empresa?.endereco
-    ? `<div style="text-align:center;font-size:10px;margin-bottom:2px;">${empresa.endereco}</div>`
+    ? `<div style="text-align:center;font-size:10px;margin-bottom:2px;">${escapeHtml(empresa.endereco)}</div>`
     : "";
 
   el.innerHTML = `
@@ -705,10 +705,10 @@ function imprimirRecibo(venda, empresa) {
       <div style="text-align:center;font-size:11px;margin:6px 0 10px;">Recibo de Venda</div>
       <div style="border-top:1px dashed #000;margin:6px 0;"></div>
 
-      <div style="font-size:12px;"><strong>ID:</strong> ${venda.idVenda || venda.id}</div>
+      <div style="font-size:12px;"><strong>ID:</strong> ${escapeHtml(venda.idVenda || venda.id)}</div>
       <div style="font-size:12px;"><strong>Data:</strong> ${fmtData(venda.data)}</div>
-      <div style="font-size:12px;"><strong>Cliente:</strong> ${venda.cliente || "—"}</div>
-      ${venda.vendedor ? `<div style="font-size:12px;"><strong>Vendedor:</strong> ${venda.vendedor}</div>` : ""}
+      <div style="font-size:12px;"><strong>Cliente:</strong> ${escapeHtml(venda.cliente || "—")}</div>
+      ${venda.vendedor ? `<div style="font-size:12px;"><strong>Vendedor:</strong> ${escapeHtml(venda.vendedor)}</div>` : ""}
 
       <div style="border-top:1px dashed #000;margin:8px 0;"></div>
 
@@ -721,7 +721,7 @@ function imprimirRecibo(venda, empresa) {
         const totalItem = (i.preco || 0) * (i.qtd || 1) - (i.desconto || 0);
         return `
           <div style="display:grid;grid-template-columns:1fr auto auto;gap:1px 8px;font-size:11px;margin-bottom:5px;">
-            <span style="font-weight:bold;">${i.nome || i.produto || "Item livre"}</span>
+            <span style="font-weight:bold;">${escapeHtml(i.nome || i.produto || "Item livre")}</span>
             <span style="text-align:right;font-weight:bold;">${i.qtd}x</span>
             <span style="text-align:right;font-weight:bold;">${fmtR$(totalItem)}</span>
             <span style="font-size:10px;color:#444;grid-column:1/-1;">Unitário: ${fmtR$(i.preco)}</span>
@@ -761,7 +761,7 @@ function imprimirRecibo(venda, empresa) {
 
       ${venda.observacao ? `
         <div style="border-top:1px dashed #000;margin:8px 0;"></div>
-        <div style="font-size:11px;"><strong>Obs:</strong> ${venda.observacao}</div>` : ""}
+        <div style="font-size:11px;"><strong>Obs:</strong> ${escapeHtml(venda.observacao)}</div>` : ""}
 
       <div style="text-align:center;font-size:10px;margin-top:14px;">Obrigado!</div>
     </div>
@@ -769,11 +769,38 @@ function imprimirRecibo(venda, empresa) {
   window.print();
 }
 
-/* ── Exportar CSV ── */
+/* ── Sanitizar HTML para prevenir XSS ── */
+function escapeHtml(text) {
+  if (!text) return "";
+  const map = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  };
+  return String(text).replace(/[&<>"']/g, (char) => map[char]);
+}
+
+/* ── Escapar CSV para prevenir injection ── */
+function escaparCSV(valor) {
+  if (!valor) return "";
+  const str = String(valor);
+  // Prevenir fórmulas: =, +, -, @
+  if (/^[=+\-@]/.test(str)) {
+    return `"'${str}"`;
+  }
+  // Escapar aspas duplas e envolver em aspas
+  if (str.includes('"') || str.includes(',') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
 function exportarCSV(vendas) {
   const header = "ID,Cliente,Data,Pagamento,Vendedor,Itens,Total\n";
   const rows = vendas.map(v =>
-    `${v.id},"${v.cliente || ""}","${fmtData(v.data)}","${v.formaPagamento || ""}","${v.vendedor || ""}",${v.itens?.length || 0},${v.total || 0}`
+    `${escaparCSV(v.id)},${escaparCSV(v.cliente || "")},${escaparCSV(fmtData(v.data))},${escaparCSV(v.formaPagamento || "")},${escaparCSV(v.vendedor || "")},${v.itens?.length || 0},${v.total || 0}`
   ).join("\n");
   const blob = new Blob([header + rows], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -1209,6 +1236,7 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
 
   /* ── QR Pix ── */
   const [showQrPix, setShowQrPix] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   function itemVazio(tipoAtual = "produto") {
     return {
@@ -1233,7 +1261,7 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
   }, [tipo]);
 
   /* Autocomplete de produtos/serviços */
-  const catalogoFiltrado = (search, idx) => {
+  const catalogoFiltrado = (search) => {
     const lista = tipo === "servico" ? servicos : produtos;
     if (!search.trim()) return lista.slice(0, 8);
     const q = search.toLowerCase();
@@ -1350,7 +1378,8 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
   };
 
   const handleSalvar = async () => {
-    if (!validar()) return;
+    if (!validar() || isSaving) return;
+    setIsSaving(true);
     setSalvando(true);
 
     const payload = {
@@ -1419,6 +1448,7 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
       }
       if (itensInsuficientes.length > 0) {
         setSalvando(false);
+        setIsSaving(false);
         setEstoqueInsuficienteInfo(itensInsuficientes);
         return;
       }
@@ -1426,6 +1456,7 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
 
     await onSave(payload, isEdit ? venda : null);
     setSalvando(false);
+    setIsSaving(false);
   };
 
   /* Autocomplete clientes */
@@ -2300,7 +2331,6 @@ export default function Vendas() {
   const [produtos, setProdutos]   = useState([]);
   const [servicos, setServicos]   = useState([]);
   const [vendedores, setVendedores] = useState([]);
-  const [vendaIdCnt, setVendaIdCnt] = useState(0);
   /* Taxas de cartão — carregadas uma vez do Firestore, com fallback nos defaults */
   const [taxas, setTaxas]                     = useState(TAXAS_DEFAULT);
   const [senhaCancelamento, setSenhaCancelamento] = useState("");
@@ -2317,7 +2347,6 @@ export default function Vendas() {
   const [detalhe, setDetalhe]           = useState(null);
   const [deletando, setDeletando]       = useState(null); // fluxo de cancelar
   const [excluindoDef, setExcluindoDef] = useState(null); // fluxo de exclusão definitiva (admin)
-  const [confirmarDepoisDetalhe, setConfirmarDepoisDetalhe] = useState(false);
   const [tab, setTab]                   = useState("ativas");
   const [sortKey, setSortKey]           = useState("data");
   const [sortDir, setSortDir]           = useState("desc");
@@ -2356,10 +2385,6 @@ useEffect(() => {
   const servicosCol = collection(db, "users", tenantUid, "servicos");
   const vendsCol    = collection(db, "users", tenantUid, "vendedores");
 
-  const unsub1 = onSnapshot(userRef, (snap) => {
-    if (snap.exists()) setVendaIdCnt(snap.data().vendaIdCnt || 0);
-  }, fsSnapshotError("Vendas:userRef"));
-
   /* Carrega taxas de cartão uma vez (getDoc, não listener — dado estático da sessão) */
   getDoc(doc(db, "users", tenantUid, "config", "geral"))
     .then(snap => {
@@ -2397,7 +2422,6 @@ useEffect(() => {
   fsSnapshotError("Vendas:vendedores"));
 
   return () => {
-    unsub1();
     unsub2();
     unsub3();
     unsub4();
@@ -2712,20 +2736,26 @@ useEffect(() => {
     if (!tenantUid || !deletando) return;
     const vendaId = deletando.id;
 
-    /* 1. Marcar como cancelada + restaurar estoque (atômico) */
-    await runTransaction(db, async (tx) => {
-      for (const item of (deletando.itens || [])) {
-        if (item.produtoId && item.tipo === "produto") {
-          const ref = doc(db, "users", tenantUid, "produtos", item.produtoId);
-          tx.update(ref, { estoque: increment(item.qtd || 1) });
+    try {
+      /* 1. Marcar como cancelada + restaurar estoque (atômico) */
+      await runTransaction(db, async (tx) => {
+        for (const item of (deletando.itens || [])) {
+          if (item.produtoId && item.tipo === "produto") {
+            const ref = doc(db, "users", tenantUid, "produtos", item.produtoId);
+            tx.update(ref, { estoque: increment(item.qtd || 1) });
+          }
         }
-      }
-      tx.update(doc(db, "users", tenantUid, "vendas", vendaId), {
-        status: "cancelada",
-        canceladaEm: serverTimestamp(),
-        canceladaPor: { uid: user?.uid, nome: nomeUsuario || user?.displayName || user?.email || "—", cargo },
+        tx.update(doc(db, "users", tenantUid, "vendas", vendaId), {
+          status: "cancelada",
+          canceladaEm: serverTimestamp(),
+          canceladaPor: { uid: user?.uid, nome: nomeUsuario || user?.displayName || user?.email || "—", cargo },
+        });
       });
-    });
+    } catch (err) {
+      fsError(err, "Vendas:cancelarTransacao");
+      setDeletando(null);
+      return;
+    }
 
     /* 2. Remover entradas do Caixa vinculadas a esta venda */
     try {
@@ -2799,16 +2829,22 @@ useEffect(() => {
     if (!tenantUid || !excluindoDef) return;
     const vendaId = excluindoDef.id;
 
-    /* 1. Deletar venda + restaurar estoque (atômico) */
-    await runTransaction(db, async (tx) => {
-      for (const item of (excluindoDef.itens || [])) {
-        if (item.produtoId && item.tipo === "produto") {
-          const ref = doc(db, "users", tenantUid, "produtos", item.produtoId);
-          tx.update(ref, { estoque: increment(item.qtd || 1) });
+    try {
+      /* 1. Deletar venda + restaurar estoque (atômico) */
+      await runTransaction(db, async (tx) => {
+        for (const item of (excluindoDef.itens || [])) {
+          if (item.produtoId && item.tipo === "produto") {
+            const ref = doc(db, "users", tenantUid, "produtos", item.produtoId);
+            tx.update(ref, { estoque: increment(item.qtd || 1) });
+          }
         }
-      }
-      tx.delete(doc(db, "users", tenantUid, "vendas", vendaId));
-    });
+        tx.delete(doc(db, "users", tenantUid, "vendas", vendaId));
+      });
+    } catch (err) {
+      fsError(err, "Vendas:excluirTransacao");
+      setExcluindoDef(null);
+      return;
+    }
 
     /* 2. Remover entradas do Caixa vinculadas a esta venda */
     try {
@@ -3023,7 +3059,6 @@ useEffect(() => {
         <button
           className={`vd-tab ${tab === "pdv" ? "active" : ""}`}
           onClick={() => setTab("pdv")}
-          style={tab === "pdv" ? {} : {}}
         >
           <Barcode size={14} /> PDV
           <span className="vd-tab-badge">{vendasPDV.length}</span>
