@@ -12,7 +12,7 @@ import {
   Search, Plus, Edit2, Trash2, X, Printer,
   ShoppingCart, Package, ChevronDown, ChevronUp,
   Download, Copy, Filter, Calendar, Ban, ChevronsUpDown, Barcode,
-  QrCode, CheckCircle, AlertCircle,
+  QrCode, CheckCircle, AlertCircle, UtensilsCrossed,
 } from "lucide-react";
 
 import AuthContext from "../contexts/AuthContext";
@@ -2889,7 +2889,7 @@ useEffect(() => {
 
   /* Filtros — ativas */
   const vendasFiltradas = useMemo(() => {
-    let lista = filtrarPorPeriodo(vendas.filter(v => v.status !== "cancelada" && v.origem !== "pdv"), period, dataInicio, dataFim);
+    let lista = filtrarPorPeriodo(vendas.filter(v => v.status !== "cancelada" && v.origem !== "pdv" && v.origem !== "mesa"), period, dataInicio, dataFim);
     if (search.trim()) {
       const q = search.toLowerCase();
       lista = lista.filter(v =>
@@ -2975,7 +2975,21 @@ useEffect(() => {
     });
   }, [vendas, period, dataInicio, dataFim, search, pdvSortKey, pdvSortDir]);
 
-  if (!tenantUid) return <div className="vd-loading">Carregando autenticação...</div>;
+  const vendasMesa = useMemo(() => {
+    let lista = filtrarPorPeriodo(
+      vendas.filter(v => v.origem === "mesa" && v.status !== "cancelada"),
+      period, dataInicio, dataFim
+    );
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      lista = lista.filter(v =>
+        (v.idVenda || v.id)?.toLowerCase().includes(q) ||
+        v.cliente?.toLowerCase().includes(q) ||
+        v.vendedorNome?.toLowerCase().includes(q)
+      );
+    }
+    return lista.sort((a, b) => (b.criadoEm || "").localeCompare(a.criadoEm || ""));
+  }, [vendas, period, dataInicio, dataFim, search]);
 
   const handleSort = (key) => {
     if (sortKey === key) {
@@ -3025,11 +3039,11 @@ useEffect(() => {
           <span className="vd-tab-badge">{vendasFiltradas.length}</span>
         </button>
         <button
-          className={`vd-tab cancelada ${tab === "canceladas" ? "active" : ""}`}
-          onClick={() => setTab("canceladas")}
+          className={`vd-tab ${tab === "mesas" ? "active" : ""}`}
+          onClick={() => setTab("mesas")}
         >
-          <Ban size={14} /> Canceladas
-          <span className="vd-tab-badge">{vendasCanceladas.length}</span>
+          <UtensilsCrossed size={14} /> Mesas
+          <span className="vd-tab-badge">{vendasMesa.length}</span>
         </button>
         <button
           className={`vd-tab ${tab === "pdv" ? "active" : ""}`}
@@ -3038,13 +3052,20 @@ useEffect(() => {
           <Barcode size={14} /> PDV
           <span className="vd-tab-badge">{vendasPDV.length}</span>
         </button>
+        <button
+          className={`vd-tab cancelada ${tab === "canceladas" ? "active" : ""}`}
+          onClick={() => setTab("canceladas")}
+        >
+          <Ban size={14} /> Canceladas
+          <span className="vd-tab-badge">{vendasCanceladas.length}</span>
+        </button>
       </div>
 
       {/* Topbar — search compartilhado entre abas */}
       <header className="vd-topbar">
         <div className="vd-topbar-title">
-          <h1>{tab === "ativas" ? "Vendas" : tab === "canceladas" ? "Vendas Canceladas" : "Vendas PDV"}</h1>
-          <p>{tab === "ativas" ? "Gerencie e acompanhe todas as vendas" : tab === "canceladas" ? "Histórico de vendas canceladas" : "Vendas realizadas pelo Ponto de Venda"}</p>
+          <h1>{tab === "ativas" ? "Vendas" : tab === "canceladas" ? "Vendas Canceladas" : tab === "mesas" ? "Vendas de Mesas" : "Vendas PDV"}</h1>
+          <p>{tab === "ativas" ? "Gerencie e acompanhe todas as vendas" : tab === "canceladas" ? "Histórico de vendas canceladas" : tab === "mesas" ? "Vendas finalizadas pelo módulo de Mesas" : "Vendas realizadas pelo Ponto de Venda"}</p>
         </div>
 
         <div className="vd-search">
@@ -3181,6 +3202,57 @@ useEffect(() => {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Tabela: Vendas de Mesas ── */}
+      {tab === "mesas" && (
+        <div className="ag-content">
+          <div className="vd-table-wrap">
+            <div className="vd-table-header">
+              <div className="vd-table-title">
+                Vendas de Mesas
+                <span className="vd-count-badge">{vendasMesa.length}</span>
+              </div>
+              <div className="vd-table-actions">
+                <button className="vd-export-btn" onClick={() => exportarCSV(vendasMesa)}>
+                  <Download size={11} /> CSV
+                </button>
+              </div>
+            </div>
+
+            <div className="vd-row vd-row-head">
+              <span>MESA</span>
+              <span>CLIENTE</span>
+              <span>DATA</span>
+              <span>PAGAMENTOS</span>
+              <span>OPERADOR</span>
+              <span>ITENS</span>
+              <span>TOTAL</span>
+            </div>
+
+            {loading ? (
+              <div className="vd-loading">Carregando...</div>
+            ) : vendasMesa.length === 0 ? (
+              <div className="vd-empty">
+                <UtensilsCrossed size={28} color="var(--text-3)" style={{ marginBottom: 8 }} />
+                <p>Nenhuma venda de mesa no período.</p>
+              </div>
+            ) : vendasMesa.map(v => {
+              const pagLabel = (v.pagamentos || []).map(p => p.label).join(" + ") || v.formaPagamento || "—";
+              return (
+                <div key={v.id} className="vd-row" onClick={() => setDetalhe(v)}>
+                  <span className="vd-vid">{v.mesaNumero != null ? `Mesa ${v.mesaNumero}` : "—"}</span>
+                  <span className="vd-cliente">{v.cliente || "—"}</span>
+                  <span>{fmtData(v.data)}</span>
+                  <span><span className="vd-fp-badge">{pagLabel}</span></span>
+                  <span>{v.vendedorNome || "—"}</span>
+                  <span>{v.itens?.length || 0} item(s)</span>
+                  <span className="vd-total">{fmtR$(v.total)}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
