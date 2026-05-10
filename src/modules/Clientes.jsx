@@ -567,7 +567,11 @@ function gerarIdCliente(cnt) {
 }
 
 export default function Clientes() {
-  const { tenantUid, nomeUsuario, cargo, podeCriarV, podeEditarV, podeExcluirV } = useAuth();
+  const { tenantUid, nomeUsuario, cargo, podeCriar, podeEditar, podeExcluir } = useAuth();
+
+  const podeCriarV   = podeCriar("clientes");
+  const podeEditarV  = podeEditar("clientes");
+  const podeExcluirV = podeExcluir("clientes");
   const [loading, setLoading] = useState(true);
   const [clientes, setClientes] = useState([]);
   const [vendas, setVendas] = useState([]);
