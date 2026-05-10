@@ -541,11 +541,7 @@ function ModalNovoServico({ servico, servicos, categorias, onSave, onClose, onAb
   const [erros, setErros]     = useState({});
   const [salvando, setSalvando] = useState(false);
 
-  useEffect(() => {
-    const handleKeyDown = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+
 
   const set = (campo, valor) => {
     setForm(f => ({ ...f, [campo]: valor }));
