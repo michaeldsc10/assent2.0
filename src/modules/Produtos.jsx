@@ -3,7 +3,7 @@
    Estrutura: users/{uid}/produtos/{id}
    ═══════════════════════════════════════════════════ */
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Search, Package, Edit2, Trash2, X, AlertTriangle, ImageOff, Barcode,
 } from "lucide-react";
@@ -881,6 +881,23 @@ export default function Produtos() {
   const [deletando, setDeletando] = useState(null);
 
 
+  /* ── Atalho de teclado: N → Novo Produto ── */
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (modalNovo || editando || deletando) return;
+      if (e.key === "n" || e.key === "N") {
+        if (podeCriarV) {
+          e.preventDefault();
+          setModalNovo(true);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [modalNovo, editando, deletando, podeCriarV]);
+
   /* Firestore */
   useEffect(() => {
     if (!tenantUid) { setLoading(false); return; }
@@ -1005,8 +1022,9 @@ export default function Produtos() {
         <button
           className="btn-novo-pd"
           onClick={() => setModalNovo(true)}
+          title="Novo Produto (N)"
         >
-          <Package size={14} /> + Novo Produto
+          <Package size={14} /> <span style={{ borderBottom: "1.5px solid currentColor" }}>N</span>ovo Produto
         </button>
         )}
       </header>
