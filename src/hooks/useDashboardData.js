@@ -368,11 +368,13 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
       .slice(0, 5)
       .map(([nome, d]) => ({ nome, qtd: d.qtd, total: d.total }));
 
-    /* ── Top Clientes ── */
+    /* ── Top Clientes (ignora PDV e mesas) ── */
     const cliMap = {};
     vendasPeriodo.forEach((v) => {
-      const k = v.cliente || "—";
-      cliMap[k] = (cliMap[k] || 0) + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0));
+      const nome = (v.cliente || "").trim();
+      if (!nome) return;                         // PDV
+      if (/^mesa\b/i.test(nome)) return;         // Mesa X
+      cliMap[nome] = (cliMap[nome] || 0) + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0));
     });
     const topClientes = Object.entries(cliMap)
       .sort((a, b) => b[1] - a[1])
