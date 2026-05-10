@@ -1161,12 +1161,15 @@ export default function AReceber() {
   /* ── KPIs (memoizado) ── */
   const kpis = useMemo(() => {
     const totalPendente = contas
-      .filter(c => c.status === "pendente" || c.status === "vencido")
-      .reduce((acc, c) => acc + c.valorRestante, 0);
+      .filter(c => {
+        const s = calcStatus(c.valorRestante, c.dataVencimento);
+        return s === "pendente" || s === "vencido";
+      })
+      .reduce((acc, c) => acc + Math.max(0, c.valorRestante), 0);
 
     const totalVencido = contas
-      .filter(c => c.status === "vencido")
-      .reduce((acc, c) => acc + c.valorRestante, 0);
+      .filter(c => calcStatus(c.valorRestante, c.dataVencimento) === "vencido")
+      .reduce((acc, c) => acc + Math.max(0, c.valorRestante), 0);
 
     const totalRecebido = contas
       .reduce((acc, c) => acc + c.valorPago, 0);
