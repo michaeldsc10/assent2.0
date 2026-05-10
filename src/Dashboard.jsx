@@ -1691,6 +1691,7 @@ function ChartToggle({ value, onChange }) {
 
 /* ── Chart 3D Bars ── */
 function Chart3DBars({ data, period, height = 170 }) {
+  const [tooltip, setTooltip] = useState(null); // { x, y, d, v }
   if (!data || data.length === 0) return (
     <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-3)", fontSize: 12 }}>
       Nenhum dado no período
@@ -1698,9 +1699,34 @@ function Chart3DBars({ data, period, height = 170 }) {
   );
   const max = Math.max(...data.map(d => d.v || 0), 1);
   const total = data.reduce((a, b) => a + (b.v || 0), 0);
-  const CONTAINER_H = height - 40; // espaço para labels + legend
+  const CONTAINER_H = height - 40;
   return (
-    <div className="chart3d-wrap">
+    <div className="chart3d-wrap" style={{ position: "relative" }}>
+      {/* Tooltip */}
+      {tooltip && (
+        <div style={{
+          position: "absolute", zIndex: 20,
+          left: tooltip.x, top: tooltip.y,
+          transform: "translate(-50%, -110%)",
+          pointerEvents: "none",
+          background: "var(--s2)",
+          border: "1px solid rgba(200,165,94,0.2)",
+          borderRadius: 10, padding: "8px 14px",
+          fontSize: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+          whiteSpace: "nowrap",
+        }}>
+          <div style={{ color: "var(--text-3)", fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6, borderBottom: "1px solid var(--border)", paddingBottom: 5 }}>
+            {tooltip.d}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ width: 8, height: 8, borderRadius: 2, background: "#c8a55e", boxShadow: "0 0 6px rgba(200,165,94,0.6)" }} />
+            <span style={{ color: "var(--text-2)" }}>Receita</span>
+            <span style={{ color: "var(--gold)", fontWeight: 700, marginLeft: 8 }}>
+              R$ {(tooltip.v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+        </div>
+      )}
       <div className="chart3d-inner" style={{ height }}>
         <div className="chart3d-yaxis">
           {[1, 0.66, 0.33, 0].map((r, i) => (
@@ -1719,8 +1745,20 @@ function Chart3DBars({ data, period, height = 170 }) {
             {data.map((d, i) => {
               const barH = Math.max(6, ((d.v || 0) / max) * (CONTAINER_H - 10));
               return (
-                <div className="bar3d-wrap" key={i}>
-                  <div className="bar3d" style={{ height: `${barH}px`, "--d": `${i * 0.04}s` }}>
+                <div
+                  className="bar3d-wrap" key={i}
+                  onMouseEnter={e => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const wrapRect = e.currentTarget.closest(".chart3d-wrap").getBoundingClientRect();
+                    setTooltip({ x: rect.left - wrapRect.left + rect.width / 2, y: rect.top - wrapRect.top, d: d.d || d.l || "", v: d.v || 0 });
+                  }}
+                  onMouseLeave={() => setTooltip(null)}
+                >
+                  <div className="bar3d" style={{
+                    height: `${barH}px`, "--d": `${i * 0.04}s`,
+                    filter: tooltip?.d === (d.d || d.l) ? "brightness(1.25)" : undefined,
+                    transition: "filter 0.15s",
+                  }}>
                     <div className="bar3d-glow" />
                     <div className="bar3d-front" />
                     <div className="bar3d-side" />
@@ -1901,8 +1939,8 @@ export default function Dashboard() {
     () => localStorage.getItem("ag_theme") || "dark"
   );
   const [dashView, setDashView] = useState("overview"); // "overview" | "charts"
-  const [faturMode, setFaturMode] = useState("flat");        // "flat" | "3d"
-  const [chartsBarMode, setChartsBarMode] = useState("flat"); // para renderChartsView
+  const [faturMode, setFaturMode] = useState("3d");        // "flat" | "3d"
+  const [chartsBarMode, setChartsBarMode] = useState("3d"); // para renderChartsView
   const [searchQuery, setSearchQuery]     = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -3404,7 +3442,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               <Tooltip content={<GoldTooltip />} />
             </PieChart>
             <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
-              {(dash.mixData || [{ name: "Produtos", value: 60 }, { name: "Serviços", value: 40 }]).map((item, i) => (
+              {(dash.mixData || []).map((item, i) => (
                 <div key={i}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5 }}>
                     <span style={{ color: "var(--text-2)", display: "flex", alignItems: "center", gap: 6 }}>
