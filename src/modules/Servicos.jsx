@@ -19,8 +19,7 @@ import {
   setDoc,
   deleteDoc,
   onSnapshot,
-  query,
-  where,
+  increment,
   getDocs,
 } from "firebase/firestore";
 
@@ -49,7 +48,6 @@ const CSS = `
     box-shadow: 0 28px 72px rgba(0,0,0,0.65);
     animation: slideUp .18s ease;
   }
-  .modal-box-lg  { max-width: 680px; }
   .modal-box-md  { max-width: 420px; }
   .modal-box::-webkit-scrollbar { width: 3px; }
   .modal-box::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
@@ -101,8 +99,6 @@ const CSS = `
   .form-input.err:focus { box-shadow: 0 0 0 3px rgba(224,82,82,0.1); }
   .form-error { font-size: 11px; color: var(--red); margin-top: 5px; }
   .form-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
-
   textarea.form-input { resize: vertical; min-height: 70px; }
 
   /* Buttons */
@@ -366,7 +362,7 @@ function MargemBadge({ preco, custo }) {
 }
 
 function CatBadge({ categoria, categorias }) {
-  const cat = categorias?.find(c => c.id === categoria || c.nome === categoria);
+  const cat = categorias?.find(c => c.id === categoria);
   if (!cat) return <span style={{ color: "var(--text-3)", fontSize: 11 }}>—</span>;
   const bg = cat.cor ? `${cat.cor}22` : "rgba(200,165,94,0.12)";
   const color = cat.cor || "var(--gold)";
@@ -426,7 +422,7 @@ function ModalCategorias({ categorias, onClose, onAdd, onEdit, onDelete, servico
   };
 
   const servicosDaCat = (catId) =>
-    servicos.filter(s => s.categoriaId === catId || s.categoria === catId).length;
+    servicos.filter(s => s.categoriaId === catId).length;
 
   return (
     <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -587,7 +583,7 @@ function ModalNovoServico({ servico, servicos, categorias, onSave, onClose, onAb
     await onSave({
       nome:        form.nome.trim(),
       preco:       parseMoeda(form.preco),
-      custo:       parseMoeda(form.custo),
+      custo:       form.custo.trim() === "" ? null : parseMoeda(form.custo),
       categoriaId: form.categoriaId || null,
       descricao:   form.descricao.trim(),
     });
@@ -719,7 +715,7 @@ function ModalNovoServico({ servico, servicos, categorias, onSave, onClose, onAb
 /* ════════════════════════════════════════════════════
    MODAL: Confirmar Exclusão de Serviço
    ════════════════════════════════════════════════════ */
-function ModalConfirmDelete({ servico, vendas, onConfirm, onClose }) {
+function ModalConfirmDelete({ servico, vendas, loadingVendas, onConfirm, onClose }) {
   const [excluindo, setExcluindo] = useState(false);
 
   // Verifica quantas vendas referenciam este serviço pelo ID interno
@@ -735,8 +731,11 @@ function ModalConfirmDelete({ servico, vendas, onConfirm, onClose }) {
   const handleConfirm = async () => {
     if (bloqueado) return;
     setExcluindo(true);
-    await onConfirm();
-    setExcluindo(false);
+    try {
+      await onConfirm();
+    } finally {
+      setExcluindo(false);
+    }
   };
 
   return (
@@ -750,7 +749,9 @@ function ModalConfirmDelete({ servico, vendas, onConfirm, onClose }) {
         </div>
 
         <div className="modal-body">
-          {bloqueado ? (
+          {loadingVendas ? (
+            <div className="sv-loading" style={{ padding: "32px 20px" }}>Verificando referências...</div>
+          ) : bloqueado ? (
             <div className="del-warn">
               <div className="del-warn-icon">
                 <AlertTriangle size={18} color="var(--red)" />
@@ -781,7 +782,7 @@ function ModalConfirmDelete({ servico, vendas, onConfirm, onClose }) {
           <button className="btn-secondary" onClick={onClose}>
             {bloqueado ? "Fechar" : "Cancelar"}
           </button>
-          {!bloqueado && (
+          {!loadingVendas && !bloqueado && (
             <button className="btn-danger" onClick={handleConfirm} disabled={excluindo}>
               {excluindo ? "Excluindo..." : "Confirmar Exclusão"}
             </button>
@@ -807,6 +808,7 @@ export default function Servicos() {
   const [servicos, setServicos]     = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [vendas, setVendas]         = useState([]);
+  const [loadingVendas, setLoadingVendas] = useState(false);
   const [servicoIdCnt, setServicoIdCnt] = useState(0);
   const [catIdCnt, setCatIdCnt]     = useState(0);
   const [search, setSearch]         = useState("");
@@ -825,7 +827,6 @@ export default function Servicos() {
     const userRef      = doc(db, "users", tenantUid);
     const servicosCol  = collection(db, "users", tenantUid, "servicos");
     const categoriasCol = collection(db, "users", tenantUid, "categoriasServico");
-    const vendasCol    = collection(db, "users", tenantUid, "vendas");
 
     const unsubUser = onSnapshot(userRef, snap => {
       if (snap.exists()) {
@@ -837,58 +838,78 @@ export default function Servicos() {
     const unsubServicos = onSnapshot(servicosCol, snap => {
       setServicos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
       setLoading(false);
-    }, fsSnapshotError("Servicos:servicos"));
+    }, err => { fsSnapshotError("Servicos:servicos")(err); setLoading(false); });
 
     const unsubCats = onSnapshot(categoriasCol, snap => {
       setCategorias(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }, fsSnapshotError("Servicos:categorias"));
 
-    const unsubVendas = onSnapshot(vendasCol, snap => {
-      setVendas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, fsSnapshotError("Servicos:vendas"));
-
-    return () => { unsubUser(); unsubServicos(); unsubCats(); unsubVendas(); };
+    return () => { unsubUser(); unsubServicos(); unsubCats(); };
   }, [tenantUid]);
 
   /* ── CRUD Serviços ── */
   const handleAdd = async (form) => {
     if (!tenantUid) return;
     const newId = gerarIdServico(servicoIdCnt);
-    await setDoc(doc(db, "users", tenantUid, "servicos", newId), {
-      ...form,
-      criadoEm: new Date().toISOString(),
-    });
-    await setDoc(doc(db, "users", tenantUid), { servicoIdCnt: servicoIdCnt + 1 }, { merge: true });
-    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.SERVICOS, descricao: montarDescricao("criar", "Serviço", form.nome, newId) });
-    setModalNovo(false);
+    try {
+      await setDoc(doc(db, "users", tenantUid, "servicos", newId), {
+        ...form,
+        criadoEm: new Date().toISOString(),
+      });
+      await setDoc(doc(db, "users", tenantUid), { servicoIdCnt: increment(1) }, { merge: true });
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.SERVICOS, descricao: montarDescricao("criar", "Serviço", form.nome, newId) });
+      setModalNovo(false);
+    } catch (err) {
+      console.error("Servicos:handleAdd", err);
+      throw err;
+    }
   };
 
   const handleEdit = async (form) => {
     if (!tenantUid || !editando) return;
-    await setDoc(doc(db, "users", tenantUid, "servicos", editando.id), {
-      ...form,
-      atualizadoEm: new Date().toISOString(),
-    }, { merge: true });
-    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.SERVICOS, descricao: montarDescricao("editar", "Serviço", form.nome, editando.id) });
-    setEditando(null);
+    try {
+      await setDoc(doc(db, "users", tenantUid, "servicos", editando.id), {
+        nome:        form.nome,
+        preco:       form.preco,
+        custo:       form.custo,
+        categoriaId: form.categoriaId,
+        descricao:   form.descricao,
+        atualizadoEm: new Date().toISOString(),
+      }, { merge: true });
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.SERVICOS, descricao: montarDescricao("editar", "Serviço", form.nome, editando.id) });
+      setEditando(null);
+    } catch (err) {
+      console.error("Servicos:handleEdit", err);
+      throw err;
+    }
   };
 
   const handleDelete = async () => {
     if (!tenantUid || !deletando) return;
-    await deleteDoc(doc(db, "users", tenantUid, "servicos", deletando.id));
-    await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.SERVICOS, descricao: montarDescricao("excluir", "Serviço", deletando.nome, deletando.id) });
-    setDeletando(null);
+    try {
+      await deleteDoc(doc(db, "users", tenantUid, "servicos", deletando.id));
+      await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EXCLUIR, modulo: LOG_MODULO.SERVICOS, descricao: montarDescricao("excluir", "Serviço", deletando.nome, deletando.id) });
+      setDeletando(null);
+    } catch (err) {
+      console.error("Servicos:handleDelete", err);
+      throw err;
+    }
   };
 
   /* ── CRUD Categorias ── */
   const handleAddCat = async (form) => {
     if (!tenantUid) return;
     const newId = `CAT${String(catIdCnt + 1).padStart(3, "0")}`;
-    await setDoc(doc(db, "users", tenantUid, "categoriasServico", newId), {
-      ...form,
-      criadoEm: new Date().toISOString(),
-    });
-    await setDoc(doc(db, "users", tenantUid), { catServicoIdCnt: catIdCnt + 1 }, { merge: true });
+    try {
+      await setDoc(doc(db, "users", tenantUid, "categoriasServico", newId), {
+        ...form,
+        criadoEm: new Date().toISOString(),
+      });
+      await setDoc(doc(db, "users", tenantUid), { catServicoIdCnt: increment(1) }, { merge: true });
+    } catch (err) {
+      console.error("Servicos:handleAddCat", err);
+      throw err;
+    }
   };
 
   const handleEditCat = async (catId, form) => {
@@ -899,6 +920,23 @@ export default function Servicos() {
   const handleDeleteCat = async (catId) => {
     if (!tenantUid) return;
     await deleteDoc(doc(db, "users", tenantUid, "categoriasServico", catId));
+  };
+
+  /* ── Abrir modal exclusão: busca vendas pontualmente ── */
+  const abrirExclusao = async (servico) => {
+    if (!tenantUid) return;
+    setLoadingVendas(true);
+    setDeletando(servico);
+    try {
+      const vendasCol = collection(db, "users", tenantUid, "vendas");
+      const snap = await getDocs(vendasCol);
+      setVendas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      console.error("Servicos:abrirExclusao", err);
+      setVendas([]);
+    } finally {
+      setLoadingVendas(false);
+    }
   };
 
   /* ── Filtro de busca ── */
@@ -999,7 +1037,7 @@ export default function Servicos() {
                   {podeEditarV && <button className="btn-icon btn-icon-edit" onClick={() => setEditando(s)}>
                     <Edit2 size={13} />
                   </button>}
-                  {podeExcluirV && <button className="btn-icon btn-icon-del" onClick={() => setDeletando(s)}>
+                  {podeExcluirV && <button className="btn-icon btn-icon-del" onClick={() => abrirExclusao(s)}>
                     <Trash2 size={13} />
                   </button>}
                 </div>
@@ -1033,6 +1071,7 @@ export default function Servicos() {
         <ModalConfirmDelete
           servico={deletando}
           vendas={vendas}
+          loadingVendas={loadingVendas}
           onConfirm={handleDelete}
           onClose={() => setDeletando(null)}
         />
