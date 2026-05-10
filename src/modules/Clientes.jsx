@@ -736,7 +736,7 @@ export default function Clientes() {
             title="Novo Cliente (N)"
           >
             <UserPlus size={14} />
-            <u style={{ textDecorationThickness: "1.5px", textUnderlineOffset: "2px" }}>N</u>ovo Cliente
+            <span style={{ borderBottom: "1.5px solid currentColor" }}>N</span>ovo Cliente
           </button>
         )}
       </header>
