@@ -114,7 +114,7 @@ const FlowThemeCtx = createContext({ T: getT(true), S: null });
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 function getS(T) { return {
   root: {
-    display:"flex", height:"100vh", height:"100dvh",
+    display:"flex", height:"100dvh",
     background: T.ink,
     color: T.text100,
     fontFamily:"'Inter', system-ui, sans-serif",
@@ -2092,7 +2092,8 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
   const themeCtx = useMemo(() => ({ T, S }), [T, S]);
 
   const isEssencial = plano === "essencial";
-  const LIMITE_RESERVAS_ESSENCIAL = 150;
+  // Mantém sincronizado com LIMITES_PLANO.essencial.reservas no backend (index.js)
+  const LIMITE_RESERVAS_ESSENCIAL = 250;
 
   const meuPrestadorId = isAdmin ? "admin" : (prestadores.find(p=>p.linkedUserId===user?.uid&&p.ativo)?.id || null);
 
@@ -2153,7 +2154,7 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
       }
     }
     initAdmin().catch(err=>console.error("[Flow] initAdmin error:", err));
-  },[tenantUid, user?.uid]);
+  },[tenantUid, user?.uid, isAdmin]);
 
   // Carrega prestadores
   useEffect(()=>{
@@ -2175,7 +2176,7 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
 
   // Guards
   if(!tenantUid) return null;
-  if(plano !== "profissional" && plano !== "essencial" && plano !== "delux") return (
+  if(plano !== "profissional" && plano !== "essencial") return (
     <FlowThemeCtx.Provider value={themeCtx}>
       <div style={S.root}><TelaUpgrade onVoltar={onVoltar}/></div>
     </FlowThemeCtx.Provider>
@@ -2254,7 +2255,7 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
           </button>
           <span style={S.topbarTitle}>{titulos[tela]}</span>
           <span className="flow-plan-badge" style={{fontSize:10,padding:"4px 12px",borderRadius:20,border:"1px solid rgba(192,155,82,0.25)",background:T.goldA06,color:T.goldHi,fontWeight:700,letterSpacing:"0.8px",textTransform:"uppercase",flexShrink:0}}>
-            {isEssencial ? "★ Essencial" : plano === "delux" ? "★ Delux" : "★ Profissional"}
+            {isEssencial ? "★ Essencial" : "★ Profissional"}
           </span>
         </header>
 
