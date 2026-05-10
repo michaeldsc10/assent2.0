@@ -2812,6 +2812,11 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   /* ── Atalhos de teclado ── */
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        const overlay = document.querySelector(".modal-overlay");
+        if (overlay) overlay.click();
+        return;
+      }
       if (!e.altKey) return;
       const tag = document.activeElement?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement?.isContentEditable) return;
