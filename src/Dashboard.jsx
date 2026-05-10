@@ -528,40 +528,35 @@ const CSS = `
   html, body, #root { height: 100%; width: 100%; margin: 0; padding: 0; }
 
   :root {
-    --bg:           #07070a;
-    --s1:           #0d0d11;
-    --s2:           #121217;
-    --s3:           #18181f;
-    --border:       rgba(255,255,255,0.065);
-    --border-h:     rgba(255,255,255,0.12);
+    --bg:           #09090c;
+    --s1:           #0f0f13;
+    --s2:           #141419;
+    --s3:           #1a1a22;
+    --border:       rgba(255,255,255,0.07);
+    --border-h:     rgba(255,255,255,0.13);
     --gold:         #c8a55e;
     --gold-l:       #dfc07c;
-    --gold-d:       rgba(200,165,94,0.10);
+    --gold-d:       rgba(200,165,94,0.12);
     --gold-brand:   #D4AF37;
     --text:         #edeae3;
-    --text-2:       #9895a3;
-    --text-3:       rgba(255,255,255,0.28);
+    --text-2:       #a09caa;
+    --text-3:       #f6f5fa;
     --green:        #3ecf8e;
-    --green-d:      rgba(62,207,142,0.09);
+    --green-d:      rgba(62,207,142,0.1);
     --red:          #e05252;
-    --red-d:        rgba(224,82,82,0.09);
+    --red-d:        rgba(224,82,82,0.1);
     --blue:         #5b8ef0;
-    --blue-d:       rgba(91,142,240,0.09);
+    --blue-d:       rgba(91,142,240,0.1);
     --purple:       #a78bfa;
-    --purple-d:     rgba(167,139,250,0.09);
+    --purple-d:     rgba(167,139,250,0.1);
     --amber:        #f59e0b;
-    --amber-d:      rgba(245,158,11,0.09);
+    --amber-d:      rgba(245,158,11,0.1);
     --sidebar-w:    220px;
     --sidebar-w-sm: 64px;
     --header-h:     62px;
     --sidebar-transition: width 0.22s cubic-bezier(0.4,0,0.2,1);
-    /* tech tokens */
-    --glow-gold:    0 0 24px rgba(200,165,94,0.07);
-    --glow-card:    0 2px 12px rgba(0,0,0,0.4);
-    --grid-line:    rgba(200,165,94,0.025);
     font-family: 'Inter', system-ui, sans-serif;
     --font-display: 'Inter', system-ui, sans-serif;
-    --font-mono:    'JetBrains Mono', monospace;
     color-scheme: dark;
   }
 
@@ -570,12 +565,8 @@ const CSS = `
     display: flex;
     flex-direction: column;
     height: 100vh;
-    height: 100dvh;
-    background:
-      linear-gradient(var(--grid-line) 1px, transparent 1px),
-      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
-      var(--bg);
-    background-size: 48px 48px;
+    height: 100dvh; /* mobile: exclui barra do browser */
+    background: var(--bg);
     color: var(--text);
     overflow: hidden;
   }
@@ -584,11 +575,8 @@ const CSS = `
   .ag-global-header {
     height: var(--header-h);
     flex-shrink: 0;
-    background: rgba(13,13,17,0.95);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+    background: var(--s1);
     border-bottom: 1px solid var(--border);
-    box-shadow: 0 1px 0 rgba(200,165,94,0.06), 0 4px 24px rgba(0,0,0,0.4);
     display: flex;
     align-items: center;
     padding: 0 16px 0 0;
@@ -662,11 +650,8 @@ const CSS = `
 .ag-notif-panel {
   position: absolute; top: calc(100% + 10px); right: 0;
   width: 400px; max-height: 580px;
-  background: rgba(13,13,17,0.96);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(200,165,94,0.10);
-  border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,.50), 0 0 0 1px rgba(255,255,255,0.03) inset;
+  background: var(--s1); border: 1px solid var(--border);
+  border-radius: 20px; box-shadow: 0 20px 56px rgba(0,0,0,.38);
   z-index: 200; overflow: hidden; display: flex; flex-direction: column;
 }
 
@@ -691,90 +676,32 @@ const CSS = `
 .ag-notif-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
 .ag-notif-item {
-  padding: 13px 14px 12px;
+  padding: 14px 16px;
   border-radius: 14px;
   border: 1px solid var(--border);
-  background: linear-gradient(135deg, rgba(22,22,30,0.95) 0%, rgba(16,16,22,0.95) 100%);
-  display: flex; flex-direction: column; gap: 0;
+  background: var(--s2);
+  display: flex; flex-direction: column; gap: 4px;
   transition: border-color .18s, transform .18s, box-shadow .18s;
   cursor: default;
-  position: relative;
-  overflow: hidden;
-}
-.ag-notif-item::before {
-  content: "";
-  position: absolute; top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.07) 50%, transparent 100%);
 }
 .ag-notif-item:hover {
+  border-color: var(--border-h);
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-}
-
-/* linha de acento esquerda via var */
-.ag-notif-item-accent {
-  position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-  border-radius: 14px 0 0 14px;
-}
-
-/* linha topo do card (row com ícone + categoria + fechar) */
-.ag-notif-row-top {
-  display: flex; align-items: center; gap: 10px;
-  margin-bottom: 9px;
-}
-
-/* ícone circular */
-.ag-notif-icon {
-  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  border: 1px solid rgba(255,255,255,0.07);
-  position: relative;
-}
-.ag-notif-icon::after {
-  content: ""; position: absolute; inset: 0; border-radius: 9px;
-  background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 60%);
-  pointer-events: none;
-}
-
-/* categoria / subtipo */
-.ag-notif-categoria {
-  font-size: 9px; font-weight: 700; letter-spacing: 0.10em;
-  text-transform: uppercase; flex: 1; line-height: 1.3;
-  font-family: 'Inter', system-ui, sans-serif;
-}
-
-/* badge urgência (VENCE HOJE / AMANHÃ) */
-.ag-notif-urgencia {
-  font-size: 9px; font-weight: 700; letter-spacing: 0.07em;
-  text-transform: uppercase; padding: 2px 8px; border-radius: 20px;
-  border: 1px solid; flex-shrink: 0;
-}
-
-/* conteúdo principal */
-.ag-notif-row-body {
-  padding-left: 46px;
-}
-
-/* footer com dot + time */
-.ag-notif-row-footer {
-  display: flex; align-items: center; gap: 6px;
-  padding-left: 46px; margin-top: 6px;
-}
-.ag-notif-dot {
-  width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
+  box-shadow: 0 6px 20px rgba(0,0,0,.18);
 }
 
 .ag-notif-item-title {
   font-size: 13px; font-weight: 600; color: var(--text);
-  font-family: 'Inter', system-ui, sans-serif; line-height: 1.4;
+  font-family: 'Inter', system-ui, sans-serif;
 }
 .ag-notif-item-body {
   font-size: 12px; color: var(--text-2); line-height: 1.55;
-  font-family: 'Inter', system-ui, sans-serif; margin-top: 4px;
+  font-family: 'Inter', system-ui, sans-serif;
 }
 .ag-notif-item-meta {
   font-size: 10px; color: var(--text-3);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'Inter', system-ui, sans-serif;
+  margin-top: 3px;
 }
 
 .ag-notif-empty {
@@ -876,8 +803,7 @@ const CSS = `
   /* ══ SIDEBAR ══ */
   .ag-sidebar {
     width: var(--sidebar-w); flex-shrink: 0;
-    background: rgba(13,13,17,0.97);
-    border-right: 1px solid var(--border);
+    background: var(--s1); border-right: 1px solid var(--border);
     display: flex; flex-direction: column;
     overflow: hidden; transition: var(--sidebar-transition);
   }
@@ -906,12 +832,8 @@ const CSS = `
     transition: background .12s, color .12s, border-color .12s, padding .22s;
     white-space: nowrap; overflow: hidden; position: relative;
   }
-  .ag-nav-item:hover  { background: rgba(255,255,255,0.025); color: var(--text); }
-  .ag-nav-item.active {
-    background: linear-gradient(90deg, rgba(200,165,94,0.12) 0%, rgba(200,165,94,0.04) 100%);
-    color: var(--gold); border-left-color: var(--gold);
-    box-shadow: inset 0 0 20px rgba(200,165,94,0.04);
-  }
+  .ag-nav-item:hover  { background: rgba(255,255,255,0.03); color: var(--text); }
+  .ag-nav-item.active { background: var(--gold-d); color: var(--gold); border-left-color: var(--gold); }
   .ag-nav-item.active svg { color: var(--gold); }
 
   .ag-nav-item span {
@@ -952,31 +874,17 @@ const CSS = `
   .acesso-negado__spinner { width: 2rem; height: 2rem; border: 3px solid var(--border); border-top-color: var(--gold-brand); border-radius: 50%; animation: spin 0.7s linear infinite; }
 
   .ag-topbar {
-    padding: 14px 24px;
-    background: rgba(13,13,17,0.85);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    padding: 14px 24px; background: var(--s1);
     border-bottom: 1px solid var(--border);
     display: flex; align-items: center; gap: 16px; flex-shrink: 0;
   }
   .ag-topbar-title h1 {
-    font-family: 'Inter', system-ui, sans-serif; font-size: 20px; font-weight: 800;
-    color: var(--gold-brand); line-height: 1.15;
-    letter-spacing: 0.12em; text-transform: uppercase;
-    background: linear-gradient(135deg, #D4AF37 10%, #f0d060 55%, #c8a55e 100%);
+    font-family: var(--font-display); font-size: 26px; font-weight: 600;
+    color: var(--gold-brand); line-height: 1.15; letter-spacing: 0.01em;
+    background: linear-gradient(135deg, #D4AF37 10%, #e8ca60 55%, #c8a55e 100%);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
   }
-  .ag-topbar-title p { font-size: 11px; color: var(--text-3); margin-top: 3px; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 500; }
-
-  @keyframes ag-pulse-dot {
-    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(62,207,142,0.5); }
-    50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(62,207,142,0); }
-  }
-  .ag-live-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--green); display: inline-block;
-    animation: ag-pulse-dot 2s infinite; margin-right: 6px; flex-shrink: 0;
-  }
+  .ag-topbar-title p { font-size: 11px; color: var(--text-3); margin-top: 3px; letter-spacing: 0.02em; }
 
   .ag-search {
     display: flex; align-items: center; gap: 8px;
@@ -999,13 +907,8 @@ const CSS = `
     background: transparent; color: var(--text-2);
     font-family: 'Inter', system-ui, sans-serif; transition: all .13s;
   }
-  .ag-period-btn:hover  { background: rgba(255,255,255,0.04); color: var(--text); }
-  .ag-period-btn.active {
-    background: rgba(200,165,94,0.08);
-    border-color: rgba(200,165,94,0.28);
-    color: var(--gold);
-    box-shadow: 0 0 12px rgba(200,165,94,0.08);
-  }
+  .ag-period-btn:hover  { background: var(--s2); color: var(--text); }
+  .ag-period-btn.active { background: var(--gold-d); border-color: rgba(200,165,94,.3); color: var(--gold); }
 
   /* ══ CONTENT ══ */
   .ag-content { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px 36px; -webkit-overflow-scrolling: touch; }
@@ -1014,35 +917,31 @@ const CSS = `
 
   /* ══ CARDS ══ */
   .ag-card {
-    background: linear-gradient(145deg, var(--s1) 0%, rgba(18,18,25,0.95) 100%);
-    border: 1px solid var(--border);
+    background: var(--s1); border: 1px solid var(--border);
     border-radius: 14px; padding: 20px;
-    box-shadow: var(--glow-card), inset 0 1px 0 rgba(255,255,255,0.025);
     transition: border-color .2s, box-shadow .2s, transform .2s;
   }
   .ag-card:hover {
     border-color: var(--border-h);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
+    box-shadow: 0 6px 28px rgba(0,0,0,0.3);
     transform: translateY(-2px);
   }
   .ag-card-click { cursor: pointer; }
   .ag-card-click:hover {
-    border-color: rgba(200,165,94,0.22);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(200,165,94,0.08), inset 0 1px 0 rgba(200,165,94,0.06);
+    border-color: rgba(200,165,94,0.25);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
     transform: translateY(-3px);
   }
   .ag-card-click:active { transform: translateY(-1px); }
 
   .ag-card-bare {
-    background: linear-gradient(145deg, var(--s1) 0%, rgba(18,18,25,0.95) 100%);
-    border: 1px solid var(--border);
+    background: var(--s1); border: 1px solid var(--border);
     border-radius: 14px; overflow: hidden;
-    box-shadow: var(--glow-card), inset 0 1px 0 rgba(255,255,255,0.025);
     transition: border-color .2s, box-shadow .2s, transform .2s;
   }
   .ag-card-bare:hover {
     border-color: var(--border-h);
-    box-shadow: 0 8px 28px rgba(0,0,0,0.4);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.25);
     transform: translateY(-1px);
   }
 
@@ -1072,16 +971,15 @@ const CSS = `
   .ag-mini-icon {
     width: 44px; height: 44px; border-radius: 11px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
   }
-  .ag-mini-val { font-family: var(--font-mono); font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: -0.02em; }
+  .ag-mini-val { font-family: 'Inter', system-ui, sans-serif; font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
   .ag-mini-lbl { font-size: 11px; color: var(--text-2); margin-top: 4px; }
 
   /* ══ KPI CARDS ══ */
-  .ag-kpi-label { font-size: 10px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--text-2); margin-bottom: 10px; }
-  .ag-kpi-val   { font-family: var(--font-mono); font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: -0.02em; }
+  .ag-kpi-label { font-size: 10px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; color: var(--text-2); margin-bottom: 10px; }
+  .ag-kpi-val   { font-family: 'Inter', system-ui, sans-serif; font-size: 24px; font-weight: 700; color: var(--text); line-height: 1; }
   .ag-kpi-meta  { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-  .ag-trend     { font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 2px; }
+  .ag-trend     { font-size: 11px; font-weight: 500; display: flex; align-items: center; gap: 2px; }
   .ag-sub       { font-size: 11px; color: var(--text-3); }
 
   /* ══ TABELAS ══ */
@@ -1098,10 +996,9 @@ const CSS = `
 
   /* ══ RESUMO DESPESAS ══ */
   .ag-despesa-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; padding: 18px; }
-  .ag-despesa-card { border-radius: 12px; padding: 15px; backdrop-filter: blur(4px); transition: transform .15s; }
-  .ag-despesa-card:hover { transform: translateY(-2px); }
-  .ag-despesa-label { font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; margin-bottom: 8px; }
-  .ag-despesa-count { font-family: var(--font-mono); font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: -0.02em; }
+  .ag-despesa-card { border-radius: 10px; padding: 15px; }
+  .ag-despesa-label { font-size: 9px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; margin-bottom: 8px; }
+  .ag-despesa-count { font-family: 'Inter', system-ui, sans-serif; font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
   .ag-despesa-val   { font-size: 11px; color: var(--text-2); margin-top: 6px; }
 
   /* ══ FILTRO PERSONALIZADO ══ */
@@ -1125,12 +1022,12 @@ const CSS = `
 
   /* ══ LOADING SKELETON ══ */
   @keyframes ag-shimmer {
-    0%   { background-position: -600px 0; }
-    100% { background-position:  600px 0; }
+    0%   { background-position: -400px 0; }
+    100% { background-position:  400px 0; }
   }
   .ag-skeleton {
-    background: linear-gradient(90deg, var(--s2) 25%, rgba(200,165,94,0.04) 50%, var(--s2) 75%);
-    background-size: 1200px 100%; animation: ag-shimmer 1.6s ease-in-out infinite;
+    background: linear-gradient(90deg, var(--s2) 25%, var(--s3) 50%, var(--s2) 75%);
+    background-size: 800px 100%; animation: ag-shimmer 1.4s infinite;
     border-radius: 6px; height: 1em; display: inline-block; width: 100%;
   }
 
@@ -2419,7 +2316,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       <header className="ag-topbar">
         <div className="ag-topbar-title">
           <h1>Dashboard</h1>
-          <p><span className="ag-live-dot" />Visão geral do negócio</p>
+          <p>Visão geral do negócio</p>
         </div>
 
         {/* Toggle Visão */}
@@ -2621,10 +2518,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         {/* KPI Principal */}
         <div className="g3">
           {kpiMain.map((k) => (
-            <div key={k.label} className="ag-card" style={{
-              borderTop: `2px solid ${k.accent}`,
-              boxShadow: `0 2px 16px rgba(0,0,0,0.4), 0 0 40px ${k.accent}0d`,
-            }}>
+            <div key={k.label} className="ag-card" style={{ borderTop: `2px solid ${k.accent}` }}>
               <div className="ag-kpi-label">{k.label}</div>
               <div className="ag-kpi-val"><Val v={k.value} loading={dash.loading} /></div>
               <div className="ag-kpi-meta">
@@ -2641,10 +2535,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         {/* KPI Secundário */}
         <div className="g3">
           {kpiSec.map((k) => (
-            <div key={k.label} className="ag-card" style={{
-              borderTop: `2px solid ${k.accent}`,
-              boxShadow: `0 2px 16px rgba(0,0,0,0.4), 0 0 40px ${k.accent}0d`,
-            }}>
+            <div key={k.label} className="ag-card" style={{ borderTop: `2px solid ${k.accent}` }}>
               <div className="ag-kpi-label">{k.label}</div>
               <div className="ag-kpi-val"><Val v={k.value} loading={dash.loading} /></div>
               <div className="ag-kpi-meta"><span className="ag-sub">{k.sub}</span></div>
@@ -3282,115 +3173,151 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     <div className="ag-notif-empty">Nenhuma notificação no momento</div>
                   ) : (
                     todasNotif.map((n) => {
-
-                      /* ── helper: tempo relativo ── */
-                      const tempoRel = (ts) => {
-                        const d = ts?.toDate ? ts.toDate() : null;
-                        if (!d) return "—";
-                        const diff = Date.now() - d.getTime();
-                        const m = Math.floor(diff / 60000);
-                        const h = Math.floor(diff / 3600000);
-                        const dy = Math.floor(diff / 86400000);
-                        if (dy >= 1) return `há ${dy} dia${dy > 1 ? "s" : ""}`;
-                        if (h  >= 1) return `há ${h}h`;
-                        if (m  >= 1) return `há ${m} min`;
-                        return "agora";
-                      };
-
                       /* ── Insight de negócio ── */
                       if (n.tipo === "insight") {
                         const INSIGHT_PALETTE = {
-                          faturamento_alta:     { cor: "#3ecf8e", bg: "rgba(62,207,142,0.10)" },
-                          produto_destaque:     { cor: "#3ecf8e", bg: "rgba(62,207,142,0.10)" },
-                          ticket_alta:          { cor: "#3ecf8e", bg: "rgba(62,207,142,0.10)" },
-                          matriculas_alta:      { cor: "#5b8ef0", bg: "rgba(91,142,240,0.10)" },
-                          faturamento_queda:    { cor: "#e05252", bg: "rgba(224,82,82,0.10)"  },
-                          ticket_queda:         { cor: "#f59e0b", bg: "rgba(245,158,11,0.10)" },
-                          cancelamentos_alerta: { cor: "#e05252", bg: "rgba(224,82,82,0.10)"  },
-                          matriculas_queda:     { cor: "#f59e0b", bg: "rgba(245,158,11,0.10)" },
-                          matriculas_zero:      { cor: "#f59e0b", bg: "rgba(245,158,11,0.10)" },
+                          faturamento_alta:     { cor: "var(--green)",  bg: "rgba(62,207,142,0.07)",  badge: "#2daa70" },
+                          produto_destaque:     { cor: "var(--green)",  bg: "rgba(62,207,142,0.07)",  badge: "#2daa70" },
+                          ticket_alta:          { cor: "var(--green)",  bg: "rgba(62,207,142,0.07)",  badge: "#2daa70" },
+                          matriculas_alta:      { cor: "var(--blue)",   bg: "rgba(91,142,240,0.07)",  badge: "#4a7de0" },
+                          faturamento_queda:    { cor: "var(--red)",    bg: "rgba(224,82,82,0.07)",   badge: "#c04040" },
+                          ticket_queda:         { cor: "var(--amber)",  bg: "rgba(245,158,11,0.07)",  badge: "#c07800" },
+                          cancelamentos_alerta: { cor: "var(--red)",    bg: "rgba(224,82,82,0.08)",   badge: "#c04040" },
+                          matriculas_queda:     { cor: "var(--amber)",  bg: "rgba(245,158,11,0.07)",  badge: "#c07800" },
+                          matriculas_zero:      { cor: "var(--amber)",  bg: "rgba(245,158,11,0.07)",  badge: "#c07800" },
                         };
-                        const p = INSIGHT_PALETTE[n.subtipo] || { cor: "#a78bfa", bg: "rgba(167,139,250,0.10)" };
+                        const paleta = INSIGHT_PALETTE[n.tipo] || {
+                          cor: "var(--purple)", bg: "rgba(167,139,250,0.07)", badge: "#8b6ef0",
+                        };
+                        const dataInsight = n.criadoEm?.toDate ? n.criadoEm.toDate() : null;
+                        const tempoRelativo = (() => {
+                          if (!dataInsight) return "—";
+                          const diff = Date.now() - dataInsight.getTime();
+                          const d = Math.floor(diff / 86400000);
+                          const h = Math.floor(diff / 3600000);
+                          if (d >= 1) return `há ${d} dia${d > 1 ? "s" : ""}`;
+                          if (h >= 1) return `há ${h}h`;
+                          return "agora";
+                        })();
                         return (
-                          <div key={n.id} className="ag-notif-item" style={{ border: `1px solid ${p.cor}22` }}>
-                            <div className="ag-notif-item-accent" style={{ background: p.cor }} />
-                            <div className="ag-notif-row-top">
-                              <div className="ag-notif-icon" style={{ background: p.bg }}>
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={p.cor} strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                              </div>
-                              <span className="ag-notif-categoria" style={{ color: p.cor }}>
-                                Sistema · IA Insight
+                          <div
+                            key={n.id}
+                            className="ag-notif-item"
+                            style={{
+                              background: paleta.bg,
+                              borderLeft: `2px solid ${paleta.cor}`,
+                              paddingLeft: 14,
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
+                              <span style={{
+                                fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
+                                textTransform: "uppercase", color: "#fff",
+                                background: paleta.badge,
+                                borderRadius: 20, padding: "2px 8px", flexShrink: 0,
+                              }}>
+                                Insight
+                              </span>
+                              <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
+                                {tempoRelativo}
                               </span>
                               {n.prioridade === "high" && (
-                                <span className="ag-notif-urgencia" style={{ color: p.cor, borderColor: `${p.cor}40`, background: p.bg }}>
+                                <span style={{
+                                  fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
+                                  textTransform: "uppercase", color: paleta.cor,
+                                  background: paleta.bg, border: `1px solid ${paleta.cor}40`,
+                                  borderRadius: 20, padding: "2px 7px", marginLeft: "auto", flexShrink: 0,
+                                }}>
                                   atenção
                                 </span>
                               )}
                             </div>
-                            <div className="ag-notif-row-body">
-                              <div className="ag-notif-item-title">{n.titulo}</div>
-                              <div className="ag-notif-item-body">{n.mensagem}</div>
+                            <div className="ag-notif-item-title" style={{ fontSize: 13, lineHeight: 1.4 }}>
+                              {n.titulo}
                             </div>
-                            <div className="ag-notif-row-footer">
-                              <span className="ag-notif-dot" style={{ background: p.cor }} />
-                              <span className="ag-notif-item-meta">{tempoRel(n.criadoEm)}</span>
+                            <div className="ag-notif-item-body" style={{ marginTop: 5, fontSize: 12, lineHeight: 1.55 }}>
+                              {n.mensagem}
                             </div>
                           </div>
                         );
                       }
 
-                      /* ── Despesa próxima do vencimento ── */
+                      /* ── Alerta de despesa próxima do vencimento ── */
                       if (n.tipo === "despesa") {
-                        const cor = n.diffDias === 0 ? "#e05252" : n.diffDias === 1 ? "#f59e0b" : "#5b8ef0";
-                        const bg  = n.diffDias === 0 ? "rgba(224,82,82,0.10)" : n.diffDias === 1 ? "rgba(245,158,11,0.10)" : "rgba(91,142,240,0.08)";
-                        const labelUrg = n.diffDias === 0 ? "Vence hoje" : n.diffDias === 1 ? "Amanhã" : `${n.diffDias} dias`;
-                        const idShow = n.titulo?.split("—")[1]?.trim() || "";
+                        const corUrgencia =
+                          n.diffDias === 0 ? "var(--red)"   :
+                          n.diffDias === 1 ? "var(--amber)" :
+                                            "var(--blue)";
+                        const bgUrgencia =
+                          n.diffDias === 0 ? "rgba(224,82,82,0.07)"   :
+                          n.diffDias === 1 ? "rgba(245,158,11,0.07)"  :
+                                            "rgba(91,142,240,0.05)";
+                        const labelUrgencia =
+                          n.diffDias === 0 ? "Vence hoje"   :
+                          n.diffDias === 1 ? "Amanhã"       :
+                          `${n.diffDias} dias`;
                         return (
-                          <div key={n.id} className="ag-notif-item" style={{ border: `1px solid ${cor}22`, cursor: "pointer" }}
-                            onClick={() => { setModule("Despesas"); setNotifOpen(false); }}>
-                            <div className="ag-notif-item-accent" style={{ background: cor }} />
-                            <div className="ag-notif-row-top">
-                              <div className="ag-notif-icon" style={{ background: bg }}>
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={cor} strokeWidth="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                              </div>
-                              <span className="ag-notif-categoria" style={{ color: cor }}>Atenção · Despesa</span>
-                              <span className="ag-notif-urgencia" style={{ color: cor, borderColor: `${cor}40`, background: bg }}>{labelUrg}</span>
+                          <div
+                            key={n.id}
+                            className="ag-notif-item"
+                            style={{
+                              cursor: "pointer",
+                              background: bgUrgencia,
+                              borderLeft: `2px solid ${corUrgencia}`,
+                              paddingLeft: 14,
+                            }}
+                            onClick={() => { setModule("Despesas"); setNotifOpen(false); }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 2 }}>
+                              <div className="ag-notif-item-title" style={{ fontSize: 12 }}>{n.mensagem}</div>
+                              <span style={{
+                                fontSize: 9, fontWeight: 700, letterSpacing: "0.06em",
+                                textTransform: "uppercase", color: corUrgencia,
+                                background: bgUrgencia, border: `1px solid ${corUrgencia}40`,
+                                borderRadius: 20, padding: "2px 7px", flexShrink: 0,
+                              }}>{labelUrgencia}</span>
                             </div>
-                            <div className="ag-notif-row-body">
-                              <div className="ag-notif-item-title">{n.mensagem}</div>
-                              <div className="ag-notif-item-body">{idShow} · <span style={{ color: cor }}>Ir para Despesas →</span></div>
-                            </div>
-                            <div className="ag-notif-row-footer">
-                              <span className="ag-notif-dot" style={{ background: cor }} />
-                              <span className="ag-notif-item-meta">{tempoRel(n._ts ? { toDate: () => new Date(n._ts) } : null)}</span>
+                            <div style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
+                              Despesa {n.titulo.split("—")[1]?.trim() || ""} · Ir para Despesas →
                             </div>
                           </div>
                         );
                       }
 
-                      /* ── A Receber próximo do vencimento ── */
+                      /* ── Alerta de A Receber próximo do vencimento ── */
                       if (n.tipo === "a_receber") {
-                        const cor = n.diffDias === 0 ? "#3ecf8e" : "#f59e0b";
-                        const bg  = n.diffDias === 0 ? "rgba(62,207,142,0.10)" : "rgba(245,158,11,0.10)";
-                        const labelUrg = n.diffDias === 0 ? "Vence hoje" : "Amanhã";
+                        const corUrgencia =
+                          n.diffDias === 0 ? "var(--green)"  :
+                                            "var(--amber)";
+                        const bgUrgencia =
+                          n.diffDias === 0 ? "rgba(62,207,142,0.07)"  :
+                                            "rgba(245,158,11,0.07)";
+                        const labelUrgencia =
+                          n.diffDias === 0 ? "Vence hoje" : "Amanhã";
+
                         return (
-                          <div key={n.id} className="ag-notif-item" style={{ border: `1px solid ${cor}22`, cursor: "pointer" }}
-                            onClick={() => { setModule("A Receber"); setNotifOpen(false); }}>
-                            <div className="ag-notif-item-accent" style={{ background: cor }} />
-                            <div className="ag-notif-row-top">
-                              <div className="ag-notif-icon" style={{ background: bg }}>
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={cor} strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                              </div>
-                              <span className="ag-notif-categoria" style={{ color: cor }}>Financeiro · A Receber</span>
-                              <span className="ag-notif-urgencia" style={{ color: cor, borderColor: `${cor}40`, background: bg }}>{labelUrg}</span>
+                          <div
+                            key={n.id}
+                            className="ag-notif-item"
+                            style={{
+                              cursor: "pointer",
+                              background: bgUrgencia,
+                              borderLeft: `2px solid ${corUrgencia}`,
+                              paddingLeft: 14,
+                            }}
+                            onClick={() => { setModule("A Receber"); setNotifOpen(false); }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 2 }}>
+                              <div className="ag-notif-item-title" style={{ fontSize: 12 }}>{n.clienteNome}</div>
+                              <span style={{
+                                fontSize: 9, fontWeight: 700, letterSpacing: "0.06em",
+                                textTransform: "uppercase", color: corUrgencia,
+                                background: bgUrgencia, border: `1px solid ${corUrgencia}40`,
+                                borderRadius: 20, padding: "2px 7px", flexShrink: 0,
+                              }}>{labelUrgencia}</span>
                             </div>
-                            <div className="ag-notif-row-body">
-                              <div className="ag-notif-item-title">{n.clienteNome}</div>
-                              <div className="ag-notif-item-body">{n.valor} · <span style={{ color: cor }}>Ir para A Receber →</span></div>
-                            </div>
-                            <div className="ag-notif-row-footer">
-                              <span className="ag-notif-dot" style={{ background: cor }} />
-                              <span className="ag-notif-item-meta">{tempoRel(n._ts ? { toDate: () => new Date(n._ts) } : null)}</span>
+                            <div style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
+                              A Receber · {n.valor} · Ir para A Receber →
                             </div>
                           </div>
                         );
@@ -3398,66 +3325,80 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
                       /* ── Nova reserva AssFlow ── */
                       if (n.tipo === "nova_reserva") {
-                        const cor = "#c8a55e";
-                        const bg  = "rgba(200,165,94,0.10)";
                         return (
-                          <div key={n.id} className="ag-notif-item" style={{ border: `1px solid ${cor}22`, cursor: "pointer" }}
-                            onClick={() => { marcarReservaLida(n.id); setFlowInitialTab("reservas"); setSistemaAtivo("flow"); setNotifOpen(false); }}>
-                            <div className="ag-notif-item-accent" style={{ background: cor }} />
-                            <div className="ag-notif-row-top">
-                              <div className="ag-notif-icon" style={{ background: bg }}>
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={cor} strokeWidth="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                              </div>
-                              <span className="ag-notif-categoria" style={{ color: cor }}>Flow · Nova Reserva</span>
+                          <div
+                            key={n.id}
+                            className="ag-notif-item"
+                            style={{
+                              cursor: "pointer",
+                              background: "rgba(192,155,82,0.05)",
+                              borderLeft: "2px solid var(--gold)",
+                              paddingLeft: 14,
+                            }}
+                            onClick={() => {
+                              marcarReservaLida(n.id);
+                              setFlowInitialTab("reservas");
+                              setSistemaAtivo("flow");
+                              setNotifOpen(false);
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
+                              <span style={{
+                                fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
+                                textTransform: "uppercase", color: "var(--ink, #040408)",
+                                background: "var(--gold)", borderRadius: 20,
+                                padding: "2px 8px", flexShrink: 0,
+                              }}>Reserva</span>
+                              <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
+                                {n.criadoEm?.toDate
+                                  ? n.criadoEm.toDate().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
+                                  : "—"}
+                              </span>
                             </div>
-                            <div className="ag-notif-row-body">
-                              <div className="ag-notif-item-title">{n.payload?.cliente || "Nova reserva recebida"}</div>
-                              <div className="ag-notif-item-body">
-                                {n.payload?.servico} · {n.payload?.data} {n.payload?.hora && `às ${n.payload.hora}`}
-                              </div>
-                              <div className="ag-notif-item-body" style={{ marginTop: 2 }}>
-                                <span style={{ color: cor }}>Ir para Reservas →</span>
-                              </div>
+                            <div className="ag-notif-item-title" style={{ fontSize: 12, marginBottom: 4 }}>
+                              Nova reserva recebida
                             </div>
-                            <div className="ag-notif-row-footer">
-                              <span className="ag-notif-dot" style={{ background: cor }} />
-                              <span className="ag-notif-item-meta">{tempoRel(n.criadoEm)}</span>
+                            <div className="ag-notif-item-body" style={{ fontSize: 11, lineHeight: 1.55 }}>
+                              <span style={{ color: "var(--text-2)" }}>Cliente:</span> {n.payload?.cliente || "—"}<br />
+                              <span style={{ color: "var(--text-2)" }}>Serviço:</span> {n.payload?.servico || "—"}<br />
+                              <span style={{ color: "var(--text-2)" }}>Data:</span> {n.payload?.data || "—"} às {n.payload?.hora || "—"}
+                            </div>
+                            <div style={{ fontSize: 10, color: "var(--gold)", marginTop: 5, fontFamily: "'JetBrains Mono', monospace" }}>
+                              Ir para Reservas →
                             </div>
                           </div>
                         );
                       }
 
-                      /* ── Sistema / default ── */
-                      const cor = "#c8a55e";
-                      const bg  = "rgba(200,165,94,0.08)";
+                      /* ── Anúncio do sistema ── */
                       return (
-                        <div key={n.id} className="ag-notif-item" style={{ border: `1px solid ${cor}18` }}>
-                          <div className="ag-notif-item-accent" style={{ background: cor }} />
-                          <div className="ag-notif-row-top">
-                            <div className="ag-notif-icon" style={{ background: bg }}>
-                              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={cor} strokeWidth="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-                            </div>
-                            <span className="ag-notif-categoria" style={{ color: cor }}>Sistema</span>
-                            <span className="ag-notif-item-meta" style={{ marginLeft: "auto" }}>
+                        <div key={n.id} className="ag-notif-item">
+                          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
+                            <span style={{
+                              fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
+                              textTransform: "uppercase", color: "var(--gold)",
+                              background: "var(--gold-d)", border: "1px solid rgba(200,165,94,0.2)",
+                              borderRadius: 20, padding: "2px 8px", flexShrink: 0,
+                            }}>Sistema</span>
+                            <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
                               {n.criadoEm?.toDate
-                                ? n.criadoEm.toDate().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })
+                                ? n.criadoEm.toDate().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
                                 : "—"}
                             </span>
                           </div>
-                          <div className="ag-notif-row-body">
-                            <div className="ag-notif-item-title">{n.titulo}</div>
-                            <div className="ag-notif-item-body" style={{ marginTop: 4 }}>{n.mensagem}</div>
-                            {n.btnUrl && (
-                              <a href={n.btnUrl} target="_blank" rel="noopener noreferrer" className="ag-notif-cta">
-                                {n.btnTexto || "Ver mais"}
-                                <span className="ag-notif-cta-arrow" aria-hidden="true">↗</span>
-                              </a>
-                            )}
-                          </div>
-                          <div className="ag-notif-row-footer">
-                            <span className="ag-notif-dot" style={{ background: cor }} />
-                            <span className="ag-notif-item-meta">{tempoRel(n.criadoEm)}</span>
-                          </div>
+                          <div className="ag-notif-item-title">{n.titulo}</div>
+                          <div className="ag-notif-item-body" style={{ marginTop: 4 }}>{n.mensagem}</div>
+                          {n.btnUrl && (
+                            <a
+                              href={n.btnUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="ag-notif-cta"
+                            >
+                              {n.btnTexto || "Ver mais"}
+                              <span className="ag-notif-cta-arrow" aria-hidden="true">↗</span>
+                            </a>
+                          )}
                         </div>
                       );
                     })
