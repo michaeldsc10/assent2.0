@@ -2303,22 +2303,6 @@ export default function Vendas() {
   const [loading, setLoading] = useState(true);
 
   const [modalNova, setModalNova]       = useState(false);
-
-  /* Atalho "N" → Nova Venda (só neste módulo, só na aba ativas) */
-  useEffect(() => {
-    const handler = (e) => {
-      const tag = e.target?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || e.target?.isContentEditable) return;
-      if (e.key === "n" || e.key === "N") {
-        if (tab === "ativas" && podeCriar && !modalNova) {
-          e.preventDefault();
-          setModalNova(true);
-        }
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [tab, podeCriar, modalNova]);
   const [editando, setEditando]         = useState(null);
   const [detalhe, setDetalhe]           = useState(null);
   const [deletando, setDeletando]       = useState(null); // fluxo de cancelar
@@ -3097,7 +3081,7 @@ useEffect(() => {
           <button onClick={() => setModalNova(true)}
             style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: 9, background: "var(--gold)", color: "#0a0808", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, transition: "opacity .13s" }}
           >
-            <Plus size={14} /> <u>N</u>ova Venda
+            <Plus size={14} /> Nova Venda
           </button>
         )}
       </header>
