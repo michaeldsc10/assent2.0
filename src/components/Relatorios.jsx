@@ -1429,8 +1429,9 @@ function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], aReceber 
             return acc + Number(p.valor || 0);
           }, 0);
         }
+        /* Legado: sem histórico */
         if (Number(r.valorPago || 0) <= 0) return s;
-        if (!dentroDoIntervalo(r.dataPagamento || r.dataVencimento, intervalo)) return s;
+        if (!dentroDoIntervalo(r.dataPagamento || r.dataCriacao, intervalo)) return s;
         return s + Number(r.valorPago || 0);
       }, 0);
 
@@ -1743,14 +1744,23 @@ function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], aR
     );
     const _valDesp = (d) => d.status === "parcial" ? Number(d.valorPago || 0) : Number(d.valor || 0);
 
-    const aReceberManuais = aReceber.filter((r) => {
-      if (r.origem === "venda") return false;
-      if (Number(r.valorPago || 0) <= 0) return false;
-      return dentroDoIntervalo(r.dataPagamento || r.dataCriacao, intervalo);
-    });
+    /* aReceber manuais: cada entrada do histórico é uma transação independente */
+    const aReceberManuais = aReceber
+      .filter((r) => r.origem !== "venda")
+      .flatMap((r) => {
+        if (Array.isArray(r.historicoPagamentos) && r.historicoPagamentos.length > 0) {
+          return r.historicoPagamentos
+            .filter((p) => Number(p.valor || 0) > 0 && dentroDoIntervalo(parseDate(p.data), intervalo))
+            .map((p) => ({ ...r, _valor: Number(p.valor), _data: p.data }));
+        }
+        /* Legado */
+        if (Number(r.valorPago || 0) <= 0) return [];
+        if (!dentroDoIntervalo(r.dataPagamento || r.dataCriacao, intervalo)) return [];
+        return [{ ...r, _valor: Number(r.valorPago), _data: r.dataPagamento || r.dataCriacao }];
+      });
 
     const totalEntradasCaixa = entradasCaixa.reduce((s, c) => s + Number(c.valor || 0), 0);
-    const totalAReceberManual = aReceberManuais.reduce((s, r) => s + Number(r.valorPago || 0), 0);
+    const totalAReceberManual = aReceberManuais.reduce((s, r) => s + r._valor, 0);
     const totalEntradas    = totalEntradasCaixa + totalAReceberManual;
     const totalSaidasCaixa = saidasCaixa.reduce((s, c) => s + Number(c.valor || 0), 0);
     const totalDespesas    = despesasPagas.reduce((s, d) => s + _valDesp(d), 0);
@@ -1819,15 +1829,14 @@ function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], aR
     });
 
   
-      aReceberManuais.forEach((r) => {
-      const rawDate = r.dataPagamento || r.dataCriacao;
+    aReceberManuais.forEach((r, i) => {
       transacoes.push({
-        _id: `ar-${r.id}`,
-        data: rawDate,
-        dataTs: parseDate(rawDate),
+        _id: `ar-${r.id}-${i}`,
+        data: r._data,
+        dataTs: parseDate(r._data),
         tipo: "entrada",
         descricao: `A Receber · ${r.clienteNome || r.descricao || "Recebimento manual"}`,
-        entrada: Number(r.valorPago || 0),
+        entrada: r._valor,
         saida: 0,
       });
     });
