@@ -734,10 +734,7 @@ export default function Clientes() {
             className="btn-novo-cl"
             onClick={() => setModalNovo(true)}
             title="Novo Cliente (N)"
-          >
-            <UserPlus size={14} />
-            <span style={{ borderBottom: "1.5px solid currentColor" }}>N</span>ovo Cliente
-          </button>
+          ><UserPlus size={14} /><span><span style={{ borderBottom: "1.5px solid currentColor" }}>N</span>ovo Cliente</span></button>
         )}
       </header>
 
