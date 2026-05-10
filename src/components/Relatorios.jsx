@@ -1419,12 +1419,20 @@ function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], aReceber 
     const receitaCaixa   = caixaVendas.reduce((s, c) => s + Number(c.valor || 0), 0);
     const receitaLegados = vendasLegadas.reduce((s, v) => s + Number(v.total || 0), 0);
     /* Receitas manuais do a_receber (não vinculadas a vendas) — regime de caixa */
-    const aReceberPagos = aReceber.filter((r) =>
-      r.origem !== "venda" &&
-      Number(r.valorPago || 0) > 0 &&
-      dentroDoIntervalo(r.dataPagamento || r.dataVencimento, intervalo)
-    );
-    const receitaAReceber = aReceberPagos.reduce((s, r) => s + Number(r.valorPago || 0), 0);
+    const receitaAReceber = aReceber
+      .filter((r) => r.origem !== "venda")
+      .reduce((s, r) => {
+        if (Array.isArray(r.historicoPagamentos) && r.historicoPagamentos.length > 0) {
+          return s + r.historicoPagamentos.reduce((acc, p) => {
+            const dt = parseDate(p.data);
+            if (!dt || !dentroDoIntervalo(dt, intervalo)) return acc;
+            return acc + Number(p.valor || 0);
+          }, 0);
+        }
+        if (Number(r.valorPago || 0) <= 0) return s;
+        if (!dentroDoIntervalo(r.dataPagamento || r.dataVencimento, intervalo)) return s;
+        return s + Number(r.valorPago || 0);
+      }, 0);
 
     const receitaBruta   = receitaCaixa + receitaLegados + receitaAReceber;
 
