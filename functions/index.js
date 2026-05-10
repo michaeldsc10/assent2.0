@@ -12,6 +12,7 @@ const { onCall, onRequest,
 const { getFirestore,
         Timestamp, FieldValue }   = require("firebase-admin/firestore");
 const admin                       = require("firebase-admin");
+const { getAppCheck }             = require("firebase-admin/app-check");
 const Stripe                      = require("stripe");
 const nodemailer                  = require("nodemailer");
 const { defineSecret }            = require("firebase-functions/params");
@@ -74,6 +75,23 @@ const ADMIN_CALL_OPTIONS = {
 };
 
 /* Opções para as funções PIX — onRequest com CORS nativo */
+
+/* Helper: verifica token App Check para funções onRequest públicas
+   Rejeita qualquer chamada sem token válido emitido pelo reCAPTCHA do domínio. */
+async function verificarAppCheck(req, res) {
+  const token = req.headers["x-firebase-appcheck"] || "";
+  if (!token) {
+    res.status(401).json({ error: "App Check token ausente." });
+    return false;
+  }
+  try {
+    await getAppCheck().verifyToken(token);
+    return true;
+  } catch {
+    res.status(401).json({ error: "App Check token inválido." });
+    return false;
+  }
+}
 
 /* Helper: verifica token Firebase Auth e retorna uid */
 async function verificarAuth(req) {
@@ -286,6 +304,7 @@ exports.pagamentoPix = onRequest(
   { region: "us-central1", cors: FLOW_ORIGINS },
   async (req, res) => {
     if (req.method !== "POST") { res.status(405).send("Method Not Allowed"); return; }
+    if (!await verificarAppCheck(req, res)) return;
 
     const { tenantUid, reservaId } = req.body || {};
     if (!tenantUid || !reservaId) {
@@ -393,6 +412,7 @@ exports.pagamentoCartao = onRequest(
   { region: "us-central1", cors: FLOW_ORIGINS },
   async (req, res) => {
     if (req.method !== "POST") { res.status(405).send("Method Not Allowed"); return; }
+    if (!await verificarAppCheck(req, res)) return;
 
     const { tenantUid, reservaId, cardToken, installments = 1, payerEmail } = req.body || {};
     if (!tenantUid || !reservaId || !cardToken) {
@@ -482,6 +502,8 @@ exports.consultarPagamentoReserva = onRequest(
   { region: "us-central1", cors: FLOW_ORIGINS },
   async (req, res) => {
     if (req.method !== "POST") { res.status(405).send("Method Not Allowed"); return; }
+    if (!await verificarAppCheck(req, res)) return;
+
     const { tenantUid, reservaId } = req.body || {};
     if (!tenantUid || !reservaId) {
       res.status(400).json({ error: "tenantUid e reservaId são obrigatórios." }); return;
