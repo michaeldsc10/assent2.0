@@ -3097,7 +3097,7 @@ useEffect(() => {
           <button onClick={() => setModalNova(true)}
             style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: 9, background: "var(--gold)", color: "#0a0808", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, transition: "opacity .13s" }}
           >
-            <Plus size={14} /> <u>N</u>ova Venda
+            <Plus size={14} /> <span><u>N</u>ova Venda</span>
           </button>
         )}
       </header>
