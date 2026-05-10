@@ -1007,11 +1007,16 @@ export default function AReceber() {
     if (!tenantUid) return;
     try {
       const col = collection(db, "users", tenantUid, "a_receber");
+      const agora = new Date();
+      const historicoInicial = dados.valorPago > 0
+        ? [{ valor: dados.valorPago, data: agora.toISOString() }]
+        : [];
       await addDoc(col, {
         ...dados,
         origem: dados.origem || "manual",
         dataCriacao: serverTimestamp(),
-        dataPagamento: null
+        dataPagamento: dados.valorPago > 0 ? agora : null,
+        historicoPagamentos: historicoInicial,
       });
       setModalNovo(false);
       await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.CRIAR, modulo: LOG_MODULO.A_RECEBER, descricao: montarDescricao("criar", "Conta a Receber", dados.clienteNome || dados.descricao) });
@@ -1026,17 +1031,30 @@ export default function AReceber() {
     if (!tenantUid || !editando?.id) return;
     try {
       const ref = doc(db, "users", tenantUid, "a_receber", editando.id);
-      await updateDoc(ref, {
-        clienteNome: dados.clienteNome,
-        clienteId: dados.clienteId,
-        descricao: dados.descricao,
-        valorTotal: dados.valorTotal,
-        valorPago: dados.valorPago,
-        valorRestante: dados.valorRestante,
+      // Detecta se houve incremento manual no valorPago
+      const vpAnterior = editando.valorPago || 0;
+      const vpNovo     = dados.valorPago || 0;
+      const incremento = vpNovo - vpAnterior;
+      const agora      = new Date();
+
+      const updateData = {
+        clienteNome:    dados.clienteNome,
+        clienteId:      dados.clienteId,
+        descricao:      dados.descricao,
+        valorTotal:     dados.valorTotal,
+        valorPago:      dados.valorPago,
+        valorRestante:  dados.valorRestante,
         formaPagamento: dados.formaPagamento,
         dataVencimento: dados.dataVencimento,
-        observacoes: dados.observacoes
-      });
+        observacoes:    dados.observacoes,
+      };
+
+      if (incremento > 0) {
+        updateData.dataPagamento       = agora;
+        updateData.historicoPagamentos = arrayUnion({ valor: incremento, data: agora.toISOString() });
+      }
+
+      await updateDoc(ref, updateData);
       setEditando(null);
       await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.A_RECEBER, descricao: montarDescricao("editar", "Conta a Receber", dados.clienteNome || dados.descricao, editando.id) });
     } catch (err) {
