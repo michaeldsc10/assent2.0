@@ -1148,13 +1148,18 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
   // Cabeçalho
   const [clienteSearch, setClienteSearch] = useState(venda?.cliente || "");
   const [clienteAC, setClienteAC] = useState(false);
-  const [dataVenda, setDataVenda] = useState(
-    venda?.data 
-      ? (venda.data?.toDate 
-          ? venda.data.toDate().toISOString().split("T")[0] 
-          : new Date(venda.data).toISOString().split("T")[0]) 
-      : new Date().toISOString().split("T")[0]
-  );
+  const [dataVenda, setDataVenda] = useState(() => {
+    const toLocalDate = (d) => {
+      const dt = d?.toDate ? d.toDate() : new Date(d);
+      const y = dt.getFullYear();
+      const m = String(dt.getMonth() + 1).padStart(2, "0");
+      const day = String(dt.getDate()).padStart(2, "0");
+      return `${y}-${m}-${day}`;
+    };
+    if (venda?.data) return toLocalDate(venda.data);
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`;
+  });
   // Vendedor: se cargo=vendedor, sempre usa o próprio nome (não pode trocar)
   const isVendedorCargo = cargo === "vendedor";
   const podeEscolherVendedor = cargo === "admin" || cargo === "comercial";
