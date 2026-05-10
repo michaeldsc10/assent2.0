@@ -1690,16 +1690,90 @@ function ChartToggle({ value, onChange }) {
 }
 
 /* ── Chart 3D Bars ── */
-function Chart3DBars({ data, period, height = 170 }) {
-  const [tooltip, setTooltip] = useState(null); // { x, y, d, v }
-  if (!data || data.length === 0) return (
+// series: [{ key, label, color, sideColor, topColor, glowColor }]
+const BAR3D_SERIES = [
+  {
+    key: "receita", label: "Receita",
+    frontGrad: "linear-gradient(180deg, #f0d060 0%, #d4a020 25%, #a87018 70%, #7a4c08 100%)",
+    sideGrad:  "linear-gradient(180deg, #7a4c08 0%, #3a2404 100%)",
+    topGrad:   "linear-gradient(90deg, #fff890 0%, #e8cc40 50%, #c89020 100%)",
+    glow:      "rgba(200,165,94,0.5)", dot: "#c8a55e",
+  },
+  {
+    key: "custo", label: "Custo",
+    frontGrad: "linear-gradient(180deg, #f07070 0%, #c03030 25%, #8a1818 70%, #5a0808 100%)",
+    sideGrad:  "linear-gradient(180deg, #6a1010 0%, #3a0404 100%)",
+    topGrad:   "linear-gradient(90deg, #ffaaaa 0%, #e04040 50%, #b02020 100%)",
+    glow:      "rgba(224,82,82,0.5)", dot: "#e05252",
+  },
+];
+
+function Bar3D({ h, delay, series, active, onEnter, onLeave }) {
+  return (
+    <div
+      style={{ position: "relative", width: "40%", maxWidth: 18, flexShrink: 0, cursor: "crosshair" }}
+      onMouseEnter={onEnter} onMouseLeave={onLeave}
+    >
+      <div style={{
+        position: "relative", width: "100%", height: `${h}px`,
+        transformOrigin: "bottom center",
+        animation: `bar3d-rise 0.45s cubic-bezier(0.34,1.4,0.64,1) ${delay}s both`,
+        filter: active ? "brightness(1.3)" : undefined,
+        transition: "filter 0.15s",
+      }}>
+        {/* glow */}
+        <div style={{
+          position: "absolute", bottom: -6, left: -8, right: -8, height: 14,
+          background: `radial-gradient(ellipse at center, ${series.glow} 0%, transparent 70%)`,
+          filter: "blur(5px)", pointerEvents: "none", zIndex: -1,
+        }} />
+        {/* front */}
+        <div style={{ position: "absolute", inset: 0, background: series.frontGrad, borderTop: "1px solid rgba(255,235,100,0.35)" }} />
+        {/* side */}
+        <div style={{
+          position: "absolute", left: "100%", top: -5, width: 6, height: "calc(100% + 5px)",
+          background: series.sideGrad,
+          clipPath: "polygon(0 5px, 6px 0, 6px calc(100% - 5px), 0 100%)",
+        }} />
+        {/* top */}
+        <div style={{
+          position: "absolute", top: -5, left: 0, width: "calc(100% + 6px)", height: 5,
+          background: series.topGrad,
+          clipPath: "polygon(6px 0, calc(100%) 0, calc(100% - 6px) 5px, 0 5px)",
+        }} />
+      </div>
+    </div>
+  );
+}
+
+function Chart3DBars({ data, series: seriesProp, period, height = 170 }) {
+  const [tooltip, setTooltip] = useState(null);
+  // series: quais colunas mostrar. Default: só receita (key "v")
+  const useDual = !!seriesProp; // se passar series prop, usa dual
+  const activeSeries = seriesProp || [BAR3D_SERIES[0]];
+
+  const emptyCheck = useDual
+    ? (!data || data.length === 0)
+    : (!data || data.length === 0);
+
+  if (emptyCheck) return (
     <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-3)", fontSize: 12 }}>
       Nenhum dado no período
     </div>
   );
-  const max = Math.max(...data.map(d => d.v || 0), 1);
-  const total = data.reduce((a, b) => a + (b.v || 0), 0);
-  const CONTAINER_H = height - 40;
+
+  // max across all series
+  const max = Math.max(...data.flatMap(d =>
+    activeSeries.map(s => d[s.key] || d.v || 0)
+  ), 1);
+
+  const totalReceita = data.reduce((a, b) => a + (b[activeSeries[0].key] || b.v || 0), 0);
+  const totalCusto   = useDual && activeSeries[1] ? data.reduce((a, b) => a + (b[activeSeries[1].key] || 0), 0) : null;
+
+  const CONTAINER_H = height - 46;
+
+  const getLabel = (d) => d.d || d.mes || d.l || "";
+
   return (
     <div className="chart3d-wrap" style={{ position: "relative" }}>
       {/* Tooltip */}
@@ -1710,23 +1784,26 @@ function Chart3DBars({ data, period, height = 170 }) {
           transform: "translate(-50%, -110%)",
           pointerEvents: "none",
           background: "var(--s2)",
-          border: "1px solid rgba(200,165,94,0.2)",
+          border: "1px solid rgba(200,165,94,0.18)",
           borderRadius: 10, padding: "8px 14px",
           fontSize: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
           whiteSpace: "nowrap",
         }}>
           <div style={{ color: "var(--text-3)", fontSize: 10, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 6, borderBottom: "1px solid var(--border)", paddingBottom: 5 }}>
-            {tooltip.d}
+            {tooltip.label}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 8, height: 8, borderRadius: 2, background: "#c8a55e", boxShadow: "0 0 6px rgba(200,165,94,0.6)" }} />
-            <span style={{ color: "var(--text-2)" }}>Receita</span>
-            <span style={{ color: "var(--gold)", fontWeight: 700, marginLeft: 8 }}>
-              R$ {(tooltip.v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-            </span>
-          </div>
+          {activeSeries.map(s => (
+            <div key={s.key} style={{ display: "flex", alignItems: "center", gap: 8, margin: "3px 0" }}>
+              <div style={{ width: 8, height: 8, borderRadius: 2, background: s.dot, boxShadow: `0 0 6px ${s.dot}99` }} />
+              <span style={{ color: "var(--text-2)" }}>{s.label}</span>
+              <span style={{ color: s.dot, fontWeight: 700, marginLeft: 8 }}>
+                R$ {((tooltip[s.key] ?? tooltip.v) || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+          ))}
         </div>
       )}
+
       <div className="chart3d-inner" style={{ height }}>
         <div className="chart3d-yaxis">
           {[1, 0.66, 0.33, 0].map((r, i) => (
@@ -1743,43 +1820,205 @@ function Chart3DBars({ data, period, height = 170 }) {
           ))}
           <div className="chart3d-bars">
             {data.map((d, i) => {
-              const barH = Math.max(6, ((d.v || 0) / max) * (CONTAINER_H - 10));
+              const lbl = getLabel(d);
+              const isHovered = tooltip?.label === lbl;
               return (
                 <div
-                  className="bar3d-wrap" key={i}
+                  key={i}
+                  style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%", gap: 2 }}
                   onMouseEnter={e => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     const wrapRect = e.currentTarget.closest(".chart3d-wrap").getBoundingClientRect();
-                    setTooltip({ x: rect.left - wrapRect.left + rect.width / 2, y: rect.top - wrapRect.top, d: d.d || d.l || "", v: d.v || 0 });
+                    setTooltip({ x: rect.left - wrapRect.left + rect.width / 2, y: rect.top - wrapRect.top, label: lbl, ...d });
                   }}
                   onMouseLeave={() => setTooltip(null)}
                 >
-                  <div className="bar3d" style={{
-                    height: `${barH}px`, "--d": `${i * 0.04}s`,
-                    filter: tooltip?.d === (d.d || d.l) ? "brightness(1.25)" : undefined,
-                    transition: "filter 0.15s",
-                  }}>
-                    <div className="bar3d-glow" />
-                    <div className="bar3d-front" />
-                    <div className="bar3d-side" />
-                    <div className="bar3d-top" />
+                  {/* barras lado a lado */}
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: 2, width: "100%", justifyContent: "center" }}>
+                    {activeSeries.map(s => {
+                      const val = d[s.key] ?? (s.key === activeSeries[0].key ? d.v : 0) ?? 0;
+                      const barH = Math.max(4, (val / max) * (CONTAINER_H - 10));
+                      return (
+                        <Bar3D
+                          key={s.key}
+                          h={barH}
+                          delay={i * 0.04}
+                          series={s}
+                          active={isHovered}
+                        />
+                      );
+                    })}
                   </div>
-                  <div className="bar3d-label">{d.d || d.l || ""}</div>
+                  <div className="bar3d-label">{lbl}</div>
                 </div>
               );
             })}
           </div>
         </div>
       </div>
+
+      {/* Legend */}
       <div className="chart3d-legend">
-        <div className="chart3d-legend-left">
-          <span className="chart3d-legend-dot" />
-          <span>Receita líquida</span>
+        <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+          {activeSeries.map(s => (
+            <div key={s.key} className="chart3d-legend-left">
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: s.dot, display: "inline-block" }} />
+              <span>{s.label}</span>
+            </div>
+          ))}
         </div>
         <div className="chart3d-legend-right">
           <span>{period}</span>
-          <b>R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</b>
+          {totalCusto !== null ? (
+            <b>R$ {totalReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} <span style={{ color: "#e05252", fontSize: 11 }}>/ R$ {totalCusto.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span></b>
+          ) : (
+            <b>R$ {totalReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</b>
+          )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Chart 3D Donut (Mix de Receita) ── */
+function Chart3DDonut({ data, height = 200 }) {
+  const [hovered, setHovered] = useState(null);
+  const PIE_COLORS = ["#c8a55e", "#3ecf8e", "#5b8ef0", "#f59e0b", "#e052a0"];
+
+  if (!data || data.length === 0) return (
+    <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-3)", fontSize: 12 }}>
+      Nenhum dado disponível
+    </div>
+  );
+
+  const total = data.reduce((a, b) => a + (b.value || 0), 0) || 1;
+  const CX = 90, CY = 90, R_OUT = 72, R_IN = 44, DEPTH = 14;
+  const toRad = (deg) => (deg - 90) * Math.PI / 180;
+
+  // build slices
+  let startAngle = 0;
+  const slices = data.map((item, i) => {
+    const pct = (item.value || 0) / total;
+    const sweep = pct * 360;
+    const mid = startAngle + sweep / 2;
+    const s = { ...item, startAngle, sweep, mid, color: PIE_COLORS[i % PIE_COLORS.length], pct };
+    startAngle += sweep;
+    return s;
+  });
+
+  const arcPath = (cx, cy, r, start, sweep) => {
+    if (sweep >= 360) sweep = 359.999;
+    const s = toRad(start), e = toRad(start + sweep);
+    const lg = sweep > 180 ? 1 : 0;
+    return `M ${cx + r * Math.cos(s)} ${cy + r * Math.sin(s)} A ${r} ${r} 0 ${lg} 1 ${cx + r * Math.cos(e)} ${cy + r * Math.sin(e)}`;
+  };
+
+  const donutPath = (cx, cy, rOut, rIn, start, sweep) => {
+    if (sweep >= 360) sweep = 359.999;
+    const s = toRad(start), e = toRad(start + sweep);
+    const lg = sweep > 180 ? 1 : 0;
+    const x1o = cx + rOut * Math.cos(s), y1o = cy + rOut * Math.sin(s);
+    const x2o = cx + rOut * Math.cos(e), y2o = cy + rOut * Math.sin(e);
+    const x1i = cx + rIn  * Math.cos(e), y1i = cy + rIn  * Math.sin(e);
+    const x2i = cx + rIn  * Math.cos(s), y2i = cy + rIn  * Math.sin(s);
+    return `M ${x1o} ${y1o} A ${rOut} ${rOut} 0 ${lg} 1 ${x2o} ${y2o} L ${x1i} ${y1i} A ${rIn} ${rIn} 0 ${lg} 0 ${x2i} ${y2i} Z`;
+  };
+
+  const hov = hovered !== null ? slices[hovered] : null;
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 20, height }}>
+      <svg width={CX * 2} height={CY * 2 + DEPTH} style={{ overflow: "visible", flexShrink: 0 }}>
+        <defs>
+          {slices.map((s, i) => (
+            <linearGradient key={i} id={`dg${i}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={s.color} stopOpacity="0.55" />
+              <stop offset="100%" stopColor={s.color} stopOpacity="0.2" />
+            </linearGradient>
+          ))}
+        </defs>
+
+        {/* 3D depth ring — bottom face */}
+        {slices.map((s, i) => {
+          if (s.sweep < 1) return null;
+          const isHov = hovered === i;
+          const dy = isHov ? -5 : 0;
+          // side walls: outer arc bottom -> top -> inner arc bottom (depth)
+          const startD = s.startAngle, endD = s.startAngle + s.sweep;
+          const sR = toRad(startD), eR = toRad(endD);
+          const lg = s.sweep > 180 ? 1 : 0;
+
+          // outer wall
+          const ox1 = CX + R_OUT * Math.cos(sR), oy1 = CY + R_OUT * Math.sin(sR) + dy;
+          const ox2 = CX + R_OUT * Math.cos(eR), oy2 = CY + R_OUT * Math.sin(eR) + dy;
+          const outerWall = `M ${ox1} ${oy1 + DEPTH} L ${ox1} ${oy1} A ${R_OUT} ${R_OUT} 0 ${lg} 1 ${ox2} ${oy2} L ${ox2} ${oy2 + DEPTH} A ${R_OUT} ${R_OUT} 0 ${lg} 0 ${ox1} ${oy1 + DEPTH} Z`;
+
+          // inner wall
+          const ix1 = CX + R_IN * Math.cos(sR), iy1 = CY + R_IN * Math.sin(sR) + dy;
+          const ix2 = CX + R_IN * Math.cos(eR), iy2 = CY + R_IN * Math.sin(eR) + dy;
+          const innerWall = `M ${ix1} ${iy1 + DEPTH} L ${ix1} ${iy1} A ${R_IN} ${R_IN} 0 ${lg} 1 ${ix2} ${iy2} L ${ix2} ${iy2 + DEPTH} A ${R_IN} ${R_IN} 0 ${lg} 0 ${ix1} ${iy1 + DEPTH} Z`;
+
+          return (
+            <g key={i} style={{ cursor: "pointer" }} onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}>
+              <path d={outerWall} fill={`url(#dg${i})`} stroke={s.color} strokeWidth="0.3" strokeOpacity="0.4" />
+              <path d={innerWall} fill={s.color} fillOpacity="0.12" stroke={s.color} strokeWidth="0.3" strokeOpacity="0.3" />
+            </g>
+          );
+        })}
+
+        {/* Top face */}
+        {slices.map((s, i) => {
+          if (s.sweep < 1) return null;
+          const isHov = hovered === i;
+          const dy = isHov ? -5 : 0;
+          const d = donutPath(CX, CY + dy, R_OUT, R_IN, s.startAngle, s.sweep);
+          return (
+            <g key={i} style={{ cursor: "pointer" }} onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}>
+              <path
+                d={d}
+                fill={s.color}
+                fillOpacity={isHov ? 0.95 : 0.82}
+                stroke={isHov ? s.color : "var(--s1)"}
+                strokeWidth={isHov ? 1.5 : 1}
+                style={{ filter: isHov ? `drop-shadow(0 0 8px ${s.color}88)` : undefined, transition: "all 0.15s" }}
+              />
+            </g>
+          );
+        })}
+
+        {/* Center label */}
+        <text x={CX} y={CY - 6} textAnchor="middle" fill="var(--text)" fontSize="13" fontWeight="700" fontFamily="Inter, system-ui">
+          {hov ? `${Math.round(hov.pct * 100)}%` : "Mix"}
+        </text>
+        <text x={CX} y={CY + 10} textAnchor="middle" fill="var(--text-3)" fontSize="9" fontFamily="Inter, system-ui">
+          {hov ? hov.name : "receita"}
+        </text>
+      </svg>
+
+      {/* Legend */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
+        {slices.map((s, i) => (
+          <div
+            key={i}
+            style={{ cursor: "pointer", opacity: hovered !== null && hovered !== i ? 0.45 : 1, transition: "opacity 0.15s" }}
+            onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 4 }}>
+              <span style={{ color: "var(--text-2)", display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color, display: "inline-block", boxShadow: `0 0 6px ${s.color}66` }} />
+                {s.name}
+              </span>
+              <span style={{ color: s.color, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{Math.round(s.pct * 100)}%</span>
+            </div>
+            <div style={{ background: "var(--s2)", borderRadius: 4, height: 5, overflow: "hidden" }}>
+              <div style={{
+                width: `${Math.round(s.pct * 100)}%`, height: "100%",
+                background: `linear-gradient(90deg, ${s.color}, ${s.color}88)`,
+                borderRadius: 4, transition: "width 0.6s ease",
+              }} />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -1941,6 +2180,7 @@ export default function Dashboard() {
   const [dashView, setDashView] = useState("overview"); // "overview" | "charts"
   const [faturMode, setFaturMode] = useState("3d");        // "flat" | "3d"
   const [chartsBarMode, setChartsBarMode] = useState("3d"); // para renderChartsView
+  const [mixMode, setMixMode] = useState("3d");             // "flat" | "3d"
   const [searchQuery, setSearchQuery]     = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -3355,7 +3595,12 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           headerRight={<ChartToggle value={chartsBarMode} onChange={setChartsBarMode} />}
         >
           {semDados ? <EmptyState /> : chartsBarMode === "3d" ? (
-            <Chart3DBars data={faturDia} period={period} height={240} />
+            <Chart3DBars
+              data={receitaData.map(d => ({ ...d, d: d.mes, receita: d.receita, custo: d.custo }))}
+              series={[BAR3D_SERIES[0], BAR3D_SERIES[1]]}
+              period={period}
+              height={240}
+            />
           ) : (
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={dash.loading ? [] : receitaData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barSize={14} barGap={3}>
@@ -3426,8 +3671,11 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           </ResponsiveContainer>
         </Card>
 
-        {/* 4. Mix de Receita — PieChart melhorado */}
-        <Card title="Mix de Receita" subtitle="Distribuição por categoria">
+        {/* 4. Mix de Receita — PieChart / 3D Donut */}
+        <Card title="Mix de Receita" subtitle="Distribuição por categoria" headerRight={<ChartToggle value={mixMode} onChange={setMixMode} />}>
+          {mixMode === "3d" ? (
+            <Chart3DDonut data={dash.mixData || []} height={180} />
+          ) : (
           <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
             <PieChart width={160} height={160}>
               <Pie
@@ -3458,6 +3706,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               ))}
             </div>
           </div>
+          )}
         </Card>
 
         {/* 5. Top Produtos — Horizontal Bars */}
