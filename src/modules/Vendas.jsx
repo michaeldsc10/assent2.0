@@ -2320,12 +2320,16 @@ export default function Vendas() {
   const [tab, setTab]                   = useState("ativas");
 
   const TAB_ORDER_DEFAULT = ["ativas", "mesas", "pdv", "canceladas"];
-  const LS_KEY = "vendas_tab_order";
+  const LS_KEY = "vendas_tab_order_v2";
   const [tabOrder, setTabOrder] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(LS_KEY));
-      if (Array.isArray(saved) && saved.length === TAB_ORDER_DEFAULT.length &&
-          TAB_ORDER_DEFAULT.every(k => saved.includes(k))) return saved;
+      if (
+        Array.isArray(saved) &&
+        saved.length === TAB_ORDER_DEFAULT.length &&
+        saved.every(k => TAB_ORDER_DEFAULT.includes(k)) &&
+        TAB_ORDER_DEFAULT.every(k => saved.includes(k))
+      ) return saved;
     } catch {}
     return TAB_ORDER_DEFAULT;
   });
@@ -3075,6 +3079,7 @@ useEffect(() => {
             pdv:       { label: "PDV",        icon: <Barcode size={14} />,         badge: vendasPDV.length,        extra: "" },
             canceladas:{ label: "Canceladas", icon: <Ban size={14} />,             badge: vendasCanceladas.length, extra: "cancelada" },
           }[key];
+          if (!cfg) return null;
           return (
             <button
               key={key}
