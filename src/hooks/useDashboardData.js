@@ -196,20 +196,20 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
     }, 0);
 
     /* Receitas manuais do a_receber (não vinculadas a vendas) — regime de caixa */
+    /* Receitas manuais do a_receber (não vinculadas a vendas) — regime de caixa */
     const receitaAReceberManual = aReceber
       .filter((r) => r.origem !== "venda")
       .reduce((s, r) => {
         /* Com histórico: soma só as entradas dentro do período */
         if (Array.isArray(r.historicoPagamentos) && r.historicoPagamentos.length > 0) {
-          const soma = r.historicoPagamentos.reduce((acc, p) => {
+          return s + r.historicoPagamentos.reduce((acc, p) => {
             const dt = toDate(p.data);
             if (!dt) return acc;
             if (periodStart && (dt < periodStart || dt > periodEnd)) return acc;
             return acc + Number(p.valor || 0);
           }, 0);
-          return s + soma;
         }
-        /* Legado (sem histórico): comportamento anterior */
+        /* Legado: sem histórico */
         if (Number(r.valorPago || 0) <= 0) return s;
         const dt = toDate(r.dataPagamento) || toDate(r.dataCriacao);
         if (!dt) return s;
@@ -376,12 +376,12 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
       .slice(0, 5)
       .map(([nome, d]) => ({ nome, qtd: d.qtd, total: d.total }));
 
-    /* ── Top Clientes (ignora PDV e mesas) ── */
+    /* ── Top Clientes ── */
     const cliMap = {};
     vendasPeriodo.forEach((v) => {
       const nome = (v.cliente || "").trim();
-      if (!nome) return;                         // PDV
-      if (/^mesa\b/i.test(nome)) return;         // Mesa X
+      // Exclui vendas sem cliente (PDV anônimo) e mesas
+      if (!nome || nome === "—" || nome === "-" || /^mesa\s/i.test(nome)) return;
       cliMap[nome] = (cliMap[nome] || 0) + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0));
     });
     const topClientes = Object.entries(cliMap)
