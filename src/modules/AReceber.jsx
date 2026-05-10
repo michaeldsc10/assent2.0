@@ -17,6 +17,9 @@ import {
   Clock,
   AlertCircle,
   Filter,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
@@ -253,7 +256,7 @@ const CSS = `
 
   .ar-row {
     display: grid;
-    grid-template-columns: 1.2fr 1.5fr 0.9fr 1fr 0.8fr 1fr;
+    grid-template-columns: 1.2fr 1.5fr 0.8fr 0.8fr 1fr 0.8fr 1fr;
     gap: 12px; padding: 12px 22px; border-bottom: 1px solid var(--border);
     align-items: center; transition: background .13s; cursor: pointer;
   }
@@ -1174,6 +1177,7 @@ export default function AReceber() {
   const COLUNAS_HEAD = [
     { key: "clienteNome",    label: "Cliente" },
     { key: "descricao",      label: "Descrição" },
+    { key: null,             label: "Total" },
     { key: null,             label: "Restante" },
     { key: "dataVencimento", label: "Vencimento" },
     { key: "status",         label: "Status" },
@@ -1256,8 +1260,12 @@ export default function AReceber() {
                 style={{ display: "flex", alignItems: "center", gap: 4 }}
               >
                 {label}
-                {key && sortKey === key && (
-                  <span style={{ fontSize: 10 }}>{sortDir === "asc" ? "↑" : "↓"}</span>
+                {key && (
+                  sortKey === key
+                    ? sortDir === "asc"
+                      ? <ArrowUp size={11} style={{ flexShrink: 0 }} />
+                      : <ArrowDown size={11} style={{ flexShrink: 0 }} />
+                    : <ArrowUpDown size={11} style={{ flexShrink: 0, opacity: 0.35 }} />
                 )}
               </span>
             ))}
@@ -1285,6 +1293,9 @@ export default function AReceber() {
                 >
                   <span className="ar-cliente">{c.clienteNome || "—"}</span>
                   <span className="ar-desc" title={c.descricao}>{c.descricao || "—"}</span>
+                  <span className="ar-valor" style={{ color: "var(--text-2)", fontWeight: 500 }}>
+                    {fmtR$(c.valorTotal)}
+                  </span>
                   <span className={`ar-valor ${statusCalc}`}>
                     {fmtR$(c.valorRestante)}
                   </span>
