@@ -816,6 +816,8 @@ function ModalPagamento({ conta, onConfirm, onClose }) {
   const [valorStr, setValorStr] = useState("");
   const [erro, setErro]         = useState("");
   const [salvando, setSalvando] = useState(false);
+  const hoje = (() => { const n = new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`; })();
+  const [dataRecebimento, setDataRecebimento] = useState(hoje);
 
   const handleConfirmar = async () => {
     const valor = parseFloat(valorStr.replace(",", "."));
@@ -828,9 +830,13 @@ function ModalPagamento({ conta, onConfirm, onClose }) {
       setErro(`Valor maior que o restante (${fmtR$(conta.valorRestante)}).`);
       return;
     }
+    if (!dataRecebimento) {
+      setErro("Informe a data do recebimento.");
+      return;
+    }
 
     setSalvando(true);
-    await onConfirm(valor);
+    await onConfirm(valor, dataRecebimento);
     setSalvando(false);
   };
 
@@ -864,7 +870,7 @@ function ModalPagamento({ conta, onConfirm, onClose }) {
             </div>
           </div>
 
-          <div className="form-group" style={{ marginBottom: 0 }}>
+          <div className="form-group">
             <label className="form-label">
               Valor Recebido (R$) <span className="form-label-req">*</span>
             </label>
@@ -877,6 +883,17 @@ function ModalPagamento({ conta, onConfirm, onClose }) {
               autoFocus
             />
             {erro && <div className="form-error">{erro}</div>}
+          </div>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label className="form-label">
+              Data do Recebimento <span className="form-label-req">*</span>
+            </label>
+            <input
+              type="date"
+              className="form-input"
+              value={dataRecebimento}
+              onChange={e => { setDataRecebimento(e.target.value); setErro(""); }}
+            />
           </div>
         </div>
 
@@ -1029,7 +1046,7 @@ export default function AReceber() {
   }, [tenantUid, editando?.id, nomeUsuario, cargo]);
 
   /* ── Pagamento ── */
-  const handlePagamento = useCallback(async (valor) => {
+  const handlePagamento = useCallback(async (valor, dataRecebimento) => {
     if (!tenantUid || !pagamento?.id) return;
     try {
       await runTransaction(db, async (t) => {
@@ -1041,11 +1058,14 @@ export default function AReceber() {
         const novoValorPago = (contaAtual.valorPago || 0) + valor;
         const novoValorRestante = Math.max((contaAtual.valorTotal || 0) - novoValorPago, 0);
 
+        const dataISO = dataRecebimento
+          ? new Date(dataRecebimento + "T12:00:00").toISOString()
+          : new Date().toISOString();
         t.update(ref, {
           valorPago: novoValorPago,
           valorRestante: novoValorRestante,
-          dataPagamento: serverTimestamp(),
-          historicoPagamentos: arrayUnion({ valor, data: new Date().toISOString() }),
+          dataPagamento: dataRecebimento ? new Date(dataRecebimento + "T12:00:00") : new Date(),
+          historicoPagamentos: arrayUnion({ valor, data: dataISO }),
         });
 
         if (contaAtual.origem === "venda" && contaAtual.referenciaId) {
