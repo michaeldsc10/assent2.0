@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════
-   ASSENT v2.0 — Clientes.jsx
+   ASSENT v2.0 — Clientes.jsx [CORRIGIDO]
    Estrutura: users/{uid}/clientes/{id}
    Exibe todos os perfis (cliente e aluno) com badge visual.
    Filtro por perfil na topbar.
@@ -195,518 +195,389 @@ const CSS = `
     align-items: center; font-size: 12px; color: var(--text-2);
   }
   .cl-row:hover { background: rgba(255,255,255,0.02); }
-  .cl-row-head { background: var(--s2); }
-  .cl-row-head span {
-    font-size: 10px; font-weight: 500; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--text-3);
+  .cl-row-head {
+    background: var(--s2); font-weight: 600; color: var(--text);
+    border-bottom: 1px solid var(--border-h);
   }
-  .cl-id { font-family: 'Sora', sans-serif; font-size: 11px; color: var(--gold); font-weight: 500; }
-  .cl-nome { color: var(--text); font-size: 13px; font-weight: 500; cursor: pointer; }
+  .cl-id { font-family: 'Courier New', monospace; font-weight: 600; color: var(--text); }
+  .cl-nome { color: var(--text); cursor: pointer; font-weight: 500; }
   .cl-nome:hover { color: var(--gold); text-decoration: underline; }
   .cl-insta { color: var(--blue); }
-  .cl-overflow { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .cl-actions { display: flex; align-items: center; gap: 5px; justify-content: flex-end; }
-
-  /* Badge de perfil */
-  .cl-badge-aluno {
-    display: inline-flex; align-items: center; gap: 4px;
-    padding: 2px 7px; border-radius: 20px; font-size: 10px; font-weight: 600;
-    background: rgba(200,165,94,0.12); border: 1px solid rgba(200,165,94,.3);
-    color: var(--gold); white-space: nowrap;
-  }
-  .cl-badge-cliente {
-    display: inline-flex; align-items: center; gap: 4px;
-    padding: 2px 7px; border-radius: 20px; font-size: 10px; font-weight: 600;
-    background: var(--s3); border: 1px solid var(--border);
-    color: var(--text-3); white-space: nowrap;
-  }
-  .cl-badge-ambos {
-    display: inline-flex; align-items: center; gap: 4px;
-    padding: 2px 7px; border-radius: 20px; font-size: 10px; font-weight: 600;
-    background: rgba(91,142,240,0.12); border: 1px solid rgba(91,142,240,.3);
-    color: var(--blue); white-space: nowrap;
+  .cl-overflow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cl-actions {
+    display: flex; gap: 4px; justify-content: flex-end;
   }
 
-  .cl-empty, .cl-loading { padding: 56px 20px; text-align: center; color: var(--text-3); }
+  .cl-loading {
+    padding: 40px 20px; text-align: center;
+    color: var(--text-2); font-size: 13px;
+  }
+  .cl-empty {
+    padding: 60px 20px; text-align: center;
+    color: var(--text-3); font-size: 13px;
+  }
 
-  /* ── Modal Histórico ── */
-  .hist-kpis {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px;
+  /* ── Modal novo/edição ── */
+  .modal-section { margin-bottom: 20px; }
+  .modal-section:last-child { margin-bottom: 0; }
+  .modal-section-title {
+    font-size: 10px; font-weight: 600;
+    letter-spacing: .08em; text-transform: uppercase;
+    color: var(--text-2); margin-bottom: 12px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
   }
-  .hist-kpi { background: var(--s2); border: 1px solid var(--border); border-radius: 10px; padding: 13px 16px; }
-  .hist-kpi-label {
-    font-size: 10px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: .07em; color: var(--text-3); margin-bottom: 6px;
+  .form-checkbox-group {
+    display: flex; gap: 14px;
   }
-  .hist-kpi-val { font-family: 'Sora', sans-serif; font-size: 18px; font-weight: 700; }
-  .hist-periods { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; }
-  .hist-period-btn {
-    padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 500;
-    background: var(--s3); border: 1px solid var(--border);
-    color: var(--text-2); cursor: pointer; transition: all .13s;
-    font-family: 'DM Sans', sans-serif;
+  .form-checkbox-item {
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
   }
-  .hist-period-btn:hover { background: var(--s2); color: var(--text); }
-  .hist-period-btn.active { background: rgba(200,165,94,0.15); border-color: var(--gold); color: var(--gold); }
-  .hist-section-label {
-    font-size: 10px; font-weight: 600; letter-spacing: .07em;
-    text-transform: uppercase; color: var(--text-3); margin-bottom: 10px;
+  .form-checkbox-item input {
+    width: 16px; height: 16px; cursor: pointer;
   }
-  .hist-row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 12px; border-radius: 8px;
-    background: var(--s2); border: 1px solid var(--border);
-    margin-bottom: 7px; cursor: pointer; transition: border-color .13s;
+  .form-checkbox-label {
+    font-size: 12px; color: var(--text); cursor: pointer;
   }
-  .hist-row:hover { border-color: var(--border-h); }
-  .hist-venda-id { font-family: 'Sora', sans-serif; font-size: 11px; color: var(--gold); font-weight: 500; min-width: 60px; }
-  .hist-venda-data { font-size: 12px; color: var(--text-2); flex: 1; }
-  .hist-fp { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--s3); border: 1px solid var(--border); color: var(--text-2); }
-  .hist-total { font-family: 'Sora', sans-serif; font-size: 13px; color: var(--green); font-weight: 600; margin-left: auto; }
-  .hist-empty { padding: 32px; text-align: center; color: var(--text-3); font-size: 13px; }
 
-  /* ── Modal Detalhe Venda ── */
-  .vd-meta {
-    display: flex; gap: 20px; flex-wrap: wrap;
-    background: var(--s2); border: 1px solid var(--border);
-    border-radius: 9px; padding: 12px 15px; margin-bottom: 14px;
-    font-size: 12px; color: var(--text-2);
+  /* ── Modal histórico ── */
+  .modal-vendas-container {
+    max-height: 380px; overflow-y: auto;
   }
-  .vd-meta-row strong { color: var(--text); }
-  .btn-imprimir {
-    display: flex; align-items: center; gap: 6px;
-    padding: 7px 14px; border-radius: 8px; margin-bottom: 16px;
-    background: var(--s3); border: 1px solid var(--border);
-    color: var(--text-2); cursor: pointer; font-size: 12px;
-    font-family: 'DM Sans', sans-serif; transition: all .13s;
+  .modal-vendas-list {
+    display: flex; flex-direction: column; gap: 10px;
   }
-  .btn-imprimir:hover { background: var(--s2); color: var(--text); }
-  .vd-table { border: 1px solid var(--border); border-radius: 9px; overflow: hidden; margin-bottom: 14px; }
-  .vd-thead {
-    display: grid; grid-template-columns: 1fr 60px 100px 100px 90px 100px;
-    padding: 9px 14px; gap: 8px; background: var(--s2); border-bottom: 1px solid var(--border);
-    font-size: 9px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3);
+  .modal-venda-item {
+    padding: 10px 12px; background: var(--s2);
+    border: 1px solid var(--border); border-radius: 8px;
+    cursor: pointer; transition: all .15s;
   }
-  .vd-trow {
-    display: grid; grid-template-columns: 1fr 60px 100px 100px 90px 100px;
-    padding: 9px 14px; gap: 8px; border-bottom: 1px solid var(--border);
-    font-size: 12px; color: var(--text-2); align-items: center;
+  .modal-venda-item:hover {
+    background: var(--s3); border-color: var(--border-h);
   }
-  .vd-trow:last-child { border-bottom: none; }
-  .vd-nome { color: var(--text); font-size: 13px; }
-  .vd-totals {
-    display: flex; gap: 10px; flex-wrap: wrap;
-    background: var(--s2); border: 1px solid var(--border); border-radius: 9px; padding: 12px 15px;
+  .modal-venda-id {
+    font-family: 'Courier New', monospace; font-size: 11px;
+    color: var(--text-2); margin-bottom: 3px;
   }
-  .vd-total-cell { flex: 1; min-width: 90px; }
-  .vd-total-label {
-    font-size: 10px; font-weight: 600; text-transform: uppercase;
-    letter-spacing: .06em; color: var(--text-3); margin-bottom: 4px;
+  .modal-venda-data {
+    font-size: 12px; color: var(--text);
+    display: flex; justify-content: space-between;
   }
-  .vd-total-val { font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 700; }
-  .confirm-body {
-    padding: 28px 22px; text-align: center; font-size: 13px; color: var(--text-2); line-height: 1.6;
+  .modal-venda-valor {
+    font-weight: 600; color: var(--gold);
   }
-  .confirm-icon { font-size: 32px; margin-bottom: 12px; }
-  .confirm-body strong { color: var(--text); }
+
+  /* ── Modal confirmação delete ── */
+  .modal-icon-warning {
+    width: 48px; height: 48px;
+    border-radius: 12px; background: rgba(255,193,7,0.1);
+    border: 1px solid rgba(255,193,7,0.3);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 16px;
+  }
+  .modal-confirm-text {
+    text-align: center; font-size: 13px; color: var(--text-2);
+    line-height: 1.5; margin-bottom: 20px;
+  }
+  .modal-confirm-text strong { color: var(--text); }
+
+  /* ── Detalhe venda ── */
+  .modal-venda-detalhe { }
+  .modal-venda-row {
+    display: flex; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+    font-size: 12px;
+  }
+  .modal-venda-row-label { color: var(--text-2); }
+  .modal-venda-row-value { color: var(--text); font-weight: 500; }
 `;
 
-/* ── Helpers ── */
-const fmtR$ = (v) =>
-  `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+const PERFIL_OPCOES = [
+  { key: "todos",   label: "Todos" },
+  { key: "cliente", label: "Clientes" },
+  { key: "aluno",   label: "Alunos" },
+  { key: "ambos",   label: "Ambos" },
+];
 
-const fmtData = (d) => {
-  if (!d) return "—";
-  try {
-    const dt = d?.toDate ? d.toDate() : new Date(d);
-    return dt.toLocaleDateString("pt-BR");
-  } catch {
-    return String(d);
-  }
-};
+function PerfilBadge({ perfis = [] }) {
+  const isAluno   = perfis.includes("aluno");
+  const isCliente = perfis.includes("cliente");
 
-const gerarIdCliente = (cnt) => `C${String(cnt + 1).padStart(4, "0")}`;
-
-const PERIODS_HIST = ["Tudo", "Este mês", "Últimos 3 meses", "Este ano"];
-
-const filtrarPorPeriodo = (vendas, period) => {
-  if (period === "Tudo") return vendas;
-  const now = new Date();
-  return vendas.filter((v) => {
-    try {
-      const data = v.data?.toDate ? v.data.toDate() : new Date(v.data);
-      if (isNaN(data)) return false;
-      if (period === "Este mês")
-        return data.getMonth() === now.getMonth() && data.getFullYear() === now.getFullYear();
-      if (period === "Últimos 3 meses") {
-        const diffMs = now - data;
-        return diffMs >= 0 && diffMs <= 1000 * 60 * 60 * 24 * 90;
-      }
-      if (period === "Este ano") return data.getFullYear() === now.getFullYear();
-    } catch { return false; }
-    return true;
-  });
-};
-
-/* ── Badge de perfil ── */
-function PerfilBadge({ perfis }) {
-  const isAluno   = perfis?.includes("aluno");
-  const isCliente = perfis?.includes("cliente") || !perfis?.length; // docs sem perfil = cliente legado
+  if (!perfis.length) return <span style={{ color: "var(--text-3)" }}>—</span>;
 
   if (isAluno && isCliente) {
-    return <span className="cl-badge-ambos"><GraduationCap size={9} /> Ambos</span>;
+    return (
+      <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+        <span style={{ padding: "2px 6px", borderRadius: "4px", background: "rgba(91,142,240,0.15)", color: "var(--blue)", fontSize: "10px", fontWeight: "600" }}>Aluno</span>
+        <span style={{ padding: "2px 6px", borderRadius: "4px", background: "rgba(200,165,94,0.15)", color: "var(--gold)", fontSize: "10px", fontWeight: "600" }}>Cliente</span>
+      </span>
+    );
   }
+
   if (isAluno) {
-    return <span className="cl-badge-aluno"><GraduationCap size={9} /> Aluno</span>;
+    return (
+      <span style={{ padding: "2px 6px", borderRadius: "4px", background: "rgba(91,142,240,0.15)", color: "var(--blue)", fontSize: "10px", fontWeight: "600", display: "inline-block" }}>
+        Aluno
+      </span>
+    );
   }
-  return <span className="cl-badge-cliente">Cliente</span>;
+
+  return (
+    <span style={{ padding: "2px 6px", borderRadius: "4px", background: "rgba(200,165,94,0.15)", color: "var(--gold)", fontSize: "10px", fontWeight: "600", display: "inline-block" }}>
+      Cliente
+    </span>
+  );
 }
 
-/* ══════════════════════════════════════════════════
-   MODAL: Novo / Editar Cliente
-   ══════════════════════════════════════════════════ */
 function ModalNovoCliente({ cliente, clientes, onSave, onClose }) {
-  const isEdit  = !!cliente;
-  const isAluno = cliente?.perfis?.includes("aluno");
+  const [form, setForm] = useState(cliente || {});
+  const [erros, setErros] = useState({});
 
-  const [form, setForm] = useState({
-    nome:      cliente?.nome      || "",
-    telefone:  cliente?.telefone  || "",
-    cpf:       cliente?.cpf       || cliente?.documento || "", // lê os dois campos para compatibilidade
-    instagram: cliente?.instagram || "",
-    endereco:  cliente?.endereco  || "",
-  });
-  const [erros, setErros]     = useState({});
-  const [salvando, setSalvando] = useState(false);
-
-  const set = (campo, valor) => {
-    setForm(f => ({ ...f, [campo]: valor }));
-    if (erros[campo]) setErros(e => ({ ...e, [campo]: "" }));
-  };
-
-  const validar = () => {
-    const e = {};
-    const nomeLimpo = form.nome.trim();
-    if (!nomeLimpo)          e.nome     = "Nome é obrigatório.";
-    if (!form.telefone.trim()) e.telefone = "Telefone é obrigatório.";
-    if (!form.cpf.trim())    e.cpf      = "CPF/CNPJ é obrigatório.";
-
-    if (nomeLimpo) {
-      const duplicado = clientes.some(c =>
-        c.nome.trim().toLowerCase() === nomeLimpo.toLowerCase() &&
-        c.id !== cliente?.id
-      );
-      if (duplicado) e.nome = "Já existe um cliente com este nome exato.";
+  const validate = () => {
+    const novosErros = {};
+    if (!form.nome?.trim()) novosErros.nome = "Obrigatório";
+    if (form.cpf && clientes.some(c => c.id !== cliente?.id && c.cpf === form.cpf)) {
+      novosErros.cpf = "CPF já cadastrado";
     }
-
-    setErros(e);
-    return Object.keys(e).length === 0;
+    setErros(novosErros);
+    return Object.keys(novosErros).length === 0;
   };
 
-  const handleSalvar = async () => {
-    if (!validar()) return;
-    setSalvando(true);
-    await onSave({
-      nome:      form.nome.trim(),
-      telefone:  form.telefone.trim(),
-      cpf:       form.cpf.trim(),
-      instagram: form.instagram.trim().replace(/^@/, ""),
-      endereco:  form.endereco.trim(),
-    });
-    setSalvando(false);
+  const handleSave = () => {
+    if (validate()) onSave(form);
   };
 
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box">
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <div className="modal-title">{isEdit ? "Editar Cliente" : "Novo Cliente"}</div>
-            <div className="modal-sub">
-              {isEdit
-                ? `Editando ${cliente.id} — ${cliente.nome}${isAluno ? " · Este cadastro é também um Aluno" : ""}`
-                : "Preencha os dados do novo cliente"}
-            </div>
+            <div className="modal-title">{cliente ? "Editar Cliente" : "Novo Cliente"}</div>
+            <div className="modal-sub">{cliente ? "Atualize os dados" : "Cadastre um novo cliente ou aluno"}</div>
           </div>
-          <button className="modal-close" onClick={onClose}>
-            <X size={14} color="var(--text-2)" />
-          </button>
+          <button className="modal-close" onClick={onClose}><X size={16} /></button>
         </div>
-
         <div className="modal-body">
-          {/* Aviso quando editar um aluno via Clientes.jsx */}
-          {isAluno && (
-            <div style={{
-              background: "rgba(200,165,94,.08)", border: "1px solid rgba(200,165,94,.25)",
-              borderRadius: 9, padding: "10px 14px", marginBottom: 16,
-              fontSize: 12, color: "var(--gold)", display: "flex", alignItems: "center", gap: 8,
-            }}>
-              <GraduationCap size={13} />
-              Dados de mensalidade deste aluno são gerenciados no módulo de Matrículas.
+          <div className="modal-section">
+            <div className="modal-section-title">Dados Pessoais</div>
+            <div className="form-group">
+              <label className="form-label">Nome <span className="form-label-req">*</span></label>
+              <input
+                className={`form-input ${erros.nome ? "err" : ""}`}
+                type="text"
+                value={form.nome || ""}
+                onChange={(e) => setForm({ ...form, nome: e.target.value })}
+                placeholder="Nome completo"
+              />
+              {erros.nome && <div className="form-error">{erros.nome}</div>}
             </div>
-          )}
-
-          <div className="form-group">
-            <label className="form-label">Nome <span className="form-label-req">*</span></label>
-            <input className={`form-input ${erros.nome ? "err" : ""}`}
-              value={form.nome} onChange={e => set("nome", e.target.value)}
-              placeholder="Nome completo" autoFocus />
-            {erros.nome && <div className="form-error">{erros.nome}</div>}
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">CPF</label>
+                <input
+                  className={`form-input ${erros.cpf ? "err" : ""}`}
+                  type="text"
+                  value={form.cpf || ""}
+                  onChange={(e) => setForm({ ...form, cpf: e.target.value })}
+                  placeholder="000.000.000-00"
+                />
+                {erros.cpf && <div className="form-error">{erros.cpf}</div>}
+              </div>
+              <div className="form-group">
+                <label className="form-label">Telefone</label>
+                <input
+                  className="form-input"
+                  type="text"
+                  value={form.telefone || ""}
+                  onChange={(e) => setForm({ ...form, telefone: e.target.value })}
+                  placeholder="(11) 9 9999-9999"
+                />
+              </div>
+            </div>
           </div>
 
-          <div className="form-row">
+          <div className="modal-section">
+            <div className="modal-section-title">Redes Sociais</div>
             <div className="form-group">
-              <label className="form-label">Telefone <span className="form-label-req">*</span></label>
-              <input className={`form-input ${erros.telefone ? "err" : ""}`}
-                value={form.telefone} onChange={e => set("telefone", e.target.value)}
-                placeholder="(62) 99999-9999" />
-              {erros.telefone && <div className="form-error">{erros.telefone}</div>}
-            </div>
-            <div className="form-group">
-              <label className="form-label">CPF / CNPJ <span className="form-label-req">*</span></label>
-              <input className={`form-input ${erros.cpf ? "err" : ""}`}
-                value={form.cpf} onChange={e => set("cpf", e.target.value)}
-                placeholder="000.000.000-00" />
-              {erros.cpf && <div className="form-error">{erros.cpf}</div>}
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Instagram</label>
-              <input className="form-input"
-                value={form.instagram} onChange={e => set("instagram", e.target.value)}
-                placeholder="@usuario" />
+              <input
+                className="form-input"
+                type="text"
+                value={form.instagram || ""}
+                onChange={(e) => setForm({ ...form, instagram: e.target.value })}
+                placeholder="usuario"
+              />
             </div>
-            <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Endereço</label>
-              <input className="form-input"
-                value={form.endereco} onChange={e => set("endereco", e.target.value)}
-                placeholder="Rua, número, bairro" />
+          </div>
+
+          <div className="modal-section">
+            <div className="modal-section-title">Endereço</div>
+            <div className="form-group">
+              <label className="form-label">Rua, Número, Complemento</label>
+              <input
+                className="form-input"
+                type="text"
+                value={form.endereco || ""}
+                onChange={(e) => setForm({ ...form, endereco: e.target.value })}
+                placeholder="Endereço completo"
+              />
+            </div>
+          </div>
+
+          <div className="modal-section">
+            <div className="modal-section-title">Perfil</div>
+            <div className="form-checkbox-group">
+              <label className="form-checkbox-item">
+                <input
+                  type="checkbox"
+                  checked={form.perfis?.includes("cliente") || false}
+                  onChange={(e) => {
+                    const newPerfis = form.perfis || [];
+                    if (e.target.checked) {
+                      if (!newPerfis.includes("cliente")) setForm({ ...form, perfis: [...newPerfis, "cliente"] });
+                    } else {
+                      setForm({ ...form, perfis: newPerfis.filter(p => p !== "cliente") });
+                    }
+                  }}
+                />
+                <span className="form-checkbox-label">Cliente</span>
+              </label>
+              <label className="form-checkbox-item">
+                <input
+                  type="checkbox"
+                  checked={form.perfis?.includes("aluno") || false}
+                  onChange={(e) => {
+                    const newPerfis = form.perfis || [];
+                    if (e.target.checked) {
+                      if (!newPerfis.includes("aluno")) setForm({ ...form, perfis: [...newPerfis, "aluno"] });
+                    } else {
+                      setForm({ ...form, perfis: newPerfis.filter(p => p !== "aluno") });
+                    }
+                  }}
+                />
+                <span className="form-checkbox-label">Aluno</span>
+              </label>
             </div>
           </div>
         </div>
-
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
-            {salvando ? "Salvando..." : isEdit ? "Salvar Alterações" : "Cadastrar Cliente"}
-          </button>
+          <button className="btn-primary" onClick={handleSave}>{cliente ? "Salvar Alterações" : "Criar Cliente"}</button>
         </div>
       </div>
     </div>
   );
 }
 
-/* ══════════════════════════════════════════════════
-   MODAL: Detalhe de Venda
-   ══════════════════════════════════════════════════ */
-function ModalDetalheVenda({ venda, onClose }) {
-  if (!venda) return null;
-  const itens      = venda.itens || [];
-  const subtotal   = itens.reduce((s, i) => s + (i.preco || 0) * (i.qtd || 1), 0);
-  const descontos  = itens.reduce((s, i) => s + (i.desconto || 0), 0);
-  const custoTotal = itens.reduce((s, i) => s + (i.custo || 0) * (i.qtd || 1), 0);
-  const total      = typeof venda.total === "number" ? venda.total : subtotal - descontos;
-  const lucro      = total - custoTotal;
-
-  return (
-    <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box modal-box-lg">
-        <div className="modal-header">
-          <div>
-            <div className="modal-title" style={{ color: "var(--gold)" }}>{venda.id}</div>
-            <div className="modal-sub">Detalhes da venda</div>
-          </div>
-          <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)" /></button>
-        </div>
-        <div className="modal-body">
-          <div className="vd-meta">
-            <div className="vd-meta-row">Cliente: <strong>{venda.cliente || "—"}</strong></div>
-            <div className="vd-meta-row">Data: <strong>{fmtData(venda.data)}</strong></div>
-            <div className="vd-meta-row">Pagamento: <strong>{venda.formaPagamento || "—"}</strong></div>
-          </div>
-          <button className="btn-imprimir" onClick={() => window.print()}>
-            <Printer size={13} /> Imprimir
-          </button>
-          <div className="vd-table">
-            <div className="vd-thead">
-              <span>PRODUTO</span>
-              <span style={{ textAlign: "center" }}>QTD</span>
-              <span style={{ textAlign: "right" }}>PREÇO UNIT.</span>
-              <span style={{ textAlign: "right" }}>CUSTO UNIT.</span>
-              <span style={{ textAlign: "right" }}>DESCONTO</span>
-              <span style={{ textAlign: "right" }}>TOTAL ITEM</span>
-            </div>
-            {itens.length === 0 ? (
-              <div style={{ padding: "18px", textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>
-                Nenhum item registrado nesta venda.
-              </div>
-            ) : itens.map((item, i) => {
-              const totalItem = (item.preco || 0) * (item.qtd || 1) - (item.desconto || 0);
-              return (
-                <div key={i} className="vd-trow">
-                  <span className="vd-nome">{item.nome || item.produto || "—"}</span>
-                  <span style={{ textAlign: "center" }}>{item.qtd || 1}</span>
-                  <span style={{ textAlign: "right" }}>{fmtR$(item.preco)}</span>
-                  <span style={{ textAlign: "right", color: "var(--red)" }}>{fmtR$(item.custo)}</span>
-                  <span style={{ textAlign: "right" }}>{item.desconto ? fmtR$(item.desconto) : "—"}</span>
-                  <span style={{ textAlign: "right", color: "var(--green)", fontFamily: "Sora, sans-serif", fontWeight: 500 }}>{fmtR$(totalItem)}</span>
-                </div>
-              );
-            })}
-          </div>
-          <div className="vd-totals">
-            <div className="vd-total-cell"><div className="vd-total-label">Subtotal</div><div className="vd-total-val" style={{ color: "var(--text)" }}>{fmtR$(subtotal)}</div></div>
-            <div className="vd-total-cell"><div className="vd-total-label">Descontos</div><div className="vd-total-val" style={{ color: "var(--red)" }}>{fmtR$(descontos)}</div></div>
-            <div className="vd-total-cell"><div className="vd-total-label">Custo Total</div><div className="vd-total-val" style={{ color: "var(--red)" }}>{fmtR$(custoTotal)}</div></div>
-            <div className="vd-total-cell"><div className="vd-total-label">Total</div><div className="vd-total-val" style={{ color: "var(--green)" }}>{fmtR$(total)}</div></div>
-            <div className="vd-total-cell"><div className="vd-total-label">Lucro Est.</div><div className="vd-total-val" style={{ color: "var(--gold)" }}>{fmtR$(lucro)}</div></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════
-   MODAL: Histórico de Compras
-   ══════════════════════════════════════════════════ */
 function ModalHistorico({ cliente, vendas, onClose, onVerVenda }) {
-  const [period, setPeriod] = useState("Tudo");
-
-  const vendasCliente = useMemo(() =>
-    vendas.filter(v =>
-      v.cliente?.trim().toLowerCase() === cliente.nome.trim().toLowerCase()
-    ),
-    [vendas, cliente.nome]
-  );
-  const vendasFiltradas = useMemo(() =>
-    filtrarPorPeriodo(vendasCliente, period),
-    [vendasCliente, period]
-  );
-
-  const totalGasto = vendasFiltradas.reduce((s, v) => s + (v.total || 0), 0);
-  const totalItens = vendasFiltradas.reduce((s, v) => s + (v.itens?.length || 0), 0);
+  const clienteVendas = vendas.filter(v => v.clienteId === cliente.id).sort((a, b) => new Date(b.data) - new Date(a.data));
 
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box modal-box-lg" style={{ maxWidth: 580 }}>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box modal-box-lg" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div>
             <div className="modal-title">{cliente.nome}</div>
-            <div className="modal-sub">
-              {[cliente.telefone, cliente.cpf || cliente.documento].filter(Boolean).join(" · ")}
-            </div>
+            <div className="modal-sub">{cliente.cpf || cliente.documento || "Sem CPF/CNPJ"}</div>
           </div>
-          <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)" /></button>
+          <button className="modal-close" onClick={onClose}><X size={16} /></button>
         </div>
         <div className="modal-body">
-          <div className="hist-kpis">
-            <div className="hist-kpi">
-              <div className="hist-kpi-label">Compras</div>
-              <div className="hist-kpi-val" style={{ color: "var(--text)" }}>{vendasFiltradas.length}</div>
-            </div>
-            <div className="hist-kpi">
-              <div className="hist-kpi-label">Total Gasto</div>
-              <div className="hist-kpi-val" style={{ color: "var(--green)" }}>{fmtR$(totalGasto)}</div>
-            </div>
-            <div className="hist-kpi">
-              <div className="hist-kpi-label">Itens Comprados</div>
-              <div className="hist-kpi-val" style={{ color: "var(--gold)" }}>{totalItens}</div>
+          <div className="modal-section">
+            <div className="modal-section-title">Histórico de Vendas</div>
+            <div className="modal-vendas-container">
+              <div className="modal-vendas-list">
+                {clienteVendas.length === 0 ? (
+                  <div style={{ padding: "30px 20px", textAlign: "center", color: "var(--text-3)", fontSize: "12px" }}>
+                    Nenhuma venda registrada.
+                  </div>
+                ) : (
+                  clienteVendas.map(v => (
+                    <div key={v.id} className="modal-venda-item" onClick={() => onVerVenda(v)}>
+                      <div className="modal-venda-id">ID: {v.id}</div>
+                      <div className="modal-venda-data">
+                        <span>{new Date(v.data).toLocaleDateString("pt-BR")}</span>
+                        <span className="modal-venda-valor">R$ {(v.total || 0).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
           </div>
-          <div className="hist-periods">
-            {PERIODS_HIST.map(p => (
-              <button key={p} className={`hist-period-btn ${period === p ? "active" : ""}`}
-                onClick={() => setPeriod(p)}>{p}</button>
-            ))}
-          </div>
-          <div className="hist-section-label">Histórico de Compras</div>
-          {vendasFiltradas.length === 0 ? (
-            <div className="hist-empty">Nenhuma venda encontrada neste período.</div>
-          ) : vendasFiltradas.map((v, i) => (
-            <div key={i} className="hist-row" onClick={() => onVerVenda(v)}>
-              <span className="hist-venda-id">{v.id}</span>
-              <span className="hist-venda-data">{fmtData(v.data)}</span>
-              {v.formaPagamento && <span className="hist-fp">{v.formaPagamento}</span>}
-              <span className="hist-total">{fmtR$(v.total)}</span>
-              <ChevronRight size={14} color="var(--text-3)" />
-            </div>
-          ))}
         </div>
       </div>
     </div>
   );
 }
 
-/* ══════════════════════════════════════════════════
-   MODAL: Confirmar Exclusão
-   ══════════════════════════════════════════════════ */
 function ModalConfirmDelete({ cliente, onConfirm, onClose }) {
-  const [excluindo, setExcluindo] = useState(false);
-
-  const handleConfirm = async () => {
-    setExcluindo(true);
-    await onConfirm();
-    setExcluindo(false);
-  };
-
   return (
-    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box" style={{ maxWidth: 400 }}>
+    <div className="modal-overlay modal-overlay-top" onClick={onClose}>
+      <div className="modal-box modal-box-md" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <div className="modal-title">Excluir Cliente</div>
-          <button className="modal-close" onClick={onClose}><X size={14} color="var(--text-2)" /></button>
+          <div className="modal-title">Confirmar exclusão</div>
+          <button className="modal-close" onClick={onClose}><X size={16} /></button>
         </div>
-        <div className="confirm-body">
-          <div className="confirm-icon">🗑️</div>
-          <p>
-            Tem certeza que deseja excluir <strong>{cliente.nome}</strong>?<br />
-            Esta ação não pode ser desfeita.
-          </p>
+        <div className="modal-body">
+          <div className="modal-icon-warning">
+            <Trash2 size={24} color="var(--gold)" />
+          </div>
+          <div className="modal-confirm-text">
+            Tem certeza que deseja excluir <strong>{cliente.nome}</strong>? Esta ação não pode ser desfeita.
+          </div>
         </div>
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-danger" onClick={handleConfirm} disabled={excluindo}>
-            {excluindo ? "Excluindo..." : "Confirmar Exclusão"}
-          </button>
+          <button className="btn-danger" onClick={onConfirm}>Excluir</button>
         </div>
       </div>
     </div>
   );
 }
 
-/* ══════════════════════════════════════════════════
-   COMPONENTE PRINCIPAL
-   ══════════════════════════════════════════════════ */
+function ModalDetalheVenda({ venda, onClose }) {
+  return (
+    <div className="modal-overlay modal-overlay-top" onClick={onClose}>
+      <div className="modal-box modal-box-md" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <div className="modal-title">Venda #{venda.id}</div>
+          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="modal-body modal-venda-detalhe">
+          <div className="modal-venda-row">
+            <span className="modal-venda-row-label">Data:</span>
+            <span className="modal-venda-row-value">{new Date(venda.data).toLocaleDateString("pt-BR")}</span>
+          </div>
+          <div className="modal-venda-row">
+            <span className="modal-venda-row-label">Total:</span>
+            <span className="modal-venda-row-value">R$ {(venda.total || 0).toFixed(2)}</span>
+          </div>
+          <div className="modal-venda-row">
+            <span className="modal-venda-row-label">Status:</span>
+            <span className="modal-venda-row-value">{venda.status || "Finalizada"}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-/* Opções de filtro de perfil */
-const PERFIL_OPCOES = [
-  { key: "todos",   label: "Todos"    },
-  { key: "cliente", label: "Clientes" },
-  { key: "aluno",   label: "Alunos"   },
-  { key: "ambos",   label: "Ambos"    },
-];
+function gerarIdCliente(cnt) {
+  return String(cnt + 1).padStart(5, "0");
+}
 
 export default function Clientes() {
-  const { tenantUid, cargo, nomeUsuario, podeCriar, podeEditar, podeExcluir } = useAuth();
-
-  const podeCriarV   = podeCriar("clientes");
-  const podeEditarV  = podeEditar("clientes");
-  const podeExcluirV = podeExcluir("clientes");
-
-  const [clientes,     setClientes]     = useState([]);
-  const [vendas,       setVendas]       = useState([]);
+  const { tenantUid, nomeUsuario, cargo, podeCriarV, podeEditarV, podeExcluirV } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [clientes, setClientes] = useState([]);
+  const [vendas, setVendas] = useState([]);
   const [clienteIdCnt, setClienteIdCnt] = useState(0);
-  const [search,       setSearch]       = useState("");
+  const [search, setSearch] = useState("");
   const [perfilFilter, setPerfilFilter] = useState("todos");
-  const [loading,      setLoading]      = useState(true);
-
-  const [modalNovo,    setModalNovo]    = useState(false);
-  const [editando,     setEditando]     = useState(null);
-  const [deletando,    setDeletando]    = useState(null);
-  const [historico,    setHistorico]    = useState(null);
+  const [modalNovo, setModalNovo] = useState(false);
+  const [editando, setEditando] = useState(null);
+  const [deletando, setDeletando] = useState(null);
+  const [historico, setHistorico] = useState(null);
   const [vendaDetalhe, setVendaDetalhe] = useState(null);
 
   /* ── Firestore listeners ── */
@@ -770,17 +641,17 @@ export default function Clientes() {
         const isCliente = c.perfis?.includes("cliente") || !c.perfis?.length;
         const isAmbos   = isAluno && isCliente;
 
-        if (perfilFilter === "aluno"   && !isAluno)           return false;
-        if (perfilFilter === "cliente" && (!isCliente || isAmbos)) return false;
-        if (perfilFilter === "ambos"   && !isAmbos)           return false;
+        if (perfilFilter === "aluno"   && !isAluno)   return false;
+        if (perfilFilter === "cliente" && !isCliente) return false;
+        if (perfilFilter === "ambos"   && !isAmbos)   return false;
       }
 
       /* ── Filtro de busca ── */
       if (!q) return true;
-      const doc = c.cpf || c.documento || "";
+      const docNumber = c.cpf || c.documento || "";
       return (
         c.nome?.toLowerCase().includes(q) ||
-        doc.toLowerCase().includes(q) ||
+        docNumber.toLowerCase().includes(q) ||
         c.telefone?.toLowerCase().includes(q)
       );
     });
@@ -789,10 +660,14 @@ export default function Clientes() {
   /* Contadores por perfil para exibir nos botões */
   const contadores = useMemo(() => {
     const alunos   = clientes.filter(c => c.perfis?.includes("aluno")).length;
-    const clts     = clientes.filter(c => c.perfis?.includes("cliente") && !c.perfis?.includes("aluno")).length;
+    const clientes_only = clientes.filter(c => c.perfis?.includes("cliente") && !c.perfis?.includes("aluno")).length;
     const ambos    = clientes.filter(c => c.perfis?.includes("aluno") && c.perfis?.includes("cliente")).length;
-    const legados  = clientes.filter(c => !c.perfis?.length).length; // docs sem perfil (legado)
-    return { alunos, clientes: clts + legados, ambos };
+    const legados  = clientes.filter(c => !c.perfis?.length).length;
+    return { 
+      alunos, 
+      clientes: clientes_only + legados + ambos,
+      ambos 
+    };
   }, [clientes]);
 
   return (
