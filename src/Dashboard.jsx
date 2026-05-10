@@ -2522,7 +2522,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       <header className="ag-topbar">
         <div className="ag-topbar-title">
           <h1>Dashboard</h1>
-          <p><span className="ag-live-dot" />Visão geral do negócio</p>
+          <p><span className="ag-live-dot" />Visão geral do negócio ° Dados em tempo real</p>
         </div>
 
         {/* Toggle Visão */}
