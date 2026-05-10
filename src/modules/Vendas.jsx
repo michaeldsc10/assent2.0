@@ -12,7 +12,7 @@ import {
   Search, Plus, Edit2, Trash2, X, Printer,
   ShoppingCart, Package, ChevronDown, ChevronUp,
   Download, Copy, Filter, Calendar, Ban, ChevronsUpDown, Barcode,
-  QrCode, CheckCircle, AlertCircle, Eye, EyeOff,
+  QrCode, CheckCircle, AlertCircle,
 } from "lucide-react";
 
 import AuthContext from "../contexts/AuthContext";
@@ -683,7 +683,7 @@ function imprimirRecibo(venda, empresa) {
   /* Cabeçalho da empresa */
   const logoHtml = empresa?.logo
     ? `<div style="text-align:center;margin-bottom:6px;">
-         <img src="${empresa.logo}" alt="Logo" style="max-height:60px;max-width:180px;filter:grayscale(100%);object-fit:contain;" />
+         <img src="${escapeHtml(empresa.logo)}" alt="Logo" style="max-height:60px;max-width:180px;filter:grayscale(100%);object-fit:contain;" />
        </div>`
     : "";
   const nomeEmpresa = empresa?.nomeEmpresa
@@ -2115,27 +2115,15 @@ function ModalDetalheVenda({ venda, empresa, onClose, onEditar, onCancelar, onEx
 /* ══════════════════════════════════════════════════
    MODAL: Confirmar Cancelamento de Venda
    ══════════════════════════════════════════════════ */
-function ModalCancelarVenda({ venda, senhaCancelamento, onConfirm, onClose }) {
+function ModalCancelarVenda({ venda, onConfirm, onClose }) {
   const [cancelando, setCancelando] = useState(false);
-  const [senha, setSenha]           = useState("");
-  const [erro, setErro]             = useState("");
-  const [showPass, setShowPass]     = useState(false);
-  const inputRef                    = useRef(null);
-
-  useEffect(() => {
-    if (senhaCancelamento) setTimeout(() => inputRef.current?.focus(), 80);
-  }, [senhaCancelamento]);
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
   const handleConfirm = async () => {
-    if (senhaCancelamento && senha !== senhaCancelamento) {
-      setErro("Senha incorreta.");
-      setSenha("");
-      inputRef.current?.focus();
-      return;
-    }
     setCancelando(true);
     await onConfirm();
-    setCancelando(false);
+    if (mountedRef.current) setCancelando(false);
   };
 
   return (
@@ -2158,49 +2146,6 @@ function ModalCancelarVenda({ venda, senhaCancelamento, onConfirm, onClose }) {
               A venda ficará salva no histórico com status <strong>Cancelada</strong>.
             </span>
           </p>
-
-          {/* Campo de senha — só exibe se admin cadastrou uma */}
-          {senhaCancelamento && (
-            <div style={{ marginTop: 16, textAlign: "left" }}>
-              <div style={{
-                fontSize: 10, fontWeight: 600, letterSpacing: ".07em",
-                textTransform: "uppercase", color: "var(--text-2)", marginBottom: 7,
-              }}>
-                Senha de Cancelamento <span style={{ color: "var(--gold)" }}>*</span>
-              </div>
-              <div style={{ position: "relative" }}>
-                <input
-                  ref={inputRef}
-                  type={showPass ? "text" : "password"}
-                  value={senha}
-                  onChange={e => { setSenha(e.target.value); setErro(""); }}
-                  onKeyDown={e => e.key === "Enter" && handleConfirm()}
-                  placeholder="••••••••"
-                  style={{
-                    width: "100%", boxSizing: "border-box",
-                    background: "var(--s2)",
-                    border: `1px solid ${erro ? "var(--red)" : "var(--border)"}`,
-                    borderRadius: 9, padding: "10px 40px 10px 13px",
-                    color: "var(--text)", fontSize: 13, outline: "none",
-                    fontFamily: "'DM Sans',sans-serif",
-                    transition: "border-color .15s",
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass(s => !s)}
-                  style={{
-                    position: "absolute", right: 11, top: "50%", transform: "translateY(-50%)",
-                    background: "none", border: "none", cursor: "pointer",
-                    color: "var(--text-3)", display: "flex", alignItems: "center", padding: 0,
-                  }}
-                >
-                  {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
-              </div>
-              {erro && <div style={{ fontSize: 11, color: "var(--red)", marginTop: 5 }}>{erro}</div>}
-            </div>
-          )}
         </div>
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Voltar</button>
@@ -2219,11 +2164,13 @@ function ModalCancelarVenda({ venda, senhaCancelamento, onConfirm, onClose }) {
    ══════════════════════════════════════════════════ */
 function ModalExcluirVenda({ venda, onConfirm, onClose }) {
   const [excluindo, setExcluindo] = useState(false);
+  const mountedRef = useRef(true);
+  useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
 
   const handleConfirm = async () => {
     setExcluindo(true);
     await onConfirm();
-    setExcluindo(false);
+    if (mountedRef.current) setExcluindo(false);
   };
 
   return (
@@ -2347,7 +2294,6 @@ export default function Vendas() {
   const [vendedores, setVendedores] = useState([]);
   /* Taxas de cartão — carregadas uma vez do Firestore, com fallback nos defaults */
   const [taxas, setTaxas]                     = useState(TAXAS_DEFAULT);
-  const [senhaCancelamento, setSenhaCancelamento] = useState("");
   const [configEmpresa, setConfigEmpresa]     = useState(null);
 
   const [search, setSearch]   = useState("");
@@ -2405,7 +2351,6 @@ useEffect(() => {
       if (snap.exists()) {
         const d = snap.data();
         if (d.taxas)               setTaxas(prev => ({ ...TAXAS_DEFAULT, ...d.taxas }));
-        if (d.senhaCancelamento)   setSenhaCancelamento(d.senhaCancelamento);
         if (d.empresa)             setConfigEmpresa(d.empresa);
       }
     })
@@ -2668,8 +2613,8 @@ useEffect(() => {
     } catch (err) {
       fsError(err, "Vendas:criar");
       if (err.message === "ESTOQUE_INSUFICIENTE") {
-        // A validação local já exibiu o modal — aqui é só a barreira do Firestore.
-        // Nada a fazer; o modal no ModalNovaVenda já foi disparado antes do onSave.
+        // A validação local pode ter usado dado desatualizado — exibe feedback
+        alert("Estoque insuficiente para um ou mais produtos. Recarregue a página e tente novamente.");
         return;
       }
       alert("Erro ao registrar a venda. Tente novamente.");
@@ -3429,7 +3374,6 @@ useEffect(() => {
       {deletando && (
         <ModalCancelarVenda
           venda={deletando}
-          senhaCancelamento={senhaCancelamento}
           onConfirm={handleCancelar}
           onClose={() => setDeletando(null)}
         />
