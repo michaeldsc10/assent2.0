@@ -961,7 +961,7 @@ export default function PDV({ onVoltar }) {
   /* ── Modal busca de produto (F8) ── */
   const [showBuscaModal, setShowBuscaModal] = useState(false);
   const [buscaModalQuery, setBuscaModalQuery] = useState("");
-  const [buscaModalResultados, setBuscaModalResultados] = useState([]);
+  const [buscaModalTodos, setBuscaModalTodos] = useState([]);
   const [buscaModalLoading, setBuscaModalLoading] = useState(false);
   const buscaModalInputRef = useRef(null);
 
@@ -981,41 +981,33 @@ export default function PDV({ onVoltar }) {
 
   const operadorDisplay = nomeOperador || vendedorNome || user?.displayName || user?.email?.split("@")[0] || "Operador";
 
-  /* ── Busca no modal F8 ── */
+  /* ── Busca no modal F8 — carrega tudo ao abrir, filtra local ── */
   useEffect(() => {
-    const buscar = async () => {
-      if (!tenantUid || buscaModalQuery.trim().length < 2) {
-        setBuscaModalResultados([]);
-        return;
-      }
-      setBuscaModalLoading(true);
-      try {
-        const ref = collection(db, "users", tenantUid, "produtos");
-        const q = query(ref, orderBy("nome"), limit(30));
-        const snap = await getDocs(q);
-        const termo = buscaModalQuery.toLowerCase();
-        setBuscaModalResultados(
-          snap.docs
-            .map(d => sanitizarProduto({ id: d.id, ...d.data() }))
-            .filter(p => p.nome.toLowerCase().includes(termo) || p.codigoBarras.includes(termo))
-            .slice(0, 12)
-        );
-      } catch { setBuscaModalResultados([]); }
-      finally { setBuscaModalLoading(false); }
-    };
-    const timer = setTimeout(buscar, 280);
-    return () => clearTimeout(timer);
-  }, [buscaModalQuery, tenantUid]);
-
-  /* ── Foco no input do modal ao abrir ── */
-  useEffect(() => {
-    if (showBuscaModal) {
-      setTimeout(() => buscaModalInputRef.current?.focus(), 60);
-    } else {
+    if (!showBuscaModal) {
       setBuscaModalQuery("");
-      setBuscaModalResultados([]);
+      setBuscaModalTodos([]);
+      return;
     }
-  }, [showBuscaModal]);
+    setTimeout(() => buscaModalInputRef.current?.focus(), 60);
+    if (!tenantUid) return;
+    setBuscaModalLoading(true);
+    const ref = collection(db, "users", tenantUid, "produtos");
+    const q = query(ref, orderBy("nome"), limit(200));
+    getDocs(q)
+      .then(snap => setBuscaModalTodos(
+        snap.docs.map(d => sanitizarProduto({ id: d.id, ...d.data() }))
+      ))
+      .catch(() => setBuscaModalTodos([]))
+      .finally(() => setBuscaModalLoading(false));
+  }, [showBuscaModal, tenantUid]);
+
+  /* ── Resultados filtrados do modal ── */
+  const buscaModalResultados = buscaModalQuery.trim().length < 2
+    ? buscaModalTodos
+    : buscaModalTodos.filter(p =>
+        p.nome.toLowerCase().includes(buscaModalQuery.toLowerCase()) ||
+        p.codigoBarras.includes(buscaModalQuery)
+      );
 
   /* ─── Total do carrinho ─── */
   const total    = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
@@ -1424,7 +1416,6 @@ export default function PDV({ onVoltar }) {
                   color:"#e8e8f0", fontSize:16, fontWeight:500,
                 }}
               />
-              {buscaModalLoading && <Loader2 size={15} color="#c8a55e" style={{ animation:"spin .7s linear infinite", flexShrink:0 }} />}
               <span
                 role="button"
                 onClick={() => setShowBuscaModal(false)}
@@ -1437,18 +1428,18 @@ export default function PDV({ onVoltar }) {
             </div>
 
             {/* Resultados */}
-            <div style={{ maxHeight:380, overflowY:"auto" }}>
-              {buscaModalResultados.length === 0 && buscaModalQuery.length >= 2 && !buscaModalLoading && (
+            <div style={{ maxHeight:420, overflowY:"auto" }}>
+              {buscaModalLoading && (
+                <div style={{ padding:"28px 20px", textAlign:"center", color:"#5c5e72", fontSize:13, display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+                  <Loader2 size={14} style={{ animation:"spin .7s linear infinite" }} /> Carregando produtos...
+                </div>
+              )}
+              {!buscaModalLoading && buscaModalResultados.length === 0 && buscaModalQuery.length >= 2 && (
                 <div style={{ padding:"28px 20px", textAlign:"center", color:"#5c5e72", fontSize:13 }}>
                   Nenhum produto encontrado para &ldquo;{buscaModalQuery}&rdquo;
                 </div>
               )}
-              {buscaModalResultados.length === 0 && buscaModalQuery.length < 2 && (
-                <div style={{ padding:"28px 20px", textAlign:"center", color:"#5c5e72", fontSize:13 }}>
-                  Digite pelo menos 2 caracteres para buscar
-                </div>
-              )}
-              {buscaModalResultados.map((p, idx) => (
+              {!buscaModalLoading && buscaModalResultados.map((p, idx) => (
                 <button
                   key={p.id}
                   onClick={() => { adicionarAoCarrinho(p); setShowBuscaModal(false); }}
