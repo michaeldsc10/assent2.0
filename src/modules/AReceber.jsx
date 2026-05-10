@@ -35,6 +35,7 @@ import {
   getDoc,
   getDocs,
   increment,
+  arrayUnion,
   query,
   where,
 } from "firebase/firestore";
@@ -1043,7 +1044,8 @@ export default function AReceber() {
         t.update(ref, {
           valorPago: novoValorPago,
           valorRestante: novoValorRestante,
-          dataPagamento: serverTimestamp()
+          dataPagamento: serverTimestamp(),
+          historicoPagamentos: arrayUnion({ valor, data: new Date().toISOString() }),
         });
 
         if (contaAtual.origem === "venda" && contaAtual.referenciaId) {
