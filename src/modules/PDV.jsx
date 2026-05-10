@@ -6,14 +6,14 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  Search, ShoppingCart, Plus, Minus,
+  Search, ShoppingCart, Trash2, Plus, Minus,
   CheckCircle, X, AlertCircle, Barcode, User,
   CreditCard, Banknote, QrCode, Package, ArrowLeft,
-  Receipt, Loader2, Printer, PlusCircle,
-  Copy,
+  Receipt, Loader2, ChevronDown, Printer, PlusCircle, Trash2 as TrashIcon,
+  Copy, Eye, EyeOff,
 } from "lucide-react";
 
-import { auth, db } from "../lib/firebase";
+import { auth, db, functions } from "../lib/firebase";
 import { fsError, fsSnapshotError } from "../utils/firestoreError";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -46,10 +46,11 @@ function sanitizarProduto(produto) {
     foto:         typeof produto.foto === "string" && produto.foto ? produto.foto : null,
   };
 }
-
-/* ── Formata moeda BRL para recibos/cupom ── */
-const fmtR$PDV = (v) =>
-  `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+const fmtNum = (v) =>
+  Number(v || 0).toLocaleString("pt-BR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
 /* ══════════════════════════════════════════════════════
    MODAL PAGAMENTO PARCIAL
@@ -251,11 +252,6 @@ function ModalPagamento({ restante, taxas, onConfirm, onClose }) {
                 Troco: {fmt(troco)}
               </div>
             )}
-            {troco !== null && troco < 0 && (
-              <div style={{ marginTop:6, fontSize:13, color:"#e05555", fontWeight:600 }}>
-                ⚠ Valor insuficiente ({fmt(Math.abs(troco))} a menos)
-              </div>
-            )}
           </div>
         )}
 
@@ -306,7 +302,7 @@ function ModalCupom({ venda, troco, empresa, onClose }) {
     dinheiro: "Dinheiro",
     cartao:   "Débito",
     pix:      "Pix",
-    credito:  `Crédito ${(venda.pagamentos?.find(p => p.forma === "credito")?.parcelas) || venda.parcelas || 1}x`,
+    credito:  `Crédito ${venda.parcelas}x`,
   };
 
   const imprimir = () => {
@@ -478,7 +474,6 @@ function ModalQrPix({ valor, descricao, tenantUid, onPago, onClose }) {
 
   /* Helper — chama Cloud Function via fetch com token Firebase Auth */
   const callCF = async (nome, body) => {
-    if (!auth.currentUser) throw new Error("Sessão expirada. Faça login novamente.");
     const token = await getIdToken(auth.currentUser);
     const res   = await fetch(`${CF_BASE}/${nome}`, {
       method:  "POST",
@@ -808,19 +803,145 @@ function ModalQrPix({ valor, descricao, tenantUid, onPago, onClose }) {
   );
 }
 
+/* ══════════════════════════════════════════════════════
+   MODAL SENHA CANCELAMENTO PDV
+   ══════════════════════════════════════════════════════ */
+function ModalSenhaCancelar({ senhaCadastrada, onConfirm, onClose }) {
+  const [senha, setSenha] = useState("");
+  const [erro, setErro]   = useState("");
+  const [show, setShow]   = useState(false);
+  const inputRef          = useRef(null);
+
+  useEffect(() => { setTimeout(() => inputRef.current?.focus(), 80); }, []);
+
+  const confirmar = () => {
+    /* Se admin não cadastrou senha — libera sem bloqueio */
+    if (!senhaCadastrada) { onConfirm(); return; }
+    if (senha !== senhaCadastrada) {
+      setErro("Senha incorreta.");
+      setSenha("");
+      inputRef.current?.focus();
+      return;
+    }
+    onConfirm();
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 10000,
+        background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontFamily: "'DM Sans','Segoe UI',sans-serif",
+        animation: "fadeIn .15s ease",
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: "#16181f",
+          border: "1px solid rgba(224,82,82,0.3)",
+          borderRadius: 16, width: 320, padding: "24px 22px",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.75)",
+          display: "flex", flexDirection: "column", gap: 18,
+          animation: "slideUp .18s ease",
+        }}
+      >
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: 9,
+              background: "rgba(224,82,82,0.1)", border: "1px solid rgba(224,82,82,0.3)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <X size={16} color="#e05555" />
+            </div>
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: "#e8e8f0" }}>Cancelar Venda</div>
+              <div style={{ fontSize: 11, color: "#7a7c96" }}>Senha de autorização obrigatória</div>
+            </div>
+          </div>
+          <span role="button" onClick={onClose}
+            style={{ color: "#5c5e72", cursor: "pointer", display: "flex" }}>
+            <X size={15} />
+          </span>
+        </div>
+
+        {/* Input senha */}
+        <div>
+          <div style={{ fontSize: 11, color: "#5c5e72", marginBottom: 6,
+            textTransform: "uppercase", letterSpacing: ".05em" }}>
+            Senha de Cancelamento
+          </div>
+          <div style={{ position: "relative" }}>
+            <input
+              ref={inputRef}
+              type={show ? "text" : "password"}
+              value={senha}
+              onChange={e => { setSenha(e.target.value); setErro(""); }}
+              onKeyDown={e => e.key === "Enter" && confirmar()}
+              placeholder="••••••••"
+              style={{
+                width: "100%", boxSizing: "border-box",
+                background: "rgba(255,255,255,0.06)",
+                border: `1px solid ${erro ? "rgba(224,82,82,0.6)" : "rgba(255,255,255,0.15)"}`,
+                borderRadius: 9, padding: "11px 40px 11px 14px",
+                color: "#e8e8f0", fontSize: 15, outline: "none",
+                fontFamily: "'DM Sans',sans-serif",
+                transition: "border-color .15s",
+              }}
+            />
+            <span role="button" onClick={() => setShow(s => !s)}
+              style={{
+                position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
+                cursor: "pointer", color: "#5c5e72", display: "flex",
+              }}>
+              {show ? <EyeOff size={15} /> : <Eye size={15} />}
+            </span>
+          </div>
+          {erro && <div style={{ fontSize: 11, color: "#e05555", marginTop: 5 }}>{erro}</div>}
+        </div>
+
+        {/* Ações */}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={onClose}
+            style={{
+              flex: 1, padding: "10px", borderRadius: 9,
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              color: "#9193a5", fontSize: 13, cursor: "pointer",
+              fontFamily: "'DM Sans',sans-serif",
+            }}
+          >Voltar</button>
+          <button
+            onClick={confirmar}
+            style={{
+              flex: 2, padding: "10px", borderRadius: 9,
+              background: "rgba(224,82,82,0.15)",
+              border: "1px solid rgba(224,82,82,0.4)",
+              color: "#e05555", fontSize: 13, fontWeight: 700,
+              cursor: "pointer", fontFamily: "'DM Sans',sans-serif",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            }}
+          >
+            <X size={13} /> Confirmar Cancelamento
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* ═══════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
    ═══════════════════════════════════════════════════ */
 
-/* ─── Escapa HTML para uso em innerHTML (anti-XSS) ─── */
-const escHtml = (s) =>
-  String(s || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+/* ── Recibo de impressão — mesmo modelo de Vendas.jsx ── */
+const fmtR$PDV = (v) =>
+  `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
 function imprimirRecibo(venda, empresa) {
   const el = document.getElementById("recibo-print-root");
@@ -837,8 +958,8 @@ function imprimirRecibo(venda, empresa) {
 
   const pgtoLinhas = pagamentos.map(p => {
     const label = temParc && pagamentos.length === 1
-      ? `${escHtml(p.label)} — ${venda.parcelas}x de ${fmtR$PDV(venda.total / venda.parcelas)}`
-      : escHtml(p.label);
+      ? `${p.label} — ${venda.parcelas}x de ${fmtR$PDV(venda.total / venda.parcelas)}`
+      : p.label;
     return `
       <div style="display:flex;justify-content:space-between;font-size:12px;">
         <span>${label}</span>
@@ -848,17 +969,17 @@ function imprimirRecibo(venda, empresa) {
 
   const logoHtml = empresa?.logo
     ? `<div style="text-align:center;margin-bottom:6px;">
-         <img src="${escHtml(empresa.logo)}" alt="Logo" style="max-height:60px;max-width:180px;filter:grayscale(100%);object-fit:contain;" />
+         <img src="${empresa.logo}" alt="Logo" style="max-height:60px;max-width:180px;filter:grayscale(100%);object-fit:contain;" />
        </div>`
     : "";
   const nomeEmpresaHtml = empresa?.nomeEmpresa
-    ? `<div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:3px;">${escHtml(empresa.nomeEmpresa)}</div>`
+    ? `<div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:3px;">${empresa.nomeEmpresa}</div>`
     : `<div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:3px;">ASSENT</div>`;
   const cnpjHtml = empresa?.cnpj
-    ? `<div style="text-align:center;font-size:10px;margin-bottom:2px;">CNPJ: ${escHtml(empresa.cnpj)}</div>`
+    ? `<div style="text-align:center;font-size:10px;margin-bottom:2px;">CNPJ: ${empresa.cnpj}</div>`
     : "";
   const enderecoHtml = empresa?.endereco
-    ? `<div style="text-align:center;font-size:10px;margin-bottom:2px;">${escHtml(empresa.endereco)}</div>`
+    ? `<div style="text-align:center;font-size:10px;margin-bottom:2px;">${empresa.endereco}</div>`
     : "";
 
   el.innerHTML = `
@@ -870,10 +991,10 @@ function imprimirRecibo(venda, empresa) {
       <div style="text-align:center;font-size:11px;margin:6px 0 10px;">Recibo de Venda</div>
       <div style="border-top:1px dashed #000;margin:6px 0;"></div>
 
-      <div style="font-size:12px;"><strong>ID:</strong> ${escHtml(venda.idVenda || venda.id)}</div>
+      <div style="font-size:12px;"><strong>ID:</strong> ${venda.idVenda || venda.id}</div>
       <div style="font-size:12px;"><strong>Data:</strong> ${new Date().toLocaleDateString("pt-BR")}</div>
-      ${venda.cliente ? `<div style="font-size:12px;"><strong>Cliente:</strong> ${escHtml(venda.cliente)}</div>` : ""}
-      ${venda.operador ? `<div style="font-size:12px;"><strong>Operador:</strong> ${escHtml(venda.operador)}</div>` : ""}
+      ${venda.cliente ? `<div style="font-size:12px;"><strong>Cliente:</strong> ${venda.cliente}</div>` : ""}
+      ${venda.operador ? `<div style="font-size:12px;"><strong>Operador:</strong> ${venda.operador}</div>` : ""}
 
       <div style="border-top:1px dashed #000;margin:8px 0;"></div>
 
@@ -886,8 +1007,8 @@ function imprimirRecibo(venda, empresa) {
         const totalItem = (i.preco || 0) * (i.qtd || 1) - (i.desconto || 0);
         return `
           <div style="display:grid;grid-template-columns:1fr auto auto;gap:1px 8px;font-size:11px;margin-bottom:5px;">
-            <span style="font-weight:bold;">${escHtml(i.nome || "Item livre")}</span>
-            <span style="text-align:right;font-weight:bold;">${Number(i.qtd)}x</span>
+            <span style="font-weight:bold;">${i.nome || "Item livre"}</span>
+            <span style="text-align:right;font-weight:bold;">${i.qtd}x</span>
             <span style="text-align:right;font-weight:bold;">${fmtR$PDV(totalItem)}</span>
             <span style="font-size:10px;color:#444;grid-column:1/-1;">Unitário: ${fmtR$PDV(i.preco)}</span>
             ${i.desconto > 0 ? `<span style="font-size:10px;color:#444;grid-column:1/-1;">Desconto: -${fmtR$PDV(i.desconto)}</span>` : ""}
@@ -947,6 +1068,9 @@ export default function PDV({ onVoltar }) {
   /* ── Pix QR Code (Mercado Pago) ── */
   const [showQrPix, setShowQrPix] = useState(false);
 
+  /* ── Senha de cancelamento ── */
+  const [showSenhaCancelar, setShowSenhaCancelar] = useState(false);
+
   /* ── UI states ── */
   const [finalizando, setFinalizando] = useState(false);
   const [vendaFinalizada, setVendaFinalizada] = useState(null);
@@ -964,6 +1088,8 @@ export default function PDV({ onVoltar }) {
   const [buscaModalResultados, setBuscaModalResultados] = useState([]);
   const [buscaModalLoading, setBuscaModalLoading] = useState(false);
   const buscaModalInputRef = useRef(null);
+
+  const buscaRef = useRef(null);
 
   /* ─── Busca nome do operador em licencas/{tenantUid} ─── */
   useEffect(() => {
@@ -1017,11 +1143,19 @@ export default function PDV({ onVoltar }) {
     }
   }, [showBuscaModal]);
 
+  /* ─── Mapeamento forma → label ─── */
+  const FORMA_LABEL = {
+    dinheiro: "Dinheiro",
+    cartao:   "Cartão de Débito",
+    pix:      "Pix",
+    credito:  "Cartão de Crédito",
+  };
+
   /* ─── Total do carrinho ─── */
   const total    = carrinho.reduce((acc, item) => acc + item.subtotal, 0);
   const pago     = pagamentos.reduce((acc, p) => acc + p.valor, 0);
   const restante = parseFloat((total - pago).toFixed(2));
-  const vencido  = restante <= 0.01; // considera quitado
+  const vencido  = restante <= 0.009; // considera quitado
 
   /* ─── Taxas ─── */
   const taxas = config?.taxas || {};
@@ -1058,7 +1192,7 @@ export default function PDV({ onVoltar }) {
         setBuscando(false);
       }
     },
-    [tenantUid, adicionarAoCarrinho]
+    [tenantUid]
   );
 
   /* ══════════════════════════════════
@@ -1081,7 +1215,8 @@ export default function PDV({ onVoltar }) {
           .filter(
             (p) =>
               p.nome?.toLowerCase().includes(termo) ||
-              p.codigoBarras?.includes(termo)
+              p.codigoBarras?.includes(termo) ||
+              p.codigo?.includes(termo)
           )
           .slice(0, 8);
         setProdutosFiltrados(resultados);
@@ -1189,7 +1324,7 @@ export default function PDV({ onVoltar }) {
   /* ══════════════════════════════════
      FINALIZAR VENDA
      ══════════════════════════════════ */
-  const finalizarVenda = useCallback(async (extraPagamento = null) => {
+  const finalizarVenda = async (extraPagamento = null) => {
     if (!tenantUid) return;
     if (carrinho.length === 0) {
       setErro("Adicione pelo menos um produto ao carrinho.");
@@ -1275,8 +1410,7 @@ export default function PDV({ onVoltar }) {
     } finally {
       setFinalizando(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tenantUid, carrinho, pagamentos, total, cliente, vendedorId, nomeOperador, operadorDisplay]);
+  };
 
   /* ── Atalhos de teclado globais ── */
   /* Inserido APÓS todas as declarações que referencia (vencido, finalizando, carrinho, finalizarVenda) */
@@ -1512,6 +1646,13 @@ export default function PDV({ onVoltar }) {
         />
       )}
 
+      {showSenhaCancelar && (
+        <ModalSenhaCancelar
+          senhaCadastrada={config?.senhaCancelamento || ""}
+          onConfirm={() => { setShowSenhaCancelar(false); limparVenda(); }}
+          onClose={() => setShowSenhaCancelar(false)}
+        />
+      )}
 
       {/* Modal QR Code PIX */}
       {showQrPix && (
@@ -1529,8 +1670,7 @@ export default function PDV({ onVoltar }) {
               valorRecebido: null,
               troco:         null,
             };
-            // Não adiciona ao state — finalizarVenda recebe como extraPagamento
-            // para evitar que o closure capture o pagamento duplicado
+            setPagamentos(ps => [...ps, pixPagamento]);
             setShowQrPix(false);
             finalizarVenda(pixPagamento);
           }}
@@ -1654,6 +1794,7 @@ export default function PDV({ onVoltar }) {
             <div className="pdv-search-box">
               <Search size={15} className="pdv-search-icon" />
               <input
+                ref={buscaRef}
                 type="text"
                 className="pdv-search-input"
                 placeholder="Buscar produto por nome..."
@@ -1911,7 +2052,7 @@ export default function PDV({ onVoltar }) {
                     <span></span>
                   </div>
                   {carrinho.map((item, idx) => (
-                    <div key={`${item.produto.id}-${idx}`} className="pdv-carrinho-row">
+                    <div key={item.produto.id + idx} className="pdv-carrinho-row">
                       <div className="pdv-item-nome">
                         <span>{item.produto.nome}</span>
                         {item.produto.codigoBarras && (
@@ -2027,7 +2168,7 @@ export default function PDV({ onVoltar }) {
             </span>
 
             {carrinho.length > 0 && (
-              <button className="pdv-btn-cancelar" onClick={limparVenda}>
+              <button className="pdv-btn-cancelar" onClick={() => setShowSenhaCancelar(true)}>
                 <X size={14} /> Cancelar venda
               </button>
             )}
