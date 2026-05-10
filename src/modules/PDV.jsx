@@ -48,7 +48,7 @@ function sanitizarProduto(produto) {
 }
 
 /* ── Formata moeda BRL para recibos/cupom ── */
-const fmtRecibo = (v) =>
+const fmtR$PDV = (v) =>
   `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 
 /* ══════════════════════════════════════════════════════
@@ -328,7 +328,7 @@ function ModalCupom({ venda, troco, empresa, onClose }) {
     };
     if (troco != null && troco > 0) {
       vendaParaRecibo.pagamentos = (venda.pagamentos || []).map((p, i) =>
-        i === 0 ? { ...p, label: `${p.label} (troco: ${fmtRecibo(troco)})` } : p
+        i === 0 ? { ...p, label: `${p.label} (troco: ${fmtR$PDV(troco)})` } : p
       );
     }
     imprimirRecibo(vendaParaRecibo, empresa);
@@ -382,8 +382,8 @@ function ModalCupom({ venda, troco, empresa, onClose }) {
               <div key={i} style={{ display:"grid", gridTemplateColumns:"1fr auto auto", gap:"1px 8px", fontSize:11, marginBottom:5 }}>
                 <span style={{ fontWeight:"bold" }}>{nome}</span>
                 <span style={{ textAlign:"right", fontWeight:"bold" }}>{qty}x</span>
-                <span style={{ textAlign:"right", fontWeight:"bold" }}>{fmtRecibo(total)}</span>
-                <span style={{ fontSize:10, color:"#555", gridColumn:"1/-1" }}>Unitário: {fmtRecibo(preco)}</span>
+                <span style={{ textAlign:"right", fontWeight:"bold" }}>{fmtR$PDV(total)}</span>
+                <span style={{ fontSize:10, color:"#555", gridColumn:"1/-1" }}>Unitário: {fmtR$PDV(preco)}</span>
               </div>
             );
           })}
@@ -393,11 +393,11 @@ function ModalCupom({ venda, troco, empresa, onClose }) {
           {/* Total */}
           <div style={{ display:"flex", justifyContent:"space-between", fontWeight:"bold", fontSize:14, marginTop:2 }}>
             <span>TOTAL</span>
-            <span>{fmtRecibo(venda.total)}</span>
+            <span>{fmtR$PDV(venda.total)}</span>
           </div>
           {troco != null && troco > 0 && (
             <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"#1a7a3c", fontWeight:600 }}>
-              <span>Troco</span><span>{fmtRecibo(troco)}</span>
+              <span>Troco</span><span>{fmtR$PDV(troco)}</span>
             </div>
           )}
 
@@ -408,7 +408,7 @@ function ModalCupom({ venda, troco, empresa, onClose }) {
           {(venda.pagamentos || []).map((p, i) => (
             <div key={i} style={{ display:"flex", justifyContent:"space-between", fontSize:11 }}>
               <span>{p.label}</span>
-              <span style={{ fontWeight:"bold" }}>{fmtRecibo(p.valor ?? venda.total)}</span>
+              <span style={{ fontWeight:"bold" }}>{fmtR$PDV(p.valor ?? venda.total)}</span>
             </div>
           ))}
 
@@ -837,12 +837,12 @@ function imprimirRecibo(venda, empresa) {
 
   const pgtoLinhas = pagamentos.map(p => {
     const label = temParc && pagamentos.length === 1
-      ? `${escHtml(p.label)} — ${venda.parcelas}x de ${fmtRecibo(venda.total / venda.parcelas)}`
+      ? `${escHtml(p.label)} — ${venda.parcelas}x de ${fmtR$PDV(venda.total / venda.parcelas)}`
       : escHtml(p.label);
     return `
       <div style="display:flex;justify-content:space-between;font-size:12px;">
         <span>${label}</span>
-        <span style="font-weight:bold;">${fmtRecibo(p.valor ?? venda.total)}</span>
+        <span style="font-weight:bold;">${fmtR$PDV(p.valor ?? venda.total)}</span>
       </div>`;
   }).join("");
 
@@ -888,9 +888,9 @@ function imprimirRecibo(venda, empresa) {
           <div style="display:grid;grid-template-columns:1fr auto auto;gap:1px 8px;font-size:11px;margin-bottom:5px;">
             <span style="font-weight:bold;">${escHtml(i.nome || "Item livre")}</span>
             <span style="text-align:right;font-weight:bold;">${Number(i.qtd)}x</span>
-            <span style="text-align:right;font-weight:bold;">${fmtRecibo(totalItem)}</span>
-            <span style="font-size:10px;color:#444;grid-column:1/-1;">Unitário: ${fmtRecibo(i.preco)}</span>
-            ${i.desconto > 0 ? `<span style="font-size:10px;color:#444;grid-column:1/-1;">Desconto: -${fmtRecibo(i.desconto)}</span>` : ""}
+            <span style="text-align:right;font-weight:bold;">${fmtR$PDV(totalItem)}</span>
+            <span style="font-size:10px;color:#444;grid-column:1/-1;">Unitário: ${fmtR$PDV(i.preco)}</span>
+            ${i.desconto > 0 ? `<span style="font-size:10px;color:#444;grid-column:1/-1;">Desconto: -${fmtR$PDV(i.desconto)}</span>` : ""}
           </div>`;
       }).join("")}
 
@@ -898,14 +898,14 @@ function imprimirRecibo(venda, empresa) {
 
       ${descontos > 0 ? `
         <div style="display:flex;justify-content:space-between;font-size:11px;">
-          <span>Descontos</span><span>-${fmtRecibo(descontos)}</span>
+          <span>Descontos</span><span>-${fmtR$PDV(descontos)}</span>
         </div>` : ""}
       ${temTaxa ? `
         <div style="display:flex;justify-content:space-between;font-size:11px;color:#444;">
-          <span>Taxa cartão (${venda.taxaPercentual}%)</span><span>${fmtRecibo(venda.valorTaxa)}</span>
+          <span>Taxa cartão (${venda.taxaPercentual}%)</span><span>${fmtR$PDV(venda.valorTaxa)}</span>
         </div>` : ""}
       <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:14px;margin-top:4px;">
-        <span>TOTAL</span><span>${fmtRecibo(venda.total)}</span>
+        <span>TOTAL</span><span>${fmtR$PDV(venda.total)}</span>
       </div>
 
       <div style="border-top:1px dashed #000;margin:8px 0;"></div>
@@ -1035,6 +1035,34 @@ export default function PDV({ onVoltar }) {
   };
 
   /* ══════════════════════════════════
+     CARRINHO
+     ══════════════════════════════════ */
+  const adicionarAoCarrinho = useCallback((produto) => {
+    setCarrinho((prev) => {
+      const idx = prev.findIndex((i) => i.produto.id === produto.id);
+      if (idx >= 0) {
+        // Já existe — incrementa qty
+        const novo = [...prev];
+        novo[idx] = {
+          ...novo[idx],
+          qty: novo[idx].qty + 1,
+          subtotal: (novo[idx].qty + 1) * novo[idx].precoUnit,
+        };
+        return novo;
+      }
+      // Novo item
+      const precoUnit = parseFloat(produto.precoVenda || produto.preco || 0);
+      return [
+        ...prev,
+        { produto, qty: 1, precoUnit, subtotal: precoUnit },
+      ];
+    });
+    setBuscaProduto("");
+    setProdutosFiltrados([]);
+    setErro("");
+  }, []);
+
+  /* ══════════════════════════════════
      BUSCA POR CÓDIGO DE BARRAS
      ══════════════════════════════════ */
   const buscarPorCodigo = useCallback(
@@ -1124,34 +1152,6 @@ export default function PDV({ onVoltar }) {
     const timer = setTimeout(buscar, 350);
     return () => clearTimeout(timer);
   }, [buscaCliente, tenantUid]);
-
-  /* ══════════════════════════════════
-     CARRINHO
-     ══════════════════════════════════ */
-  const adicionarAoCarrinho = useCallback((produto) => {
-    setCarrinho((prev) => {
-      const idx = prev.findIndex((i) => i.produto.id === produto.id);
-      if (idx >= 0) {
-        // Já existe — incrementa qty
-        const novo = [...prev];
-        novo[idx] = {
-          ...novo[idx],
-          qty: novo[idx].qty + 1,
-          subtotal: (novo[idx].qty + 1) * novo[idx].precoUnit,
-        };
-        return novo;
-      }
-      // Novo item
-      const precoUnit = parseFloat(produto.precoVenda || produto.preco || 0);
-      return [
-        ...prev,
-        { produto, qty: 1, precoUnit, subtotal: precoUnit },
-      ];
-    });
-    setBuscaProduto("");
-    setProdutosFiltrados([]);
-    setErro("");
-  }, []);
 
   const alterarQty = useCallback((idx, delta) => {
     setCarrinho((prev) => {
