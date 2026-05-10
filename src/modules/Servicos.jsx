@@ -5,7 +5,7 @@
      users/{uid}/categorias/{id}        ← categorias de serviço
    ═══════════════════════════════════════════════════ */
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Search, Plus, Edit2, Trash2, X, Tag, Settings, AlertTriangle } from "lucide-react";
 
 import { db } from "../lib/firebase";
@@ -819,6 +819,20 @@ export default function Servicos() {
   const [deletando, setDeletando]     = useState(null);
   const [modalCats, setModalCats]     = useState(false);
 
+  /* ── Atalho de teclado: N → Novo Serviço ── */
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const tag = document.activeElement?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      if (modalNovo || editando || deletando || modalCats) return;
+      if ((e.key === "n" || e.key === "N") && podeCriarV) {
+        e.preventDefault();
+        setModalNovo(true);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [modalNovo, editando, deletando, modalCats, podeCriarV]);
 
   /* Firestore: escuta em tempo real */
   useEffect(() => {
@@ -982,10 +996,9 @@ export default function Servicos() {
           <button
             className="btn-novo-sv"
             onClick={() => setModalNovo(true)}
+            title="Novo Serviço (N)"
             disabled={!podeCriarV}
-          >
-            <Plus size={14} /> Novo Serviço
-          </button>
+          ><Plus size={14} /><span><span style={{ borderBottom: "1.5px solid currentColor" }}>N</span>ovo Serviço</span></button>
         </div>
       </header>
 
