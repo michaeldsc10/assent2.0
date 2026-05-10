@@ -12,7 +12,7 @@ import {
   Search, Plus, Edit2, Trash2, X, Printer,
   ShoppingCart, Package, ChevronDown, ChevronUp,
   Download, Copy, Filter, Calendar, Ban, ChevronsUpDown, Barcode,
-  QrCode, CheckCircle, AlertCircle, UtensilsCrossed, GripVertical,
+  QrCode, CheckCircle, AlertCircle, UtensilsCrossed,
 } from "lucide-react";
 
 import AuthContext from "../contexts/AuthContext";
@@ -185,7 +185,6 @@ const CSS = `
     font-family:'DM Sans',sans-serif; font-size:13px; font-weight:500;
     color:var(--text-3); background:transparent; border:1px solid transparent;
     border-bottom:none; transition:all .15s; margin-bottom:-1px;
-    user-select:none;
   }
   .vd-tab:hover { color:var(--text-2); background:var(--s2); }
   .vd-tab.active { color:var(--gold); background:var(--s2); border-color:var(--border); border-bottom-color:var(--s2); }
@@ -196,15 +195,6 @@ const CSS = `
     padding:1px 7px; border-radius:20px; font-weight:600;
   }
   .vd-tab.active .vd-tab-badge { background:rgba(200,165,94,0.15); color:var(--gold); }
-  .vd-tab.dragging { opacity:.35; }
-  .vd-tab.drag-over { outline:2px solid var(--gold); outline-offset:-2px; }
-  .vd-tab-grip {
-    color:var(--text-3); opacity:0; cursor:grab; flex-shrink:0;
-    display:flex; align-items:center; margin-left:-4px;
-    transition:opacity .15s;
-  }
-  .vd-tab:hover .vd-tab-grip { opacity:.5; }
-  .vd-tab:active .vd-tab-grip { cursor:grabbing; }
 
   /* ── Row cancelada ── */
   .vd-row-cancelada {
@@ -2318,37 +2308,6 @@ export default function Vendas() {
   const [deletando, setDeletando]       = useState(null); // fluxo de cancelar
   const [excluindoDef, setExcluindoDef] = useState(null); // fluxo de exclusão definitiva (admin)
   const [tab, setTab]                   = useState("ativas");
-
-  const TAB_ORDER_DEFAULT = ["ativas", "mesas", "pdv", "canceladas"];
-  const LS_KEY = "vendas_tab_order_v2";
-  const [tabOrder, setTabOrder] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(LS_KEY));
-      if (
-        Array.isArray(saved) &&
-        saved.length === TAB_ORDER_DEFAULT.length &&
-        saved.every(k => TAB_ORDER_DEFAULT.includes(k)) &&
-        TAB_ORDER_DEFAULT.every(k => saved.includes(k))
-      ) return saved;
-    } catch {}
-    return TAB_ORDER_DEFAULT;
-  });
-  const dragTab = useRef(null);
-
-  const handleDragStart = (key) => { dragTab.current = key; };
-  const handleDrop = (targetKey) => {
-    if (!dragTab.current || dragTab.current === targetKey) return;
-    setTabOrder(prev => {
-      const next = [...prev];
-      const from = next.indexOf(dragTab.current);
-      const to   = next.indexOf(targetKey);
-      next.splice(from, 1);
-      next.splice(to, 0, dragTab.current);
-      try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {}
-      return next;
-    });
-    dragTab.current = null;
-  };
   const [sortKey, setSortKey]           = useState("data");
   const [sortDir, setSortDir]           = useState("desc");
   const [pdvSortKey, setPdvSortKey]     = useState("data");
@@ -3072,30 +3031,34 @@ useEffect(() => {
 
       {/* ── Tabs ── */}
       <div className="vd-tabs">
-        {tabOrder.map(key => {
-          const cfg = {
-            ativas:    { label: "Vendas",     icon: <ShoppingCart size={14} />,    badge: vendasFiltradas.length, extra: "" },
-            mesas:     { label: "Mesas",      icon: <UtensilsCrossed size={14} />, badge: vendasMesa.length,      extra: "" },
-            pdv:       { label: "PDV",        icon: <Barcode size={14} />,         badge: vendasPDV.length,        extra: "" },
-            canceladas:{ label: "Canceladas", icon: <Ban size={14} />,             badge: vendasCanceladas.length, extra: "cancelada" },
-          }[key];
-          if (!cfg) return null;
-          return (
-            <button
-              key={key}
-              draggable
-              onDragStart={() => handleDragStart(key)}
-              onDragOver={e => e.preventDefault()}
-              onDrop={() => handleDrop(key)}
-              className={`vd-tab ${cfg.extra} ${tab === key ? "active" : ""}`}
-              onClick={() => setTab(key)}
-            >
-              <span className="vd-tab-grip"><GripVertical size={12} /></span>
-              {cfg.icon} {cfg.label}
-              <span className="vd-tab-badge">{cfg.badge}</span>
-            </button>
-          );
-        })}
+        <button
+          className={`vd-tab ${tab === "ativas" ? "active" : ""}`}
+          onClick={() => setTab("ativas")}
+        >
+          <ShoppingCart size={14} /> Vendas
+          <span className="vd-tab-badge">{vendasFiltradas.length}</span>
+        </button>
+        <button
+          className={`vd-tab ${tab === "mesas" ? "active" : ""}`}
+          onClick={() => setTab("mesas")}
+        >
+          <UtensilsCrossed size={14} /> Mesas
+          <span className="vd-tab-badge">{vendasMesa.length}</span>
+        </button>
+        <button
+          className={`vd-tab ${tab === "pdv" ? "active" : ""}`}
+          onClick={() => setTab("pdv")}
+        >
+          <Barcode size={14} /> PDV
+          <span className="vd-tab-badge">{vendasPDV.length}</span>
+        </button>
+        <button
+          className={`vd-tab cancelada ${tab === "canceladas" ? "active" : ""}`}
+          onClick={() => setTab("canceladas")}
+        >
+          <Ban size={14} /> Canceladas
+          <span className="vd-tab-badge">{vendasCanceladas.length}</span>
+        </button>
       </div>
 
       {/* Topbar — search compartilhado entre abas */}
