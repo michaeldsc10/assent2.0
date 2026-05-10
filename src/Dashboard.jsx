@@ -528,35 +528,40 @@ const CSS = `
   html, body, #root { height: 100%; width: 100%; margin: 0; padding: 0; }
 
   :root {
-    --bg:           #09090c;
-    --s1:           #0f0f13;
-    --s2:           #141419;
-    --s3:           #1a1a22;
-    --border:       rgba(255,255,255,0.07);
-    --border-h:     rgba(255,255,255,0.13);
+    --bg:           #07070a;
+    --s1:           #0d0d11;
+    --s2:           #121217;
+    --s3:           #18181f;
+    --border:       rgba(255,255,255,0.065);
+    --border-h:     rgba(255,255,255,0.12);
     --gold:         #c8a55e;
     --gold-l:       #dfc07c;
-    --gold-d:       rgba(200,165,94,0.12);
+    --gold-d:       rgba(200,165,94,0.10);
     --gold-brand:   #D4AF37;
     --text:         #edeae3;
-    --text-2:       #a09caa;
-    --text-3:       #f6f5fa;
+    --text-2:       #9895a3;
+    --text-3:       rgba(255,255,255,0.28);
     --green:        #3ecf8e;
-    --green-d:      rgba(62,207,142,0.1);
+    --green-d:      rgba(62,207,142,0.09);
     --red:          #e05252;
-    --red-d:        rgba(224,82,82,0.1);
+    --red-d:        rgba(224,82,82,0.09);
     --blue:         #5b8ef0;
-    --blue-d:       rgba(91,142,240,0.1);
+    --blue-d:       rgba(91,142,240,0.09);
     --purple:       #a78bfa;
-    --purple-d:     rgba(167,139,250,0.1);
+    --purple-d:     rgba(167,139,250,0.09);
     --amber:        #f59e0b;
-    --amber-d:      rgba(245,158,11,0.1);
+    --amber-d:      rgba(245,158,11,0.09);
     --sidebar-w:    220px;
     --sidebar-w-sm: 64px;
     --header-h:     62px;
     --sidebar-transition: width 0.22s cubic-bezier(0.4,0,0.2,1);
+    /* tech tokens */
+    --glow-gold:    0 0 24px rgba(200,165,94,0.07);
+    --glow-card:    0 2px 12px rgba(0,0,0,0.4);
+    --grid-line:    rgba(200,165,94,0.025);
     font-family: 'Inter', system-ui, sans-serif;
     --font-display: 'Inter', system-ui, sans-serif;
+    --font-mono:    'JetBrains Mono', monospace;
     color-scheme: dark;
   }
 
@@ -565,8 +570,12 @@ const CSS = `
     display: flex;
     flex-direction: column;
     height: 100vh;
-    height: 100dvh; /* mobile: exclui barra do browser */
-    background: var(--bg);
+    height: 100dvh;
+    background:
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+      var(--bg);
+    background-size: 48px 48px;
     color: var(--text);
     overflow: hidden;
   }
@@ -575,8 +584,11 @@ const CSS = `
   .ag-global-header {
     height: var(--header-h);
     flex-shrink: 0;
-    background: var(--s1);
+    background: rgba(13,13,17,0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
     border-bottom: 1px solid var(--border);
+    box-shadow: 0 1px 0 rgba(200,165,94,0.06), 0 4px 24px rgba(0,0,0,0.4);
     display: flex;
     align-items: center;
     padding: 0 16px 0 0;
@@ -650,8 +662,11 @@ const CSS = `
 .ag-notif-panel {
   position: absolute; top: calc(100% + 10px); right: 0;
   width: 400px; max-height: 580px;
-  background: var(--s1); border: 1px solid var(--border);
-  border-radius: 20px; box-shadow: 0 20px 56px rgba(0,0,0,.38);
+  background: rgba(13,13,17,0.96);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(200,165,94,0.10);
+  border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,.50), 0 0 0 1px rgba(255,255,255,0.03) inset;
   z-index: 200; overflow: hidden; display: flex; flex-direction: column;
 }
 
@@ -675,33 +690,194 @@ const CSS = `
 .ag-notif-list::-webkit-scrollbar { width: 4px; }
 .ag-notif-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-.ag-notif-item {
-  padding: 14px 16px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: var(--s2);
-  display: flex; flex-direction: column; gap: 4px;
-  transition: border-color .18s, transform .18s, box-shadow .18s;
-  cursor: default;
+/* ══ HOLOGRAPHIC NOTIFICATIONS ══ */
+@keyframes holo-scan {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(500%);  }
 }
-.ag-notif-item:hover {
-  border-color: var(--border-h);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0,0,0,.18);
+@keyframes holo-flicker {
+  0%,89%,91%,100% { opacity: 1; }
+  90%             { opacity: .82; }
 }
 
-.ag-notif-item-title {
-  font-size: 13px; font-weight: 600; color: var(--text);
+/* wrapper */
+.holo {
+  position: relative;
+  display: flex; flex-direction: column; align-items: stretch;
+  animation: holo-flicker 9s ease-in-out infinite;
+}
+
+/* card */
+.holo-card {
+  position: relative; overflow: hidden;
+  border-radius: 12px;
+  padding: 13px 38px 13px 13px;
+  background: rgba(9,9,14,0.93);
+  display: flex; flex-direction: column; gap: 0;
+  z-index: 1;
+  transition: transform .18s, box-shadow .18s;
+  cursor: default;
+}
+.holo:hover .holo-card { transform: translateY(-2px); }
+
+/* scanlines estáticas */
+.holo-card::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px, transparent 3px,
+    rgba(255,255,255,0.011) 3px, rgba(255,255,255,0.011) 4px
+  );
+  pointer-events: none; z-index: 0; border-radius: 12px;
+}
+
+/* scan band animada */
+.holo-card::after {
+  content: "";
+  position: absolute; left: 0; right: 0; height: 55px;
+  background: linear-gradient(180deg, transparent 0%, rgba(255,255,255,0.022) 50%, transparent 100%);
+  pointer-events: none; z-index: 1;
+  animation: holo-scan 6s linear infinite;
+}
+
+/* beam — cone de projeção abaixo do card */
+.holo-beam {
+  height: 14px;
+  margin: 0 20px;
+  clip-path: polygon(3% 0%, 97% 0%, 78% 100%, 22% 100%);
+  opacity: .9;
+}
+
+/* base — plataforma emissora */
+.holo-base {
+  height: 2px; border-radius: 2px;
+  margin: 0 26px;
+}
+
+/* ícone */
+.holo-icon {
+  width: 36px; height: 36px; border-radius: 9px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid; position: relative; overflow: hidden; z-index: 2;
+}
+.holo-icon::after {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 50%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.11) 0%, transparent 100%);
+  border-radius: 9px 9px 0 0; pointer-events: none;
+}
+
+/* top row */
+.holo-row-top {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 9px; position: relative; z-index: 2;
+}
+
+/* categoria */
+.holo-categoria {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.10em;
+  text-transform: uppercase; flex: 1; line-height: 1.2;
   font-family: 'Inter', system-ui, sans-serif;
 }
-.ag-notif-item-body {
-  font-size: 12px; color: var(--text-2); line-height: 1.55;
+
+/* badge urgência */
+.holo-urgencia {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; padding: 2px 8px;
+  border-radius: 20px; border: 1px solid; flex-shrink: 0;
   font-family: 'Inter', system-ui, sans-serif;
 }
+
+/* conteúdo */
+.holo-title {
+  font-size: 13px; font-weight: 700; color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif; line-height: 1.35;
+  position: relative; z-index: 2; padding-left: 46px;
+}
+.holo-msg {
+  font-size: 11px; color: var(--text-2); line-height: 1.5;
+  font-family: 'Inter', system-ui, sans-serif;
+  position: relative; z-index: 2; padding-left: 46px; margin-top: 3px;
+}
+.holo-meta {
+  display: flex; align-items: center; gap: 6px;
+  padding-left: 46px; margin-top: 8px;
+  position: relative; z-index: 2;
+}
+.holo-meta-dot {
+  width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
+}
+.holo-meta span:last-child {
+  font-size: 10px; color: var(--text-3);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* close */
+.holo-close {
+  position: absolute; top: 10px; right: 10px; z-index: 10;
+  width: 22px; height: 22px; border-radius: 6px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--text-3); padding: 0;
+  transition: background .13s, color .13s;
+}
+.holo-close:hover { background: rgba(255,255,255,0.09); color: var(--text); }
+
+/* ══ TONES ══ */
+/* GOLD */
+.holo.gold .holo-card { border: 1px solid rgba(200,165,94,.30); box-shadow: 0 0 28px rgba(200,165,94,.08), 0 2px 12px rgba(0,0,0,.5), inset 0 1px 0 rgba(200,165,94,.12); }
+.holo.gold .holo-icon { background: rgba(200,165,94,.12); border-color: rgba(200,165,94,.35); color: #c8a55e; }
+.holo.gold .holo-beam { background: linear-gradient(180deg, rgba(200,165,94,.20) 0%, transparent 100%); }
+.holo.gold .holo-base { background: #c8a55e; box-shadow: 0 0 10px rgba(200,165,94,.6), 0 0 22px rgba(200,165,94,.28); }
+.holo.gold .holo-meta-dot { background: #c8a55e; box-shadow: 0 0 5px rgba(200,165,94,.7); }
+.holo.gold .holo-categoria { color: #c8a55e; }
+.holo.gold .holo-urgencia { color: #c8a55e; border-color: rgba(200,165,94,.35); background: rgba(200,165,94,.10); }
+.holo.gold:hover .holo-card { box-shadow: 0 0 40px rgba(200,165,94,.14), 0 6px 20px rgba(0,0,0,.5), inset 0 1px 0 rgba(200,165,94,.18); }
+
+/* CYAN */
+.holo.cyan .holo-card { border: 1px solid rgba(62,207,142,.28); box-shadow: 0 0 28px rgba(62,207,142,.08), 0 2px 12px rgba(0,0,0,.5), inset 0 1px 0 rgba(62,207,142,.10); }
+.holo.cyan .holo-icon { background: rgba(62,207,142,.10); border-color: rgba(62,207,142,.32); color: #3ecf8e; }
+.holo.cyan .holo-beam { background: linear-gradient(180deg, rgba(62,207,142,.18) 0%, transparent 100%); }
+.holo.cyan .holo-base { background: #3ecf8e; box-shadow: 0 0 10px rgba(62,207,142,.6), 0 0 22px rgba(62,207,142,.28); }
+.holo.cyan .holo-meta-dot { background: #3ecf8e; box-shadow: 0 0 5px rgba(62,207,142,.7); }
+.holo.cyan .holo-categoria { color: #3ecf8e; }
+.holo.cyan .holo-urgencia { color: #3ecf8e; border-color: rgba(62,207,142,.35); background: rgba(62,207,142,.10); }
+.holo.cyan:hover .holo-card { box-shadow: 0 0 40px rgba(62,207,142,.14), 0 6px 20px rgba(0,0,0,.5), inset 0 1px 0 rgba(62,207,142,.16); }
+
+/* MAG */
+.holo.mag .holo-card { border: 1px solid rgba(224,82,82,.28); box-shadow: 0 0 28px rgba(224,82,82,.08), 0 2px 12px rgba(0,0,0,.5), inset 0 1px 0 rgba(224,82,82,.10); }
+.holo.mag .holo-icon { background: rgba(224,82,82,.10); border-color: rgba(224,82,82,.32); color: #e05252; }
+.holo.mag .holo-beam { background: linear-gradient(180deg, rgba(224,82,82,.18) 0%, transparent 100%); }
+.holo.mag .holo-base { background: #e05252; box-shadow: 0 0 10px rgba(224,82,82,.6), 0 0 22px rgba(224,82,82,.28); }
+.holo.mag .holo-meta-dot { background: #e05252; box-shadow: 0 0 5px rgba(224,82,82,.7); }
+.holo.mag .holo-categoria { color: #e05252; }
+.holo.mag .holo-urgencia { color: #e05252; border-color: rgba(224,82,82,.35); background: rgba(224,82,82,.10); }
+.holo.mag:hover .holo-card { box-shadow: 0 0 40px rgba(224,82,82,.14), 0 6px 20px rgba(0,0,0,.5), inset 0 1px 0 rgba(224,82,82,.16); }
+
+/* AMBER */
+.holo.amber .holo-card { border: 1px solid rgba(245,158,11,.28); box-shadow: 0 0 28px rgba(245,158,11,.08), 0 2px 12px rgba(0,0,0,.5), inset 0 1px 0 rgba(245,158,11,.10); }
+.holo.amber .holo-icon { background: rgba(245,158,11,.10); border-color: rgba(245,158,11,.32); color: #f59e0b; }
+.holo.amber .holo-beam { background: linear-gradient(180deg, rgba(245,158,11,.18) 0%, transparent 100%); }
+.holo.amber .holo-base { background: #f59e0b; box-shadow: 0 0 10px rgba(245,158,11,.6), 0 0 22px rgba(245,158,11,.28); }
+.holo.amber .holo-meta-dot { background: #f59e0b; box-shadow: 0 0 5px rgba(245,158,11,.7); }
+.holo.amber .holo-categoria { color: #f59e0b; }
+.holo.amber .holo-urgencia { color: #f59e0b; border-color: rgba(245,158,11,.35); background: rgba(245,158,11,.10); }
+.holo.amber:hover .holo-card { box-shadow: 0 0 40px rgba(245,158,11,.14), 0 6px 20px rgba(0,0,0,.5), inset 0 1px 0 rgba(245,158,11,.16); }
+
+/* BLUE */
+.holo.blue .holo-card { border: 1px solid rgba(91,142,240,.28); box-shadow: 0 0 28px rgba(91,142,240,.08), 0 2px 12px rgba(0,0,0,.5), inset 0 1px 0 rgba(91,142,240,.10); }
+.holo.blue .holo-icon { background: rgba(91,142,240,.10); border-color: rgba(91,142,240,.32); color: #5b8ef0; }
+.holo.blue .holo-beam { background: linear-gradient(180deg, rgba(91,142,240,.18) 0%, transparent 100%); }
+.holo.blue .holo-base { background: #5b8ef0; box-shadow: 0 0 10px rgba(91,142,240,.6), 0 0 22px rgba(91,142,240,.28); }
+.holo.blue .holo-meta-dot { background: #5b8ef0; box-shadow: 0 0 5px rgba(91,142,240,.7); }
+.holo.blue .holo-categoria { color: #5b8ef0; }
+.holo.blue .holo-urgencia { color: #5b8ef0; border-color: rgba(91,142,240,.35); background: rgba(91,142,240,.10); }
+.holo.blue:hover .holo-card { box-shadow: 0 0 40px rgba(91,142,240,.14), 0 6px 20px rgba(0,0,0,.5), inset 0 1px 0 rgba(91,142,240,.16); }
+
 .ag-notif-item-meta {
   font-size: 10px; color: var(--text-3);
-  font-family: 'Inter', system-ui, sans-serif;
-  margin-top: 3px;
+  font-family: 'JetBrains Mono', monospace;
 }
 
 .ag-notif-empty {
@@ -803,7 +979,8 @@ const CSS = `
   /* ══ SIDEBAR ══ */
   .ag-sidebar {
     width: var(--sidebar-w); flex-shrink: 0;
-    background: var(--s1); border-right: 1px solid var(--border);
+    background: rgba(13,13,17,0.97);
+    border-right: 1px solid var(--border);
     display: flex; flex-direction: column;
     overflow: hidden; transition: var(--sidebar-transition);
   }
@@ -832,8 +1009,12 @@ const CSS = `
     transition: background .12s, color .12s, border-color .12s, padding .22s;
     white-space: nowrap; overflow: hidden; position: relative;
   }
-  .ag-nav-item:hover  { background: rgba(255,255,255,0.03); color: var(--text); }
-  .ag-nav-item.active { background: var(--gold-d); color: var(--gold); border-left-color: var(--gold); }
+  .ag-nav-item:hover  { background: rgba(255,255,255,0.025); color: var(--text); }
+  .ag-nav-item.active {
+    background: linear-gradient(90deg, rgba(200,165,94,0.12) 0%, rgba(200,165,94,0.04) 100%);
+    color: var(--gold); border-left-color: var(--gold);
+    box-shadow: inset 0 0 20px rgba(200,165,94,0.04);
+  }
   .ag-nav-item.active svg { color: var(--gold); }
 
   .ag-nav-item span {
@@ -874,17 +1055,31 @@ const CSS = `
   .acesso-negado__spinner { width: 2rem; height: 2rem; border: 3px solid var(--border); border-top-color: var(--gold-brand); border-radius: 50%; animation: spin 0.7s linear infinite; }
 
   .ag-topbar {
-    padding: 14px 24px; background: var(--s1);
+    padding: 14px 24px;
+    background: rgba(13,13,17,0.85);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border);
     display: flex; align-items: center; gap: 16px; flex-shrink: 0;
   }
   .ag-topbar-title h1 {
-    font-family: var(--font-display); font-size: 26px; font-weight: 600;
-    color: var(--gold-brand); line-height: 1.15; letter-spacing: 0.01em;
-    background: linear-gradient(135deg, #D4AF37 10%, #e8ca60 55%, #c8a55e 100%);
+    font-family: 'Inter', system-ui, sans-serif; font-size: 20px; font-weight: 800;
+    color: var(--gold-brand); line-height: 1.15;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    background: linear-gradient(135deg, #D4AF37 10%, #f0d060 55%, #c8a55e 100%);
     -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
   }
-  .ag-topbar-title p { font-size: 11px; color: var(--text-3); margin-top: 3px; letter-spacing: 0.02em; }
+  .ag-topbar-title p { font-size: 11px; color: var(--text-3); margin-top: 3px; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 500; }
+
+  @keyframes ag-pulse-dot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(62,207,142,0.5); }
+    50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(62,207,142,0); }
+  }
+  .ag-live-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green); display: inline-block;
+    animation: ag-pulse-dot 2s infinite; margin-right: 6px; flex-shrink: 0;
+  }
 
   .ag-search {
     display: flex; align-items: center; gap: 8px;
@@ -907,8 +1102,13 @@ const CSS = `
     background: transparent; color: var(--text-2);
     font-family: 'Inter', system-ui, sans-serif; transition: all .13s;
   }
-  .ag-period-btn:hover  { background: var(--s2); color: var(--text); }
-  .ag-period-btn.active { background: var(--gold-d); border-color: rgba(200,165,94,.3); color: var(--gold); }
+  .ag-period-btn:hover  { background: rgba(255,255,255,0.04); color: var(--text); }
+  .ag-period-btn.active {
+    background: rgba(200,165,94,0.08);
+    border-color: rgba(200,165,94,0.28);
+    color: var(--gold);
+    box-shadow: 0 0 12px rgba(200,165,94,0.08);
+  }
 
   /* ══ CONTENT ══ */
   .ag-content { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px 36px; -webkit-overflow-scrolling: touch; }
@@ -917,31 +1117,35 @@ const CSS = `
 
   /* ══ CARDS ══ */
   .ag-card {
-    background: var(--s1); border: 1px solid var(--border);
+    background: linear-gradient(145deg, var(--s1) 0%, rgba(18,18,25,0.95) 100%);
+    border: 1px solid var(--border);
     border-radius: 14px; padding: 20px;
+    box-shadow: var(--glow-card), inset 0 1px 0 rgba(255,255,255,0.025);
     transition: border-color .2s, box-shadow .2s, transform .2s;
   }
   .ag-card:hover {
     border-color: var(--border-h);
-    box-shadow: 0 6px 28px rgba(0,0,0,0.3);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
     transform: translateY(-2px);
   }
   .ag-card-click { cursor: pointer; }
   .ag-card-click:hover {
-    border-color: rgba(200,165,94,0.25);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+    border-color: rgba(200,165,94,0.22);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(200,165,94,0.08), inset 0 1px 0 rgba(200,165,94,0.06);
     transform: translateY(-3px);
   }
   .ag-card-click:active { transform: translateY(-1px); }
 
   .ag-card-bare {
-    background: var(--s1); border: 1px solid var(--border);
+    background: linear-gradient(145deg, var(--s1) 0%, rgba(18,18,25,0.95) 100%);
+    border: 1px solid var(--border);
     border-radius: 14px; overflow: hidden;
+    box-shadow: var(--glow-card), inset 0 1px 0 rgba(255,255,255,0.025);
     transition: border-color .2s, box-shadow .2s, transform .2s;
   }
   .ag-card-bare:hover {
     border-color: var(--border-h);
-    box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.4);
     transform: translateY(-1px);
   }
 
@@ -971,15 +1175,16 @@ const CSS = `
   .ag-mini-icon {
     width: 44px; height: 44px; border-radius: 11px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
   }
-  .ag-mini-val { font-family: 'Inter', system-ui, sans-serif; font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
+  .ag-mini-val { font-family: var(--font-mono); font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: -0.02em; }
   .ag-mini-lbl { font-size: 11px; color: var(--text-2); margin-top: 4px; }
 
   /* ══ KPI CARDS ══ */
-  .ag-kpi-label { font-size: 10px; font-weight: 500; letter-spacing: .07em; text-transform: uppercase; color: var(--text-2); margin-bottom: 10px; }
-  .ag-kpi-val   { font-family: 'Inter', system-ui, sans-serif; font-size: 24px; font-weight: 700; color: var(--text); line-height: 1; }
+  .ag-kpi-label { font-size: 10px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--text-2); margin-bottom: 10px; }
+  .ag-kpi-val   { font-family: var(--font-mono); font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: -0.02em; }
   .ag-kpi-meta  { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-  .ag-trend     { font-size: 11px; font-weight: 500; display: flex; align-items: center; gap: 2px; }
+  .ag-trend     { font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 2px; }
   .ag-sub       { font-size: 11px; color: var(--text-3); }
 
   /* ══ TABELAS ══ */
@@ -996,9 +1201,10 @@ const CSS = `
 
   /* ══ RESUMO DESPESAS ══ */
   .ag-despesa-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; padding: 18px; }
-  .ag-despesa-card { border-radius: 10px; padding: 15px; }
-  .ag-despesa-label { font-size: 9px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; margin-bottom: 8px; }
-  .ag-despesa-count { font-family: 'Inter', system-ui, sans-serif; font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; }
+  .ag-despesa-card { border-radius: 12px; padding: 15px; backdrop-filter: blur(4px); transition: transform .15s; }
+  .ag-despesa-card:hover { transform: translateY(-2px); }
+  .ag-despesa-label { font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; margin-bottom: 8px; }
+  .ag-despesa-count { font-family: var(--font-mono); font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: -0.02em; }
   .ag-despesa-val   { font-size: 11px; color: var(--text-2); margin-top: 6px; }
 
   /* ══ FILTRO PERSONALIZADO ══ */
@@ -1022,12 +1228,12 @@ const CSS = `
 
   /* ══ LOADING SKELETON ══ */
   @keyframes ag-shimmer {
-    0%   { background-position: -400px 0; }
-    100% { background-position:  400px 0; }
+    0%   { background-position: -600px 0; }
+    100% { background-position:  600px 0; }
   }
   .ag-skeleton {
-    background: linear-gradient(90deg, var(--s2) 25%, var(--s3) 50%, var(--s2) 75%);
-    background-size: 800px 100%; animation: ag-shimmer 1.4s infinite;
+    background: linear-gradient(90deg, var(--s2) 25%, rgba(200,165,94,0.04) 50%, var(--s2) 75%);
+    background-size: 1200px 100%; animation: ag-shimmer 1.6s ease-in-out infinite;
     border-radius: 6px; height: 1em; display: inline-block; width: 100%;
   }
 
@@ -1261,6 +1467,175 @@ const CSS = `
 @media (max-width: 480px) {
   .ag-saudacao-card { top: 68px; left: 12px; max-width: calc(100vw - 24px); }
 }
+
+/* ══ 3D BAR CHART ══ */
+@keyframes bar3d-rise {
+  from { opacity: 0; transform: scaleY(0.05); }
+  to   { opacity: 1; transform: scaleY(1); }
+}
+
+.chart3d-toggle {
+  display: flex;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+.chart3d-toggle-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  font-family: 'Inter', system-ui, sans-serif;
+  transition: all .15s;
+}
+.chart3d-toggle-btn.active {
+  background: linear-gradient(135deg, #B8860B, #D4AF37);
+  color: #050505;
+}
+.chart3d-toggle-btn:not(.active) {
+  background: transparent;
+  color: var(--text-3);
+}
+
+.chart3d-wrap {
+  padding: 4px 0 0;
+}
+.chart3d-inner {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  height: 170px;
+}
+.chart3d-yaxis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-right: 10px;
+  height: 100%;
+  flex-shrink: 0;
+  font-size: 9px;
+  color: var(--text-3);
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1;
+  padding-bottom: 20px;
+}
+.chart3d-stage {
+  flex: 1;
+  height: 100%;
+  position: relative;
+  overflow: visible;
+}
+.chart3d-floor {
+  position: absolute;
+  bottom: 20px; left: 0; right: 0; height: 1px;
+  background: rgba(200,165,94,0.14);
+}
+.chart3d-grid-lines {
+  position: absolute;
+  bottom: 20px; left: 0; right: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+  top: 0;
+}
+.chart3d-grid-line {
+  width: 100%;
+  height: 1px;
+  background: rgba(200,165,94,0.04);
+}
+.chart3d-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: calc(100% - 20px);
+  padding: 0 2px;
+}
+.bar3d-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+}
+.bar3d {
+  position: relative;
+  width: 66%;
+  max-width: 26px;
+  transform-origin: bottom center;
+  animation: bar3d-rise 0.45s cubic-bezier(0.34,1.4,0.64,1) var(--d,0s) both;
+}
+.bar3d-front {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, #f0d060 0%, #d4a020 25%, #a87018 70%, #7a4c08 100%);
+  border-top: 1px solid rgba(255,235,100,0.55);
+}
+.bar3d-glow {
+  position: absolute;
+  bottom: -6px; left: -8px; right: -8px; height: 14px;
+  background: radial-gradient(ellipse at center, rgba(200,165,94,0.5) 0%, transparent 70%);
+  filter: blur(5px);
+  pointer-events: none; z-index: -1;
+}
+.bar3d-side {
+  position: absolute;
+  left: calc(100%);
+  top: -5px;
+  width: 7px;
+  height: calc(100% + 5px);
+  background: linear-gradient(180deg, #7a4c08 0%, #3a2404 100%);
+  clip-path: polygon(0 5px, 7px 0, 7px calc(100% - 5px), 0 100%);
+}
+.bar3d-top {
+  position: absolute;
+  top: -5px;
+  left: 0;
+  width: calc(100% + 7px);
+  height: 5px;
+  background: linear-gradient(90deg, #fff890 0%, #e8cc40 50%, #c89020 100%);
+  clip-path: polygon(7px 0, calc(100%) 0, calc(100% - 7px) 5px, 0 5px);
+}
+.bar3d-label {
+  font-size: 9px;
+  color: var(--text-3);
+  font-family: 'JetBrains Mono', monospace;
+  margin-top: 5px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  width: 100%;
+  text-overflow: ellipsis;
+}
+.chart3d-legend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  font-size: 11px;
+}
+.chart3d-legend-left {
+  display: flex; align-items: center; gap: 7px; color: var(--text-2);
+}
+.chart3d-legend-dot {
+  width: 8px; height: 8px; border-radius: 2px;
+  background: #c8a55e;
+}
+.chart3d-legend-right {
+  display: flex; align-items: center; gap: 8px; color: var(--text-2);
+}
+.chart3d-legend-right b {
+  color: var(--gold);
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 700; font-size: 13px;
+}
 `;
 
 /* ══════════════════════════════════════════════════════
@@ -1297,6 +1672,79 @@ function CustomTooltip({ active, payload, label }) {
 function Val({ v, loading, prefix = "", suffix = "" }) {
   if (loading) return <span className="ag-skeleton" style={{ width: 80 }} />;
   return <>{prefix}{v}{suffix}</>;
+}
+
+/* ── Toggle 3D / LINHA ── */
+function ChartToggle({ value, onChange }) {
+  return (
+    <div className="chart3d-toggle">
+      {[["3d","3D BARS"],["flat","LINHA"]].map(([mode, label]) => (
+        <button
+          key={mode}
+          className={`chart3d-toggle-btn ${value === mode ? "active" : ""}`}
+          onClick={() => onChange(mode)}
+        >{label}</button>
+      ))}
+    </div>
+  );
+}
+
+/* ── Chart 3D Bars ── */
+function Chart3DBars({ data, period, height = 170 }) {
+  if (!data || data.length === 0) return (
+    <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-3)", fontSize: 12 }}>
+      Nenhum dado no período
+    </div>
+  );
+  const max = Math.max(...data.map(d => d.v || 0), 1);
+  const total = data.reduce((a, b) => a + (b.v || 0), 0);
+  const CONTAINER_H = height - 40; // espaço para labels + legend
+  return (
+    <div className="chart3d-wrap">
+      <div className="chart3d-inner" style={{ height }}>
+        <div className="chart3d-yaxis">
+          {[1, 0.66, 0.33, 0].map((r, i) => (
+            <span key={i}>R$ {Math.round(max * r).toLocaleString("pt-BR")}</span>
+          ))}
+        </div>
+        <div className="chart3d-stage">
+          <div className="chart3d-floor" />
+          {[0.33, 0.66, 1].map(r => (
+            <div key={r} style={{
+              position: "absolute", bottom: `calc(20px + ${r * 100}%)`, left: 0, right: 0,
+              height: 1, background: "rgba(200,165,94,0.04)", pointerEvents: "none"
+            }} />
+          ))}
+          <div className="chart3d-bars">
+            {data.map((d, i) => {
+              const barH = Math.max(6, ((d.v || 0) / max) * (CONTAINER_H - 10));
+              return (
+                <div className="bar3d-wrap" key={i}>
+                  <div className="bar3d" style={{ height: `${barH}px`, "--d": `${i * 0.04}s` }}>
+                    <div className="bar3d-glow" />
+                    <div className="bar3d-front" />
+                    <div className="bar3d-side" />
+                    <div className="bar3d-top" />
+                  </div>
+                  <div className="bar3d-label">{d.d || d.l || ""}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      <div className="chart3d-legend">
+        <div className="chart3d-legend-left">
+          <span className="chart3d-legend-dot" />
+          <span>Receita líquida</span>
+        </div>
+        <div className="chart3d-legend-right">
+          <span>{period}</span>
+          <b>R$ {total.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</b>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /* ══════════════════════════════════════════════════════
@@ -1453,6 +1901,8 @@ export default function Dashboard() {
     () => localStorage.getItem("ag_theme") || "dark"
   );
   const [dashView, setDashView] = useState("overview"); // "overview" | "charts"
+  const [faturMode, setFaturMode] = useState("flat");        // "flat" | "3d"
+  const [chartsBarMode, setChartsBarMode] = useState("flat"); // para renderChartsView
   const [searchQuery, setSearchQuery]     = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -2316,7 +2766,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       <header className="ag-topbar">
         <div className="ag-topbar-title">
           <h1>Dashboard</h1>
-          <p>Visão geral do negócio</p>
+          <p><span className="ag-live-dot" />Visão geral do negócio</p>
         </div>
 
         {/* Toggle Visão */}
@@ -2518,7 +2968,10 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         {/* KPI Principal */}
         <div className="g3">
           {kpiMain.map((k) => (
-            <div key={k.label} className="ag-card" style={{ borderTop: `2px solid ${k.accent}` }}>
+            <div key={k.label} className="ag-card" style={{
+              borderTop: `2px solid ${k.accent}`,
+              boxShadow: `0 2px 16px rgba(0,0,0,0.4), 0 0 40px ${k.accent}0d`,
+            }}>
               <div className="ag-kpi-label">{k.label}</div>
               <div className="ag-kpi-val"><Val v={k.value} loading={dash.loading} /></div>
               <div className="ag-kpi-meta">
@@ -2535,7 +2988,10 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         {/* KPI Secundário */}
         <div className="g3">
           {kpiSec.map((k) => (
-            <div key={k.label} className="ag-card" style={{ borderTop: `2px solid ${k.accent}` }}>
+            <div key={k.label} className="ag-card" style={{
+              borderTop: `2px solid ${k.accent}`,
+              boxShadow: `0 2px 16px rgba(0,0,0,0.4), 0 0 40px ${k.accent}0d`,
+            }}>
               <div className="ag-kpi-label">{k.label}</div>
               <div className="ag-kpi-val"><Val v={k.value} loading={dash.loading} /></div>
               <div className="ag-kpi-meta"><span className="ag-sub">{k.sub}</span></div>
@@ -2547,17 +3003,26 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         <div className="g21">
           <div className="ag-card">
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <div className="ag-card-title">Faturamento por período</div>
-              <span style={{
-                fontSize: 10, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase",
-                color: "var(--gold)", background: "var(--gold-d)", padding: "3px 9px",
-                borderRadius: 20, border: "1px solid rgba(200,165,94,0.2)",
-              }}>
-                {period === "Personalizado" && customRange.from && customRange.to
-                  ? `${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")}`
-                  : period === "Personalizado" ? "Selecione o intervalo" : period}
-              </span>
+              <div className="ag-card-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--gold)", display: "inline-block" }} />
+                Faturamento por período
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{
+                  fontSize: 10, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase",
+                  color: "var(--gold)", background: "var(--gold-d)", padding: "3px 9px",
+                  borderRadius: 20, border: "1px solid rgba(200,165,94,0.2)",
+                }}>
+                  {period === "Personalizado" && customRange.from && customRange.to
+                    ? `${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")}`
+                    : period === "Personalizado" ? "Selecione o intervalo" : period}
+                </span>
+                <ChartToggle value={faturMode} onChange={setFaturMode} />
+              </div>
             </div>
+            {faturMode === "3d" ? (
+              <Chart3DBars data={dash.loading ? [] : dash.faturamentoPorDia} period={period} height={200} />
+            ) : (
             <ResponsiveContainer width="100%" height={180}>
               <AreaChart data={dash.loading ? [] : dash.faturamentoPorDia} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
                 <defs>
@@ -2577,6 +3042,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   activeDot={{ r: 5, fill: "#c8a55e", stroke: "rgba(200,165,94,0.3)", strokeWidth: 6, filter: "url(#glowGoldMain)" }} />
               </AreaChart>
             </ResponsiveContainer>
+            )}
           </div>
 
           <div className="ag-card" style={{ display: "flex", flexDirection: "column" }}>
@@ -2776,15 +3242,18 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     const semDados = !dash.loading && faturDia.every(pt => pt.v === 0);
     const semProdutos = !dash.loading && produtosPie.length === 0;
 
-    const Card = ({ children, title, subtitle, style = {} }) => (
+    const Card = ({ children, title, subtitle, style = {}, headerRight }) => (
       <div style={{
         background: "var(--s1)", border: "1px solid var(--border)",
         borderRadius: 14, padding: "20px 20px 16px", ...style,
       }}>
-        {(title || subtitle) && (
-          <div style={{ marginBottom: 16 }}>
-            {title && <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", letterSpacing: "0.01em" }}>{title}</div>}
-            {subtitle && <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3 }}>{subtitle}</div>}
+        {(title || subtitle || headerRight) && (
+          <div style={{ marginBottom: 16, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+            <div>
+              {title && <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", letterSpacing: "0.01em" }}>{title}</div>}
+              {subtitle && <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3 }}>{subtitle}</div>}
+            </div>
+            {headerRight && <div style={{ flexShrink: 0 }}>{headerRight}</div>}
           </div>
         )}
         {children}
@@ -2840,13 +3309,16 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     return (
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, padding: 4 }}>
 
-        {/* 1. Faturamento vs Custo — BarChart */}
+        {/* 1. Faturamento vs Custo — BarChart / 3D */}
         <Card
           title="Faturamento vs Custo"
           subtitle={`Período: ${period}${period === "Personalizado" && customRange.from && customRange.to ? ` (${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")})` : ""}`}
           style={{ gridColumn: "1 / 2" }}
+          headerRight={<ChartToggle value={chartsBarMode} onChange={setChartsBarMode} />}
         >
-          {semDados ? <EmptyState /> : (
+          {semDados ? <EmptyState /> : chartsBarMode === "3d" ? (
+            <Chart3DBars data={faturDia} period={period} height={240} />
+          ) : (
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={dash.loading ? [] : receitaData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barSize={14} barGap={3}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
@@ -3173,152 +3645,109 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     <div className="ag-notif-empty">Nenhuma notificação no momento</div>
                   ) : (
                     todasNotif.map((n) => {
-                      /* ── Insight de negócio ── */
+
+                      /* helper: tempo relativo */
+                      const tempoRel = (ts) => {
+                        const d = ts?.toDate ? ts.toDate() : null;
+                        if (!d) return "—";
+                        const diff = Date.now() - d.getTime();
+                        const m = Math.floor(diff / 60000);
+                        const h = Math.floor(diff / 3600000);
+                        const dy = Math.floor(diff / 86400000);
+                        if (dy >= 1) return `há ${dy} dia${dy > 1 ? "s" : ""}`;
+                        if (h  >= 1) return `há ${h}h`;
+                        if (m  >= 1) return `há ${m} min`;
+                        return "agora";
+                      };
+
+                      /* ── Insight ── */
                       if (n.tipo === "insight") {
-                        const INSIGHT_PALETTE = {
-                          faturamento_alta:     { cor: "var(--green)",  bg: "rgba(62,207,142,0.07)",  badge: "#2daa70" },
-                          produto_destaque:     { cor: "var(--green)",  bg: "rgba(62,207,142,0.07)",  badge: "#2daa70" },
-                          ticket_alta:          { cor: "var(--green)",  bg: "rgba(62,207,142,0.07)",  badge: "#2daa70" },
-                          matriculas_alta:      { cor: "var(--blue)",   bg: "rgba(91,142,240,0.07)",  badge: "#4a7de0" },
-                          faturamento_queda:    { cor: "var(--red)",    bg: "rgba(224,82,82,0.07)",   badge: "#c04040" },
-                          ticket_queda:         { cor: "var(--amber)",  bg: "rgba(245,158,11,0.07)",  badge: "#c07800" },
-                          cancelamentos_alerta: { cor: "var(--red)",    bg: "rgba(224,82,82,0.08)",   badge: "#c04040" },
-                          matriculas_queda:     { cor: "var(--amber)",  bg: "rgba(245,158,11,0.07)",  badge: "#c07800" },
-                          matriculas_zero:      { cor: "var(--amber)",  bg: "rgba(245,158,11,0.07)",  badge: "#c07800" },
+                        const PALETTE = {
+                          faturamento_alta: "cyan", produto_destaque: "cyan",
+                          ticket_alta: "cyan",      matriculas_alta: "blue",
+                          faturamento_queda: "mag",  ticket_queda: "amber",
+                          cancelamentos_alerta: "mag", matriculas_queda: "amber",
+                          matriculas_zero: "amber",
                         };
-                        const paleta = INSIGHT_PALETTE[n.tipo] || {
-                          cor: "var(--purple)", bg: "rgba(167,139,250,0.07)", badge: "#8b6ef0",
-                        };
-                        const dataInsight = n.criadoEm?.toDate ? n.criadoEm.toDate() : null;
-                        const tempoRelativo = (() => {
-                          if (!dataInsight) return "—";
-                          const diff = Date.now() - dataInsight.getTime();
-                          const d = Math.floor(diff / 86400000);
-                          const h = Math.floor(diff / 3600000);
-                          if (d >= 1) return `há ${d} dia${d > 1 ? "s" : ""}`;
-                          if (h >= 1) return `há ${h}h`;
-                          return "agora";
-                        })();
+                        const tone = PALETTE[n.subtipo] || "blue";
                         return (
-                          <div
-                            key={n.id}
-                            className="ag-notif-item"
-                            style={{
-                              background: paleta.bg,
-                              borderLeft: `2px solid ${paleta.cor}`,
-                              paddingLeft: 14,
-                            }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 6 }}>
-                              <span style={{
-                                fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
-                                textTransform: "uppercase", color: "#fff",
-                                background: paleta.badge,
-                                borderRadius: 20, padding: "2px 8px", flexShrink: 0,
-                              }}>
-                                Insight
-                              </span>
-                              <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
-                                {tempoRelativo}
-                              </span>
-                              {n.prioridade === "high" && (
-                                <span style={{
-                                  fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
-                                  textTransform: "uppercase", color: paleta.cor,
-                                  background: paleta.bg, border: `1px solid ${paleta.cor}40`,
-                                  borderRadius: 20, padding: "2px 7px", marginLeft: "auto", flexShrink: 0,
-                                }}>
-                                  atenção
-                                </span>
-                              )}
+                          <div key={n.id} className={`holo ${tone}`}>
+                            <div className="holo-card">
+                              <div className="holo-row-top">
+                                <div className="holo-icon">
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5l2.5 1.5"/></svg>
+                                </div>
+                                <span className="holo-categoria">Sistema · IA Insight</span>
+                                {n.prioridade === "high" && <span className="holo-urgencia">atenção</span>}
+                              </div>
+                              <div className="holo-title">{n.titulo}</div>
+                              <div className="holo-msg">{n.mensagem}</div>
+                              <div className="holo-meta">
+                                <span className="holo-meta-dot" />
+                                <span>{tempoRel(n.criadoEm)}</span>
+                              </div>
                             </div>
-                            <div className="ag-notif-item-title" style={{ fontSize: 13, lineHeight: 1.4 }}>
-                              {n.titulo}
-                            </div>
-                            <div className="ag-notif-item-body" style={{ marginTop: 5, fontSize: 12, lineHeight: 1.55 }}>
-                              {n.mensagem}
-                            </div>
+                            <div className="holo-beam" />
+                            <div className="holo-base" />
                           </div>
                         );
                       }
 
-                      /* ── Alerta de despesa próxima do vencimento ── */
+                      /* ── Despesa ── */
                       if (n.tipo === "despesa") {
-                        const corUrgencia =
-                          n.diffDias === 0 ? "var(--red)"   :
-                          n.diffDias === 1 ? "var(--amber)" :
-                                            "var(--blue)";
-                        const bgUrgencia =
-                          n.diffDias === 0 ? "rgba(224,82,82,0.07)"   :
-                          n.diffDias === 1 ? "rgba(245,158,11,0.07)"  :
-                                            "rgba(91,142,240,0.05)";
-                        const labelUrgencia =
-                          n.diffDias === 0 ? "Vence hoje"   :
-                          n.diffDias === 1 ? "Amanhã"       :
-                          `${n.diffDias} dias`;
+                        const tone = n.diffDias === 0 ? "mag" : n.diffDias === 1 ? "amber" : "blue";
+                        const labelUrg = n.diffDias === 0 ? "Vence hoje" : n.diffDias === 1 ? "Amanhã" : `${n.diffDias} dias`;
+                        const idShow = n.titulo?.split("—")[1]?.trim() || "";
+                        const tsObj = n._ts ? { toDate: () => new Date(n._ts) } : null;
                         return (
-                          <div
-                            key={n.id}
-                            className="ag-notif-item"
-                            style={{
-                              cursor: "pointer",
-                              background: bgUrgencia,
-                              borderLeft: `2px solid ${corUrgencia}`,
-                              paddingLeft: 14,
-                            }}
-                            onClick={() => { setModule("Despesas"); setNotifOpen(false); }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 2 }}>
-                              <div className="ag-notif-item-title" style={{ fontSize: 12 }}>{n.mensagem}</div>
-                              <span style={{
-                                fontSize: 9, fontWeight: 700, letterSpacing: "0.06em",
-                                textTransform: "uppercase", color: corUrgencia,
-                                background: bgUrgencia, border: `1px solid ${corUrgencia}40`,
-                                borderRadius: 20, padding: "2px 7px", flexShrink: 0,
-                              }}>{labelUrgencia}</span>
+                          <div key={n.id} className={`holo ${tone}`} style={{ cursor: "pointer" }}
+                            onClick={() => { setModule("Despesas"); setNotifOpen(false); }}>
+                            <div className="holo-card">
+                              <div className="holo-row-top">
+                                <div className="holo-icon">
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                                </div>
+                                <span className="holo-categoria">Atenção · Despesa</span>
+                                <span className="holo-urgencia">{labelUrg}</span>
+                              </div>
+                              <div className="holo-title">{n.mensagem}</div>
+                              <div className="holo-msg">{idShow && `${idShow} · `}<span style={{ opacity: .7 }}>Ir para Despesas →</span></div>
+                              <div className="holo-meta">
+                                <span className="holo-meta-dot" />
+                                <span>{tempoRel(tsObj)}</span>
+                              </div>
                             </div>
-                            <div style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
-                              Despesa {n.titulo.split("—")[1]?.trim() || ""} · Ir para Despesas →
-                            </div>
+                            <div className="holo-beam" />
+                            <div className="holo-base" />
                           </div>
                         );
                       }
 
-                      /* ── Alerta de A Receber próximo do vencimento ── */
+                      /* ── A Receber ── */
                       if (n.tipo === "a_receber") {
-                        const corUrgencia =
-                          n.diffDias === 0 ? "var(--green)"  :
-                                            "var(--amber)";
-                        const bgUrgencia =
-                          n.diffDias === 0 ? "rgba(62,207,142,0.07)"  :
-                                            "rgba(245,158,11,0.07)";
-                        const labelUrgencia =
-                          n.diffDias === 0 ? "Vence hoje" : "Amanhã";
-
+                        const tone = n.diffDias === 0 ? "cyan" : "amber";
+                        const labelUrg = n.diffDias === 0 ? "Vence hoje" : "Amanhã";
+                        const tsObj = n._ts ? { toDate: () => new Date(n._ts) } : null;
                         return (
-                          <div
-                            key={n.id}
-                            className="ag-notif-item"
-                            style={{
-                              cursor: "pointer",
-                              background: bgUrgencia,
-                              borderLeft: `2px solid ${corUrgencia}`,
-                              paddingLeft: 14,
-                            }}
-                            onClick={() => { setModule("A Receber"); setNotifOpen(false); }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 2 }}>
-                              <div className="ag-notif-item-title" style={{ fontSize: 12 }}>{n.clienteNome}</div>
-                              <span style={{
-                                fontSize: 9, fontWeight: 700, letterSpacing: "0.06em",
-                                textTransform: "uppercase", color: corUrgencia,
-                                background: bgUrgencia, border: `1px solid ${corUrgencia}40`,
-                                borderRadius: 20, padding: "2px 7px", flexShrink: 0,
-                              }}>{labelUrgencia}</span>
+                          <div key={n.id} className={`holo ${tone}`} style={{ cursor: "pointer" }}
+                            onClick={() => { setModule("A Receber"); setNotifOpen(false); }}>
+                            <div className="holo-card">
+                              <div className="holo-row-top">
+                                <div className="holo-icon">
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                                </div>
+                                <span className="holo-categoria">Financeiro · A Receber</span>
+                                <span className="holo-urgencia">{labelUrg}</span>
+                              </div>
+                              <div className="holo-title">{n.clienteNome}</div>
+                              <div className="holo-msg">{n.valor} · <span style={{ opacity: .7 }}>Ir para A Receber →</span></div>
+                              <div className="holo-meta">
+                                <span className="holo-meta-dot" />
+                                <span>{tempoRel(tsObj)}</span>
+                              </div>
                             </div>
-                            <div style={{ fontSize: 11, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
-                              A Receber · {n.valor} · Ir para A Receber →
-                            </div>
+                            <div className="holo-beam" />
+                            <div className="holo-base" />
                           </div>
                         );
                       }
@@ -3326,79 +3755,59 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                       /* ── Nova reserva AssFlow ── */
                       if (n.tipo === "nova_reserva") {
                         return (
-                          <div
-                            key={n.id}
-                            className="ag-notif-item"
-                            style={{
-                              cursor: "pointer",
-                              background: "rgba(192,155,82,0.05)",
-                              borderLeft: "2px solid var(--gold)",
-                              paddingLeft: 14,
-                            }}
-                            onClick={() => {
-                              marcarReservaLida(n.id);
-                              setFlowInitialTab("reservas");
-                              setSistemaAtivo("flow");
-                              setNotifOpen(false);
-                            }}
-                          >
-                            <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
-                              <span style={{
-                                fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
-                                textTransform: "uppercase", color: "var(--ink, #040408)",
-                                background: "var(--gold)", borderRadius: 20,
-                                padding: "2px 8px", flexShrink: 0,
-                              }}>Reserva</span>
-                              <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
-                                {n.criadoEm?.toDate
-                                  ? n.criadoEm.toDate().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-                                  : "—"}
-                              </span>
+                          <div key={n.id} className="holo gold" style={{ cursor: "pointer" }}
+                            onClick={() => { marcarReservaLida(n.id); setFlowInitialTab("reservas"); setSistemaAtivo("flow"); setNotifOpen(false); }}>
+                            <div className="holo-card">
+                              <div className="holo-row-top">
+                                <div className="holo-icon">
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                                </div>
+                                <span className="holo-categoria">Flow · Nova Reserva</span>
+                              </div>
+                              <div className="holo-title">{n.payload?.cliente || "Nova reserva"}</div>
+                              <div className="holo-msg">
+                                {n.payload?.servico}{n.payload?.data ? ` · ${n.payload.data}` : ""}{n.payload?.hora ? ` às ${n.payload.hora}` : ""}<br/>
+                                <span style={{ opacity: .7 }}>Ir para Reservas →</span>
+                              </div>
+                              <div className="holo-meta">
+                                <span className="holo-meta-dot" />
+                                <span>{tempoRel(n.criadoEm)}</span>
+                              </div>
                             </div>
-                            <div className="ag-notif-item-title" style={{ fontSize: 12, marginBottom: 4 }}>
-                              Nova reserva recebida
-                            </div>
-                            <div className="ag-notif-item-body" style={{ fontSize: 11, lineHeight: 1.55 }}>
-                              <span style={{ color: "var(--text-2)" }}>Cliente:</span> {n.payload?.cliente || "—"}<br />
-                              <span style={{ color: "var(--text-2)" }}>Serviço:</span> {n.payload?.servico || "—"}<br />
-                              <span style={{ color: "var(--text-2)" }}>Data:</span> {n.payload?.data || "—"} às {n.payload?.hora || "—"}
-                            </div>
-                            <div style={{ fontSize: 10, color: "var(--gold)", marginTop: 5, fontFamily: "'JetBrains Mono', monospace" }}>
-                              Ir para Reservas →
-                            </div>
+                            <div className="holo-beam" />
+                            <div className="holo-base" />
                           </div>
                         );
                       }
 
-                      /* ── Anúncio do sistema ── */
+                      /* ── Sistema / default ── */
                       return (
-                        <div key={n.id} className="ag-notif-item">
-                          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 5 }}>
-                            <span style={{
-                              fontSize: 9, fontWeight: 700, letterSpacing: "0.07em",
-                              textTransform: "uppercase", color: "var(--gold)",
-                              background: "var(--gold-d)", border: "1px solid rgba(200,165,94,0.2)",
-                              borderRadius: 20, padding: "2px 8px", flexShrink: 0,
-                            }}>Sistema</span>
-                            <span style={{ fontSize: 10, color: "var(--text-3)", fontFamily: "'JetBrains Mono', monospace" }}>
-                              {n.criadoEm?.toDate
-                                ? n.criadoEm.toDate().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
-                                : "—"}
-                            </span>
+                        <div key={n.id} className="holo gold">
+                          <div className="holo-card">
+                            <div className="holo-row-top">
+                              <div className="holo-icon">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                              </div>
+                              <span className="holo-categoria">Sistema</span>
+                              <span className="ag-notif-item-meta" style={{ marginLeft: "auto" }}>
+                                {n.criadoEm?.toDate ? n.criadoEm.toDate().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—"}
+                              </span>
+                            </div>
+                            <div className="holo-title">{n.titulo}</div>
+                            <div className="holo-msg">{n.mensagem}</div>
+                            {n.btnUrl && (
+                              <a href={n.btnUrl} target="_blank" rel="noopener noreferrer" className="ag-notif-cta" style={{ marginTop: 10 }}>
+                                {n.btnTexto || "Ver mais"}
+                                <span className="ag-notif-cta-arrow" aria-hidden="true">↗</span>
+                              </a>
+                            )}
+                            <div className="holo-meta">
+                              <span className="holo-meta-dot" />
+                              <span>{tempoRel(n.criadoEm)}</span>
+                            </div>
                           </div>
-                          <div className="ag-notif-item-title">{n.titulo}</div>
-                          <div className="ag-notif-item-body" style={{ marginTop: 4 }}>{n.mensagem}</div>
-                          {n.btnUrl && (
-                            <a
-                              href={n.btnUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="ag-notif-cta"
-                            >
-                              {n.btnTexto || "Ver mais"}
-                              <span className="ag-notif-cta-arrow" aria-hidden="true">↗</span>
-                            </a>
-                          )}
+                          <div className="holo-beam" />
+                          <div className="holo-base" />
                         </div>
                       );
                     })
