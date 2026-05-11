@@ -1177,7 +1177,7 @@ export default function AReceber() {
         .replace(/\[nome\]/g,    conta.clienteNome || "")
         .replace(/\[valor\]/g,   fmtR$(conta.valorRestante))
         .replace(/\[data\]/g,    fmtData(conta.dataVencimento))
-        .replace(/\[empresa\]/g, nomeEmpresa || cfgSnap.data()?.nomeEmpresa || "");
+        .replace(/\[empresa\]/g, nomeEmpresa || cfgSnap.data()?.empresa?.nomeEmpresa || cfgSnap.data()?.nomeEmpresa || "");
 
       const url = `https://wa.me/55${telefone}?text=${encodeURIComponent(texto)}`;
       window.open(url, "_blank", "noopener,noreferrer");
@@ -1191,7 +1191,7 @@ export default function AReceber() {
   useEffect(() => {
     if (!tenantUid) return;
     getDoc(doc(db, "users", tenantUid, "config", "geral")).then(snap => {
-      if (snap.exists()) setNomeEmpresa(snap.data().nomeEmpresa || "");
+      if (snap.exists()) setNomeEmpresa(snap.data().empresa?.nomeEmpresa || snap.data().nomeEmpresa || "");
     }).catch(() => {});
   }, [tenantUid]);
 
