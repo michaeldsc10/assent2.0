@@ -1176,6 +1176,7 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
 
   // Cabeçalho
   const [clienteSearch, setClienteSearch] = useState(venda?.cliente || "");
+  const [clienteIdSel, setClienteIdSel]   = useState(venda?.clienteId || null);
   const [clienteAC, setClienteAC] = useState(false);
   const [dataVenda, setDataVenda] = useState(() => {
     const toLocalDate = (d) => {
@@ -1365,6 +1366,7 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
   const validar = () => {
     const e = {};
     if (!clienteSearch.trim()) e.cliente = "Informe o cliente.";
+    else if (!clienteIdSel) e.cliente = "Selecione um cliente cadastrado da lista.";
     if (!formaPgto) e.formaPgto = "Selecione a forma de pagamento.";
     /* Validações exclusivas do Sinal */
     if (formaPgto === "Sinal") {
@@ -1385,6 +1387,7 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
   const buildPayload = () => {
     const base = {
       cliente: clienteSearch.trim(),
+      clienteId: clienteIdSel || null,
       data: new Date(dataVenda + "T12:00:00"),
       vendedor:   vendedor.trim(),
       vendedorId: vendedorIdSel || "",
@@ -1510,7 +1513,7 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
                 className={`form-input ${erros.cliente ? "err" : ""}`}
                 placeholder="Buscar por nome ou CPF..."
                 value={clienteSearch}
-                onChange={e => { setClienteSearch(e.target.value); setClienteAC(true); }}
+                onChange={e => { setClienteSearch(e.target.value); setClienteIdSel(null); setClienteAC(true); }}
                 onFocus={() => setClienteAC(true)}
                 onBlur={() => setTimeout(() => setClienteAC(false), 180)}
                 autoComplete="off"
@@ -1522,7 +1525,7 @@ function ModalNovaVenda({ venda, uid, cargo, vendedorId: vendedorIdLogado, vende
                     ? <div className="nv-ac-empty">Nenhum cliente encontrado</div>
                     : clientesFiltrados.map(c => (
                         <div key={c.id} className="nv-ac-item" 
-                             onMouseDown={() => { setClienteSearch(c.nome); setClienteAC(false); }}>
+                             onMouseDown={() => { setClienteSearch(c.nome); setClienteIdSel(c.id); setClienteAC(false); }}>
                           <span>{c.nome}</span>
                           <span className="nv-ac-item-sub">{c.cpf || c.telefone || ""}</span>
                         </div>
@@ -2539,6 +2542,7 @@ useEffect(() => {
           await addDoc(collection(db, "users", tenantUid, "a_receber"), {
             descricao:       "Venda - Pagamento pendente",
             clienteNome:     payload.cliente || "Consumidor Final",
+            clienteId:       payload.clienteId || null,
             valorTotal:      payload.valorRestante,
             valorPago:       0,
             valorRestante:   payload.valorRestante,
@@ -2676,6 +2680,7 @@ useEffect(() => {
         await addDoc(collection(db, "users", tenantUid, "a_receber"), {
           descricao:       "Venda - Pagamento pendente",
           clienteNome:     payload.cliente || "Consumidor Final",
+          clienteId:       payload.clienteId || null,
           valorTotal:      payload.valorRestante,
           valorPago:       0,
           valorRestante:   payload.valorRestante,
