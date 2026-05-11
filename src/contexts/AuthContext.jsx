@@ -280,7 +280,7 @@ if (licencaDoc.exists()) {
       const perfil = perfilDoc.data();
 
       // Bloqueia usuário desativado
-      if (!perfil.ativo) {
+      if (perfil.ativo === false) {
         await _rejeitarAcesso("Usuário desativado.");
         return;
       }
