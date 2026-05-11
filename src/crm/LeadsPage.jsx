@@ -16,6 +16,10 @@ import {
   montarPromptLead,
 } from "./useLeads";
 import { calcularTemperaturaLead } from "./CRMModule";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "../lib/firebase";
+
+const _gerarMensagemIA = httpsCallable(functions, "gerarMensagemIA");
 
 // ─── Helpers locais ───────────────────────────────────────────────────────────
 function iniciais(nome = "") {
@@ -40,21 +44,8 @@ function fmtData(iso) {
 }
 
 async function chamarIA(system, user) {
-  const r = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${import.meta.env.VITE_GEMINI_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: system }] },
-        contents: [{ role: "user", parts: [{ text: user }] }],
-        generationConfig: { maxOutputTokens: 600, temperature: 0.85 },
-      }),
-    }
-  );
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.error?.message || "Erro na IA");
-  return d.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  const result = await _gerarMensagemIA({ system, user });
+  return result.data.texto;
 }
 
 // ─── Wrapper de temperatura com normalização de case ─────────────────────────
