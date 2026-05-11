@@ -20,6 +20,8 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  MessageCircle,
+  MessageSquare,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
@@ -32,6 +34,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  setDoc,
   onSnapshot,
   serverTimestamp,
   runTransaction,
@@ -388,6 +391,45 @@ const CSS = `
   .detalhe-info-full {
     grid-column: 1 / -1;
   }
+  .btn-icon-wpp   { color: #25D366; }
+  .btn-icon-wpp:hover   { background: rgba(37,211,102,.12); border-color: rgba(37,211,102,.25); }
+
+  .btn-wpp-msg {
+    display: flex; align-items: center; gap: 7px;
+    padding: 8px 16px; border-radius: 9px;
+    background: var(--s3); color: var(--text-2);
+    border: 1px solid var(--border); cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px; font-weight: 500;
+    white-space: nowrap;
+    transition: all .13s;
+  }
+  .btn-wpp-msg:hover { background: rgba(37,211,102,.1); color: #25D366; border-color: rgba(37,211,102,.3); }
+
+  .wpp-atalhos {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
+  }
+  .wpp-atalho-chip {
+    padding: 4px 9px; border-radius: 5px; font-size: 11px; font-weight: 600;
+    background: rgba(37,211,102,0.1); color: #25D366;
+    border: 1px solid rgba(37,211,102,0.25);
+    cursor: pointer; transition: background .13s; font-family: 'DM Sans', sans-serif;
+    user-select: none;
+  }
+  .wpp-atalho-chip:hover { background: rgba(37,211,102,0.2); }
+
+  .wpp-preview {
+    background: var(--s2); border: 1px solid var(--border);
+    border-radius: 9px; padding: 12px 14px;
+    font-size: 12px; color: var(--text-2); line-height: 1.6;
+    min-height: 60px; white-space: pre-wrap; word-break: break-word;
+    margin-top: 10px;
+  }
+  .wpp-preview-label {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    color: var(--text-3); margin-bottom: 5px; letter-spacing: .07em;
+  }
+
   .detalhe-section-title {
     font-size: 11px; font-weight: 700; text-transform: uppercase;
     color: var(--text-2); margin-top: 16px; margin-bottom: 10px;
@@ -952,6 +994,139 @@ function ModalConfirmDelete({ conta, onConfirm, onClose }) {
 }
 
 /* ══════════════════════════════════════════════════
+   MODAL: Gerenciar Mensagem WhatsApp
+   ══════════════════════════════════════════════════ */
+function ModalMensagemWhatsapp({ onClose, tenantUid }) {
+  const MSG_PATH = `users/${tenantUid}/config/geral`;
+  const CAMPO    = "wppMensagemCobranca";
+  const DEFAULT  = "Olá [nome], tudo bem? Passando para lembrar que você possui um valor de [valor] com vencimento em [data] com [empresa]. Qualquer dúvida estamos à disposição!";
+
+  const [msg, setMsg]         = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const textareaRef           = useRef(null);
+
+  useEffect(() => {
+    if (!tenantUid) return;
+    getDoc(doc(db, MSG_PATH)).then(snap => {
+      if (snap.exists() && snap.data()[CAMPO]) {
+        setMsg(snap.data()[CAMPO]);
+      } else {
+        setMsg(DEFAULT);
+      }
+    }).catch(() => setMsg(DEFAULT)).finally(() => setLoading(false));
+  }, [tenantUid]);
+
+  const inserirAtalho = (atalho) => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const s = el.selectionStart;
+    const e = el.selectionEnd;
+    const nova = msg.slice(0, s) + atalho + msg.slice(e);
+    setMsg(nova);
+    setTimeout(() => {
+      el.focus();
+      el.setSelectionRange(s + atalho.length, s + atalho.length);
+    }, 0);
+  };
+
+  const handleSalvar = async () => {
+    if (!tenantUid) return;
+    setSalvando(true);
+    try {
+      await updateDoc(doc(db, MSG_PATH), { [CAMPO]: msg });
+    } catch (err) {
+      // doc pode não existir
+      try {
+        await setDoc(doc(db, MSG_PATH), { [CAMPO]: msg }, { merge: true });
+      } catch (err2) {
+        alert("Erro ao salvar mensagem.");
+      }
+    } finally {
+      setSalvando(false);
+      onClose();
+    }
+  };
+
+  const ATALHOS = [
+    { label: "[nome]",    desc: "Nome do cliente" },
+    { label: "[valor]",   desc: "Valor do registro" },
+    { label: "[data]",    desc: "Data de vencimento" },
+    { label: "[empresa]", desc: "Nome da empresa" },
+  ];
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box" style={{ maxWidth: 540 }}>
+        <div className="modal-header">
+          <div>
+            <div className="modal-title">Mensagem de Cobrança WhatsApp</div>
+            <div className="modal-sub">Configure o template enviado ao cliente</div>
+          </div>
+          <button className="modal-close" onClick={onClose}>
+            <X size={14} color="var(--text-2)" />
+          </button>
+        </div>
+
+        <div className="modal-body">
+          {loading ? (
+            <div style={{ color: "var(--text-2)", fontSize: 13 }}>Carregando...</div>
+          ) : (
+            <>
+              <div className="form-group">
+                <label className="form-label">Atalhos — clique para inserir</label>
+                <div className="wpp-atalhos">
+                  {ATALHOS.map(a => (
+                    <button
+                      key={a.label}
+                      className="wpp-atalho-chip"
+                      title={a.desc}
+                      onClick={() => inserirAtalho(a.label)}
+                    >
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 12 }}>
+                <label className="form-label">Mensagem</label>
+                <textarea
+                  ref={textareaRef}
+                  className="form-textarea"
+                  style={{ minHeight: 110 }}
+                  value={msg}
+                  onChange={e => setMsg(e.target.value)}
+                  placeholder="Digite a mensagem de cobrança..."
+                />
+              </div>
+
+              <div>
+                <div className="wpp-preview-label">Pré-visualização</div>
+                <div className="wpp-preview">
+                  {msg
+                    .replace(/\[nome\]/g, "João Silva")
+                    .replace(/\[valor\]/g, "R$ 350,00")
+                    .replace(/\[data\]/g, "15/05/2025")
+                    .replace(/\[empresa\]/g, "Minha Empresa") || <span style={{ opacity: .5 }}>Nenhuma mensagem</span>}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
+          <button className="btn-primary" onClick={handleSalvar} disabled={salvando || loading}>
+            {salvando ? "Salvando..." : "Salvar Mensagem"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════
    COMPONENTE PRINCIPAL: AReceber
    ══════════════════════════════════════════════════ */
 export default function AReceber() {
@@ -969,16 +1144,56 @@ export default function AReceber() {
   const podeEditarV  = podeEditar("aReceber");
   const podeExcluirV = podeExcluir("aReceber");
 
-  const [modalNovo, setModalNovo]   = useState(false);
-  const [editando, setEditando]     = useState(null);
-  const [deletando, setDeletando]   = useState(null);
-  const [pagamento, setPagamento]   = useState(null);
-  const [detalhes, setDetalhes]     = useState(null);
+  const [modalNovo, setModalNovo]         = useState(false);
+  const [editando, setEditando]           = useState(null);
+  const [deletando, setDeletando]         = useState(null);
+  const [pagamento, setPagamento]         = useState(null);
+  const [detalhes, setDetalhes]           = useState(null);
+  const [modalWppMsg, setModalWppMsg]     = useState(false);
+  const [nomeEmpresa, setNomeEmpresa]     = useState("");
 
   const toggleSort = (key) => {
     setSortDir(d => sortKey === key ? (d === "asc" ? "desc" : "asc") : "asc");
     setSortKey(key);
   };
+
+  /* ── WhatsApp cobrança ── */
+  const abrirWpp = useCallback(async (conta) => {
+    if (!tenantUid || !conta.clienteId) return;
+    try {
+      // Busca telefone do cliente
+      const clienteSnap = await getDoc(doc(db, "users", tenantUid, "clientes", conta.clienteId));
+      if (!clienteSnap.exists()) { alert("Cliente não encontrado."); return; }
+      const telefone = (clienteSnap.data().telefone || clienteSnap.data().celular || "").replace(/\D/g, "");
+      if (!telefone) { alert("Cliente sem telefone cadastrado."); return; }
+
+      // Busca template
+      const cfgSnap = await getDoc(doc(db, "users", tenantUid, "config", "geral"));
+      const template = (cfgSnap.exists() && cfgSnap.data().wppMensagemCobranca)
+        ? cfgSnap.data().wppMensagemCobranca
+        : "Olá [nome], você possui um valor de [valor] com vencimento em [data] com [empresa].";
+
+      const texto = template
+        .replace(/\[nome\]/g,    conta.clienteNome || "")
+        .replace(/\[valor\]/g,   fmtR$(conta.valorRestante))
+        .replace(/\[data\]/g,    fmtData(conta.dataVencimento))
+        .replace(/\[empresa\]/g, nomeEmpresa || cfgSnap.data()?.nomeEmpresa || "");
+
+      const url = `https://wa.me/55${telefone}?text=${encodeURIComponent(texto)}`;
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      fsError(err, "AReceber:abrirWpp");
+      alert("Erro ao gerar link do WhatsApp.");
+    }
+  }, [tenantUid, nomeEmpresa]);
+
+  /* ── nomeEmpresa ── */
+  useEffect(() => {
+    if (!tenantUid) return;
+    getDoc(doc(db, "users", tenantUid, "config", "geral")).then(snap => {
+      if (snap.exists()) setNomeEmpresa(snap.data().nomeEmpresa || "");
+    }).catch(() => {});
+  }, [tenantUid]);
 
   /* ── Firestore — listener em tempo real ── */
   useEffect(() => {
@@ -1221,6 +1436,9 @@ export default function AReceber() {
         {podeCriarV && <button className="btn-novo-ar" onClick={() => setModalNovo(true)}>
           <Plus size={14} /> Nova Conta
         </button>}
+        <button className="btn-wpp-msg" onClick={() => setModalWppMsg(true)}>
+          <MessageSquare size={14} /> Mensagem WhatsApp
+        </button>
       </header>
 
       <div className="ag-content">
@@ -1307,6 +1525,15 @@ export default function AReceber() {
                   </span>
                   <StatusBadge status={statusCalc} />
                   <div className="ar-actions" onClick={e => e.stopPropagation()}>
+                    {c.clienteId && statusCalc !== "pago" && (
+                      <button
+                        className="btn-icon btn-icon-wpp"
+                        title="Enviar cobrança WhatsApp"
+                        onClick={() => abrirWpp(c)}
+                      >
+                        <MessageCircle size={13} />
+                      </button>
+                    )}
                     {statusCalc !== "pago" && (
                       <button
                         className="btn-icon btn-icon-pay"
@@ -1369,6 +1596,12 @@ export default function AReceber() {
         <ModalDetalhes
           conta={detalhes}
           onClose={() => setDetalhes(null)}
+        />
+      )}
+      {modalWppMsg && (
+        <ModalMensagemWhatsapp
+          tenantUid={tenantUid}
+          onClose={() => setModalWppMsg(false)}
         />
       )}
     </>
