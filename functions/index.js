@@ -26,6 +26,7 @@ const STRIPE_TEST_SECRET_KEY = defineSecret("STRIPE_TEST_SECRET_KEY");
 const STRIPE_TEST_WEBHOOK    = defineSecret("STRIPE_TEST_WEBHOOK_SECRET");
 const MAIL_USER              = defineSecret("MAIL_USER");
 const MAIL_PASS              = defineSecret("MAIL_PASS");
+const GEMINI_KEY             = defineSecret("GEMINI_KEY");
 
 /* URL do webhook MP — definida aqui para evitar uso antes da declaração */
 const WEBHOOK_URL = "https://us-central1-assent-2b945.cloudfunctions.net/mpWebhook";
@@ -2065,6 +2066,49 @@ exports.atualizarPlano = onCall(ADMIN_CALL_OPTIONS, async (request) => {
 
   throw new HttpsError("invalid-argument", `Action desconhecida: ${action}`);
 });
+
+/* ═══════════════════════════════════════════════════
+   GEMINI AI PROXY — gerarMensagemIA
+   A key fica no Secret Manager; nunca vai ao frontend.
+   Só usuários autenticados com App Check válido chamam.
+   ═══════════════════════════════════════════════════ */
+exports.gerarMensagemIA = onCall(
+  { ...CALL_OPTIONS, secrets: [GEMINI_KEY] },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Autenticação necessária.");
+    }
+
+    const { system, user } = request.data || {};
+    if (!system || !user || typeof system !== "string" || typeof user !== "string") {
+      throw new HttpsError("invalid-argument", "Campos 'system' e 'user' são obrigatórios.");
+    }
+    if (system.length > 2000 || user.length > 2000) {
+      throw new HttpsError("invalid-argument", "Prompt excede o limite de 2000 caracteres.");
+    }
+
+    const key = GEMINI_KEY.value();
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`;
+
+    const resp = await fetch(url, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: system }] },
+        contents:           [{ role: "user", parts: [{ text: user }] }],
+        generationConfig:   { maxOutputTokens: 600, temperature: 0.85 },
+      }),
+    });
+
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new HttpsError("internal", data.error?.message || "Erro na API Gemini.");
+    }
+
+    const texto = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    return { texto };
+  }
+);
 
 /* ─── Exporta funções de notificacoes ─── */
 module.exports = {
