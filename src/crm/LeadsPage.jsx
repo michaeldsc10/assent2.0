@@ -61,8 +61,8 @@ async function chamarIA(system, user) {
 // O status pode chegar capitalizado do Cloud Function ("Novo") ou em
 // minúsculas do select manual ("novo"). Normalizamos antes de pontuar.
 function tempLead(lead) {
-  const st = (lead.status || "");
-  const normalizado = st.charAt(0).toUpperCase() + st.slice(1).toLowerCase();
+  if (!lead.status) return "frio";
+  const normalizado = lead.status.charAt(0).toUpperCase() + lead.status.slice(1).toLowerCase();
   return calcularTemperaturaLead({ ...lead, status: normalizado });
 }
 

@@ -15,7 +15,10 @@ const MESES_ABREV = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out"
 function toDate(val) {
   if (!val) return null;
   if (val?.toDate) return val.toDate();                        // Firestore Timestamp
-  if (typeof val === "string") return new Date(val + "T12:00:00"); // YYYY-MM-DD string
+  if (typeof val === "string") {                                    // YYYY-MM-DD string
+    const [y, m, d] = val.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
   return new Date(val);
 }
 

@@ -99,7 +99,7 @@ function calcularScoreChurn(clientes = [], vendas = [], radar = RADAR_PADRAO) {
     const totalGasto = vendasCliente.reduce(
       (acc, v) => acc + (v.total ?? v.custoTotal ?? 0), 0
     );
-    const ticketMedio = Math.round(totalGasto / vendasCliente.length);
+    const ticketMedio = vendasCliente.length > 0 ? Math.round(totalGasto / vendasCliente.length) : 0;
 
     const contagem = {};
     vendasCliente.forEach((v) =>
@@ -108,8 +108,8 @@ function calcularScoreChurn(clientes = [], vendas = [], radar = RADAR_PADRAO) {
         contagem[nomeProduto] = (contagem[nomeProduto] || 0) + 1;
       })
     );
-    const [produtoFavorito] =
-      Object.entries(contagem).sort((a, b) => b[1] - a[1])[0] || [];
+    const produtoFavorito =
+      Object.entries(contagem).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
     const mult = (frequenciaMedia && frequenciaMedia > 0) ? diasAusente / frequenciaMedia : null;
     let risco = "baixo";
