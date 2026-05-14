@@ -502,7 +502,7 @@ function ModalFormEvento({ evento, onSave, onClose, categorias = [] }) {
 
   const [form, setForm] = useState({
     titulo:      evento?.titulo      || "",
-    tipo:        evento?.tipo        || "Reunião",
+    tipo:        evento?.tipo        || listaTipos(categorias)[0] || "Reunião",
     data:        evento?.data        || todayISO(),
     horario:     evento?.horario     || "",
     cliente:     evento?.cliente     || "",
@@ -579,7 +579,7 @@ function ModalFormEvento({ evento, onSave, onClose, categorias = [] }) {
           {/* Tipo + Data + Horário */}
           <div className="form-row-3">
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Tipo</label>
+              <label className="form-label">Categoria</label>
               <select
                 className="form-input"
                 value={form.tipo}
@@ -1141,6 +1141,7 @@ export default function Agenda({ isPro = false }) {
             <AgendaLista
               eventos={eventosFiltrados}
               loading={loading}
+              categorias={categorias}
               onVerDetalhes={setDetalhes}
               onEditar={setFormEvt}
               onConcluir={handleConcluir}
