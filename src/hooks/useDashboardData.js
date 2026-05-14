@@ -192,35 +192,43 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
       : vendas;
 
     /* ── Receita & Vendas ── */
-    // Caixa: só soma o que foi efetivamente recebido (total - restante a receber)
+    // Mapa: referenciaId → valorTotal original do a_receber vinculado à venda
+    // Usado para saber quanto foi para a_receber (e não contar duas vezes)
+    const arPorVenda = {};
+    aReceber
+      .filter((r) => r.origem === "venda" && r.referenciaId)
+      .forEach((r) => {
+        arPorVenda[r.referenciaId] = (arPorVenda[r.referenciaId] || 0) + (Number(r.valorTotal) || 0);
+      });
+
+    // Caixa: só conta o que foi pago NO ATO da venda (total - o que foi para a_receber)
+    // Pagamentos posteriores via a_receber são contados abaixo por data de recebimento
     const receitaVendas = vendasPeriodo.reduce((s, v) => {
-      const total    = Number(v.total) || 0;
-      const restante = Number(v.valorRestante) || 0;
-      return s + (total - restante);
+      const total   = Number(v.total) || 0;
+      const arTotal = arPorVenda[v.id] || 0;
+      return s + Math.max(0, total - arTotal);
     }, 0);
 
-    /* Receitas manuais do a_receber (não vinculadas a vendas) — regime de caixa */
-    const receitaAReceberManual = aReceber
-      .filter((r) => r.origem !== "venda")
-      .reduce((s, r) => {
-        /* Com histórico: soma cada entrada individualmente pelo período */
-        if (Array.isArray(r.historicoPagamentos) && r.historicoPagamentos.length > 0) {
-          return s + r.historicoPagamentos.reduce((acc, p) => {
-            const dt = toDate(p.data);
-            if (!dt) return acc;
-            if (periodStart && (dt < periodStart || dt > periodEnd)) return acc;
-            return acc + Number(p.valor || 0);
-          }, 0);
-        }
-        /* Legado: sem histórico — filtra pela data do pagamento */
-        if (Number(r.valorPago || 0) <= 0) return s;
-        const dt = toDate(r.dataPagamento) || toDate(r.dataCriacao);
-        if (!dt) return s;
-        if (periodStart && (dt < periodStart || dt > periodEnd)) return s;
-        return s + Number(r.valorPago || 0);
-      }, 0);
+    /* Receitas do a_receber — TODOS os tipos (manual e venda) — regime de caixa por data de recebimento */
+    const receitaAReceber = aReceber.reduce((s, r) => {
+      /* Com histórico: soma cada entrada individualmente pelo período */
+      if (Array.isArray(r.historicoPagamentos) && r.historicoPagamentos.length > 0) {
+        return s + r.historicoPagamentos.reduce((acc, p) => {
+          const dt = toDate(p.data);
+          if (!dt) return acc;
+          if (periodStart && (dt < periodStart || dt > periodEnd)) return acc;
+          return acc + Number(p.valor || 0);
+        }, 0);
+      }
+      /* Legado: sem histórico — filtra pela data do pagamento */
+      if (Number(r.valorPago || 0) <= 0) return s;
+      const dt = toDate(r.dataPagamento) || toDate(r.dataCriacao);
+      if (!dt) return s;
+      if (periodStart && (dt < periodStart || dt > periodEnd)) return s;
+      return s + Number(r.valorPago || 0);
+    }, 0);
 
-    const receitaBruta = receitaVendas + receitaAReceberManual;
+    const receitaBruta = receitaVendas + receitaAReceber;
     const numVendas   = vendasPeriodo.length;
     const ticketMedio = numVendas > 0 ? receitaBruta / numVendas : 0;
 
