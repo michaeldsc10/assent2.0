@@ -1418,9 +1418,8 @@ function RelatorioDRE({ vendas, despesas, caixa = [], vendedores = [], aReceber 
     /* Receita real recebida no período */
     const receitaCaixa   = caixaVendas.reduce((s, c) => s + Number(c.valor || 0), 0);
     const receitaLegados = vendasLegadas.reduce((s, v) => s + Number(v.total || 0), 0);
-    /* Receitas manuais do a_receber (não vinculadas a vendas) — regime de caixa */
+    /* Receitas do a_receber — todos os tipos — regime de caixa por data de recebimento */
     const receitaAReceber = aReceber
-      .filter((r) => r.origem !== "venda")
       .reduce((s, r) => {
         if (Array.isArray(r.historicoPagamentos) && r.historicoPagamentos.length > 0) {
           return s + r.historicoPagamentos.reduce((acc, p) => {
@@ -1744,9 +1743,8 @@ function RelatorioFinanceiro({ caixa, despesas, vendas = [], vendedores = [], aR
     );
     const _valDesp = (d) => d.status === "parcial" ? Number(d.valorPago || 0) : Number(d.valor || 0);
 
-    /* aReceber manuais: cada entrada do histórico é uma transação independente */
+    /* aReceber: cada entrada do histórico é uma transação independente */
     const aReceberManuais = aReceber
-      .filter((r) => r.origem !== "venda")
       .flatMap((r) => {
         if (Array.isArray(r.historicoPagamentos) && r.historicoPagamentos.length > 0) {
           return r.historicoPagamentos
