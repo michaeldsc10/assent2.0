@@ -5,11 +5,11 @@
 
 import { memo } from "react";
 import { CheckCircle2, Edit2, Trash2 } from "lucide-react";
-import { TIPO_ESTILO, fmtData } from "./Agenda";
+import { resolverEstiloTipo, fmtData } from "./Agenda";
 
 /* ── Badge de tipo ── */
-function TipoBadge({ tipo }) {
-  const estilo = TIPO_ESTILO[tipo] || TIPO_ESTILO["Outro"];
+function TipoBadge({ tipo, categorias }) {
+  const estilo = resolverEstiloTipo(tipo, categorias);
   return (
     <span
       className="ag-badge"
@@ -21,13 +21,13 @@ function TipoBadge({ tipo }) {
 }
 
 /* ── Linha de evento ── */
-const EventoRow = memo(function EventoRow({ evento, onVerDetalhes, onEditar, onConcluir, onExcluir }) {
+const EventoRow = memo(function EventoRow({ evento, categorias, onVerDetalhes, onEditar, onConcluir, onExcluir }) {
   const concluido = evento.status === "concluido";
 
   return (
     <div className={`ag-row ${concluido ? "concluido" : ""}`}>
       {/* Tipo */}
-      <TipoBadge tipo={evento.tipo} />
+      <TipoBadge tipo={evento.tipo} categorias={categorias} />
 
       {/* Horário */}
       <span className="ag-horario">{evento.horario || "—"}</span>
@@ -86,7 +86,7 @@ const EventoRow = memo(function EventoRow({ evento, onVerDetalhes, onEditar, onC
 /* ══════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL — AgendaLista
    ══════════════════════════════════════════════════════ */
-export default function AgendaLista({ eventos, loading, onVerDetalhes, onEditar, onConcluir, onExcluir }) {
+export default function AgendaLista({ eventos, loading, categorias = [], onVerDetalhes, onEditar, onConcluir, onExcluir }) {
   return (
     <div className="ag-lista-wrap">
       <div className="ag-lista-header">
@@ -119,6 +119,7 @@ export default function AgendaLista({ eventos, loading, onVerDetalhes, onEditar,
           <EventoRow
             key={ev.id}
             evento={ev}
+            categorias={categorias}
             onVerDetalhes={onVerDetalhes}
             onEditar={onEditar}
             onConcluir={onConcluir}
