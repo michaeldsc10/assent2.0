@@ -582,22 +582,24 @@ export function gerarMensagemTemplate(insight, empresaNome, variacaoIdx = 0) {
   const nome1   = (insight.cliente || "você").split(" ")[0];
   const produto = insight.produtoFavorito || null;
   const servico = insight.servico || null;
+  const empresa = empresaNome || null;
+  const abre    = empresa ? `Oi ${nome1}! Aqui é da ${empresa}.` : `Oi ${nome1}!`;
 
   if (insight.tipo === "risco") {
     const templates = produto
       ? [
-          `Oi ${nome1}! Lembrei de você organizando a agenda aqui. Já faz um tempo que não te vejo — quando dá pra passar?`,
-          `Ei ${nome1}! Tava vendo aqui e senti sua falta. Aquele(a) ${produto} tá precisando de você! Quando aparece?`,
-          `Oi ${nome1}! Passando rapidinho pra dar um oi. Como tá? Quando a gente consegue marcar?`,
-          `Oi ${nome1}! Você sumiu! Tudo certo por aí? Quando passa por aqui de novo?`,
-          `Oi ${nome1}! Lembrei de você agora. Já na hora de um novo ${produto}? Quando posso te esperar?`,
+          `${abre} Faz um tempo que você não passa — ainda precisando de ${produto}? Tenho horário essa semana, é só me falar.`,
+          `Oi ${nome1}! Você sumiu, Tava vendo a agenda aqui e lembrei de você. Quando quer marcar o próximo ${produto}?`,
+          `${abre} Sumiu! Tudo bem por aí? Quando quiser retomar o ${produto} é só me chamar, encaixo você rapidinho.`,
+          `Oi ${nome1}! Faz um tempo hein — tá fazendo ${produto} em outro lugar? Me fala que vejo o que consigo fazer por você.`,
+          `${abre} Você tá sumido(a)! Ainda precisando de ${produto}? Agenda essa semana tá boa — quando quer marcar?`,
         ]
       : [
-          `Oi ${nome1}! Lembrei de você organizando a agenda aqui. Faz um tempo que não te vejo — tudo bem?`,
-          `Ei ${nome1}! Passando pra dar um oi. Você sumiu! Como tão as coisas? Quando a gente se vê?`,
-          `Oi ${nome1}! Tava vendo minha lista e senti sua falta. Quando consegue aparecer por aqui?`,
-          `Oi ${nome1}! Tudo bem com você? Faz um tempão — quando a gente consegue marcar algo?`,
-          `Oi ${nome1}! Passando rapidinho. Como tá? Quando consigo te ver por aqui de novo?`,
+          `${abre} Faz um tempo que você não passa por aqui — tudo bem? Quando quer marcar algo?`,
+          `Oi ${nome1}! Você sumiu! Tava vendo a agenda e lembrei de você. Quando a gente consegue marcar?`,
+          `${abre} Tá sumido(a)! Tudo certo por aí? Se precisar de qualquer coisa é só me chamar, tenho horário essa semana.`,
+          `Oi ${nome1}! Faz um tempão que não te vejo — tudo bem? Quando quer passar aqui?`,
+          `${abre} Sumiu! Sentimos sua falta. Quando quer voltar? Agenda essa semana ainda tem bons horários.`,
         ];
     return templates[variacaoIdx % templates.length];
   }
@@ -605,18 +607,18 @@ export function gerarMensagemTemplate(insight, empresaNome, variacaoIdx = 0) {
   if (insight.tipo === "oportunidade") {
     const templates = servico && produto
       ? [
-          `Oi ${nome1}! Quem faz ${produto} direitinho costuma amar o(a) ${servico} — pode ser o próximo passo certo pra você. Quer saber mais?`,
-          `Oi ${nome1}! Tenho uma novidade que combina perfeitamente com o que você já faz aqui. Posso te contar rapidinho?`,
-          `Oi ${nome1}! Pensando no seu trabalho com ${produto}, acho que o(a) ${servico} pode levar os resultados ainda mais longe. Quando conversa?`,
-          `Oi ${nome1}! Uma coisa que quero muito te mostrar: o(a) ${servico}. Complementa demais o que você já faz. Posso te explicar?`,
+          `Oi ${nome1}! Você já faz ${produto} aqui — queria te mostrar o(a) ${servico} que complementa muito. Posso te explicar rapidinho?`,
+          `${abre} Tenho uma novidade que acho que combina demais com quem já faz ${produto}. É o(a) ${servico} — posso te contar mais?`,
+          `Oi ${nome1}! Quem já faz ${produto} costuma amar o(a) ${servico}. Você já pensou nisso? Vale muito a pena, posso te explicar.`,
+          `${abre} Tem algo novo aqui que acho que vai te interessar: o(a) ${servico}. Complementa perfeitamente o ${produto} que você já faz. Quando conversa?`,
         ]
       : [
-          `Oi ${nome1}! Tenho uma novidade que acho que vai te interessar. Posso te contar rapidinho?`,
-          `Oi ${nome1}! Lembrei de você quando vi algo que combina muito com o que você já faz por aqui. Quando conversa?`,
-          `Oi ${nome1}! Tenho algo novo que pode ser o próximo passo natural pra você. Quer saber?`,
+          `${abre} Tenho uma novidade aqui que acho que vai te interessar. Posso te contar rapidinho?`,
+          `Oi ${nome1}! Lembrei de você quando surgiu uma coisa nova aqui que combina muito com o que você já faz. Quando conversa?`,
+          `${abre} Tenho algo que acho que é o próximo passo natural pra você. Posso te explicar rapidinho?`,
         ];
     return templates[variacaoIdx % templates.length];
   }
 
-  return `Oi ${nome1}! Passando pra dar um oi. Como você tá?`;
+  return `${abre} Passando pra dar um oi — tudo bem com você?`;
 }
