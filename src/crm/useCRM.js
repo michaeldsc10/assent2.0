@@ -10,16 +10,14 @@ import {
 import { db } from "../lib/firebase";
 
 // ─── Configuração padrão do Radar ────────────────────────────────────────────
-// Salva em dadosCRM/{empresaId} → radar
-// Sobrescrito pelo usuário via Configurações → Configurar Radar.
 export const RADAR_PADRAO = {
-  diasMedio: 15,   // dias ausente → risco médio  (sem histórico de frequência)
-  diasAlto:  30,   // dias ausente → risco alto   (sem histórico de frequência)
-  multMedio: 1.5,  // mult. da freq. média → risco médio
-  multAlto:  2.5,  // mult. da freq. média → risco alto
+  diasMedio: 15,
+  diasAlto:  30,
+  multMedio: 1.5,
+  multAlto:  2.5,
 };
 
-// ─── Helper: converte Timestamp do Firestore ou string para Date ──────────────
+// ─── Helper: converte Timestamp ou string para Date ───────────────────────────
 function toDate(val) {
   if (!val) return null;
   if (val?.toDate) return val.toDate();
@@ -30,7 +28,7 @@ function toDate(val) {
 // ─── Helper: compara nome do cliente com tolerância a nomes parciais ──────────
 function matchNomeCliente(vendaCliente = "", clienteNome = "") {
   const a = (vendaCliente || "").trim().toLowerCase();
-  const b = (clienteNome || "").trim().toLowerCase();
+  const b = (clienteNome  || "").trim().toLowerCase();
   if (!a || !b) return false;
   return a === b || b.startsWith(a) || a.startsWith(b);
 }
@@ -46,7 +44,6 @@ function chaveCliente(clienteId, clienteNome) {
 }
 
 // ─── Ignorar cliente ──────────────────────────────────────────────────────────
-// Caminho: dadosCRM/{empresaId}/ignore/{chaveCliente}
 export async function ignorarCliente(empresaId, cliente) {
   const chave = chaveCliente(cliente.id, cliente.nome);
   await setDoc(doc(db, "dadosCRM", empresaId, "ignore", chave), {
@@ -80,7 +77,7 @@ function calcularScoreChurn(clientes = [], vendas = [], radar = RADAR_PADRAO) {
       return { ...cliente, _semVendas: true, risco: "indefinido" };
     }
 
-    const ultima = vendasCliente[vendasCliente.length - 1];
+    const ultima     = vendasCliente[vendasCliente.length - 1];
     const diasAusente = Math.floor((hoje - ultima._data) / 86400000);
 
     let frequenciaMedia = null;
@@ -96,9 +93,7 @@ function calcularScoreChurn(clientes = [], vendas = [], radar = RADAR_PADRAO) {
       );
     }
 
-    const totalGasto = vendasCliente.reduce(
-      (acc, v) => acc + (v.total ?? v.custoTotal ?? 0), 0
-    );
+    const totalGasto  = vendasCliente.reduce((acc, v) => acc + (v.total ?? v.custoTotal ?? 0), 0);
     const ticketMedio = vendasCliente.length > 0 ? Math.round(totalGasto / vendasCliente.length) : 0;
 
     const contagem = {};
@@ -112,12 +107,12 @@ function calcularScoreChurn(clientes = [], vendas = [], radar = RADAR_PADRAO) {
       Object.entries(contagem).sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 
     const mult = (frequenciaMedia && frequenciaMedia > 0) ? diasAusente / frequenciaMedia : null;
-    let risco = "baixo";
+    let risco  = "baixo";
     if (mult !== null) {
-      if (mult > multAlto)  risco = "alto";
+      if (mult > multAlto)   risco = "alto";
       else if (mult > multMedio) risco = "medio";
     } else {
-      if (diasAusente > diasAlto)  risco = "alto";
+      if (diasAusente > diasAlto)   risco = "alto";
       else if (diasAusente > diasMedio) risco = "medio";
     }
 
@@ -200,6 +195,7 @@ function gerarInsights(clientesComScore, vendas = [], servicos = [], ignorados =
         servico: naoComprado.nome,
         preco: naoComprado.preco,
         ticketMedio: c.ticketMedio,
+        produtoFavorito: c.produtoFavorito,
         descricao: `Sempre contrata ${catFav}, mas nunca experimentou "${naoComprado.nome}". Potencial: +R$ ${naoComprado.preco}.`,
       });
     }
@@ -208,28 +204,24 @@ function gerarInsights(clientesComScore, vendas = [], servicos = [], ignorados =
   return insights.sort((a, b) => a.prioridade - b.prioridade);
 }
 
-
 // ─── Diagnóstico do momento da empresa ───────────────────────────────────────
-// Detecta em qual fase o negócio está com base nos dados reais.
-// Retorna um objeto `momento` que filtra quais insights são relevantes.
 export function diagnosticarMomento(clientesComScore, vendas = []) {
   const hoje      = new Date();
   const comVendas = clientesComScore.filter(c => !c._semVendas);
   const semVendas = clientesComScore.filter(c => c._semVendas);
 
-  const v7d  = vendas.filter(v => { try { return (hoje - (v.data?.toDate ? v.data.toDate() : new Date(v.data))) < 7*86400000; } catch { return false; } });
+  const v7d  = vendas.filter(v => { try { return (hoje - (v.data?.toDate ? v.data.toDate() : new Date(v.data))) < 7*86400000;  } catch { return false; } });
   const v30d = vendas.filter(v => { try { return (hoje - (v.data?.toDate ? v.data.toDate() : new Date(v.data))) < 30*86400000; } catch { return false; } });
   const v90d = vendas.filter(v => { try { return (hoje - (v.data?.toDate ? v.data.toDate() : new Date(v.data))) < 90*86400000; } catch { return false; } });
 
-  const emRisco    = comVendas.filter(c => c.risco === "alto" || c.risco === "medio");
-  const fieis      = comVendas.filter(c => c.risco === "baixo" && c.totalCompras >= 2);
-  const novos      = comVendas.filter(c => c.totalCompras === 1);
-  const dormentes  = comVendas.filter(c => c.diasAusente > 60);
+  const emRisco   = comVendas.filter(c => c.risco === "alto" || c.risco === "medio");
+  const fieis     = comVendas.filter(c => c.risco === "baixo" && c.totalCompras >= 2);
+  const novos     = comVendas.filter(c => c.totalCompras === 1);
+  const dormentes = comVendas.filter(c => c.diasAusente > 60);
 
   const receitaV30 = v30d.reduce((a, v) => a + (v.total ?? v.custoTotal ?? 0), 0);
   const receitaV90 = v90d.reduce((a, v) => a + (v.total ?? v.custoTotal ?? 0), 0);
 
-  // Contagem de serviços mais vendidos
   const contagemServicos = {};
   vendas.forEach(v => (v.itens || []).forEach(i => {
     const nome = i.nome || i.produto;
@@ -241,54 +233,22 @@ export function diagnosticarMomento(clientesComScore, vendas = []) {
     ? Math.round(comVendas.reduce((a, c) => a + (c.ticketMedio || 0), 0) / comVendas.length)
     : 0;
 
-  // Classificação do momento
   let fase;
-  if (comVendas.length === 0) {
-    fase = "base_vazia";
-  } else if (comVendas.length < 5) {
-    fase = "construcao";
-  } else if (emRisco.length > comVendas.length * 0.4) {
-    fase = "retencao_critica";
-  } else if (v30d.length === 0 && comVendas.length >= 3) {
-    fase = "estagnado";
-  } else if (comVendas.length >= 10 && receitaV30 >= 1000) {
-    fase = "escalonando";
-  } else {
-    fase = "crescendo";
-  }
+  if (comVendas.length === 0)                              fase = "base_vazia";
+  else if (comVendas.length < 5)                           fase = "construcao";
+  else if (emRisco.length > comVendas.length * 0.4)        fase = "retencao_critica";
+  else if (v30d.length === 0 && comVendas.length >= 3)     fase = "estagnado";
+  else if (comVendas.length >= 10 && receitaV30 >= 1000)   fase = "escalonando";
+  else                                                      fase = "crescendo";
 
-  // Nomes dos clientes sem compra (semVendas) — primeiros nomes para personalização
-  const nomesContatos = semVendas
-    .slice(0, 3)
-    .map(c => c.nome?.split(" ")[0])
-    .filter(Boolean);
-
-  // Nomes dos clientes em risco — para citar no diagnóstico
-  const nomesEmRisco = emRisco
-    .slice(0, 3)
-    .map(c => c.nome?.split(" ")[0])
-    .filter(Boolean);
-
-  // Nomes dos dormentes
-  const nomesDormentes = dormentes
-    .slice(0, 2)
-    .map(c => c.nome?.split(" ")[0])
-    .filter(Boolean);
-
-  // Nomes dos novos (1 compra)
-  const nomesNovos = novos
-    .slice(0, 3)
-    .map(c => c.nome?.split(" ")[0])
-    .filter(Boolean);
-
-  // Maior tempo ausente entre os em risco
-  const maxDiasRisco = emRisco.length
-    ? Math.max(...emRisco.map(c => c.diasAusente || 0))
-    : 0;
+  const nomesContatos  = semVendas.slice(0, 3).map(c => c.nome?.split(" ")[0]).filter(Boolean);
+  const nomesEmRisco   = emRisco.slice(0, 3).map(c => c.nome?.split(" ")[0]).filter(Boolean);
+  const nomesDormentes = dormentes.slice(0, 2).map(c => c.nome?.split(" ")[0]).filter(Boolean);
+  const nomesNovos     = novos.slice(0, 3).map(c => c.nome?.split(" ")[0]).filter(Boolean);
+  const maxDiasRisco   = emRisco.length ? Math.max(...emRisco.map(c => c.diasAusente || 0)) : 0;
 
   return {
     fase,
-    // métricas para uso nos insights
     totalClientes: comVendas.length,
     semVendas: semVendas.length,
     emRisco: emRisco.length,
@@ -304,7 +264,6 @@ export function diagnosticarMomento(clientesComScore, vendas = []) {
     v7dLength: v7d.length,
     v30dLength: v30d.length,
     taxaRisco: comVendas.length ? emRisco.length / comVendas.length : 0,
-    // dados ricos para personalização
     nomesContatos,
     nomesEmRisco,
     nomesDormentes,
@@ -314,18 +273,7 @@ export function diagnosticarMomento(clientesComScore, vendas = []) {
 }
 
 // ─── Banco de insights de crescimento ────────────────────────────────────────
-// Cada insight tem:
-//   fases[]     — em quais fases do negócio ele é relevante
-//   quando(m)   — condição adicional baseada nas métricas do momento
-//   titulo(m)   — título curto, factual, com dados reais
-//   diagnostico(m) — o problema ou oportunidade em 1 frase
-//   recomendacao(m) — ação concreta em 1-2 frases
-//   metrica(m)  — { valor, label } — o número que ancora o card
-//   categoria   — agrupamento visual
-
 const BANCO_INSIGHTS_CRESCIMENTO = [
-
-  // ── BASE VAZIA / CONSTRUÇÃO ───────────────────────────────────────────────
   {
     id: "igr-indicacao-fieis",
     fases: ["crescendo", "construcao", "escalonando"],
@@ -371,8 +319,6 @@ const BANCO_INSIGHTS_CRESCIMENTO = [
     diagnostico: (m) => `Você teve ${m.v30dLength} venda${m.v30dLength > 1 ? "s" : ""} no mês mas a semana está parada. Reativar quem já comprou custa 5× menos do que captar novo cliente.`,
     recomendacao: (m) => `Selecione ${m.nomesNovos?.length ? `${m.nomesNovos.slice(0,2).join(", ")} e mais 1 cliente` : "3 clientes"} com compra recente e envie uma mensagem hoje. Não precisa de oferta — uma mensagem de acompanhamento já reabre o canal.`,
   },
-
-  // ── RETENÇÃO CRÍTICA ──────────────────────────────────────────────────────
   {
     id: "igr-retencao-critica",
     fases: ["retencao_critica"],
@@ -393,8 +339,6 @@ const BANCO_INSIGHTS_CRESCIMENTO = [
     diagnostico: (m) => `${m.nomesDormentes?.length ? `${m.nomesDormentes.join(", ")} ${m.dormentes > m.nomesDormentes.length ? `e outros ${m.dormentes - m.nomesDormentes.length}` : ""} estão` : `${m.dormentes} clientes estão`} há mais de 60 dias sem comprar — raramente voltam por conta própria, mas respondem bem a contato direto personalizado.`,
     recomendacao: (m) => `Uma campanha de reativação focada em "você sumiu" — com algo de novo para mostrar ${m.topServico ? `como "${m.topServico}"` : ""} — costuma trazer 15–25% de volta no primeiro mês.`,
   },
-
-  // ── CRESCIMENTO / CONSOLIDAÇÃO ────────────────────────────────────────────
   {
     id: "igr-segunda-compra",
     fases: ["construcao", "crescendo"],
@@ -435,8 +379,6 @@ const BANCO_INSIGHTS_CRESCIMENTO = [
     diagnostico: (m) => `Com R$ ${m.receitaV30.toLocaleString("pt-BR")} gerados no mês e base fidelizada, você tem dados suficientes para criar um público similar e testar campanhas com baixo risco.`,
     recomendacao: () => `R$ 300–500 em Meta Ads segmentados por interesses do seu público já geram aprendizado de campanha. Sem base consolidada, o investimento em tráfego é prematuro.`,
   },
-
-  // ── ESCALONAMENTO ─────────────────────────────────────────────────────────
   {
     id: "igr-escala-processos",
     fases: ["escalonando"],
@@ -444,7 +386,8 @@ const BANCO_INSIGHTS_CRESCIMENTO = [
     quando: (m) => m.totalClientes >= 10,
     metrica: (m) => ({ valor: m.totalClientes, label: "clientes na base" }),
     titulo: () => "Volume exige processos — antes de crescer mais",
-    diagnostico: (m) => `Com ${m.totalClientes} clientes, o gargalo muda de captação para operação. Negócios que crescem sem estrutura de atendimento perdem qualidade e aumentam o churn sem perceber.`,    recomendacao: () => `Documente o fluxo de atendimento, automatize confirmações e padronize a entrega. Processos permitem escalar sem depender da sua memória.`,
+    diagnostico: (m) => `Com ${m.totalClientes} clientes, o gargalo muda de captação para operação. Negócios que crescem sem estrutura de atendimento perdem qualidade e aumentam o churn sem perceber.`,
+    recomendacao: () => `Documente o fluxo de atendimento, automatize confirmações e padronize a entrega. Processos permitem escalar sem depender da sua memória.`,
   },
   {
     id: "igr-prova-social",
@@ -469,12 +412,12 @@ export function gerarInsightsCrescimento(clientesComScore, vendas = [], servicos
       catch { return false; }
     })
     .map(ins => ({
-      id:            ins.id,
-      categoria:     ins.categoria,
-      metrica:       ins.metrica(momento),
-      titulo:        ins.titulo(momento),
-      diagnostico:   ins.diagnostico(momento),
-      recomendacao:  ins.recomendacao(momento),
+      id:           ins.id,
+      categoria:    ins.categoria,
+      metrica:      ins.metrica(momento),
+      titulo:       ins.titulo(momento),
+      diagnostico:  ins.diagnostico(momento),
+      recomendacao: ins.recomendacao(momento),
     }));
 
   return { momento, ativos };
@@ -482,16 +425,16 @@ export function gerarInsightsCrescimento(clientesComScore, vendas = [], servicos
 
 // ─── Métricas do painel ───────────────────────────────────────────────────────
 function calcularMetricas(clientesComScore, vendas = []) {
-  const hoje = new Date();
+  const hoje      = new Date();
   const trintaDias = new Date(hoje - 30 * 86400000);
-  const com = clientesComScore.filter((c) => !c._semVendas);
+  const com       = clientesComScore.filter((c) => !c._semVendas);
 
   return {
     totalClientes: com.length,
-    emRisco: com.filter((c) => c.risco === "alto" || c.risco === "medio").length,
+    emRisco:   com.filter((c) => c.risco === "alto" || c.risco === "medio").length,
     dormentes: com.filter((c) => c.diasAusente > 60).length,
-    fieis: com.filter((c) => c.risco === "baixo" && c.totalCompras >= 2).length,
-    novos: com.filter((c) => c.totalCompras === 1).length,
+    fieis:     com.filter((c) => c.risco === "baixo" && c.totalCompras >= 2).length,
+    novos:     com.filter((c) => c.totalCompras === 1).length,
     receitaEmRisco: com
       .filter((c) => c.risco === "alto" || c.risco === "medio")
       .reduce((a, c) => a + (c.ticketMedio || 0), 0),
@@ -550,16 +493,11 @@ export function useCRM(empresaId) {
         !pronto.radar
       ) return;
 
-      const radar = { ...RADAR_PADRAO, ...buffer.radar };
+      const radar            = { ...RADAR_PADRAO, ...buffer.radar };
       const clientesComScore = calcularScoreChurn(buffer.clientes, buffer.vendas, radar);
-      const insights = gerarInsights(
-        clientesComScore,
-        buffer.vendas,
-        buffer.servicos,
-        buffer.ignorados
-      );
-      const metricas    = calcularMetricas(clientesComScore, buffer.vendas);
-      const crescimento  = gerarInsightsCrescimento(clientesComScore, buffer.vendas, buffer.servicos);
+      const insights         = gerarInsights(clientesComScore, buffer.vendas, buffer.servicos, buffer.ignorados);
+      const metricas         = calcularMetricas(clientesComScore, buffer.vendas);
+      const crescimento      = gerarInsightsCrescimento(clientesComScore, buffer.vendas, buffer.servicos);
 
       setEstado({
         carregando: false,
@@ -587,11 +525,7 @@ export function useCRM(empresaId) {
     unsubs.push(
       onSnapshot(
         collection(db, "users", empresaId, "clientes"),
-        (snap) => {
-          buffer.clientes = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-          pronto.clientes = true;
-          recalcular();
-        },
+        (snap) => { buffer.clientes = snap.docs.map((d) => ({ id: d.id, ...d.data() })); pronto.clientes = true; recalcular(); },
         onErro("clientes")
       )
     );
@@ -599,11 +533,7 @@ export function useCRM(empresaId) {
     unsubs.push(
       onSnapshot(
         collection(db, "users", empresaId, "vendas"),
-        (snap) => {
-          buffer.vendas = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-          pronto.vendas = true;
-          recalcular();
-        },
+        (snap) => { buffer.vendas = snap.docs.map((d) => ({ id: d.id, ...d.data() })); pronto.vendas = true; recalcular(); },
         onErro("vendas")
       )
     );
@@ -611,11 +541,7 @@ export function useCRM(empresaId) {
     unsubs.push(
       onSnapshot(
         collection(db, "users", empresaId, "servicos"),
-        (snap) => {
-          buffer.servicos = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-          pronto.servicos = true;
-          recalcular();
-        },
+        (snap) => { buffer.servicos = snap.docs.map((d) => ({ id: d.id, ...d.data() })); pronto.servicos = true; recalcular(); },
         onErro("serviços")
       )
     );
@@ -623,53 +549,24 @@ export function useCRM(empresaId) {
     unsubs.push(
       onSnapshot(
         doc(db, "users", empresaId, "config", "geral"),
-        (snap) => {
-          buffer.config = snap.exists() ? snap.data() : {};
-          pronto.config = true;
-          recalcular();
-        },
-        (err) => {
-          console.warn("[useCRM] Config não encontrada:", err);
-          pronto.config = true;
-          recalcular();
-        }
+        (snap) => { buffer.config = snap.exists() ? snap.data() : {}; pronto.config = true; recalcular(); },
+        (err) => { console.warn("[useCRM] Config não encontrada:", err); pronto.config = true; recalcular(); }
       )
     );
 
-    // ── Ignorados: dadosCRM/{empresaId}/ignore ──────────────────────────────
     unsubs.push(
       onSnapshot(
         collection(db, "dadosCRM", empresaId, "ignore"),
-        (snap) => {
-          buffer.ignorados = snap.docs.map((d) => ({ _docId: d.id, ...d.data() }));
-          pronto.ignorados = true;
-          recalcular();
-        },
-        (err) => {
-          // Coleção pode ainda não existir: não bloqueia o sistema
-          console.warn("[useCRM] Coleção ignore não encontrada (normal na 1ª vez):", err);
-          pronto.ignorados = true;
-          recalcular();
-        }
+        (snap) => { buffer.ignorados = snap.docs.map((d) => ({ _docId: d.id, ...d.data() })); pronto.ignorados = true; recalcular(); },
+        (err) => { console.warn("[useCRM] Coleção ignore não encontrada (normal na 1ª vez):", err); pronto.ignorados = true; recalcular(); }
       )
     );
 
-    // ── Radar: dadosCRM/{empresaId}/radar/risco ─────────────────────────────
-    // Se o doc não existir, usa RADAR_PADRAO — não bloqueia o sistema.
     unsubs.push(
       onSnapshot(
         doc(db, "dadosCRM", empresaId, "radar", "risco"),
-        (snap) => {
-          buffer.radar = snap.exists() ? snap.data() : {};
-          pronto.radar = true;
-          recalcular();
-        },
-        (err) => {
-          console.warn("[useCRM] Config radar não encontrada (usando padrão):", err);
-          buffer.radar = {};
-          pronto.radar = true;
-          recalcular();
-        }
+        (snap) => { buffer.radar = snap.exists() ? snap.data() : {}; pronto.radar = true; recalcular(); },
+        (err) => { console.warn("[useCRM] Config radar não encontrada (usando padrão):", err); buffer.radar = {}; pronto.radar = true; recalcular(); }
       )
     );
 
@@ -679,27 +576,47 @@ export function useCRM(empresaId) {
   return estado;
 }
 
-// ─── Gerador de prompt para IA ────────────────────────────────────────────────
-export function montarPromptMensagem(insight, empresaNome) {
-  const empresa = empresaNome || "nossa agência";
+// ─── Templates de mensagem (sem IA) ──────────────────────────────────────────
+// variacaoIdx permite ciclar entre templates para o botão "Nova variação"
+export function gerarMensagemTemplate(insight, empresaNome, variacaoIdx = 0) {
+  const nome1   = (insight.cliente || "você").split(" ")[0];
+  const produto = insight.produtoFavorito || null;
+  const servico = insight.servico || null;
 
-  const system = `Você é um gestor de relacionamento da "${empresa}". 
-  Sua missão é escrever uma mensagem de WhatsApp extremamente humana e curta (máximo 3 linhas).
-  REGRAS:
-  - Use um tom de "parceria", não de "vendedor".
-  - Nunca use "espero que esteja bem" ou "notamos que você sumiu".
-  - Se houver um produto favorito, mencione algo sobre o valor dele.
-  - Termine com uma pergunta aberta.
-  - Saída: Apenas o texto da mensagem.`;
-
-  let user = "";
   if (insight.tipo === "risco") {
-    user = `Cliente: ${insight.cliente}. Serviço: ${insight.produtoFavorito || "nossos serviços"}. Ausente há ${insight.diasAusente} dias. 
-    Escreva um oi rápido, dizendo que lembrou dele ao organizar a agenda e pergunte como estão os planos dessa semana.`;
-  } else if (insight.tipo === "oportunidade") {
-    user = `Cliente: ${insight.cliente}. Já faz ${insight.produtoFavorito}, mas nunca usou "${insight.servico}". 
-    Sugira esse novo serviço como algo que pode escalar os resultados que ele já tem.`;
+    const templates = produto
+      ? [
+          `Oi ${nome1}! Lembrei de você organizando a agenda aqui. Já faz um tempo que não te vejo — quando dá pra passar?`,
+          `Ei ${nome1}! Tava vendo aqui e senti sua falta. Aquele(a) ${produto} tá precisando de você! Quando aparece?`,
+          `Oi ${nome1}! Passando rapidinho pra dar um oi. Como tá? Quando a gente consegue marcar?`,
+          `Oi ${nome1}! Você sumiu! Tudo certo por aí? Quando passa por aqui de novo?`,
+          `Oi ${nome1}! Lembrei de você agora. Já na hora de um novo ${produto}? Quando posso te esperar?`,
+        ]
+      : [
+          `Oi ${nome1}! Lembrei de você organizando a agenda aqui. Faz um tempo que não te vejo — tudo bem?`,
+          `Ei ${nome1}! Passando pra dar um oi. Você sumiu! Como tão as coisas? Quando a gente se vê?`,
+          `Oi ${nome1}! Tava vendo minha lista e senti sua falta. Quando consegue aparecer por aqui?`,
+          `Oi ${nome1}! Tudo bem com você? Faz um tempão — quando a gente consegue marcar algo?`,
+          `Oi ${nome1}! Passando rapidinho. Como tá? Quando consigo te ver por aqui de novo?`,
+        ];
+    return templates[variacaoIdx % templates.length];
   }
 
-  return { system, user };
+  if (insight.tipo === "oportunidade") {
+    const templates = servico && produto
+      ? [
+          `Oi ${nome1}! Quem faz ${produto} direitinho costuma amar o(a) ${servico} — pode ser o próximo passo certo pra você. Quer saber mais?`,
+          `Oi ${nome1}! Tenho uma novidade que combina perfeitamente com o que você já faz aqui. Posso te contar rapidinho?`,
+          `Oi ${nome1}! Pensando no seu trabalho com ${produto}, acho que o(a) ${servico} pode levar os resultados ainda mais longe. Quando conversa?`,
+          `Oi ${nome1}! Uma coisa que quero muito te mostrar: o(a) ${servico}. Complementa demais o que você já faz. Posso te explicar?`,
+        ]
+      : [
+          `Oi ${nome1}! Tenho uma novidade que acho que vai te interessar. Posso te contar rapidinho?`,
+          `Oi ${nome1}! Lembrei de você quando vi algo que combina muito com o que você já faz por aqui. Quando conversa?`,
+          `Oi ${nome1}! Tenho algo novo que pode ser o próximo passo natural pra você. Quer saber?`,
+        ];
+    return templates[variacaoIdx % templates.length];
+  }
+
+  return `Oi ${nome1}! Passando pra dar um oi. Como você tá?`;
 }
