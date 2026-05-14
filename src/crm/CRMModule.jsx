@@ -11,7 +11,7 @@
 import { useState, useEffect } from "react";
 import {
   useCRM,
-  montarPromptMensagem,
+  gerarMensagemTemplate,
   ignorarCliente,
   reativarCliente,
 } from "./useCRM";
@@ -118,24 +118,6 @@ function formatarReal(valor) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor || 0);
 }
 
-async function chamarIA(system, user) {
-  const r = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${import.meta.env.VITE_GEMINI_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        system_instruction: { parts: [{ text: system }] },
-        contents: [{ role: "user", parts: [{ text: user }] }],
-        generationConfig: { maxOutputTokens: 1500, temperature: 0.9 },
-      }),
-    }
-  );
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.error?.message || "Erro na IA");
-  return d.candidates?.[0]?.content?.parts?.[0]?.text || "";
-}
-
 // ─── Lead Scoring automático ──────────────────────────────────────────────────
 export function calcularTemperaturaLead(lead) {
   if (lead.status === "Convertido") return "quente";
@@ -181,7 +163,6 @@ function RiscoBadge({ risco, T }) {
 
 // ─── Card de Métrica ──────────────────────────────────────────────────────────
 function MetricCard({ val, label, color, T }) {
-  const isGold = !color || color === T.gold;
   return (
     <div style={{
       background: T.surface,
@@ -190,7 +171,6 @@ function MetricCard({ val, label, color, T }) {
       position: "relative", overflow: "hidden",
       transition: "border-color 0.2s, box-shadow 0.2s",
     }}>
-      {/* top accent line */}
       <div style={{
         position: "absolute", top: 0, left: 0, right: 0, height: 2,
         background: color
@@ -198,7 +178,6 @@ function MetricCard({ val, label, color, T }) {
           : `linear-gradient(90deg, ${T.goldBorder}, transparent)`,
         borderRadius: "16px 16px 0 0",
       }} />
-      {/* subtle glow top-right */}
       {color && (
         <div style={{
           position: "absolute", top: -20, right: -20, width: 80, height: 80,
@@ -219,11 +198,12 @@ function MetricCard({ val, label, color, T }) {
   );
 }
 
-// ─── Insight Card ─────────────────────────────────────────────────────────────
+// ─── InsightCard ──────────────────────────────────────────────────────────────
 function InsightCard({ insight, empresaNome, empresaId, T }) {
-  const [msg, setMsg]             = useState(null);
-  const [gerando, setGerando]     = useState(false);
-  const [ignorando, setIgnorando] = useState(false);
+  const [msg,        setMsg]        = useState(null);
+  const [variacaoIdx, setVariacaoIdx] = useState(0);
+  const [copiado,    setCopiado]    = useState(false);
+  const [ignorando,  setIgnorando]  = useState(false);
 
   const cores = {
     risco_alto:   { borda: T.red,    badgeBg: T.redDim,    badgeColor: T.red,    border: T.redBorder,    label: "Risco de perda" },
@@ -237,13 +217,22 @@ function InsightCard({ insight, empresaNome, empresaId, T }) {
   const cor      = cores[tipoKey] || cores.risco_alto;
   const telLimpo = (insight.telefone || "").replace(/\D/g, "");
 
-  async function gerarMensagem() {
-    setGerando(true); setMsg(null);
+  function gerarMensagem() {
+    const texto = gerarMensagemTemplate(insight, empresaNome, variacaoIdx);
+    setMsg(texto);
+    setVariacaoIdx((v) => v + 1);
+    setCopiado(false);
+  }
+
+  async function copiarMsg() {
+    if (!msg) return;
     try {
-      const { system, user } = montarPromptMensagem(insight, empresaNome);
-      setMsg(await chamarIA(system, user));
-    } catch { setMsg("Erro ao gerar mensagem. Tente novamente."); }
-    finally   { setGerando(false); }
+      await navigator.clipboard.writeText(msg);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      // fallback silencioso
+    }
   }
 
   async function handleIgnorar() {
@@ -261,7 +250,6 @@ function InsightCard({ insight, empresaNome, empresaId, T }) {
       transition: "border-color 0.2s",
     }}>
       <div style={{ display: "flex" }}>
-        {/* left accent bar */}
         <div style={{
           width: 3, flexShrink: 0, background: cor.borda,
           boxShadow: tipoKey === "risco_alto" ? `0 0 16px ${T.red}66` : "none",
@@ -320,16 +308,13 @@ function InsightCard({ insight, empresaNome, empresaId, T }) {
 
           {/* Actions */}
           <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap", alignItems: "center" }}>
-            <button onClick={gerarMensagem} disabled={gerando} style={{
+            <button onClick={gerarMensagem} style={{
               fontSize: 11.5, fontWeight: 600, padding: "8px 18px", borderRadius: 9,
-              background: gerando ? T.surfaceAlt : T.goldGradient,
-              color: gerando ? T.textMid : "#1a1100",
-              border: gerando ? `1px solid ${T.border}` : "none",
-              cursor: gerando ? "not-allowed" : "pointer",
-              letterSpacing: "0.06em", fontFamily: FONT, transition: "all 0.18s",
-              boxShadow: gerando ? "none" : "0 4px 18px rgba(212,175,55,0.28)",
+              background: T.goldGradient, color: "#1a1100", border: "none",
+              cursor: "pointer", letterSpacing: "0.06em", fontFamily: FONT,
+              boxShadow: "0 4px 18px rgba(212,175,55,0.28)", transition: "all 0.18s",
             }}>
-              {gerando ? "Gerando..." : "✦ Gerar mensagem"}
+              ✦ Mensagem rápida
             </button>
             {insight.telefone && (
               <button onClick={() => window.open(`https://wa.me/55${telLimpo}`, "_blank")} style={{
@@ -350,6 +335,7 @@ function InsightCard({ insight, empresaNome, empresaId, T }) {
             </button>
           </div>
 
+          {/* Mensagem gerada */}
           {msg && (
             <div style={{
               marginTop: 14, background: T.surfaceAlt, borderRadius: 12,
@@ -360,15 +346,24 @@ function InsightCard({ insight, empresaNome, empresaId, T }) {
                 {telLimpo && (
                   <button onClick={() => window.open(`https://wa.me/55${telLimpo}?text=${encodeURIComponent(msg)}`, "_blank")} style={{
                     fontSize: 11.5, fontWeight: 600, padding: "8px 16px", borderRadius: 9,
-                    background: T.greenGradient || T.green, color: "#fff", border: "none", cursor: "pointer",
+                    background: T.greenDim, color: T.green,
+                    border: `1px solid ${T.greenBorder}`, cursor: "pointer",
                     letterSpacing: "0.04em", fontFamily: FONT,
                   }}>↗ Enviar no WhatsApp</button>
                 )}
+                <button onClick={copiarMsg} style={{
+                  fontSize: 11.5, padding: "8px 16px", borderRadius: 9,
+                  background: copiado ? T.goldDim : "transparent",
+                  border: `1px solid ${copiado ? T.goldBorder : T.border}`,
+                  cursor: "pointer",
+                  color: copiado ? T.gold : T.textMid,
+                  fontFamily: FONT, transition: "all 0.2s",
+                }}>{copiado ? "✓ Copiado!" : "⎘ Copiar"}</button>
                 <button onClick={gerarMensagem} style={{
                   fontSize: 11.5, padding: "8px 16px", borderRadius: 9,
                   background: "transparent", border: `1px solid ${T.border}`,
                   cursor: "pointer", color: T.textMid, fontFamily: FONT,
-                }}>↺ Regenerar</button>
+                }}>↺ Nova variação</button>
               </div>
             </div>
           )}
@@ -378,129 +373,240 @@ function InsightCard({ insight, empresaNome, empresaId, T }) {
   );
 }
 
-// ─── Assistente IA ────────────────────────────────────────────────────────────
-function AssistenteIA({ metricas, clientes, empresaNome, T }) {
-  const [pergunta, setPergunta] = useState("");
-  const [resposta, setResposta] = useState(null);
-  const [pensando, setPensando] = useState(false);
+// ─── Painel de Diagnóstico (substitui AssistenteIA) ───────────────────────────
+function PainelDiagnostico({ metricas, clientes, empresaNome, T }) {
+  const [abertaIdx, setAbertaIdx] = useState(null);
 
-  const contexto = metricas
-    ? `Empresa: ${empresaNome || "não identificada"}.
-Clientes ativos: ${metricas.totalClientes}.
-Em risco alto: ${metricas.emRisco}.
-Dormentes (+60d): ${metricas.dormentes}.
-Fiéis: ${metricas.fieis}.
-Ticket médio geral: ${formatarReal(metricas.ticketGeral)}.
-Receita em risco: ${formatarReal(metricas.receitaEmRisco)}.
-Clientes em risco: ${clientes.filter((c) => c.risco === "alto").map((c) => `${c.nome} (${c.diasAusente}d ausente)`).join(", ") || "nenhum"}.`.trim()
-    : "";
+  const emRisco = [...clientes]
+    .filter(c => c.risco === "alto" || c.risco === "medio")
+    .sort((a, b) => (b.diasAusente || 0) - (a.diasAusente || 0))
+    .slice(0, 6);
 
-  async function perguntar(q) {
-    const texto = q || pergunta;
-    if (!texto.trim()) return;
-    setPensando(true); setResposta(null);
-    try {
-      const r = await chamarIA(
-        `Você é um consultor especialista em retenção de clientes para pequenos negócios brasileiros, trabalhando para "${empresaNome || "esta empresa"}".
-Você tem acesso aos dados reais dos clientes e deve dar conselhos práticos, diretos e específicos — nunca genéricos.
-Dados atuais do negócio:\n${contexto}
-Regras:
-- Responda sempre em português brasileiro
-- Seja direto e prático, com ações concretas
-- Use os dados reais fornecidos nas respostas
-- Cite nomes de clientes e valores quando relevante
-- Máximo 6 linhas
-- Nunca diga "com base nos dados" ou frases introdutórias`,
-        texto
-      );
-      setResposta(r);
-    } catch { setResposta("Erro ao conectar com a IA."); }
-    finally   { setPensando(false); setPergunta(""); }
-  }
+  const maisValiosos = [...clientes]
+    .filter(c => !c._semVendas)
+    .sort((a, b) => (b.ticketMedio || 0) - (a.ticketMedio || 0))
+    .slice(0, 6);
 
-  const sugestoes = [
-    "Quais clientes tenho risco de perder essa semana?",
-    "Como posso aumentar meu ticket médio?",
-    "Que campanha posso fazer para recuperar clientes dormentes?",
-    "Quem são meus clientes mais valiosos?",
+  const dormentes = [...clientes]
+    .filter(c => (c.diasAusente || 0) > 60 && !c._semVendas)
+    .sort((a, b) => (b.diasAusente || 0) - (a.diasAusente || 0))
+    .slice(0, 6);
+
+  // Texto de resumo calculado
+  const resumo = (() => {
+    if (!metricas) return "Carregando dados...";
+    const { totalClientes, fieis, emRisco: qt, ticketGeral, receitaEmRisco } = metricas;
+    const taxaFidelidade = totalClientes ? Math.round((fieis / totalClientes) * 100) : 0;
+    const linhas = [
+      `Você tem ${totalClientes} cliente${totalClientes !== 1 ? "s" : ""} ativos com histórico de compra.`,
+      `${taxaFidelidade}% são fiéis — voltam regularmente (${fieis} cliente${fieis !== 1 ? "s" : ""}).`,
+    ];
+    if (qt > 0)
+      linhas.push(`${qt} cliente${qt !== 1 ? "s" : ""} em risco de abandono, representando ${formatarReal(receitaEmRisco)} em receita potencial.`);
+    else
+      linhas.push("Nenhum cliente em risco crítico no momento — boa sinalização de retenção.");
+    if (ticketGeral > 0)
+      linhas.push(`Ticket médio atual: ${formatarReal(ticketGeral)}.`);
+    return linhas.join("\n");
+  })();
+
+  const perguntas = [
+    {
+      id: "priorizar",
+      icon: "◈",
+      label: "Quem priorizar hoje?",
+      vazio: "Nenhum cliente em risco no momento.",
+      render: () => (
+        <div style={{ marginTop: 14 }}>
+          {emRisco.map((c, i) => (
+            <div key={i} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "11px 0", borderBottom: `1px solid ${T.border}`,
+            }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: T.text, fontFamily: FONT }}>{c.nome}</div>
+                {c.produtoFavorito && (
+                  <div style={{ fontSize: 10.5, color: T.textDim, marginTop: 2 }}>{c.produtoFavorito}</div>
+                )}
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0, marginLeft: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: c.risco === "alto" ? T.red : T.yellow, fontFamily: FONT_MONO }}>
+                  {c.diasAusente}d ausente
+                </div>
+                {c.ticketMedio > 0 && (
+                  <div style={{ fontSize: 10.5, color: T.gold, fontFamily: FONT_MONO }}>{formatarReal(c.ticketMedio)}</div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: "valiosos",
+      icon: "◉",
+      label: "Clientes mais valiosos",
+      vazio: "Nenhum cliente com histórico de compras ainda.",
+      render: () => (
+        <div style={{ marginTop: 14 }}>
+          {maisValiosos.map((c, i) => (
+            <div key={i} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "11px 0", borderBottom: `1px solid ${T.border}`,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                  background: i === 0 ? T.goldDim : T.surfaceAlt,
+                  border: `1px solid ${i === 0 ? T.goldBorder : T.border}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 9, fontWeight: 700, color: i === 0 ? T.gold : T.textDim, fontFamily: FONT_MONO,
+                }}>{i + 1}</div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.text, fontFamily: FONT }}>{c.nome}</div>
+                  <div style={{ fontSize: 10.5, color: T.textDim, marginTop: 1 }}>{c.totalCompras} compra{c.totalCompras !== 1 ? "s" : ""}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: T.gold, fontFamily: FONT_MONO, flexShrink: 0, marginLeft: 12 }}>
+                {formatarReal(c.ticketMedio)}
+              </div>
+            </div>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: "dormentes",
+      icon: "✶",
+      label: "Campanha para dormentes",
+      vazio: "Nenhum cliente dormente (+60 dias) no momento.",
+      render: () => (
+        <div style={{ marginTop: 14 }}>
+          <p style={{ fontSize: 12, color: T.textMid, margin: "0 0 14px", lineHeight: 1.65, fontWeight: 300 }}>
+            {dormentes.length} cliente{dormentes.length !== 1 ? "s" : ""} sem aparecer há mais de 60 dias. Use as mensagens do Radar para reativar um por um.
+          </p>
+          {dormentes.map((c, i) => {
+            const telLimpo = (c.telefone || "").replace(/\D/g, "");
+            return (
+              <div key={i} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "10px 0", borderBottom: `1px solid ${T.border}`,
+              }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{c.nome}</div>
+                  {c.produtoFavorito && <div style={{ fontSize: 10.5, color: T.textDim, marginTop: 2 }}>{c.produtoFavorito}</div>}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, marginLeft: 12 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: T.yellow, fontFamily: FONT_MONO }}>{c.diasAusente}d</span>
+                  {telLimpo && (
+                    <button
+                      onClick={() => window.open(`https://wa.me/55${telLimpo}`, "_blank")}
+                      style={{
+                        fontSize: 10.5, padding: "5px 10px", borderRadius: 7,
+                        background: "transparent", border: `1px solid ${T.border}`,
+                        cursor: "pointer", color: T.textMid, fontFamily: FONT,
+                      }}
+                    >WA</button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ),
+    },
+    {
+      id: "resumo",
+      icon: "▦",
+      label: "Resumo do negócio",
+      vazio: null,
+      render: () => (
+        <div style={{ marginTop: 14 }}>
+          <p style={{
+            fontSize: 13, lineHeight: 1.85, color: T.text,
+            whiteSpace: "pre-wrap", margin: 0, fontFamily: FONT, fontWeight: 300,
+          }}>{resumo}</p>
+          {metricas && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 18 }}>
+              {[
+                { val: metricas.totalClientes, label: "Total ativos" },
+                { val: metricas.fieis, label: "Fiéis" },
+                { val: metricas.emRisco, label: "Em risco" },
+                { val: formatarReal(metricas.ticketGeral), label: "Ticket médio" },
+              ].map(m => (
+                <div key={m.label} style={{
+                  background: T.surfaceAlt, borderRadius: 10, padding: "12px 14px",
+                  border: `1px solid ${T.border}`,
+                }}>
+                  <div style={{ fontSize: 18, fontWeight: 700, color: T.text, fontFamily: FONT_MONO }}>{m.val}</div>
+                  <div style={{ fontSize: 9, color: T.textDim, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.10em" }}>{m.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ),
+    },
   ];
 
   return (
     <div style={{ maxWidth: 680 }}>
-      {/* Input */}
+      {/* Header */}
       <div style={{
         background: T.surface, border: `1px solid ${T.border}`,
-        borderRadius: 16, padding: 20, marginBottom: 12,
+        borderRadius: 16, padding: "20px 22px", marginBottom: 16,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <div style={{
             width: 28, height: 28, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
             background: T.goldDim, border: `1px solid ${T.goldBorder}`, fontSize: 13, color: T.gold,
-          }}>✦</div>
+          }}>◈</div>
           <span style={{ fontSize: 11, fontWeight: 600, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: FONT }}>
-            Assistente IA
+            Diagnóstico do negócio
           </span>
         </div>
-        <p style={{ fontSize: 12.5, color: T.textMid, marginBottom: 14, lineHeight: 1.65, fontFamily: FONT, fontWeight: 300 }}>
-          Faça qualquer pergunta sobre seus clientes. A IA analisa os dados em tempo real.
+        <p style={{ fontSize: 12.5, color: T.textMid, margin: 0, lineHeight: 1.65, fontFamily: FONT, fontWeight: 300 }}>
+          Análises calculadas em tempo real com os dados reais dos seus clientes e vendas.
         </p>
-        <div style={{ display: "flex", gap: 8 }}>
-          <input
-            value={pergunta}
-            onChange={(e) => setPergunta(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && perguntar()}
-            placeholder="Ex: quem devo priorizar hoje?"
-            style={{
-              flex: 1, padding: "11px 14px", borderRadius: 10, fontSize: 13,
-              border: `1px solid ${T.borderAlt}`, outline: "none",
-              fontFamily: FONT, background: T.surfaceAlt, color: T.text, minWidth: 0,
-              transition: "border-color 0.15s",
-            }}
-          />
-          <button onClick={() => perguntar()} disabled={pensando} style={{
-            padding: "11px 20px", borderRadius: 10, fontSize: 11.5, fontWeight: 600,
-            background: pensando ? T.surfaceAlt : T.goldGradient,
-            color: pensando ? T.textMid : "#1a1100",
-            border: pensando ? `1px solid ${T.border}` : "none",
-            cursor: pensando ? "not-allowed" : "pointer",
-            letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap",
-            flexShrink: 0, fontFamily: FONT, transition: "all 0.18s",
-            boxShadow: pensando ? "none" : "0 4px 18px rgba(212,175,55,0.28)",
-          }}>
-            {pensando ? "..." : "✦ Perguntar"}
-          </button>
-        </div>
       </div>
 
-      {/* Resposta */}
-      {(resposta || pensando) && (
-        <div style={{
-          background: T.goldDim, border: `1px solid ${T.goldBorder}`,
-          borderRadius: 16, padding: 20, marginBottom: 12,
-        }}>
-          {pensando
-            ? <p style={{ fontSize: 13, color: T.textMid, fontFamily: FONT, margin: 0 }}>Analisando dados...</p>
-            : <p style={{ fontSize: 13, lineHeight: 1.85, color: T.text, whiteSpace: "pre-wrap", wordBreak: "break-word", margin: 0, fontFamily: FONT, fontWeight: 300 }}>{resposta}</p>
-          }
-        </div>
-      )}
+      {/* Cards de diagnóstico */}
+      {perguntas.map((p, i) => {
+        const aberta   = abertaIdx === i;
+        const temDados = p.id === "resumo" || (
+          p.id === "priorizar" ? emRisco.length > 0
+          : p.id === "valiosos" ? maisValiosos.length > 0
+          : dormentes.length > 0
+        );
+        return (
+          <div
+            key={p.id}
+            onClick={() => setAbertaIdx(aberta ? null : i)}
+            style={{
+              background: T.surface,
+              border: `1px solid ${aberta ? T.goldBorder : T.border}`,
+              borderRadius: 14, padding: "16px 18px", marginBottom: 10,
+              cursor: "pointer", fontFamily: FONT, transition: "border-color 0.15s",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 14, color: aberta ? T.gold : T.textDim }}>{p.icon}</span>
+                <span style={{ fontSize: 13, fontWeight: aberta ? 600 : 400, color: aberta ? T.text : T.textMid, letterSpacing: "-0.01em" }}>
+                  {p.label}
+                </span>
+              </div>
+              <span style={{ fontSize: 12, color: T.textDim }}>{aberta ? "▲" : "▼"}</span>
+            </div>
 
-      {/* Sugestões */}
-      <p style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.14em", marginBottom: 10, textTransform: "uppercase", fontFamily: FONT }}>
-        Sugestões rápidas
-      </p>
-      {sugestoes.map((s) => (
-        <button key={s} onClick={() => perguntar(s)} style={{
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          width: "100%", padding: "13px 16px", marginBottom: 8, textAlign: "left",
-          background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12,
-          fontSize: 12.5, color: T.textMid, cursor: "pointer", fontFamily: FONT,
-          fontWeight: 300, transition: "all 0.15s",
-        }}>
-          <span style={{ flex: 1, paddingRight: 8 }}>{s}</span>
-          <span style={{ color: T.gold, fontSize: 13, flexShrink: 0 }}>→</span>
-        </button>
-      ))}
+            {aberta && (
+              temDados
+                ? p.render()
+                : <p style={{ fontSize: 12.5, color: T.textDim, marginTop: 14, margin: "14px 0 0", fontWeight: 300 }}>{p.vazio}</p>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -620,7 +726,6 @@ function ModalHistoricoCRM({ cliente, vendas, T, onClose }) {
         boxShadow: "0 30px 80px rgba(0,0,0,0.8)", fontFamily: FONT,
         overflow: "hidden",
       }}>
-        {/* Header do modal */}
         <div style={{
           padding: "24px 28px", borderBottom: `1px solid rgba(255,255,255,0.07)`,
           position: "relative", background: "rgba(212,175,55,0.04)",
@@ -764,7 +869,6 @@ function ClientesIgnorados({ ignorados, empresaId, T }) {
   );
 }
 
-
 // ─── Aba Crescimento ──────────────────────────────────────────────────────────
 const FASES_LABEL = {
   base_vazia:       { label: "Base em construção",    cor: "#4a8fd4" },
@@ -799,20 +903,13 @@ function InsightCrescimentoCard({ insight, idx, T }) {
       }}
     >
       <div style={{ height: 2, background: catCor, opacity: 0.9 }} />
-
       <div style={{ padding: "20px 22px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-          <span style={{
-            fontSize: 9, fontWeight: 700, color: catCor,
-            letterSpacing: "0.14em", textTransform: "uppercase",
-          }}>
+          <span style={{ fontSize: 9, fontWeight: 700, color: catCor, letterSpacing: "0.14em", textTransform: "uppercase" }}>
             {insight.categoria}
           </span>
           <div style={{ textAlign: "right" }}>
-            <div style={{
-              fontSize: 22, fontWeight: 700, color: catCor,
-              fontFamily: FONT_MONO, lineHeight: 1, letterSpacing: "-0.02em",
-            }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: catCor, fontFamily: FONT_MONO, lineHeight: 1, letterSpacing: "-0.02em" }}>
               {insight.metrica.valor}
             </div>
             <div style={{ fontSize: 9, color: T.textDim, marginTop: 2, letterSpacing: "0.04em" }}>
@@ -820,20 +917,12 @@ function InsightCrescimentoCard({ insight, idx, T }) {
             </div>
           </div>
         </div>
-
-        {/* Título */}
-        <div style={{
-          fontSize: 14, fontWeight: 600, color: T.text,
-          lineHeight: 1.35, marginBottom: 10,
-          letterSpacing: "-0.01em",
-        }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: T.text, lineHeight: 1.35, marginBottom: 10, letterSpacing: "-0.01em" }}>
           {insight.titulo}
         </div>
-
         <p style={{ fontSize: 12.5, color: T.textMid, lineHeight: 1.65, margin: 0, fontWeight: 300 }}>
           {insight.diagnostico}
         </p>
-
         <div style={{ maxHeight: expandido ? 200 : 0, overflow: "hidden", transition: "max-height 0.25s ease" }}>
           <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${T.border}` }}>
             <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8 }}>
@@ -844,7 +933,6 @@ function InsightCrescimentoCard({ insight, idx, T }) {
             </p>
           </div>
         </div>
-
         <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6 }}>
           <div style={{ flex: 1, height: 1, background: T.border }} />
           <span style={{ fontSize: 9, color: T.textDim, letterSpacing: "0.08em" }}>
@@ -862,21 +950,13 @@ function CrescimentoPage({ crescimento, T, bp }) {
   const fase = FASES_LABEL[momento?.fase] || { label: "Analisando...", cor: T.textDim };
 
   if (!momento) return (
-    <div style={{
-      textAlign: "center", padding: "60px 0",
-      color: T.textDim, fontSize: 13, fontFamily: FONT, fontWeight: 300,
-      border: `1px dashed ${T.border}`, borderRadius: 14,
-    }}>
+    <div style={{ textAlign: "center", padding: "60px 0", color: T.textDim, fontSize: 13, fontFamily: FONT, fontWeight: 300, border: `1px dashed ${T.border}`, borderRadius: 14 }}>
       Carregando diagnóstico do negócio...
     </div>
   );
 
   if (ativos.length === 0) return (
-    <div style={{
-      textAlign: "center", padding: "60px 0",
-      color: T.textDim, fontSize: 13, fontFamily: FONT, fontWeight: 300,
-      border: `1px dashed ${T.border}`, borderRadius: 14,
-    }}>
+    <div style={{ textAlign: "center", padding: "60px 0", color: T.textDim, fontSize: 13, fontFamily: FONT, fontWeight: 300, border: `1px dashed ${T.border}`, borderRadius: 14 }}>
       Nenhum insight disponível para o momento atual. Cadastre mais clientes e vendas no Assent Gestão.
     </div>
   );
@@ -887,8 +967,7 @@ function CrescimentoPage({ crescimento, T, bp }) {
     <div style={{ fontFamily: FONT }}>
       {/* Diagnóstico do momento */}
       <div style={{
-        background: T.surface,
-        border: `1px solid ${fase.cor}28`,
+        background: T.surface, border: `1px solid ${fase.cor}28`,
         borderLeft: `3px solid ${fase.cor}`,
         borderRadius: 14, padding: "20px 24px", marginBottom: 28,
         position: "relative", overflow: "hidden",
@@ -910,7 +989,7 @@ function CrescimentoPage({ crescimento, T, bp }) {
           <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
             {[
               { val: momento.totalClientes, label: "Clientes" },
-              { val: momento.fieis,         label: "Fiéis" },
+              { val: momento.fieis,         label: "Fiéis"    },
               { val: momento.emRisco,       label: "Em risco" },
             ].map(m => (
               <div key={m.label} style={{ textAlign: "right" }}>
@@ -973,13 +1052,13 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
   });
 
   const abas = [
-    { id: "radar",       icon: "◈", label: "Radar",       labelFull: "Radar do dia",    badge: insights.length || null },
-    { id: "clientes",    icon: "◉", label: "Clientes",    labelFull: "Clientes",         badge: null },
-    { id: "crescimento", icon: "✶", label: "Crescimento", labelFull: "Crescimento",      badge: crescimento?.ativos?.length || null },
-    { id: "ia",          icon: "✦", label: "IA",           labelFull: "Assistente IA",   badge: null },
-    { id: "painel",      icon: "▦", label: "Painel",       labelFull: "Painel",           badge: null },
-    { id: "leads",       icon: "◎", label: "Leads",        labelFull: "Gestão de Leads", badge: null },
-    { id: "config",      icon: "⚙", label: "Config",       labelFull: "Configurações",   badge: null },
+    { id: "radar",       icon: "◈", label: "Radar",       labelFull: "Radar do dia",        badge: insights.length || null },
+    { id: "clientes",    icon: "◉", label: "Clientes",    labelFull: "Clientes",             badge: null },
+    { id: "crescimento", icon: "✶", label: "Crescimento", labelFull: "Crescimento",          badge: crescimento?.ativos?.length || null },
+    { id: "ia",          icon: "✦", label: "Diagnóstico", labelFull: "Diagnóstico",          badge: null },
+    { id: "painel",      icon: "▦", label: "Painel",       labelFull: "Painel",               badge: null },
+    { id: "leads",       icon: "◎", label: "Leads",        labelFull: "Gestão de Leads",      badge: null },
+    { id: "config",      icon: "⚙", label: "Config",       labelFull: "Configurações",        badge: null },
   ];
 
   const sidebarWidth = bp.isMobile ? 0 : sidebarAberta ? 240 : 60;
@@ -990,7 +1069,6 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
       display: "flex", height: "100%", fontFamily: FONT,
       background: T.bg, color: T.text, position: "relative", overflow: "hidden",
     }}>
-      {/* Global keyframes + hover states */}
       <style>{`
         @keyframes crm-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.75)} }
         .crm-nav-item:hover { background: rgba(212,175,55,0.05) !important; border-color: ${T.goldBorder} !important; }
@@ -1001,7 +1079,6 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
         .crm-table-row:hover { background: ${T.goldDim} !important; }
       `}</style>
 
-      {/* Dark mode background grid */}
       {isDark && (
         <div style={{
           position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0,
@@ -1014,7 +1091,6 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
         }} />
       )}
 
-      {/* Gold radial glow */}
       {isDark && (
         <div style={{
           position: "absolute", top: "-15%", left: "30%",
@@ -1024,7 +1100,6 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
         }} />
       )}
 
-      {/* Overlay mobile */}
       {bp.isMobile && sidebarAberta && (
         <div onClick={() => setSidebarAberta(false)} style={{
           position: "fixed", inset: 0, background: "rgba(0,0,0,0.70)",
@@ -1044,7 +1119,7 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
         display: "flex", flexDirection: "column",
         transition: "width 0.22s ease, transform 0.22s ease",
         transform: bp.isMobile ? (sidebarAberta ? "translateX(0)" : "translateX(-100%)") : "none",
-        overflow: "hidden", flexShrink: 0, position: "relative",
+        overflow: "hidden", flexShrink: 0,
       }}>
         {/* Logo */}
         <div style={{
@@ -1108,7 +1183,6 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                   position: "relative",
                 }}
               >
-                {/* left indicator */}
                 {ativo && (
                   <div style={{
                     position: "absolute", left: 0, top: "20%", height: "60%",
@@ -1116,7 +1190,6 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                     boxShadow: `0 0 8px ${T.gold}88`,
                   }} />
                 )}
-                {/* Icon box */}
                 <div style={{
                   width: 28, height: 28, borderRadius: 7, flexShrink: 0,
                   display: "flex", alignItems: "center", justifyContent: "center",
@@ -1133,10 +1206,7 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                   </span>
                 )}
                 {a.badge && mostrarLabel ? (
-                  <span style={{
-                    fontSize: 9.5, fontWeight: 700, background: T.red, color: "#fff",
-                    borderRadius: 999, padding: "1px 7px", flexShrink: 0,
-                  }}>{a.badge}</span>
+                  <span style={{ fontSize: 9.5, fontWeight: 700, background: T.red, color: "#fff", borderRadius: 999, padding: "1px 7px", flexShrink: 0 }}>{a.badge}</span>
                 ) : a.badge && !mostrarLabel ? (
                   <span style={{ position: "absolute", top: 6, right: 6, width: 6, height: 6, borderRadius: "50%", background: T.red }} />
                 ) : null}
@@ -1232,7 +1302,6 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
             </div>
           </div>
 
-          {/* Direita do header */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
             <NotificacoesLeads
               acoesDisparadas={leadsData.acoesDisparadas}
@@ -1273,7 +1342,6 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
           {/* ── Radar ── */}
           {aba === "radar" && (
             <>
-              {/* Label de seção estilo aplicativos */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
                 <div style={{
                   display: "inline-flex", alignItems: "center", gap: 6,
@@ -1293,17 +1361,15 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                 )}
               </div>
 
-              {/* Métricas */}
               {metricas && (
                 <div style={{ display: "grid", gridTemplateColumns: bp.isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: 12, marginBottom: 28 }}>
-                  <MetricCard val={metricas.totalClientes}     label="Clientes ativos" color={null}   T={T} />
-                  <MetricCard val={metricas.emRisco}           label="Em risco"        color={T.red}  T={T} />
-                  <MetricCard val={metricas.dormentes}         label="Dormentes 60d+"  color={T.yellow} T={T} />
-                  <MetricCard val={metricas.fieis}             label="Clientes fiéis"  color={T.green} T={T} />
+                  <MetricCard val={metricas.totalClientes} label="Clientes ativos" color={null}      T={T} />
+                  <MetricCard val={metricas.emRisco}       label="Em risco"        color={T.red}     T={T} />
+                  <MetricCard val={metricas.dormentes}     label="Dormentes 60d+"  color={T.yellow}  T={T} />
+                  <MetricCard val={metricas.fieis}         label="Clientes fiéis"  color={T.green}   T={T} />
                 </div>
               )}
 
-              {/* Insights */}
               {insights.length === 0 ? (
                 <div style={{
                   textAlign: "center", padding: "60px 0",
@@ -1325,7 +1391,6 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
           {/* ── Clientes ── */}
           {aba === "clientes" && (
             <>
-              {/* Label + busca */}
               <div style={{ marginBottom: 20 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
                   <span style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.14em", textTransform: "uppercase" }}>
@@ -1358,9 +1423,9 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
             </>
           )}
 
-          {/* ── IA ── */}
+          {/* ── Diagnóstico (antigo IA) ── */}
           {aba === "ia" && (
-            <AssistenteIA metricas={metricas} clientes={clientes} empresaNome={nomeEmpresa} T={T} />
+            <PainelDiagnostico metricas={metricas} clientes={clientes} empresaNome={nomeEmpresa} T={T} />
           )}
 
           {/* ── Crescimento ── */}
@@ -1371,7 +1436,6 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
           {/* ── Painel ── */}
           {aba === "painel" && (
             <>
-              {/* Label */}
               <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 24 }}>
                 <span style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.14em", textTransform: "uppercase" }}>Visão geral</span>
                 <div style={{ flex: 1, height: 1, background: T.border }} />
@@ -1379,10 +1443,10 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
 
               {metricas && (
                 <div style={{ display: "grid", gridTemplateColumns: bp.isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: 12, marginBottom: 24 }}>
-                  <MetricCard val={metricas.totalClientes}           label="Total clientes"   color={null}     T={T} />
+                  <MetricCard val={metricas.totalClientes}           label="Total clientes"    color={null}    T={T} />
                   <MetricCard val={`${Math.round((metricas.fieis / Math.max(metricas.totalClientes,1))*100)}%`} label="Taxa de fidelidade" color={T.green} T={T} />
-                  <MetricCard val={metricas.emRisco}                 label="Em risco"         color={T.red}    T={T} />
-                  <MetricCard val={formatarReal(metricas.ticketGeral)} label="Ticket médio"   color={T.gold}   T={T} />
+                  <MetricCard val={metricas.emRisco}                 label="Em risco"          color={T.red}   T={T} />
+                  <MetricCard val={formatarReal(metricas.ticketGeral)} label="Ticket médio"    color={T.gold}  T={T} />
                 </div>
               )}
 
@@ -1434,8 +1498,7 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                     background: T.goldDim, border: `1px solid ${T.goldBorder}`,
                     color: T.gold, cursor: "pointer",
                     fontSize: 12, fontWeight: 600, letterSpacing: "0.06em",
-                    fontFamily: FONT, transition: "all 0.16s",
-                    boxShadow: "none",
+                    fontFamily: FONT, transition: "all 0.16s", boxShadow: "none",
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.background = T.goldGradient; e.currentTarget.style.color = "#1a1100"; e.currentTarget.style.boxShadow = "0 4px 18px rgba(212,175,55,0.28)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.background = T.goldDim; e.currentTarget.style.color = T.gold; e.currentTarget.style.boxShadow = "none"; }}
@@ -1461,8 +1524,7 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                     background: "#0f0f12", border: `1px solid rgba(255,255,255,0.09)`,
                     borderRadius: 20, width: "100%", maxWidth: 860, maxHeight: "90vh",
                     display: "flex", flexDirection: "column",
-                    boxShadow: "0 30px 80px rgba(0,0,0,0.8)",
-                    fontFamily: FONT, overflow: "hidden",
+                    boxShadow: "0 30px 80px rgba(0,0,0,0.8)", fontFamily: FONT, overflow: "hidden",
                   }}>
                     <div style={{
                       padding: "20px 26px", borderBottom: `1px solid rgba(255,255,255,0.07)`,
