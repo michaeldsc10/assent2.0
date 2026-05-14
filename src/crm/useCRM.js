@@ -62,6 +62,37 @@ export async function reativarCliente(empresaId, clienteIgnorado) {
 }
 
 // ─── Score de churn ───────────────────────────────────────────────────────────
+
+// ─── Unifica vendas + a_receber num array normalizado ────────────────────────
+// Evita duplo-contar: pula a_receber com origem="venda" (já está em vendas)
+function unificarTransacoes(vendas = [], aReceber = []) {
+  const vendasNorm = vendas.map(v => ({
+    ...v,
+    _origem: "venda",
+    cliente: v.cliente || "",
+    data:    v.data,
+    total:   v.total ?? v.custoTotal ?? 0,
+    itens:   v.itens || [],
+  }));
+
+  const aReceberNorm = aReceber
+    .filter(a =>
+      a.origem !== "venda" &&
+      (a.valorTotal || 0) > 0 &&
+      a.clienteNome
+    )
+    .map(a => ({
+      _origem: "areceber",
+      id:      a.id,
+      cliente: a.clienteNome || "",
+      data:    a.dataPagamento ?? a.dataVencimento ?? a.dataCriacao ?? null,
+      total:   a.valorTotal || 0,
+      itens:   a.descricao ? [{ nome: a.descricao }] : [],
+    }));
+
+  return [...vendasNorm, ...aReceberNorm];
+}
+
 function calcularScoreChurn(clientes = [], vendas = [], radar = RADAR_PADRAO) {
   const { diasMedio, diasAlto, multMedio, multAlto } = { ...RADAR_PADRAO, ...radar };
   const hoje = new Date();
@@ -468,6 +499,7 @@ export function useCRM(empresaId) {
     const buffer = {
       clientes:  [],
       vendas:    [],
+      aReceber:  [],
       servicos:  [],
       config:    {},
       ignorados: [],
@@ -477,6 +509,7 @@ export function useCRM(empresaId) {
     const pronto = {
       clientes:  false,
       vendas:    false,
+      aReceber:  false,
       servicos:  false,
       config:    false,
       ignorados: false,
@@ -487,6 +520,7 @@ export function useCRM(empresaId) {
       if (
         !pronto.clientes  ||
         !pronto.vendas    ||
+        !pronto.aReceber  ||
         !pronto.servicos  ||
         !pronto.config    ||
         !pronto.ignorados ||
@@ -494,10 +528,11 @@ export function useCRM(empresaId) {
       ) return;
 
       const radar            = { ...RADAR_PADRAO, ...buffer.radar };
-      const clientesComScore = calcularScoreChurn(buffer.clientes, buffer.vendas, radar);
-      const insights         = gerarInsights(clientesComScore, buffer.vendas, buffer.servicos, buffer.ignorados);
-      const metricas         = calcularMetricas(clientesComScore, buffer.vendas);
-      const crescimento      = gerarInsightsCrescimento(clientesComScore, buffer.vendas, buffer.servicos);
+      const transacoes       = unificarTransacoes(buffer.vendas, buffer.aReceber);
+      const clientesComScore = calcularScoreChurn(buffer.clientes, transacoes, radar);
+      const insights         = gerarInsights(clientesComScore, transacoes, buffer.servicos, buffer.ignorados);
+      const metricas         = calcularMetricas(clientesComScore, transacoes);
+      const crescimento      = gerarInsightsCrescimento(clientesComScore, transacoes, buffer.servicos);
 
       setEstado({
         carregando: false,
@@ -535,6 +570,14 @@ export function useCRM(empresaId) {
         collection(db, "users", empresaId, "vendas"),
         (snap) => { buffer.vendas = snap.docs.map((d) => ({ id: d.id, ...d.data() })); pronto.vendas = true; recalcular(); },
         onErro("vendas")
+      )
+    );
+
+    unsubs.push(
+      onSnapshot(
+        collection(db, "users", empresaId, "a_receber"),
+        (snap) => { buffer.aReceber = snap.docs.map((d) => ({ id: d.id, ...d.data() })); pronto.aReceber = true; recalcular(); },
+        (err) => { console.warn("[useCRM] a_receber:", err); pronto.aReceber = true; recalcular(); }
       )
     );
 
@@ -596,7 +639,7 @@ export function gerarMensagemTemplate(insight, empresaNome, variacaoIdx = 0) {
         ]
       : [
           `${abre} Faz um tempo que você não passa por aqui — tudo bem? Quando quer marcar algo?`,
-          `Oi ${nome1}! Você sumiu! Tava vendo a agenda e lembrei de você. Quando a gente consegue marcar?`,
+          `Oi ${nome1}! Você sumiu! Estava vendo a agenda e lembrei de você. Quando a gente consegue marcar?`,
           `${abre} Tá sumido(a)! Tudo certo por aí? Se precisar de qualquer coisa é só me chamar, tenho horário essa semana.`,
           `Oi ${nome1}! Faz um tempão que não te vejo — tudo bem? Quando quer passar aqui?`,
           `${abre} Sumiu! Sentimos sua falta. Quando quer voltar? Agenda essa semana ainda tem bons horários.`,
