@@ -1549,6 +1549,20 @@ export default function Despesas() {
   const [modalCategorias, setModalCategorias] = useState(false);
   const [viendoDetalhes, setViendoDetalhes]   = useState(null);
 
+  useEffect(() => {
+    if (!podeCriarV) return;
+    const handler = (e) => {
+      if (e.key === "n" || e.key === "N") {
+        const tag = document.activeElement?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        e.preventDefault();
+        setModalNovo(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [podeCriarV]);
+
   /* ── Firestore ── */
   useEffect(() => {
     if (!tenantUid) { setLoading(false); return; }
@@ -1955,7 +1969,7 @@ export default function Despesas() {
             disabled={!podeCriarV}
             title={undefined}
           >
-            <Plus size={14} /> Nova Despesa
+            <Plus size={14} /> <span><u>N</u>ova Despesa</span>
           </button>
         </div>
       </header>
