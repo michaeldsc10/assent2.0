@@ -310,7 +310,7 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
         const fim    = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, 59, 59, 999);
         const totalVendas = vendas
           .filter((v) => { const dt = toDate(v.data); return dt && dt >= inicio && dt <= fim; })
-          .reduce((s, v) => s + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0)), 0);
+          .reduce((s, v) => s + Math.max(0, (Number(v.total) || 0) - (arPorVenda[v.id] || 0)), 0);
         return { d: `${String(h).padStart(2, "0")}h`, v: totalVendas + aReceberNaJanela(inicio, fim) };
       });
     } else if (period === "Todos") {
@@ -321,7 +321,7 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
         const fim    = new Date(ref.getFullYear(), ref.getMonth() + 1, 0, 23, 59, 59, 999);
         const totalVendas = vendas
           .filter((v) => { const dt = toDate(v.data); return dt && dt >= inicio && dt <= fim; })
-          .reduce((s, v) => s + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0)), 0);
+          .reduce((s, v) => s + Math.max(0, (Number(v.total) || 0) - (arPorVenda[v.id] || 0)), 0);
         const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
         return { d: `${meses[ref.getMonth()]}/${String(ref.getFullYear()).slice(2)}`, v: totalVendas + aReceberNaJanela(inicio, fim) };
       });
@@ -334,7 +334,7 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
         const next = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
         const totalVendas = vendas
           .filter((v) => { const dt = toDate(v.data); return dt && dt >= d && dt <= next; })
-          .reduce((s, v) => s + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0)), 0);
+          .reduce((s, v) => s + Math.max(0, (Number(v.total) || 0) - (arPorVenda[v.id] || 0)), 0);
         return {
           d: `${String(d.getDate()).padStart(2, "0")}/${d.getMonth() + 1}`,
           v: totalVendas + aReceberNaJanela(d, next),
@@ -351,7 +351,7 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
         const next = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
         const totalVendas = vendas
           .filter((v) => { const dt = toDate(v.data); return dt && dt >= d && dt <= next; })
-          .reduce((s, v) => s + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0)), 0);
+          .reduce((s, v) => s + Math.max(0, (Number(v.total) || 0) - (arPorVenda[v.id] || 0)), 0);
         return {
           d: `${String(d.getDate()).padStart(2, "0")}/${d.getMonth() + 1}`,
           v: totalVendas + aReceberNaJanela(d, next),
@@ -407,7 +407,7 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
       const nome = (v.cliente || "").trim();
       // Exclui vendas sem cliente (PDV anônimo) e mesas
       if (!nome || nome === "—" || nome === "-" || /^mesa\s/i.test(nome)) return;
-      cliMap[nome] = (cliMap[nome] || 0) + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0));
+      cliMap[nome] = (cliMap[nome] || 0) + Math.max(0, (Number(v.total) || 0) - (arPorVenda[v.id] || 0));
     });
     const topClientes = Object.entries(cliMap)
       .sort((a, b) => b[1] - a[1])
