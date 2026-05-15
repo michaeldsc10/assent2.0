@@ -1468,6 +1468,24 @@ const CSS = `
     background: #141414;
     border-right: 1px solid rgba(255,255,255,0.06);
   }
+  .ag-app.light .ag-sidebar-mobile {
+    background: #141414;
+    border-right: 1px solid rgba(255,255,255,0.06);
+  }
+  .ag-app.light .ag-sidebar-mobile-header { border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .ag-app.light .ag-sidebar-mobile-close {
+    background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.08); color: rgba(255,255,255,0.55);
+  }
+  .ag-app.light .ag-sidebar-mobile-close:hover { background: rgba(255,255,255,0.1); color: #fff; }
+  .ag-app.light .ag-sidebar-mobile .ag-sec-label { color: rgba(255,255,255,0.28); }
+  .ag-app.light .ag-sidebar-mobile .ag-nav-item { color: rgba(255,255,255,0.55); }
+  .ag-app.light .ag-sidebar-mobile .ag-nav-item:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.88); }
+  .ag-app.light .ag-sidebar-mobile .ag-nav-item.active {
+    background: linear-gradient(90deg, rgba(200,165,94,0.15) 0%, rgba(200,165,94,0.05) 100%);
+    color: var(--gold-brand);
+    border-left-color: var(--gold-brand);
+  }
+  .ag-app.light .ag-sidebar-mobile .ag-nav-item.active svg { color: var(--gold-brand); }
   .ag-app.light .ag-sidebar .ag-sec-label { color: rgba(255,255,255,0.28); }
   .ag-app.light .ag-sidebar .ag-nav-item { color: rgba(255,255,255,0.55); }
   .ag-app.light .ag-sidebar .ag-nav-item:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.88); }
