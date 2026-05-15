@@ -336,8 +336,24 @@ const RESPONSIVE_CSS = `
 
 /* ── AGENDA ── */
 @media (max-width: 640px) {
-  .ag-main { overflow-y: auto !important; -webkit-overflow-scrolling: touch; }
-  .ag-page { overflow: auto !important; }
+  /* ag-main vira o scrollable container */
+  .ag-main {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    display: block !important;
+  }
+  /* ag-page cresce com o conteúdo, sem altura fixa */
+  .ag-page {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: visible !important;
+  }
+  /* ag-content não precisa mais scrollar — o pai scrolla */
+  .ag-content {
+    overflow: visible !important;
+    flex: none !important;
+    min-height: 0 !important;
+  }
 
   /* Topbar da Agenda */
   .ag-topbar {
