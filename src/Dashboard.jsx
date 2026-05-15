@@ -500,17 +500,15 @@ const RESPONSIVE_CSS = `
   .ag-periods      { display: none !important; }
   .ag-custom-range { display: none !important; }
   .ag-period-mobile { display: flex !important; }
+  .db-kpi-strip { grid-template-columns: repeat(2, 1fr) !important; }
   .db-body { grid-template-columns: 1fr !important; }
   .db-aside { display: none !important; }
-  .db-kpi-strip { flex-wrap: nowrap !important; overflow-x: auto !important; }
-  .db-kpi-item { min-width: 130px !important; }
 }
 @media (min-width: 721px) {
   .ag-period-mobile { display: none !important; }
 }
 @media (max-width: 480px) {
-  .db-cols-2 { grid-template-columns: 1fr !important; }
-  .db-cols-2 > div:first-child { border-right: none !important; border-bottom: 1px solid var(--border) !important; }
+  .db-kpi-strip { grid-template-columns: 1fr 1fr !important; }
 }
 
 /* ── MOBILE BOTTOM NAV ── */
@@ -1110,73 +1108,61 @@ const CSS = `
   }
 
   /* ══ CONTENT ══ */
-  .ag-content { flex: 1; min-height: 0; overflow-y: auto; padding: 0; -webkit-overflow-scrolling: touch; background: var(--bg); }
+  .ag-content { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px 36px; -webkit-overflow-scrolling: touch; }
   .ag-content::-webkit-scrollbar { width: 4px; }
   .ag-content::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
 
   /* ══ KPI STRIP ══ */
   .db-kpi-strip {
-    display: flex; align-items: stretch;
-    border-bottom: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .db-kpi-card {
     background: var(--s1);
-    overflow-x: auto; flex-shrink: 0;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+    transition: box-shadow .15s, border-color .15s;
   }
-  .db-kpi-strip::-webkit-scrollbar { display: none; }
-  .db-kpi-item {
-    flex: 1; min-width: 140px;
-    padding: 14px 20px;
-    border-right: 1px solid var(--border);
-    display: flex; flex-direction: column; gap: 4px;
-    transition: background .13s;
-  }
-  .db-kpi-item:last-child { border-right: none; }
-  .db-kpi-item:hover { background: var(--s2); }
+  .db-kpi-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.22); border-color: var(--border-h); }
   .db-kpi-label {
     font-size: 10px; font-weight: 600; letter-spacing: .08em;
-    text-transform: uppercase; color: var(--text-3);
-    white-space: nowrap;
+    text-transform: uppercase; color: var(--text-3); margin-bottom: 8px;
   }
   .db-kpi-val {
     font-family: var(--font-mono); font-size: 20px; font-weight: 700;
     color: var(--text); line-height: 1; letter-spacing: -0.02em;
+    margin-bottom: 6px;
   }
-  .db-kpi-meta {
-    display: flex; align-items: center; gap: 5px;
-    font-size: 11px; color: var(--text-3); margin-top: 1px;
-  }
+  .db-kpi-meta { display: flex; align-items: center; gap: 4px; }
   .db-kpi-trend { font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 2px; }
+  .db-kpi-sub { font-size: 11px; color: var(--text-3); }
 
-  /* ══ BODY LAYOUT ══ */
-  .db-body {
-    display: grid; grid-template-columns: 1fr 260px;
-    min-height: 0;
-  }
-  .db-main {
-    border-right: 1px solid var(--border);
-    overflow-y: auto; min-height: 0;
-  }
-  .db-main::-webkit-scrollbar { width: 4px; }
-  .db-main::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
-  .db-aside {
-    overflow-y: auto; background: var(--s1); min-height: 0;
-  }
-  .db-aside::-webkit-scrollbar { width: 3px; }
-  .db-aside::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
+  /* ══ LAYOUT BODY ══ */
+  .db-body { display: grid; grid-template-columns: 1fr 256px; gap: 16px; }
+  .db-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .db-aside { display: flex; flex-direction: column; gap: 16px; }
 
-  /* ══ SECTIONS ══ */
-  .db-section { border-bottom: 1px solid var(--border); }
-  .db-section-header {
+  /* ══ PANEL (substitui ag-card) ══ */
+  .db-panel {
+    background: var(--s1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+    transition: box-shadow .15s;
+  }
+  .db-panel:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.2); }
+  .db-panel-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 18px; border-bottom: 1px solid var(--border);
-    background: var(--s1); flex-shrink: 0;
   }
-  .db-section-title {
-    font-size: 12px; font-weight: 600; color: var(--text);
-    letter-spacing: 0.01em;
-  }
-  .db-section-body { padding: 16px 18px; }
-  .db-section-body-flush { padding: 0; }
-
+  .db-panel-title { font-size: 12px; font-weight: 600; color: var(--text); }
+  .db-panel-body { padding: 14px 16px; }
   .db-view-all {
     font-size: 11px; color: var(--gold);
     background: transparent; border: none; cursor: pointer;
@@ -1187,90 +1173,78 @@ const CSS = `
 
   /* ══ TABELAS ══ */
   .ag-trow {
-    display: grid; padding: 9px 18px;
+    display: grid; padding: 10px 16px;
     border-bottom: 1px solid var(--border);
     font-size: 12px; color: var(--text-2); transition: background .1s;
+    align-items: center;
   }
-  .ag-trow:hover   { background: rgba(255,255,255,0.018); }
+  .ag-trow:hover   { background: rgba(255,255,255,0.022); }
   .ag-trow:last-child { border-bottom: none; }
   .ag-thead { background: var(--s2); }
   .ag-th { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
-  .ag-empty-row { padding: 24px 18px; text-align: center; font-size: 12px; color: var(--text-3); }
+  .ag-empty-row { padding: 20px 16px; text-align: center; font-size: 12px; color: var(--text-3); }
 
   /* ══ ASIDE STATS ══ */
-  .db-aside-section { border-bottom: 1px solid var(--border); }
-  .db-aside-title {
-    font-size: 10px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase;
-    color: var(--text-3); padding: 10px 14px 8px;
-    border-bottom: 1px solid var(--border);
-  }
   .db-stat-row {
     display: flex; align-items: center; gap: 10px;
-    padding: 10px 14px; border-bottom: 1px solid var(--border);
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
     cursor: pointer; transition: background .1s;
   }
   .db-stat-row:last-child { border-bottom: none; }
   .db-stat-row:hover { background: var(--s2); }
   .db-stat-icon {
-    width: 30px; height: 30px; border-radius: 5px; flex-shrink: 0;
+    width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
   }
   .db-stat-label { font-size: 12px; color: var(--text-2); flex: 1; }
-  .db-stat-val { font-family: var(--font-mono); font-size: 15px; font-weight: 700; color: var(--text); }
+  .db-stat-val { font-family: var(--font-mono); font-size: 15px; font-weight: 700; }
 
-  /* ══ RESUMO DESPESAS ══ */
+  /* ══ DESPESAS ASIDE ══ */
   .db-desp-row {
-    display: grid; grid-template-columns: 1fr 56px 80px;
-    padding: 9px 14px; border-bottom: 1px solid var(--border);
-    font-size: 12px; align-items: center; transition: background .1s;
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 16px; border-bottom: 1px solid var(--border);
+    font-size: 12px; transition: background .1s;
   }
   .db-desp-row:last-child { border-bottom: none; }
-  .db-desp-row:hover { background: var(--s2); }
-  .db-desp-dot {
-    width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 8px; flex-shrink: 0;
-  }
-  .db-desp-lbl { color: var(--text-2); display: flex; align-items: center; }
-  .db-desp-count { font-family: var(--font-mono); font-weight: 700; font-size: 13px; text-align: center; }
-  .db-desp-val { font-size: 11px; color: var(--text-3); text-align: right; }
+  .db-desp-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .db-desp-label { flex: 1; color: var(--text-2); }
+  .db-desp-count { font-family: var(--font-mono); font-weight: 700; font-size: 13px; }
+  .db-desp-val { font-size: 11px; color: var(--text-3); width: 60px; text-align: right; }
 
-  /* ══ CHART SECTION ══ */
-  .db-chart-wrap { padding: 16px 18px 12px; }
+  /* ══ GRIDS (legado charts view + módulos) ══ */
+  .g4  { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 14px; }
+  .g3  { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 14px; }
+  .g21 { display: grid; grid-template-columns: 2fr 1fr;       gap: 14px; margin-bottom: 14px; }
+  .g11 { display: grid; grid-template-columns: 1fr 1fr;       gap: 14px; margin-bottom: 14px; }
+  .g1  { margin-bottom: 14px; }
 
-  /* ══ DUAL COLS ══ */
-  .db-cols-2 { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--border); }
-  .db-cols-2 > div:first-child { border-right: 1px solid var(--border); }
-
-  /* ══ GRIDS legados para charts view ══ */
-  .g4  { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 12px; }
-  .g3  { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 12px; }
-  .g21 { display: grid; grid-template-columns: 2fr 1fr;       gap: 12px; margin-bottom: 12px; }
-  .g11 { display: grid; grid-template-columns: 1fr 1fr;       gap: 12px; margin-bottom: 12px; }
-  .g1  { margin-bottom: 12px; }
-
-  /* ag-card e ag-card-bare — usados por renderChartsView e módulos externos */
+  /* ag-card e ag-card-bare usados por renderChartsView e módulos */
   .ag-card {
     background: var(--s1); border: 1px solid var(--border);
-    border-radius: 6px; padding: 16px;
-    transition: border-color .15s;
+    border-radius: 12px; padding: 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    transition: box-shadow .15s, border-color .15s;
   }
-  .ag-card:hover { border-color: var(--border-h); }
+  .ag-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.2); border-color: var(--border-h); }
   .ag-card-click { cursor: pointer; }
-  .ag-card-click:hover { border-color: rgba(200,165,94,0.25); }
+  .ag-card-click:hover { border-color: rgba(200,165,94,0.3); }
   .ag-card-bare {
     background: var(--s1); border: 1px solid var(--border);
-    border-radius: 6px; overflow: hidden;
+    border-radius: 12px; overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
   }
   .ag-card-header {
-    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    padding: 12px 16px; border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
   }
   .ag-card-title { font-size: 12px; font-weight: 600; color: var(--text); }
   .ag-view-all {
     font-size: 11px; color: var(--gold); background: transparent; border: none; cursor: pointer;
-    font-family: 'Inter', system-ui, sans-serif; display: flex; align-items: center; gap: 3px;
+    font-family: 'Inter', system-ui, sans-serif; display: flex; align-items: center; gap: 3px; transition: opacity .13s;
   }
+  .ag-view-all:hover { opacity: .75; }
   .ag-mini { display: flex; align-items: center; gap: 12px; }
-  .ag-mini-icon { width: 36px; height: 36px; border-radius: 6px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .ag-mini-icon { width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
   .ag-mini-val { font-family: var(--font-mono); font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
   .ag-mini-lbl { font-size: 11px; color: var(--text-2); margin-top: 3px; }
   .ag-kpi-label { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); margin-bottom: 8px; }
@@ -1279,7 +1253,8 @@ const CSS = `
   .ag-trend     { font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 2px; }
   .ag-sub       { font-size: 11px; color: var(--text-3); }
   .ag-despesa-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; padding: 14px; }
-  .ag-despesa-card { border-radius: 6px; padding: 12px; }
+  .ag-despesa-card { border-radius: 10px; padding: 14px; transition: transform .15s; }
+  .ag-despesa-card:hover { transform: translateY(-1px); }
   .ag-despesa-label { font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; margin-bottom: 6px; }
   .ag-despesa-count { font-family: var(--font-mono); font-size: 24px; font-weight: 700; color: var(--text); line-height: 1; }
   .ag-despesa-val   { font-size: 11px; color: var(--text-2); margin-top: 4px; }
@@ -1421,40 +1396,55 @@ const CSS = `
 
   /* ══ TEMA LIGHT ══ */
   .ag-app.light {
-    --bg:       #f4f3f0;
+    --bg:       #f0f2f5;
     --s1:       #ffffff;
-    --s2:       #f0efe9;
-    --s3:       #e8e7e0;
-    --border:   rgba(0,0,0,0.08);
-    --border-h: rgba(0,0,0,0.15);
+    --s2:       #f5f6f8;
+    --s3:       #ecedf0;
+    --border:   rgba(0,0,0,0.07);
+    --border-h: rgba(0,0,0,0.14);
     --gold:         #a07c1a;
     --gold-l:       #c09a30;
     --gold-d:       rgba(160,124,26,0.1);
     --gold-brand:   #a07c1a;
-    --text:     #1a1a1a;
-    --text-2:   #555050;
-    --text-3:   #999490;
-    --green:    #1a9e6a;
-    --green-d:  rgba(26,158,106,0.1);
-    --red:      #c03030;
-    --red-d:    rgba(192,48,48,0.1);
-    --blue:     #2a5ec0;
-    --blue-d:   rgba(42,94,192,0.1);
-    --purple:   #6b4fc8;
-    --purple-d: rgba(107,79,200,0.1);
-    --amber:    #c07800;
-    --amber-d:  rgba(192,120,0,0.1);
+    --text:     #111827;
+    --text-2:   #4b5563;
+    --text-3:   #9ca3af;
+    --green:    #16a34a;
+    --green-d:  rgba(22,163,74,0.08);
+    --red:      #dc2626;
+    --red-d:    rgba(220,38,38,0.08);
+    --blue:     #2563eb;
+    --blue-d:   rgba(37,99,235,0.08);
+    --purple:   #7c3aed;
+    --purple-d: rgba(124,58,237,0.08);
+    --amber:    #d97706;
+    --amber-d:  rgba(217,119,6,0.08);
     color-scheme: light;
   }
   .ag-app.light .ag-date-input { color-scheme: light; }
-  .ag-app.light .ag-user-dropdown { box-shadow: 0 8px 32px rgba(0,0,0,0.15); }
+  .ag-app.light .ag-card,
+  .ag-app.light .ag-card-bare,
+  .ag-app.light .db-panel,
+  .ag-app.light .db-kpi-card {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .ag-app.light .ag-card:hover,
+  .ag-app.light .db-panel:hover,
+  .ag-app.light .db-kpi-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  }
+  .ag-app.light .ag-global-header { background: rgba(255,255,255,0.97); }
+  .ag-app.light .ag-sidebar { background: rgba(255,255,255,0.98); }
+  .ag-app.light .ag-topbar { background: rgba(248,249,250,0.9); }
+  .ag-app.light .ag-trow:hover { background: rgba(0,0,0,0.018); }
+  .ag-app.light .ag-user-dropdown { box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
   .ag-app.light .ag-avatar {
     background: linear-gradient(135deg, rgba(160,124,26,0.15), rgba(160,124,26,0.05));
     border-color: rgba(160,124,26,0.25);
   }
-  .ag-app.light .ag-header-logo-icon {
-    background: linear-gradient(135deg, #b8952e, #d4af37);
-  }
+  .ag-app.light .ag-header-logo-icon { background: linear-gradient(135deg, #b8952e, #d4af37); }
+  .ag-app.light .db-stat-row:hover { background: var(--s2); }
+  .ag-app.light .db-desp-row:hover { background: var(--s2); }
 
 /* ── CARD DE SAUDAÇÃO FLUTUANTE ── */
 .ag-saudacao-card {
@@ -3141,16 +3131,16 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           <p><span className="ag-live-dot" />Visão geral do negócio</p>
         </div>
 
-        {/* Toggle Visão */}
-        <div style={{ display: "flex", background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 6, padding: 3, gap: 2, flexShrink: 0 }}>
+        <div style={{ display: "flex", background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 8, padding: 3, gap: 2, flexShrink: 0 }}>
           <button
             onClick={() => setDashView("overview")}
             style={{
               display: "flex", alignItems: "center", gap: 6,
-              padding: "5px 11px", borderRadius: 4, border: "none", cursor: "pointer",
+              padding: "5px 12px", borderRadius: 6, border: "none", cursor: "pointer",
               fontSize: 12, fontWeight: 500, fontFamily: "'Inter', system-ui, sans-serif",
-              background: dashView === "overview" ? "var(--s3)" : "transparent",
+              background: dashView === "overview" ? "var(--s1)" : "transparent",
               color: dashView === "overview" ? "var(--text)" : "var(--text-3)",
+              boxShadow: dashView === "overview" ? "0 1px 3px rgba(0,0,0,0.15)" : "none",
               transition: "all .15s",
             }}
           >
@@ -3160,7 +3150,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             onClick={() => setDashView("charts")}
             style={{
               display: "flex", alignItems: "center", gap: 6,
-              padding: "5px 11px", borderRadius: 4, border: "none", cursor: "pointer",
+              padding: "5px 12px", borderRadius: 6, border: "none", cursor: "pointer",
               fontSize: 12, fontWeight: 500, fontFamily: "'Inter', system-ui, sans-serif",
               background: dashView === "charts" ? "var(--gold-d)" : "transparent",
               color: dashView === "charts" ? "var(--gold)" : "var(--text-3)",
@@ -3179,44 +3169,25 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             onKeyDown={e => {
-              if (e.key === "Enter" && searchResults.length > 0) {
-                searchResults[0].items[0].onClick();
-              }
+              if (e.key === "Enter" && searchResults.length > 0) searchResults[0].items[0].onClick();
               if (e.key === "Escape") setSearchQuery("");
             }}
           />
           {(searchLoading || searchResults.length > 0) && searchQuery.trim() && (
             <div style={{
-              position: "absolute", top: "calc(100% + 6px)", left: 0,
-              width: "320px",
+              position: "absolute", top: "calc(100% + 6px)", left: 0, width: "320px",
               background: "var(--s1)", border: "1px solid var(--border)",
-              borderRadius: 8, zIndex: 999, overflow: "hidden",
-              boxShadow: "0 12px 32px rgba(0,0,0,0.35)"
+              borderRadius: 10, zIndex: 999, overflow: "hidden",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.15)"
             }}>
               {searchLoading ? (
-                <div style={{ padding: "14px", fontSize: 13, color: "var(--text-3)", textAlign: "center" }}>
-                  <LoadingCubes />
-                </div>
-              ) : searchResults.length === 0 ? (
-                <div style={{ padding: "14px", fontSize: 13, color: "var(--text-3)", textAlign: "center" }}>
-                  Nenhum resultado para "{searchQuery}"
-                </div>
+                <div style={{ padding: "14px", fontSize: 13, color: "var(--text-3)", textAlign: "center" }}><LoadingCubes /></div>
               ) : searchResults.map(grupo => (
                 <div key={grupo.tipo}>
-                  <div style={{
-                    padding: "8px 14px 4px",
-                    fontSize: 10, fontWeight: 700, letterSpacing: "0.08em",
-                    color: "var(--text-3)", textTransform: "uppercase"
-                  }}>{grupo.tipo}</div>
+                  <div style={{ padding: "8px 14px 4px", fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", color: "var(--text-3)", textTransform: "uppercase" }}>{grupo.tipo}</div>
                   {grupo.items.map((item, i) => (
-                    <div
-                      key={i}
-                      onClick={item.onClick}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 10,
-                        padding: "8px 14px", cursor: "pointer",
-                        transition: "background .1s",
-                      }}
+                    <div key={i} onClick={item.onClick}
+                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", cursor: "pointer", transition: "background .1s" }}
                       onMouseOver={e => e.currentTarget.style.background = "var(--s2)"}
                       onMouseOut={e => e.currentTarget.style.background = "transparent"}
                     >
@@ -3234,319 +3205,260 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         </div>
         <div className="ag-periods">
           {PERIODS.map((p) => (
-            <button
-              key={p}
-              className={`ag-period-btn ${period === p ? "active" : ""}`}
-              onClick={() => setPeriod(p)}
-            >
-              {p}
-            </button>
+            <button key={p} className={`ag-period-btn ${period === p ? "active" : ""}`} onClick={() => setPeriod(p)}>{p}</button>
           ))}
         </div>
         {period === "Personalizado" && (
           <div className="ag-custom-range">
             <label>De</label>
-            <input
-              type="date" className="ag-date-input"
-              value={customRange.from} max={customRange.to || undefined}
-              onChange={(e) => setCustomRange((r) => ({ ...r, from: e.target.value }))}
-            />
+            <input type="date" className="ag-date-input" value={customRange.from} max={customRange.to || undefined}
+              onChange={(e) => setCustomRange((r) => ({ ...r, from: e.target.value }))} />
             <span className="ag-date-sep">→</span>
             <label>Até</label>
-            <input
-              type="date" className="ag-date-input"
-              value={customRange.to} min={customRange.from || undefined}
-              onChange={(e) => setCustomRange((r) => ({ ...r, to: e.target.value }))}
-            />
+            <input type="date" className="ag-date-input" value={customRange.to} min={customRange.from || undefined}
+              onChange={(e) => setCustomRange((r) => ({ ...r, to: e.target.value }))} />
           </div>
         )}
       </header>
 
-      {/* Filtro de período — apenas mobile */}
-      <div className="ag-period-mobile" style={{
-        alignItems: "center", gap: 8,
-        padding: "10px 16px",
-        borderBottom: "1px solid var(--border)",
-        background: "var(--s1)",
-        flexShrink: 0,
-      }}>
-        <select
-          value={period}
-          onChange={(e) => setPeriod(e.target.value)}
-          style={{
-            flex: 1,
-            background: "var(--s2)",
-            border: "1px solid var(--border)",
-            borderRadius: 8,
-            color: "var(--text)",
-            fontSize: 13,
-            padding: "7px 10px",
-            fontFamily: "'Inter', system-ui, sans-serif",
-            outline: "none",
-          }}
-        >
-          {PERIODS.map((p) => (
-            <option key={p} value={p}>{p}</option>
-          ))}
+      {/* Mobile period */}
+      <div className="ag-period-mobile" style={{ alignItems: "center", gap: 8, padding: "10px 16px", borderBottom: "1px solid var(--border)", background: "var(--s1)", flexShrink: 0 }}>
+        <select value={period} onChange={(e) => setPeriod(e.target.value)}
+          style={{ flex: 1, background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13, padding: "7px 10px", fontFamily: "'Inter', system-ui, sans-serif", outline: "none" }}>
+          {PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
         {period === "Personalizado" && (
           <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1, marginTop: 8 }}>
-            <input
-              type="date" className="ag-date-input"
-              value={customRange.from} max={customRange.to || undefined}
-              onChange={(e) => setCustomRange((r) => ({ ...r, from: e.target.value }))}
-              style={{ flex: 1, fontSize: 12 }}
-            />
+            <input type="date" className="ag-date-input" value={customRange.from} max={customRange.to || undefined}
+              onChange={(e) => setCustomRange((r) => ({ ...r, from: e.target.value }))} style={{ flex: 1, fontSize: 12 }} />
             <span style={{ color: "var(--text-3)", fontSize: 12 }}>→</span>
-            <input
-              type="date" className="ag-date-input"
-              value={customRange.to} min={customRange.from || undefined}
-              onChange={(e) => setCustomRange((r) => ({ ...r, to: e.target.value }))}
-              style={{ flex: 1, fontSize: 12 }}
-            />
+            <input type="date" className="ag-date-input" value={customRange.to} min={customRange.from || undefined}
+              onChange={(e) => setCustomRange((r) => ({ ...r, to: e.target.value }))} style={{ flex: 1, fontSize: 12 }} />
           </div>
         )}
       </div>
 
-      <div className="ag-content" style={{ display: "flex", flexDirection: "column" }}>
-        {dashView === "charts" ? (
-          <div style={{ padding: "16px", flex: 1, overflowY: "auto" }}>
-            {renderChartsView()}
+      <div className="ag-content">
+        {dashView === "charts" ? renderChartsView() : (<>
+
+          {/* ── KPI CARDS ── */}
+          <div className="db-kpi-strip">
+            {[...kpiMain, ...kpiSec].map((k) => (
+              <div key={k.label} className="db-kpi-card">
+                <div className="db-kpi-label">{k.label}</div>
+                <div className="db-kpi-val" style={{ color: k.accent || "var(--text)" }}>
+                  <Val v={k.value} loading={dash.loading} />
+                </div>
+                <div className="db-kpi-meta">
+                  {k.trend ? (
+                    <span className="db-kpi-trend" style={{ color: k.up ? "var(--green)" : k.up === false ? "var(--red)" : "var(--text-3)" }}>
+                      {k.up === true && <ArrowUpRight size={11} />}
+                      {k.up === false && <ArrowDownRight size={11} />}
+                      {k.trend}
+                    </span>
+                  ) : (
+                    <span className="db-kpi-sub">{k.sub}</span>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        ) : (<>
 
-        {/* ── KPI STRIP ── */}
-        <div className="db-kpi-strip">
-          {[...kpiMain, ...kpiSec].map((k) => (
-            <div key={k.label} className="db-kpi-item">
-              <span className="db-kpi-label">{k.label}</span>
-              <span className="db-kpi-val" style={{ color: k.accent || "var(--text)" }}>
-                <Val v={k.value} loading={dash.loading} />
-              </span>
-              <div className="db-kpi-meta">
-                {k.trend && (
-                  <span className="db-kpi-trend" style={{ color: k.up ? "var(--green)" : k.up === false ? "var(--red)" : "var(--text-3)" }}>
-                    {k.up === true && <ArrowUpRight size={11} />}
-                    {k.up === false && <ArrowDownRight size={11} />}
-                    {k.trend}
-                  </span>
-                )}
-                {k.sub && !k.trend && <span style={{ color: "var(--text-3)", fontSize: 11 }}>{k.sub}</span>}
-              </div>
-            </div>
-          ))}
-        </div>
+          {/* ── BODY 2 COLUNAS ── */}
+          <div className="db-body">
 
-        {/* ── BODY: main + aside ── */}
-        <div className="db-body" style={{ flex: 1, minHeight: 0 }}>
+            {/* MAIN */}
+            <div className="db-main">
 
-          {/* MAIN */}
-          <div className="db-main">
-
-            {/* Gráfico faturamento */}
-            <div className="db-section">
-              <div className="db-section-header">
-                <span className="db-section-title">Faturamento por período</span>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 11, color: "var(--text-3)" }}>
-                    {period === "Personalizado" && customRange.from && customRange.to
-                      ? `${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")}`
-                      : period}
-                  </span>
-                  <ChartToggle value={faturMode} onChange={setFaturMode} />
+              {/* Gráfico */}
+              <div className="db-panel">
+                <div className="db-panel-header">
+                  <span className="db-panel-title">Faturamento por período</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: 11, color: "var(--text-3)" }}>
+                      {period === "Personalizado" && customRange.from && customRange.to
+                        ? `${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")}`
+                        : period}
+                    </span>
+                    <ChartToggle value={faturMode} onChange={setFaturMode} />
+                  </div>
+                </div>
+                <div style={{ padding: "16px 16px 10px" }}>
+                  {faturMode === "3d" ? (
+                    <Chart3DBars data={dash.loading ? [] : dash.faturamentoPorDia} period={period} height={180} />
+                  ) : (
+                    <ResponsiveContainer width="100%" height={168}>
+                      <AreaChart data={dash.loading ? [] : dash.faturamentoPorDia} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                        <defs>
+                          <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%"  stopColor="#c8a55e" stopOpacity={0.18} />
+                            <stop offset="95%" stopColor="#c8a55e" stopOpacity={0}    />
+                          </linearGradient>
+                        </defs>
+                        <XAxis dataKey="d" tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                        <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                        <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(200,165,94,0.15)", strokeWidth: 1, strokeDasharray: "4 3" }} />
+                        <Area type="monotone" dataKey="v" stroke="#c8a55e" strokeWidth={2} fill="url(#gGold)" dot={false}
+                          activeDot={{ r: 4, fill: "#c8a55e", stroke: "rgba(200,165,94,0.3)", strokeWidth: 5 }} />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </div>
-              <div className="db-chart-wrap">
-                {faturMode === "3d" ? (
-                  <Chart3DBars data={dash.loading ? [] : dash.faturamentoPorDia} period={period} height={180} />
-                ) : (
-                  <ResponsiveContainer width="100%" height={168}>
-                    <AreaChart data={dash.loading ? [] : dash.faturamentoPorDia} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                      <defs>
-                        <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%"  stopColor="#c8a55e" stopOpacity={0.18} />
-                          <stop offset="95%" stopColor="#c8a55e" stopOpacity={0}    />
-                        </linearGradient>
-                      </defs>
-                      <XAxis dataKey="d" tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                      <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(200,165,94,0.15)", strokeWidth: 1, strokeDasharray: "4 3" }} />
-                      <Area type="monotone" dataKey="v" stroke="#c8a55e" strokeWidth={1.5} fill="url(#gGold)" dot={false}
-                        activeDot={{ r: 4, fill: "#c8a55e", stroke: "rgba(200,165,94,0.3)", strokeWidth: 5 }} />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                )}
-              </div>
-            </div>
 
-            {/* Últimas Vendas */}
-            <div className="db-section">
-              <div className="db-section-header">
-                <span className="db-section-title">Últimas vendas</span>
-                <button className="db-view-all" onClick={() => setModule("Vendas")}>
-                  Ver todas <ChevronRight size={11} />
-                </button>
-              </div>
-              <div className="db-section-body-flush" style={{ overflowX: "auto" }}>
-                <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "80px 1fr 110px 110px", minWidth: 400 }}>
-                  {["ID", "Cliente", "Data", "Total"].map((h) => (
-                    <span key={h} className="ag-th" style={{ textAlign: h === "Total" ? "right" : "left" }}>{h}</span>
-                  ))}
+              {/* Últimas Vendas */}
+              <div className="db-panel">
+                <div className="db-panel-header">
+                  <span className="db-panel-title">Últimas vendas</span>
+                  <button className="db-view-all" onClick={() => setModule("Vendas")}>Ver todas <ChevronRight size={11} /></button>
                 </div>
-                {dash.loading ? (
-                  <div className="ag-trow" style={{ gridTemplateColumns: "1fr" }}><span className="ag-skeleton" /></div>
-                ) : dash.ultimasVendas.length === 0 ? (
-                  <div className="ag-empty-row">Nenhuma venda no período</div>
-                ) : (
-                  dash.ultimasVendas.map((v, i) => (
-                    <div key={v.id || i} className="ag-trow" style={{ gridTemplateColumns: "80px 1fr 110px 110px", minWidth: 400 }}>
+                <div style={{ overflowX: "auto" }}>
+                  <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "80px 1fr 110px 110px", minWidth: 380 }}>
+                    {["ID", "Cliente", "Data", "Total"].map((h) => (
+                      <span key={h} className="ag-th" style={{ textAlign: h === "Total" ? "right" : "left" }}>{h}</span>
+                    ))}
+                  </div>
+                  {dash.loading ? (
+                    <div className="ag-trow" style={{ gridTemplateColumns: "1fr" }}><span className="ag-skeleton" /></div>
+                  ) : dash.ultimasVendas.length === 0 ? (
+                    <div className="ag-empty-row">Nenhuma venda no período</div>
+                  ) : dash.ultimasVendas.map((v, i) => (
+                    <div key={v.id || i} className="ag-trow" style={{ gridTemplateColumns: "80px 1fr 110px 110px", minWidth: 380 }}>
                       <span style={{ color: "var(--gold)", fontFamily: "var(--font-mono)", fontSize: 11 }}>{v.idVenda || v.id}</span>
                       <span>{v.cliente || "—"}</span>
                       <span style={{ color: "var(--text-2)" }}>{fmtData(v.data)}</span>
-                      <span style={{ color: "var(--green)", textAlign: "right", fontFamily: "var(--font-mono)" }}>{fmtR$(v.total)}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Produtos + Clientes lado a lado */}
-            <div className="db-cols-2">
-              <div>
-                <div className="db-section-header">
-                  <span className="db-section-title">Produtos mais vendidos</span>
-                </div>
-                <div style={{ overflowX: "auto" }}>
-                  <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 50px 100px", minWidth: 260 }}>
-                    <span className="ag-th">Produto</span>
-                    <span className="ag-th" style={{ textAlign: "center" }}>Qtd</span>
-                    <span className="ag-th" style={{ textAlign: "right" }}>Total</span>
-                  </div>
-                  {dash.loading ? (
-                    <div className="ag-trow" style={{ gridTemplateColumns: "1fr" }}><span className="ag-skeleton" /></div>
-                  ) : dash.topProdutos.length === 0 ? (
-                    <div className="ag-empty-row">Sem dados</div>
-                  ) : dash.topProdutos.map((p, i) => (
-                    <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 50px 100px", minWidth: 260 }}>
-                      <span>{p.nome}</span>
-                      <span style={{ textAlign: "center", color: "var(--text-2)" }}>{p.qtd}</span>
-                      <span style={{ color: "var(--green)", textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 11 }}>{fmtR$(p.total)}</span>
+                      <span style={{ color: "var(--green)", textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 11 }}>{fmtR$(v.total)}</span>
                     </div>
                   ))}
                 </div>
               </div>
-              <div>
-                <div className="db-section-header">
-                  <span className="db-section-title">Clientes que mais compram</span>
-                </div>
-                <div style={{ overflowX: "auto" }}>
-                  <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 110px", minWidth: 220 }}>
-                    <span className="ag-th">Cliente</span>
-                    <span className="ag-th" style={{ textAlign: "right" }}>Total gasto</span>
-                  </div>
-                  {dash.loading ? (
-                    <div className="ag-trow" style={{ gridTemplateColumns: "1fr" }}><span className="ag-skeleton" /></div>
-                  ) : dash.topClientes.length === 0 ? (
-                    <div className="ag-empty-row">Sem dados</div>
-                  ) : dash.topClientes.map((c, i) => (
-                    <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 110px", minWidth: 220 }}>
-                      <span>{c.nome}</span>
-                      <span style={{ color: "var(--gold)", textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 11 }}>{fmtR$(c.total)}</span>
+
+              {/* Produtos + Clientes */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div className="db-panel">
+                  <div className="db-panel-header"><span className="db-panel-title">Produtos mais vendidos</span></div>
+                  <div style={{ overflowX: "auto" }}>
+                    <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 48px 96px", minWidth: 240 }}>
+                      <span className="ag-th">Produto</span>
+                      <span className="ag-th" style={{ textAlign: "center" }}>Qtd</span>
+                      <span className="ag-th" style={{ textAlign: "right" }}>Total</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-          </div>{/* /db-main */}
-
-          {/* ASIDE */}
-          <div className="db-aside">
-
-            {/* Mini stats — contadores */}
-            <div className="db-aside-section">
-              <div className="db-aside-title">Cadastros</div>
-              {miniStats.map((s) => (
-                <div key={s.label} className="db-stat-row" onClick={() => setModule(s.nav)}>
-                  <div className="db-stat-icon" style={{ background: s.dim }}>
-                    <s.icon size={15} color={s.color} />
+                    {dash.loading ? (
+                      <div className="ag-trow" style={{ gridTemplateColumns: "1fr" }}><span className="ag-skeleton" /></div>
+                    ) : dash.topProdutos.length === 0 ? (
+                      <div className="ag-empty-row">Sem dados</div>
+                    ) : dash.topProdutos.map((p, i) => (
+                      <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 48px 96px", minWidth: 240 }}>
+                        <span>{p.nome}</span>
+                        <span style={{ textAlign: "center" }}>{p.qtd}</span>
+                        <span style={{ color: "var(--green)", textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 11 }}>{fmtR$(p.total)}</span>
+                      </div>
+                    ))}
                   </div>
-                  <span className="db-stat-label">{s.label}</span>
-                  <span className="db-stat-val" style={{ color: s.color }}>
-                    <Val v={s.value} loading={dash.loading} />
-                  </span>
                 </div>
-              ))}
-            </div>
+                <div className="db-panel">
+                  <div className="db-panel-header"><span className="db-panel-title">Clientes que mais compram</span></div>
+                  <div style={{ overflowX: "auto" }}>
+                    <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 110px", minWidth: 200 }}>
+                      <span className="ag-th">Cliente</span>
+                      <span className="ag-th" style={{ textAlign: "right" }}>Total</span>
+                    </div>
+                    {dash.loading ? (
+                      <div className="ag-trow" style={{ gridTemplateColumns: "1fr" }}><span className="ag-skeleton" /></div>
+                    ) : dash.topClientes.length === 0 ? (
+                      <div className="ag-empty-row">Sem dados</div>
+                    ) : dash.topClientes.map((c, i) => (
+                      <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 110px", minWidth: 200 }}>
+                        <span>{c.nome}</span>
+                        <span style={{ color: "var(--gold)", textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 11 }}>{fmtR$(c.total)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
 
-            {/* Resumo Despesas */}
-            <div className="db-aside-section">
-              <div className="db-aside-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span>Despesas</span>
-                <button className="db-view-all" onClick={() => setModule("Despesas")} style={{ fontSize: 10, textTransform: "none", letterSpacing: 0 }}>
-                  Ver todas <ChevronRight size={10} />
-                </button>
+            </div>{/* /db-main */}
+
+            {/* ASIDE */}
+            <div className="db-aside">
+
+              {/* Mini stats */}
+              <div className="db-panel">
+                <div className="db-panel-header">
+                  <span className="db-panel-title">Cadastros</span>
+                </div>
+                {miniStats.map((s) => (
+                  <div key={s.label} className="db-stat-row" onClick={() => setModule(s.nav)}>
+                    <div className="db-stat-icon" style={{ background: s.dim }}>
+                      <s.icon size={15} color={s.color} />
+                    </div>
+                    <span className="db-stat-label">{s.label}</span>
+                    <span className="db-stat-val" style={{ color: s.color }}>
+                      <Val v={s.value} loading={dash.loading} />
+                    </span>
+                  </div>
+                ))}
               </div>
-              <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 40px 70px", padding: "6px 14px" }}>
-                <span className="ag-th">Status</span>
-                <span className="ag-th" style={{ textAlign: "center" }}>Qtd</span>
-                <span className="ag-th" style={{ textAlign: "right" }}>Valor</span>
-              </div>
-              {despesasCards.map((d) => (
-                <div key={d.label} className="db-desp-row">
-                  <span className="db-desp-lbl">
+
+              {/* Despesas */}
+              <div className="db-panel">
+                <div className="db-panel-header">
+                  <span className="db-panel-title">Despesas</span>
+                  <button className="db-view-all" onClick={() => setModule("Despesas")}>Ver todas <ChevronRight size={11} /></button>
+                </div>
+                {despesasCards.map((d) => (
+                  <div key={d.label} className="db-desp-row">
                     <span className="db-desp-dot" style={{ background: d.color }} />
-                    {d.label}
-                  </span>
-                  <span className="db-desp-count" style={{ color: d.color }}>
-                    {dash.loading ? <span className="ag-skeleton" style={{ width: 24, height: "1em" }} /> : d.count}
-                  </span>
-                  <span className="db-desp-val">{d.value}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Mix de receita */}
-            <div className="db-aside-section">
-              <div className="db-aside-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span>Mix de receita</span>
-                <ChartToggle value={mixModeOverview} onChange={setMixModeOverview} />
-              </div>
-              <div style={{ padding: "12px 14px" }}>
-                {mixModeOverview === "3d" ? (
-                  <Chart3DDonut data={dash.mixData || []} height={120} />
-                ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {(dash.mixData || []).map((item, i) => {
-                      const clr = i === 0 ? "#c8a55e" : "#3ecf8e";
-                      return (
-                        <div key={i}>
-                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
-                            <span style={{ color: "var(--text-2)", display: "flex", alignItems: "center", gap: 6 }}>
-                              <span style={{ width: 7, height: 7, borderRadius: 2, background: clr, display: "inline-block" }} />
-                              {item.name}
-                            </span>
-                            <span style={{ color: "var(--text)", fontWeight: 600, fontFamily: "var(--font-mono)" }}>
-                              {dash.loading ? "—" : `${item.value}%`}
-                            </span>
-                          </div>
-                          <div style={{ background: "var(--s3)", borderRadius: 2, height: 4 }}>
-                            <div style={{ width: `${item.value || 0}%`, height: "100%", background: clr, borderRadius: 2, transition: "width 0.5s ease" }} />
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {(!dash.mixData || dash.mixData.length === 0) && (
-                      <div style={{ fontSize: 12, color: "var(--text-3)", textAlign: "center", padding: "12px 0" }}>Sem dados no período</div>
-                    )}
+                    <span className="db-desp-label">{d.label}</span>
+                    <span className="db-desp-count" style={{ color: d.color }}>
+                      {dash.loading ? <span className="ag-skeleton" style={{ width: 20, height: "1em" }} /> : d.count}
+                    </span>
+                    <span className="db-desp-val">{d.value}</span>
                   </div>
-                )}
+                ))}
               </div>
-            </div>
 
-          </div>{/* /db-aside */}
+              {/* Mix receita */}
+              <div className="db-panel">
+                <div className="db-panel-header">
+                  <span className="db-panel-title">Mix de receita</span>
+                  <ChartToggle value={mixModeOverview} onChange={setMixModeOverview} />
+                </div>
+                <div style={{ padding: "14px 16px" }}>
+                  {mixModeOverview === "3d" ? (
+                    <Chart3DDonut data={dash.mixData || []} height={120} />
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                      {(dash.mixData || []).map((item, i) => {
+                        const clr = i === 0 ? "#c8a55e" : "#3ecf8e";
+                        return (
+                          <div key={i}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 5 }}>
+                              <span style={{ color: "var(--text-2)", display: "flex", alignItems: "center", gap: 6 }}>
+                                <span style={{ width: 8, height: 8, borderRadius: 3, background: clr, display: "inline-block" }} />
+                                {item.name}
+                              </span>
+                              <span style={{ color: "var(--text)", fontWeight: 600, fontFamily: "var(--font-mono)" }}>
+                                {dash.loading ? "—" : `${item.value}%`}
+                              </span>
+                            </div>
+                            <div style={{ background: "var(--s3)", borderRadius: 4, height: 5, overflow: "hidden" }}>
+                              <div style={{ width: `${item.value || 0}%`, height: "100%", background: clr, borderRadius: 4, transition: "width 0.5s ease" }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {(!dash.mixData || dash.mixData.length === 0) && (
+                        <div style={{ fontSize: 12, color: "var(--text-3)", textAlign: "center", padding: "8px 0" }}>Sem dados no período</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
 
-        </div>{/* /db-body */}
+            </div>{/* /db-aside */}
+
+          </div>{/* /db-body */}
 
         </>)}
       </div>
