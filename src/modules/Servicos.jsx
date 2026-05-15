@@ -227,6 +227,15 @@ const CSS = `
     font-size: 10px; font-weight: 500; letter-spacing: .06em;
     text-transform: uppercase; color: var(--text-3);
   }
+  .sv-sort-btn {
+    background: none; border: none; padding: 0; margin: 0;
+    font-size: 10px; font-weight: 500; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-3);
+    cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+    transition: color .13s;
+  }
+  .sv-sort-btn:hover { color: var(--gold); }
+  .sv-sort-btn.active { color: var(--gold); }
 
   .sv-id { font-family: 'Sora', sans-serif; font-size: 11px; color: var(--gold); font-weight: 500; }
   .sv-nome { color: var(--text); font-size: 13px; font-weight: 500; }
@@ -814,6 +823,13 @@ export default function Servicos() {
   const [servicoIdCnt, setServicoIdCnt] = useState(0);
   const [catIdCnt, setCatIdCnt]     = useState(0);
   const [search, setSearch]         = useState("");
+  const [sortField, setSortField]   = useState("id");
+  const [sortDir,   setSortDir]     = useState("asc");
+
+  const toggleSort = (field) => {
+    if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortField(field); setSortDir("asc"); }
+  };
   const [loading, setLoading]       = useState(true);
 
   const [modalNovo, setModalNovo]     = useState(false);
@@ -957,17 +973,37 @@ export default function Servicos() {
 
   /* ── Filtro de busca ── */
   const servicosFiltrados = useMemo(() => {
-    if (!search.trim()) return servicos;
-    const q = search.toLowerCase();
-    return servicos.filter(s => {
-      const cat = categorias.find(c => c.id === s.categoriaId);
-      return (
-        s.nome?.toLowerCase().includes(q) ||
-        s.descricao?.toLowerCase().includes(q) ||
-        cat?.nome?.toLowerCase().includes(q)
-      );
+    const q = search.toLowerCase().trim();
+    const filtered = q
+      ? servicos.filter(s => {
+          const cat = categorias.find(c => c.id === s.categoriaId);
+          return (
+            s.nome?.toLowerCase().includes(q) ||
+            s.descricao?.toLowerCase().includes(q) ||
+            cat?.nome?.toLowerCase().includes(q)
+          );
+        })
+      : [...servicos];
+
+    return filtered.sort((a, b) => {
+      let va, vb;
+      if (sortField === "id") {
+        va = parseInt((a.id || "").replace(/\D/g, "") || "0", 10);
+        vb = parseInt((b.id || "").replace(/\D/g, "") || "0", 10);
+      } else if (sortField === "nome") {
+        va = (a.nome || "").toLowerCase();
+        vb = (b.nome || "").toLowerCase();
+      } else {
+        const catA = categorias.find(c => c.id === a.categoriaId);
+        const catB = categorias.find(c => c.id === b.categoriaId);
+        va = (catA?.nome || "").toLowerCase();
+        vb = (catB?.nome || "").toLowerCase();
+      }
+      if (va < vb) return sortDir === "asc" ? -1 : 1;
+      if (va > vb) return sortDir === "asc" ?  1 : -1;
+      return 0;
     });
-  }, [servicos, categorias, search]);
+  }, [servicos, categorias, search, sortField, sortDir]);
 
   // App.jsx bloqueia render enquanto loadingAuth||!tenantUid
 
@@ -1015,9 +1051,21 @@ export default function Servicos() {
 
           {/* Cabeçalho da tabela */}
           <div className="sv-row sv-row-head">
-            <span>ID</span>
-            <span>Serviço</span>
-            <span>Categoria</span>
+            <span>
+              <button className={`sv-sort-btn ${sortField === "id" ? "active" : ""}`} onClick={() => toggleSort("id")}>
+                ID {sortField === "id" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+              </button>
+            </span>
+            <span>
+              <button className={`sv-sort-btn ${sortField === "nome" ? "active" : ""}`} onClick={() => toggleSort("nome")}>
+                Serviço {sortField === "nome" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+              </button>
+            </span>
+            <span>
+              <button className={`sv-sort-btn ${sortField === "categoria" ? "active" : ""}`} onClick={() => toggleSort("categoria")}>
+                Categoria {sortField === "categoria" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+              </button>
+            </span>
             <span>Preço</span>
             <span>Custo</span>
             <span>Margem</span>
