@@ -3576,9 +3576,9 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
     // Receita por ponto + despesas proporcionais (sem CMV — contabilizado na compra)
     const receitaData = faturDia.map((pt) => {
-      const propDesp = dash.receitaBruta > 0 ? (dash.valorDespesasPagas || 0) / dash.receitaBruta : 0;
+      const propDesp = dash.receitaBruta > 0 ? (dash.custoTotal || 0) / dash.receitaBruta : 0;
       const receita  = pt.v || 0;
-      const custo    = Math.round(receita * propDesp);
+      const custo    = receita * propDesp;
       return { mes: pt.d, receita, custo };
     });
 
@@ -3586,7 +3586,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     const margemPct = dash.receitaBruta > 0 ? dash.lucroLiquido / dash.receitaBruta : 0;
     const lucroData = faturDia.map((pt) => ({
       mes: pt.d,
-      lucro: Math.round((pt.v || 0) * margemPct),
+      lucro: (pt.v || 0) * margemPct,
     }));
 
     // ── Radar: métricas reais normalizadas 0–100 ──
