@@ -496,18 +496,21 @@ const RESPONSIVE_CSS = `
 
 /* ── DASHBOARD ESPECÍFICO ── */
 @media (max-width: 720px) {
-  .ag-search  { display: none !important; }
-  .ag-periods { display: none !important; }
+  .ag-search       { display: none !important; }
+  .ag-periods      { display: none !important; }
   .ag-custom-range { display: none !important; }
-  .ag-despesa-grid { grid-template-columns: 1fr 1fr !important; }
-  .ag-mini-cards-mobile { display: none !important; }
   .ag-period-mobile { display: flex !important; }
+  .db-body { grid-template-columns: 1fr !important; }
+  .db-aside { display: none !important; }
+  .db-kpi-strip { flex-wrap: nowrap !important; overflow-x: auto !important; }
+  .db-kpi-item { min-width: 130px !important; }
 }
 @media (min-width: 721px) {
   .ag-period-mobile { display: none !important; }
 }
 @media (max-width: 480px) {
-  .ag-despesa-grid { grid-template-columns: 1fr !important; }
+  .db-cols-2 { grid-template-columns: 1fr !important; }
+  .db-cols-2 > div:first-child { border-right: none !important; border-bottom: 1px solid var(--border) !important; }
 }
 
 /* ── MOBILE BOTTOM NAV ── */
@@ -571,11 +574,7 @@ const CSS = `
     flex-direction: column;
     height: 100vh;
     height: 100dvh;
-    background:
-      linear-gradient(var(--grid-line) 1px, transparent 1px),
-      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
-      var(--bg);
-    background-size: 48px 48px;
+    background: var(--bg);
     color: var(--text);
     overflow: hidden;
   }
@@ -1111,101 +1110,179 @@ const CSS = `
   }
 
   /* ══ CONTENT ══ */
-  .ag-content { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px 36px; -webkit-overflow-scrolling: touch; }
+  .ag-content { flex: 1; min-height: 0; overflow-y: auto; padding: 0; -webkit-overflow-scrolling: touch; background: var(--bg); }
   .ag-content::-webkit-scrollbar { width: 4px; }
   .ag-content::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
 
-  /* ══ CARDS ══ */
-  .ag-card {
-    background: linear-gradient(145deg, var(--s1) 0%, rgba(18,18,25,0.95) 100%);
-    border: 1px solid var(--border);
-    border-radius: 14px; padding: 20px;
-    box-shadow: var(--glow-card), inset 0 1px 0 rgba(255,255,255,0.025);
-    transition: border-color .2s, box-shadow .2s, transform .2s;
+  /* ══ KPI STRIP ══ */
+  .db-kpi-strip {
+    display: flex; align-items: stretch;
+    border-bottom: 1px solid var(--border);
+    background: var(--s1);
+    overflow-x: auto; flex-shrink: 0;
   }
-  .ag-card:hover {
-    border-color: var(--border-h);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
-    transform: translateY(-2px);
+  .db-kpi-strip::-webkit-scrollbar { display: none; }
+  .db-kpi-item {
+    flex: 1; min-width: 140px;
+    padding: 14px 20px;
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 4px;
+    transition: background .13s;
   }
-  .ag-card-click { cursor: pointer; }
-  .ag-card-click:hover {
-    border-color: rgba(200,165,94,0.22);
-    box-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 0 0 1px rgba(200,165,94,0.08), inset 0 1px 0 rgba(200,165,94,0.06);
-    transform: translateY(-3px);
+  .db-kpi-item:last-child { border-right: none; }
+  .db-kpi-item:hover { background: var(--s2); }
+  .db-kpi-label {
+    font-size: 10px; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--text-3);
+    white-space: nowrap;
   }
-  .ag-card-click:active { transform: translateY(-1px); }
+  .db-kpi-val {
+    font-family: var(--font-mono); font-size: 20px; font-weight: 700;
+    color: var(--text); line-height: 1; letter-spacing: -0.02em;
+  }
+  .db-kpi-meta {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--text-3); margin-top: 1px;
+  }
+  .db-kpi-trend { font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 2px; }
 
-  .ag-card-bare {
-    background: linear-gradient(145deg, var(--s1) 0%, rgba(18,18,25,0.95) 100%);
-    border: 1px solid var(--border);
-    border-radius: 14px; overflow: hidden;
-    box-shadow: var(--glow-card), inset 0 1px 0 rgba(255,255,255,0.025);
-    transition: border-color .2s, box-shadow .2s, transform .2s;
+  /* ══ BODY LAYOUT ══ */
+  .db-body {
+    display: grid; grid-template-columns: 1fr 260px;
+    min-height: 0;
   }
-  .ag-card-bare:hover {
-    border-color: var(--border-h);
-    box-shadow: 0 8px 28px rgba(0,0,0,0.4);
-    transform: translateY(-1px);
+  .db-main {
+    border-right: 1px solid var(--border);
+    overflow-y: auto; min-height: 0;
   }
+  .db-main::-webkit-scrollbar { width: 4px; }
+  .db-main::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
+  .db-aside {
+    overflow-y: auto; background: var(--s1); min-height: 0;
+  }
+  .db-aside::-webkit-scrollbar { width: 3px; }
+  .db-aside::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
 
-  .ag-card-header {
-    padding: 14px 18px; border-bottom: 1px solid var(--border);
+  /* ══ SECTIONS ══ */
+  .db-section { border-bottom: 1px solid var(--border); }
+  .db-section-header {
     display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 18px; border-bottom: 1px solid var(--border);
+    background: var(--s1); flex-shrink: 0;
   }
-  .ag-card-title { font-size: 13px; font-weight: 500; color: var(--text); }
+  .db-section-title {
+    font-size: 12px; font-weight: 600; color: var(--text);
+    letter-spacing: 0.01em;
+  }
+  .db-section-body { padding: 16px 18px; }
+  .db-section-body-flush { padding: 0; }
 
-  .ag-view-all {
+  .db-view-all {
     font-size: 11px; color: var(--gold);
     background: transparent; border: none; cursor: pointer;
     font-family: 'Inter', system-ui, sans-serif;
     display: flex; align-items: center; gap: 3px; transition: opacity .13s;
   }
-  .ag-view-all:hover { opacity: .75; }
-
-  /* ══ GRIDS ══ */
-  .g4  { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 16px; }
-  .g3  { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 16px; }
-  .g21 { display: grid; grid-template-columns: 2fr 1fr;        gap: 16px; margin-bottom: 16px; }
-  .g11 { display: grid; grid-template-columns: 1fr 1fr;        gap: 16px; margin-bottom: 16px; }
-  .g1  { margin-bottom: 16px; }
-
-  /* ══ MINI STATS ══ */
-  .ag-mini { display: flex; align-items: center; gap: 14px; }
-  .ag-mini-icon {
-    width: 44px; height: 44px; border-radius: 11px; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center;
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.07);
-  }
-  .ag-mini-val { font-family: var(--font-mono); font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: -0.02em; }
-  .ag-mini-lbl { font-size: 11px; color: var(--text-2); margin-top: 4px; }
-
-  /* ══ KPI CARDS ══ */
-  .ag-kpi-label { font-size: 10px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--text-2); margin-bottom: 10px; }
-  .ag-kpi-val   { font-family: var(--font-mono); font-size: 26px; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: -0.02em; }
-  .ag-kpi-meta  { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-  .ag-trend     { font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 2px; }
-  .ag-sub       { font-size: 11px; color: var(--text-3); }
+  .db-view-all:hover { opacity: .75; }
 
   /* ══ TABELAS ══ */
   .ag-trow {
-    display: grid; padding: 11px 18px;
+    display: grid; padding: 9px 18px;
     border-bottom: 1px solid var(--border);
     font-size: 12px; color: var(--text-2); transition: background .1s;
   }
-  .ag-trow:hover   { background: rgba(255,255,255,0.02); }
+  .ag-trow:hover   { background: rgba(255,255,255,0.018); }
   .ag-trow:last-child { border-bottom: none; }
   .ag-thead { background: var(--s2); }
-  .ag-th { font-size: 10px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .ag-th { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
   .ag-empty-row { padding: 24px 18px; text-align: center; font-size: 12px; color: var(--text-3); }
 
+  /* ══ ASIDE STATS ══ */
+  .db-aside-section { border-bottom: 1px solid var(--border); }
+  .db-aside-title {
+    font-size: 10px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--text-3); padding: 10px 14px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .db-stat-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background .1s;
+  }
+  .db-stat-row:last-child { border-bottom: none; }
+  .db-stat-row:hover { background: var(--s2); }
+  .db-stat-icon {
+    width: 30px; height: 30px; border-radius: 5px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .db-stat-label { font-size: 12px; color: var(--text-2); flex: 1; }
+  .db-stat-val { font-family: var(--font-mono); font-size: 15px; font-weight: 700; color: var(--text); }
+
   /* ══ RESUMO DESPESAS ══ */
-  .ag-despesa-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; padding: 18px; }
-  .ag-despesa-card { border-radius: 12px; padding: 15px; backdrop-filter: blur(4px); transition: transform .15s; }
-  .ag-despesa-card:hover { transform: translateY(-2px); }
-  .ag-despesa-label { font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; margin-bottom: 8px; }
-  .ag-despesa-count { font-family: var(--font-mono); font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; letter-spacing: -0.02em; }
-  .ag-despesa-val   { font-size: 11px; color: var(--text-2); margin-top: 6px; }
+  .db-desp-row {
+    display: grid; grid-template-columns: 1fr 56px 80px;
+    padding: 9px 14px; border-bottom: 1px solid var(--border);
+    font-size: 12px; align-items: center; transition: background .1s;
+  }
+  .db-desp-row:last-child { border-bottom: none; }
+  .db-desp-row:hover { background: var(--s2); }
+  .db-desp-dot {
+    width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 8px; flex-shrink: 0;
+  }
+  .db-desp-lbl { color: var(--text-2); display: flex; align-items: center; }
+  .db-desp-count { font-family: var(--font-mono); font-weight: 700; font-size: 13px; text-align: center; }
+  .db-desp-val { font-size: 11px; color: var(--text-3); text-align: right; }
+
+  /* ══ CHART SECTION ══ */
+  .db-chart-wrap { padding: 16px 18px 12px; }
+
+  /* ══ DUAL COLS ══ */
+  .db-cols-2 { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--border); }
+  .db-cols-2 > div:first-child { border-right: 1px solid var(--border); }
+
+  /* ══ GRIDS legados para charts view ══ */
+  .g4  { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 12px; }
+  .g3  { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 12px; }
+  .g21 { display: grid; grid-template-columns: 2fr 1fr;       gap: 12px; margin-bottom: 12px; }
+  .g11 { display: grid; grid-template-columns: 1fr 1fr;       gap: 12px; margin-bottom: 12px; }
+  .g1  { margin-bottom: 12px; }
+
+  /* ag-card e ag-card-bare — usados por renderChartsView e módulos externos */
+  .ag-card {
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 6px; padding: 16px;
+    transition: border-color .15s;
+  }
+  .ag-card:hover { border-color: var(--border-h); }
+  .ag-card-click { cursor: pointer; }
+  .ag-card-click:hover { border-color: rgba(200,165,94,0.25); }
+  .ag-card-bare {
+    background: var(--s1); border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden;
+  }
+  .ag-card-header {
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .ag-card-title { font-size: 12px; font-weight: 600; color: var(--text); }
+  .ag-view-all {
+    font-size: 11px; color: var(--gold); background: transparent; border: none; cursor: pointer;
+    font-family: 'Inter', system-ui, sans-serif; display: flex; align-items: center; gap: 3px;
+  }
+  .ag-mini { display: flex; align-items: center; gap: 12px; }
+  .ag-mini-icon { width: 36px; height: 36px; border-radius: 6px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+  .ag-mini-val { font-family: var(--font-mono); font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
+  .ag-mini-lbl { font-size: 11px; color: var(--text-2); margin-top: 3px; }
+  .ag-kpi-label { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-2); margin-bottom: 8px; }
+  .ag-kpi-val   { font-family: var(--font-mono); font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
+  .ag-kpi-meta  { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .ag-trend     { font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 2px; }
+  .ag-sub       { font-size: 11px; color: var(--text-3); }
+  .ag-despesa-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; padding: 14px; }
+  .ag-despesa-card { border-radius: 6px; padding: 12px; }
+  .ag-despesa-label { font-size: 9px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; margin-bottom: 6px; }
+  .ag-despesa-count { font-family: var(--font-mono); font-size: 24px; font-weight: 700; color: var(--text); line-height: 1; }
+  .ag-despesa-val   { font-size: 11px; color: var(--text-2); margin-top: 4px; }
 
   /* ══ FILTRO PERSONALIZADO ══ */
   .ag-custom-range {
@@ -3065,16 +3142,15 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         </div>
 
         {/* Toggle Visão */}
-        <div style={{ display: "flex", background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 10, padding: 3, gap: 2, flexShrink: 0 }}>
+        <div style={{ display: "flex", background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 6, padding: 3, gap: 2, flexShrink: 0 }}>
           <button
             onClick={() => setDashView("overview")}
             style={{
               display: "flex", alignItems: "center", gap: 6,
-              padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+              padding: "5px 11px", borderRadius: 4, border: "none", cursor: "pointer",
               fontSize: 12, fontWeight: 500, fontFamily: "'Inter', system-ui, sans-serif",
               background: dashView === "overview" ? "var(--s3)" : "transparent",
               color: dashView === "overview" ? "var(--text)" : "var(--text-3)",
-              borderColor: dashView === "overview" ? "var(--border-h)" : "transparent",
               transition: "all .15s",
             }}
           >
@@ -3084,7 +3160,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             onClick={() => setDashView("charts")}
             style={{
               display: "flex", alignItems: "center", gap: 6,
-              padding: "6px 12px", borderRadius: 8, border: "none", cursor: "pointer",
+              padding: "5px 11px", borderRadius: 4, border: "none", cursor: "pointer",
               fontSize: 12, fontWeight: 500, fontFamily: "'Inter', system-ui, sans-serif",
               background: dashView === "charts" ? "var(--gold-d)" : "transparent",
               color: dashView === "charts" ? "var(--gold)" : "var(--text-3)",
@@ -3114,7 +3190,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               position: "absolute", top: "calc(100% + 6px)", left: 0,
               width: "320px",
               background: "var(--s1)", border: "1px solid var(--border)",
-              borderRadius: 12, zIndex: 999, overflow: "hidden",
+              borderRadius: 8, zIndex: 999, overflow: "hidden",
               boxShadow: "0 12px 32px rgba(0,0,0,0.35)"
             }}>
               {searchLoading ? (
@@ -3232,254 +3308,247 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         )}
       </div>
 
-      <div className="ag-content">
-        {dashView === "charts" ? renderChartsView() : null}
-        {dashView !== "charts" && (<>
-        {/* Mini Stats */}
-        <div className="g4 ag-mini-cards-mobile">
-          {miniStats.map((s) => (
-            <div
-              key={s.label}
-              className="ag-card ag-card-click"
-              onClick={() => setModule(s.nav)}
-              title={`Ir para ${s.nav}`}
-            >
-              <div className="ag-mini">
-                <div className="ag-mini-icon" style={{ background: s.dim }}>
-                  <s.icon size={19} color={s.color} />
-                </div>
-                <div>
-                  <div className="ag-mini-val"><Val v={s.value} loading={dash.loading} /></div>
-                  <div className="ag-mini-lbl">{s.label}</div>
-                </div>
-              </div>
-              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
-                <ChevronRight size={13} color={s.color} style={{ opacity: 0.5 }} />
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* KPI Principal */}
-        <div className="g3">
-          {kpiMain.map((k) => (
-            <div key={k.label} className="ag-card" style={{
-              borderTop: `2px solid ${k.accent}`,
-              boxShadow: `0 2px 16px rgba(0,0,0,0.4), 0 0 40px ${k.accent}0d`,
-            }}>
-              <div className="ag-kpi-label">{k.label}</div>
-              <div className="ag-kpi-val"><Val v={k.value} loading={dash.loading} /></div>
-              <div className="ag-kpi-meta">
-                <span className="ag-trend" style={{ color: k.up ? "var(--green)" : "var(--red)" }}>
-                  {k.up ? <ArrowUpRight size={12} /> : <ArrowDownRight size={12} />}
-                  {k.trend}
-                </span>
-                <span className="ag-sub">{k.sub}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* KPI Secundário */}
-        <div className="g3">
-          {kpiSec.map((k) => (
-            <div key={k.label} className="ag-card" style={{
-              borderTop: `2px solid ${k.accent}`,
-              boxShadow: `0 2px 16px rgba(0,0,0,0.4), 0 0 40px ${k.accent}0d`,
-            }}>
-              <div className="ag-kpi-label">{k.label}</div>
-              <div className="ag-kpi-val"><Val v={k.value} loading={dash.loading} /></div>
-              <div className="ag-kpi-meta"><span className="ag-sub">{k.sub}</span></div>
-            </div>
-          ))}
-        </div>
-
-        {/* Gráficos */}
-        <div className="g21">
-          <div className="ag-card">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-              <div className="ag-card-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{ width: 7, height: 7, borderRadius: "50%", background: "var(--gold)", display: "inline-block" }} />
-                Faturamento por período
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <span style={{
-                  fontSize: 10, fontWeight: 500, letterSpacing: "0.06em", textTransform: "uppercase",
-                  color: "var(--gold)", background: "var(--gold-d)", padding: "3px 9px",
-                  borderRadius: 20, border: "1px solid rgba(200,165,94,0.2)",
-                }}>
-                  {period === "Personalizado" && customRange.from && customRange.to
-                    ? `${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")}`
-                    : period === "Personalizado" ? "Selecione o intervalo" : period}
-                </span>
-                <ChartToggle value={faturMode} onChange={setFaturMode} />
-              </div>
-            </div>
-            {faturMode === "3d" ? (
-              <Chart3DBars data={dash.loading ? [] : dash.faturamentoPorDia} period={period} height={200} />
-            ) : (
-            <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={dash.loading ? [] : dash.faturamentoPorDia} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                <defs>
-                  <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%"  stopColor="#c8a55e" stopOpacity={0.22} />
-                    <stop offset="95%" stopColor="#c8a55e" stopOpacity={0}    />
-                  </linearGradient>
-                  <filter id="glowGoldMain">
-                    <feGaussianBlur stdDeviation="3" result="blur" />
-                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-                  </filter>
-                </defs>
-                <XAxis dataKey="d" tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(200,165,94,0.15)", strokeWidth: 1, strokeDasharray: "4 3" }} />
-                <Area type="monotone" dataKey="v" stroke="#c8a55e" strokeWidth={2} fill="url(#gGold)" dot={false}
-                  activeDot={{ r: 5, fill: "#c8a55e", stroke: "rgba(200,165,94,0.3)", strokeWidth: 6, filter: "url(#glowGoldMain)" }} />
-              </AreaChart>
-            </ResponsiveContainer>
-            )}
+      <div className="ag-content" style={{ display: "flex", flexDirection: "column" }}>
+        {dashView === "charts" ? (
+          <div style={{ padding: "16px", flex: 1, overflowY: "auto" }}>
+            {renderChartsView()}
           </div>
+        ) : (<>
 
-          <div className="ag-card" style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-              <div className="ag-card-title">Mix de receita</div>
-              <ChartToggle value={mixModeOverview} onChange={setMixModeOverview} />
+        {/* ── KPI STRIP ── */}
+        <div className="db-kpi-strip">
+          {[...kpiMain, ...kpiSec].map((k) => (
+            <div key={k.label} className="db-kpi-item">
+              <span className="db-kpi-label">{k.label}</span>
+              <span className="db-kpi-val" style={{ color: k.accent || "var(--text)" }}>
+                <Val v={k.value} loading={dash.loading} />
+              </span>
+              <div className="db-kpi-meta">
+                {k.trend && (
+                  <span className="db-kpi-trend" style={{ color: k.up ? "var(--green)" : k.up === false ? "var(--red)" : "var(--text-3)" }}>
+                    {k.up === true && <ArrowUpRight size={11} />}
+                    {k.up === false && <ArrowDownRight size={11} />}
+                    {k.trend}
+                  </span>
+                )}
+                {k.sub && !k.trend && <span style={{ color: "var(--text-3)", fontSize: 11 }}>{k.sub}</span>}
+              </div>
             </div>
-            {mixModeOverview === "3d" ? (
-              <Chart3DDonut data={dash.mixData || []} height={160} />
-            ) : (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-              <PieChart width={130} height={130}>
-                <Pie
-                  data={dash.loading ? [{ name: "", value: 1 }] : dash.mixData}
-                  cx={60} cy={60} innerRadius={42} outerRadius={60} dataKey="value" strokeWidth={0}
-                >
-                  {(dash.mixData || []).map((_, i) => (
-                    <Cell key={i} fill={i === 0 ? "#c8a55e" : "#3ecf8e"} opacity={dash.loading ? 0.2 : (i === 0 ? 0.9 : 0.85)} />
+          ))}
+        </div>
+
+        {/* ── BODY: main + aside ── */}
+        <div className="db-body" style={{ flex: 1, minHeight: 0 }}>
+
+          {/* MAIN */}
+          <div className="db-main">
+
+            {/* Gráfico faturamento */}
+            <div className="db-section">
+              <div className="db-section-header">
+                <span className="db-section-title">Faturamento por período</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 11, color: "var(--text-3)" }}>
+                    {period === "Personalizado" && customRange.from && customRange.to
+                      ? `${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")}`
+                      : period}
+                  </span>
+                  <ChartToggle value={faturMode} onChange={setFaturMode} />
+                </div>
+              </div>
+              <div className="db-chart-wrap">
+                {faturMode === "3d" ? (
+                  <Chart3DBars data={dash.loading ? [] : dash.faturamentoPorDia} period={period} height={180} />
+                ) : (
+                  <ResponsiveContainer width="100%" height={168}>
+                    <AreaChart data={dash.loading ? [] : dash.faturamentoPorDia} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                      <defs>
+                        <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%"  stopColor="#c8a55e" stopOpacity={0.18} />
+                          <stop offset="95%" stopColor="#c8a55e" stopOpacity={0}    />
+                        </linearGradient>
+                      </defs>
+                      <XAxis dataKey="d" tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(200,165,94,0.15)", strokeWidth: 1, strokeDasharray: "4 3" }} />
+                      <Area type="monotone" dataKey="v" stroke="#c8a55e" strokeWidth={1.5} fill="url(#gGold)" dot={false}
+                        activeDot={{ r: 4, fill: "#c8a55e", stroke: "rgba(200,165,94,0.3)", strokeWidth: 5 }} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+
+            {/* Últimas Vendas */}
+            <div className="db-section">
+              <div className="db-section-header">
+                <span className="db-section-title">Últimas vendas</span>
+                <button className="db-view-all" onClick={() => setModule("Vendas")}>
+                  Ver todas <ChevronRight size={11} />
+                </button>
+              </div>
+              <div className="db-section-body-flush" style={{ overflowX: "auto" }}>
+                <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "80px 1fr 110px 110px", minWidth: 400 }}>
+                  {["ID", "Cliente", "Data", "Total"].map((h) => (
+                    <span key={h} className="ag-th" style={{ textAlign: h === "Total" ? "right" : "left" }}>{h}</span>
                   ))}
-                </Pie>
-              </PieChart>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, width: "100%" }}>
-                {(dash.mixData || []).map((item, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
-                    <div style={{ width: 8, height: 8, borderRadius: 2, background: i === 0 ? "#c8a55e" : "#3ecf8e" }} />
-                    <span style={{ color: "var(--text-2)", flex: 1 }}>{item.name}</span>
-                    <span style={{ color: "var(--text)", fontWeight: 500 }}>
-                      {dash.loading ? "—" : `${item.value}%`}
-                    </span>
-                  </div>
-                ))}
+                </div>
+                {dash.loading ? (
+                  <div className="ag-trow" style={{ gridTemplateColumns: "1fr" }}><span className="ag-skeleton" /></div>
+                ) : dash.ultimasVendas.length === 0 ? (
+                  <div className="ag-empty-row">Nenhuma venda no período</div>
+                ) : (
+                  dash.ultimasVendas.map((v, i) => (
+                    <div key={v.id || i} className="ag-trow" style={{ gridTemplateColumns: "80px 1fr 110px 110px", minWidth: 400 }}>
+                      <span style={{ color: "var(--gold)", fontFamily: "var(--font-mono)", fontSize: 11 }}>{v.idVenda || v.id}</span>
+                      <span>{v.cliente || "—"}</span>
+                      <span style={{ color: "var(--text-2)" }}>{fmtData(v.data)}</span>
+                      <span style={{ color: "var(--green)", textAlign: "right", fontFamily: "var(--font-mono)" }}>{fmtR$(v.total)}</span>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
-            )}
-          </div>
-        </div>
 
-        {/* Tabelas Produtos / Clientes */}
-        <div className="g11">
-          <div className="ag-card-bare">
-            <div className="ag-card-header">
-              <span className="ag-card-title">Produtos mais vendidos</span>
-            </div>
-            <div style={{ overflowX: "auto" }}>
-              <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 60px 110px", minWidth: 280 }}>
-                <span className="ag-th">Produto</span>
-                <span className="ag-th" style={{ textAlign: "center" }}>Qtd</span>
-                <span className="ag-th" style={{ textAlign: "right" }}>Total</span>
-              </div>
-              {dash.loading ? (
-                <div className="ag-trow" style={{ gridTemplateColumns: "1fr", minWidth: 280 }}><span className="ag-skeleton" /></div>
-              ) : dash.topProdutos.length === 0 ? (
-                <div className="ag-empty-row">Nenhuma venda no período</div>
-              ) : (
-                dash.topProdutos.map((p, i) => (
-                  <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 60px 110px", minWidth: 280 }}>
-                    <span>{p.nome}</span>
-                    <span style={{ textAlign: "center" }}>{p.qtd}</span>
-                    <span style={{ color: "var(--green)", textAlign: "right" }}>{fmtR$(p.total)}</span>
+            {/* Produtos + Clientes lado a lado */}
+            <div className="db-cols-2">
+              <div>
+                <div className="db-section-header">
+                  <span className="db-section-title">Produtos mais vendidos</span>
+                </div>
+                <div style={{ overflowX: "auto" }}>
+                  <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 50px 100px", minWidth: 260 }}>
+                    <span className="ag-th">Produto</span>
+                    <span className="ag-th" style={{ textAlign: "center" }}>Qtd</span>
+                    <span className="ag-th" style={{ textAlign: "right" }}>Total</span>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="ag-card-bare">
-            <div className="ag-card-header">
-              <span className="ag-card-title">Clientes que mais compram</span>
-            </div>
-            <div style={{ overflowX: "auto" }}>
-              <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 120px", minWidth: 240 }}>
-                <span className="ag-th">Cliente</span>
-                <span className="ag-th" style={{ textAlign: "right" }}>Total gasto</span>
+                  {dash.loading ? (
+                    <div className="ag-trow" style={{ gridTemplateColumns: "1fr" }}><span className="ag-skeleton" /></div>
+                  ) : dash.topProdutos.length === 0 ? (
+                    <div className="ag-empty-row">Sem dados</div>
+                  ) : dash.topProdutos.map((p, i) => (
+                    <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 50px 100px", minWidth: 260 }}>
+                      <span>{p.nome}</span>
+                      <span style={{ textAlign: "center", color: "var(--text-2)" }}>{p.qtd}</span>
+                      <span style={{ color: "var(--green)", textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 11 }}>{fmtR$(p.total)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-              {dash.loading ? (
-                <div className="ag-trow" style={{ gridTemplateColumns: "1fr", minWidth: 240 }}><span className="ag-skeleton" /></div>
-              ) : dash.topClientes.length === 0 ? (
-                <div className="ag-empty-row">Nenhuma venda no período</div>
-              ) : (
-                dash.topClientes.map((c, i) => (
-                  <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 120px", minWidth: 240 }}>
-                    <span>{c.nome}</span>
-                    <span style={{ color: "var(--gold)", textAlign: "right" }}>{fmtR$(c.total)}</span>
+              <div>
+                <div className="db-section-header">
+                  <span className="db-section-title">Clientes que mais compram</span>
+                </div>
+                <div style={{ overflowX: "auto" }}>
+                  <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 110px", minWidth: 220 }}>
+                    <span className="ag-th">Cliente</span>
+                    <span className="ag-th" style={{ textAlign: "right" }}>Total gasto</span>
                   </div>
-                ))
-              )}
+                  {dash.loading ? (
+                    <div className="ag-trow" style={{ gridTemplateColumns: "1fr" }}><span className="ag-skeleton" /></div>
+                  ) : dash.topClientes.length === 0 ? (
+                    <div className="ag-empty-row">Sem dados</div>
+                  ) : dash.topClientes.map((c, i) => (
+                    <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 110px", minWidth: 220 }}>
+                      <span>{c.nome}</span>
+                      <span style={{ color: "var(--gold)", textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 11 }}>{fmtR$(c.total)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Últimas Vendas */}
-        <div className="g1 ag-card-bare">
-          <div className="ag-card-header">
-            <span className="ag-card-title">Últimas vendas</span>
-            <button className="ag-view-all" onClick={() => setModule("Vendas")}>
-              Ver todas <ChevronRight size={12} />
-            </button>
-          </div>
-          <div style={{ overflowX: "auto" }}>
-            <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "90px 1fr 130px 130px", minWidth: 440 }}>
-              {["ID", "Cliente", "Data", "Total"].map((h) => (
-                <span key={h} className="ag-th" style={{ textAlign: h === "Total" ? "right" : "left" }}>{h}</span>
+          </div>{/* /db-main */}
+
+          {/* ASIDE */}
+          <div className="db-aside">
+
+            {/* Mini stats — contadores */}
+            <div className="db-aside-section">
+              <div className="db-aside-title">Cadastros</div>
+              {miniStats.map((s) => (
+                <div key={s.label} className="db-stat-row" onClick={() => setModule(s.nav)}>
+                  <div className="db-stat-icon" style={{ background: s.dim }}>
+                    <s.icon size={15} color={s.color} />
+                  </div>
+                  <span className="db-stat-label">{s.label}</span>
+                  <span className="db-stat-val" style={{ color: s.color }}>
+                    <Val v={s.value} loading={dash.loading} />
+                  </span>
+                </div>
               ))}
             </div>
-            {dash.loading ? (
-              <div className="ag-trow" style={{ gridTemplateColumns: "1fr", minWidth: 440 }}><span className="ag-skeleton" /></div>
-            ) : dash.ultimasVendas.length === 0 ? (
-              <div className="ag-empty-row">Nenhuma venda no período</div>
-            ) : (
-              dash.ultimasVendas.map((v, i) => (
-                <div key={v.id || i} className="ag-trow" style={{ gridTemplateColumns: "90px 1fr 130px 130px", minWidth: 440 }}>
-                  <span style={{ color: "var(--gold)" }}>{v.idVenda || v.id}</span>
-                  <span>{v.cliente || "—"}</span>
-                  <span>{fmtData(v.data)}</span>
-                  <span style={{ color: "var(--green)", textAlign: "right" }}>{fmtR$(v.total)}</span>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
 
-        {/* Resumo Despesas */}
-        <div className="g1 ag-card-bare">
-          <div className="ag-card-header">
-            <span className="ag-card-title">Resumo de despesas</span>
-            <button className="ag-view-all" onClick={() => setModule("Despesas")}>
-              Ver todas <ChevronRight size={12} />
-            </button>
-          </div>
-          <div className="ag-despesa-grid">
-            {despesasCards.map((d) => (
-              <div key={d.label} className="ag-despesa-card" style={{ background: d.dim, border: `1px solid ${d.color}28` }}>
-                <div className="ag-despesa-label" style={{ color: d.color }}>{d.label}</div>
-                <div className="ag-despesa-count">
-                  {dash.loading ? <span className="ag-skeleton" style={{ width: 40 }} /> : d.count}
-                </div>
-                <div className="ag-despesa-val">{d.value}</div>
+            {/* Resumo Despesas */}
+            <div className="db-aside-section">
+              <div className="db-aside-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span>Despesas</span>
+                <button className="db-view-all" onClick={() => setModule("Despesas")} style={{ fontSize: 10, textTransform: "none", letterSpacing: 0 }}>
+                  Ver todas <ChevronRight size={10} />
+                </button>
               </div>
-            ))}
-          </div>
-        </div>
-      </>)}
+              <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 40px 70px", padding: "6px 14px" }}>
+                <span className="ag-th">Status</span>
+                <span className="ag-th" style={{ textAlign: "center" }}>Qtd</span>
+                <span className="ag-th" style={{ textAlign: "right" }}>Valor</span>
+              </div>
+              {despesasCards.map((d) => (
+                <div key={d.label} className="db-desp-row">
+                  <span className="db-desp-lbl">
+                    <span className="db-desp-dot" style={{ background: d.color }} />
+                    {d.label}
+                  </span>
+                  <span className="db-desp-count" style={{ color: d.color }}>
+                    {dash.loading ? <span className="ag-skeleton" style={{ width: 24, height: "1em" }} /> : d.count}
+                  </span>
+                  <span className="db-desp-val">{d.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Mix de receita */}
+            <div className="db-aside-section">
+              <div className="db-aside-title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span>Mix de receita</span>
+                <ChartToggle value={mixModeOverview} onChange={setMixModeOverview} />
+              </div>
+              <div style={{ padding: "12px 14px" }}>
+                {mixModeOverview === "3d" ? (
+                  <Chart3DDonut data={dash.mixData || []} height={120} />
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {(dash.mixData || []).map((item, i) => {
+                      const clr = i === 0 ? "#c8a55e" : "#3ecf8e";
+                      return (
+                        <div key={i}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 4 }}>
+                            <span style={{ color: "var(--text-2)", display: "flex", alignItems: "center", gap: 6 }}>
+                              <span style={{ width: 7, height: 7, borderRadius: 2, background: clr, display: "inline-block" }} />
+                              {item.name}
+                            </span>
+                            <span style={{ color: "var(--text)", fontWeight: 600, fontFamily: "var(--font-mono)" }}>
+                              {dash.loading ? "—" : `${item.value}%`}
+                            </span>
+                          </div>
+                          <div style={{ background: "var(--s3)", borderRadius: 2, height: 4 }}>
+                            <div style={{ width: `${item.value || 0}%`, height: "100%", background: clr, borderRadius: 2, transition: "width 0.5s ease" }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {(!dash.mixData || dash.mixData.length === 0) && (
+                      <div style={{ fontSize: 12, color: "var(--text-3)", textAlign: "center", padding: "12px 0" }}>Sem dados no período</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+          </div>{/* /db-aside */}
+
+        </div>{/* /db-body */}
+
+        </>)}
       </div>
     </>
   );
