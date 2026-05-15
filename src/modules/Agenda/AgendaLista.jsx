@@ -25,19 +25,19 @@ const EventoRow = memo(function EventoRow({ evento, categorias, onVerDetalhes, o
   const concluido = evento.status === "concluido";
 
   return (
-    <div className={`ag-row ${concluido ? "concluido" : ""}`}>
+    <div
+      className={`ag-row ${concluido ? "concluido" : ""}`}
+      onClick={() => onVerDetalhes(evento)}
+      style={{ cursor: "pointer" }}
+    >
       {/* Tipo */}
       <TipoBadge tipo={evento.tipo} categorias={categorias} />
 
       {/* Horário */}
       <span className="ag-horario">{evento.horario || "—"}</span>
 
-      {/* Título — clicável */}
-      <span
-        className="ag-row-titulo"
-        onClick={() => onVerDetalhes(evento)}
-        title={evento.titulo}
-      >
+      {/* Título */}
+      <span className="ag-row-titulo" title={evento.titulo}>
         {evento.titulo}
       </span>
 
@@ -55,8 +55,8 @@ const EventoRow = memo(function EventoRow({ evento, categorias, onVerDetalhes, o
         {evento.endereco || evento.observacao || "—"}
       </span>
 
-      {/* Ações */}
-      <div className="ag-actions">
+      {/* Ações — stopPropagation para não abrir o modal */}
+      <div className="ag-actions" onClick={e => e.stopPropagation()}>
         <button
           className="btn-icon btn-icon-done"
           title={concluido ? "Reabrir" : "Concluir"}
