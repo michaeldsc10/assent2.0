@@ -1449,12 +1449,26 @@ export default function Orcamentos({ isPro = false }) {
 
   // ── Multi-tenant ──
   const { tenantUid, cargo, nomeUsuario, podeCriar, podeEditar, podeExcluir } = useAuth();
-  const uid = tenantUid; // alias — uid é passado como prop a vários sub-componentes
+  const uid = tenantUid;
 
   // ── Flags de permissão ──
   const podeCriarV   = podeCriar("orcamentos");
   const podeEditarV  = podeEditar("orcamentos");
   const podeExcluirV = podeExcluir("orcamentos");
+
+  useEffect(() => {
+    if (!podeCriarV) return;
+    const handler = (e) => {
+      if (e.key === "n" || e.key === "N") {
+        const tag = document.activeElement?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        e.preventDefault();
+        setModalNovo(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [podeCriarV]);
 
   useEffect(()=>{
     if(!uid) return;
@@ -1687,7 +1701,7 @@ export default function Orcamentos({ isPro = false }) {
             background:"var(--gold)",color:"#0a0808",border:"none",cursor:"pointer",
             fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:600,whiteSpace:"nowrap",
           }}>
-            <Plus size={14}/> Novo Orçamento
+            <Plus size={14}/> <span><u>N</u>ovo Orçamento</span>
           </button>
         </div>
       </header>
