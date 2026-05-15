@@ -2075,7 +2075,8 @@ function RelatorioDespesas({ despesas, intervalo }) {
           d.status === "cancelado" ? "cancelado" :
           d.vencimento && parseDate(d.vencimento) < hoje ? "vencido" :
           "pendente";
-        return { ...d, statusEfetivo };
+        const _dataRef = statusEfetivo === "pago" && d.dataPagamento ? d.dataPagamento : d.vencimento;
+        return { ...d, statusEfetivo, _dataRef };
       })
       .sort((a, b) => {
         const da  = parseDate(dataRefDespesa(a));
@@ -2115,6 +2116,9 @@ function RelatorioDespesas({ despesas, intervalo }) {
       ranking, maxVal,
     };
   }, [despesas, intervalo, filtroStatus]);
+
+  const { sorted: despSorted, sortKey: despSK, sortDir: despSD, handleSort: despSort } =
+    useSort(dados.filtradas, "vencimento", "asc");
 
   const handleExport = () => {
     exportarExcel("despesas", [{
@@ -2240,78 +2244,65 @@ function RelatorioDespesas({ despesas, intervalo }) {
       )}
 
       {/* ── Tabela de lançamentos ── */}
-      <TabelaRelatorio
-        title="Lançamentos de Despesas"
-        count={dados.filtradas.length}
-        empty="Nenhuma despesa encontrada para o filtro selecionado."
-        data={dados.filtradas}
-        columns={[
-          {
-            key: "statusEfetivo",
-            label: "Status",
-            render: (v) => <StatusBadgeRel status={v} />,
-          },
-          {
-            key: "dataPagamento",
-            label: "Data Ref.",
-            render: (v, row) => {
-              const isPago  = row.statusEfetivo === "pago";
-              const dataRef = isPago && v ? v : row.vencimento;
-              return (
-                <span title={isPago ? "Pago em" : "Vence em"}
-                  style={{ color: isPago ? "var(--green)" : "var(--text-2)", fontSize: 12 }}>
-                  {fmtData(dataRef)}
-                </span>
-              );
-            },
-          },
-          {
-            key: "vencimento",
-            label: "Vencimento",
-            render: (v, row) => {
-              if (!v) return <span style={{ color: "var(--text-3)" }}>—</span>;
-              const dias  = getDiasRestantes(v);
-              const color = row.statusEfetivo === "pago"
-                ? "var(--text-3)"
-                : dias !== null && dias < 0
-                ? "var(--red)"
-                : dias !== null && dias <= 3
-                ? "var(--gold)"
+      <div className="tr-wrap">
+        <div className="tr-header">
+          <span className="tr-title">Lançamentos de Despesas</span>
+          <span className="tr-badge">{dados.filtradas.length}</span>
+        </div>
+        {dados.filtradas.length === 0 ? (
+          <div className="tr-state">Nenhuma despesa encontrada para o filtro selecionado.</div>
+        ) : (
+          <>
+            <div className="tr-head" style={{ gridTemplateColumns: "110px 110px 110px 1fr 140px 90px" }}>
+              <SortTh label="Status"      sortKey="statusEfetivo" currentKey={despSK} currentDir={despSD} onSort={despSort}>Status</SortTh>
+              <SortTh label="Data Ref."   sortKey="_dataRef"      currentKey={despSK} currentDir={despSD} onSort={despSort}>Data Ref.</SortTh>
+              <SortTh label="Vencimento"  sortKey="vencimento"    currentKey={despSK} currentDir={despSD} onSort={despSort}>Vencimento</SortTh>
+              <SortTh label="Descrição"   sortKey="descricao"     currentKey={despSK} currentDir={despSD} onSort={despSort}>Descrição</SortTh>
+              <SortTh label="Categoria"   sortKey="categoria"     currentKey={despSK} currentDir={despSD} onSort={despSort}>Categoria</SortTh>
+              <SortTh label="Valor"       sortKey="valor"         currentKey={despSK} currentDir={despSD} onSort={despSort} align="right"><span style={{ width: "100%", textAlign: "right" }}>Valor</span></SortTh>
+            </div>
+            {despSorted.map((d) => {
+              const isPago  = d.statusEfetivo === "pago";
+              const dataRef = isPago && d.dataPagamento ? d.dataPagamento : d.vencimento;
+              const dias    = getDiasRestantes(d.vencimento);
+              const vencColor = isPago ? "var(--text-3)"
+                : dias !== null && dias < 0  ? "var(--red)"
+                : dias !== null && dias <= 3 ? "var(--gold)"
                 : "var(--text-2)";
-              return <span style={{ color }}>{fmtData(v)}</span>;
-            },
-          },
-          {
-            key: "descricao",
-            label: "Descrição",
-            render: (v, row) => (
-              <span style={{
-                display: "flex", alignItems: "center", gap: 6,
-                fontWeight: row.statusEfetivo === "pago" ? 400 : 500,
-                color: row.statusEfetivo === "pago" ? "var(--text-3)" : "var(--text)",
-                textDecoration: row.statusEfetivo === "cancelado" ? "line-through" : "none",
-              }}>
-                {row.statusEfetivo === "pago" && (
-                  <CheckCircle size={12} style={{ color: "var(--green)", flexShrink: 0 }} />
-                )}
-                {v || "—"}
-              </span>
-            ),
-          },
-          { key: "categoria", label: "Categoria" },
-          {
-            key: "valor", label: "Valor", align: "right",
-            render: (v, row) => (
-              <span style={{
-                fontFamily: "'Sora', sans-serif", fontWeight: 600, fontSize: 12,
-                color: row.statusEfetivo === "pago" ? "var(--green)" : "var(--red)",
-              }}>
-                {fmtR$(v)}
-              </span>
-            ),
-          },
-        ]}
-      />
+              return (
+                <div key={d.id} className="tr-row" style={{ gridTemplateColumns: "110px 110px 110px 1fr 140px 90px" }}>
+                  <StatusBadgeRel status={d.statusEfetivo} />
+                  <span title={isPago ? "Pago em" : "Vence em"}
+                    style={{ color: isPago ? "var(--green)" : "var(--text-2)", fontSize: 12 }}>
+                    {fmtData(dataRef)}
+                  </span>
+                  <span style={{ color: vencColor }}>
+                    {d.vencimento ? fmtData(d.vencimento) : <span style={{ color: "var(--text-3)" }}>—</span>}
+                  </span>
+                  <span style={{
+                    display: "flex", alignItems: "center", gap: 6,
+                    fontWeight: isPago ? 400 : 500,
+                    color: isPago ? "var(--text-3)" : "var(--text)",
+                    textDecoration: d.statusEfetivo === "cancelado" ? "line-through" : "none",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {isPago && <CheckCircle size={12} style={{ color: "var(--green)", flexShrink: 0 }} />}
+                    {d.descricao || "—"}
+                  </span>
+                  <span style={{ color: "var(--text-2)" }}>{d.categoria || <span style={{ color: "var(--text-3)" }}>—</span>}</span>
+                  <span style={{
+                    fontFamily: "'Sora', sans-serif", fontWeight: 600, fontSize: 12,
+                    color: isPago ? "var(--green)" : "var(--red)",
+                    textAlign: "right",
+                  }}>
+                    {fmtR$(d.valor)}
+                  </span>
+                </div>
+              );
+            })}
+          </>
+        )}
+      </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button className="btn-secondary" onClick={handleExport}>
