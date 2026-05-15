@@ -2231,7 +2231,7 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
       <aside className={`flow-sidebar${sidebarOpen?" open":""}`} style={S.sidebar}>
         <div style={S.sidebarHeader}>
           <div style={S.logoRow}>
-            <img src={isDark ? "/logo2_flow.png" : "/logo3_flow.png"} alt="Flow" style={{ height:72, maxWidth:"100%", objectFit:"contain", display:"block" }} />
+            <img src="/logo2_flow.png" alt="Flow" style={{ height:72, maxWidth:"100%", objectFit:"contain", display:"block" }} />
           </div>
         </div>
         <nav style={{flex:1}}>
