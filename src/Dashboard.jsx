@@ -1164,10 +1164,11 @@ const CSS = `
     background: var(--s1);
     border: 1px solid var(--border);
     border-radius: 12px;
-    overflow: hidden;
     box-shadow: 0 1px 4px rgba(0,0,0,0.18);
     transition: box-shadow .15s;
+    position: relative;
   }
+  .db-panel-table { overflow: hidden; }
   .db-panel:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.2); }
   .db-panel-header {
     padding: 12px 16px;
@@ -3334,7 +3335,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               </div>
 
               {/* Últimas Vendas */}
-              <div className="db-panel">
+              <div className="db-panel db-panel-table">
                 <div className="db-panel-header">
                   <span className="db-panel-title">Últimas vendas</span>
                   <button className="db-view-all" onClick={() => setModule("Vendas")}>Ver todas <ChevronRight size={11} /></button>
@@ -3366,7 +3367,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
               {/* Produtos + Clientes */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-                <div className="db-panel">
+                <div className="db-panel db-panel-table">
                   <div className="db-panel-header"><span className="db-panel-title">Produtos mais vendidos</span></div>
                   <div style={{ overflowX: "auto" }}>
                     <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 48px 96px", minWidth: 240 }}>
@@ -3391,7 +3392,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     ))}
                   </div>
                 </div>
-                <div className="db-panel">
+                <div className="db-panel db-panel-table">
                   <div className="db-panel-header"><span className="db-panel-title">Clientes que mais compram</span></div>
                   <div style={{ overflowX: "auto" }}>
                     <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 110px", minWidth: 200 }}>
@@ -3422,7 +3423,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             <div className="db-aside">
 
               {/* Mini stats */}
-              <div className="db-panel">
+              <div className="db-panel db-panel-table">
                 <div className="db-panel-header">
                   <span className="db-panel-title">Cadastros</span>
                 </div>
@@ -3440,7 +3441,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               </div>
 
               {/* Despesas */}
-              <div className="db-panel">
+              <div className="db-panel db-panel-table">
                 <div className="db-panel-header">
                   <span className="db-panel-title">Despesas</span>
                   <button className="db-view-all" onClick={() => setModule("Despesas")}>Ver todas <ChevronRight size={11} /></button>
