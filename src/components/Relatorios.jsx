@@ -2057,6 +2057,7 @@ function StatusBadgeRel({ status }) {
 
 function RelatorioDespesas({ despesas, intervalo }) {
   const [filtroStatus, setFiltroStatus] = useState("todas");
+  const [rankingAberto, setRankingAberto] = useState(true);
 
   const dados = useMemo(() => {
     const dataRefDespesa = (d) =>
@@ -2224,22 +2225,44 @@ function RelatorioDespesas({ despesas, intervalo }) {
       {/* ── Ranking por categoria (baseado nas filtradas) ── */}
       {dados.ranking.length > 0 && (
         <div className="tr-wrap">
-          <div className="tr-header">
+          <div
+            className="tr-header"
+            onClick={() => setRankingAberto((v) => !v)}
+            style={{ cursor: "pointer", userSelect: "none" }}
+          >
             <span className="tr-title">Ranking por Categoria</span>
-            <span className="tr-badge">{dados.ranking.length}</span>
-          </div>
-          {dados.ranking.map((r, i) => (
-            <div key={r.cat} className="rank-item">
-              <span className="rank-num">#{i + 1}</span>
-              <span className="rank-label">{r.cat}</span>
-              <div className="rank-bar-wrap">
-                <div className="rank-bar-bg">
-                  <div className="rank-bar-fill" style={{ width: `${(r.val / dados.maxVal) * 100}%` }} />
-                </div>
-              </div>
-              <span className="rank-val">{fmtR$(r.val)}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span className="tr-badge">{dados.ranking.length}</span>
+              <span style={{
+                fontSize: 11,
+                color: "var(--text-muted, #888)",
+                transition: "transform 0.2s",
+                display: "inline-block",
+                transform: rankingAberto ? "rotate(180deg)" : "rotate(0deg)"
+              }}>▼</span>
             </div>
-          ))}
+          </div>
+          <div style={{
+            display: "grid",
+            gridTemplateRows: rankingAberto ? "1fr" : "0fr",
+            transition: "grid-template-rows 0.25s ease",
+            overflow: "hidden"
+          }}>
+            <div style={{ minHeight: 0 }}>
+              {dados.ranking.map((r, i) => (
+                <div key={r.cat} className="rank-item">
+                  <span className="rank-num">#{i + 1}</span>
+                  <span className="rank-label">{r.cat}</span>
+                  <div className="rank-bar-wrap">
+                    <div className="rank-bar-bg">
+                      <div className="rank-bar-fill" style={{ width: `${(r.val / dados.maxVal) * 100}%` }} />
+                    </div>
+                  </div>
+                  <span className="rank-val">{fmtR$(r.val)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
