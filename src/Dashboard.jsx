@@ -1060,13 +1060,26 @@ const CSS = `
     display: flex; align-items: center; gap: 16px; flex-shrink: 0;
   }
   .ag-topbar-title h1 {
-    font-family: 'Inter', system-ui, sans-serif; font-size: 20px; font-weight: 800;
-    color: var(--gold-brand); line-height: 1.15;
-    letter-spacing: 0.12em; text-transform: uppercase;
-    background: linear-gradient(135deg, #D4AF37 10%, #f0d060 55%, #c8a55e 100%);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    font-family: 'Inter', system-ui, sans-serif; font-size: 17px; font-weight: 600;
+    color: var(--text); line-height: 1.2;
+    letter-spacing: -0.01em;
   }
-  .ag-topbar-title p { font-size: 11px; color: var(--text-3); margin-top: 3px; letter-spacing: 0.04em; text-transform: uppercase; font-weight: 500; }
+  .ag-topbar-title p { font-size: 11px; color: var(--text-3); margin-top: 2px; letter-spacing: 0.01em; font-weight: 400; }
+
+  /* ══ EMPTY STATE ══ */
+  .ag-empty-row { padding: 24px 18px; text-align: center; font-size: 12px; color: var(--text-3); }
+  .ag-empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 8px; padding: 32px 20px; text-align: center;
+  }
+  .ag-empty-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: var(--s2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 4px;
+  }
+  .ag-empty-title { font-size: 13px; font-weight: 600; color: var(--text-2); }
+  .ag-empty-sub { font-size: 12px; color: var(--text-3); line-height: 1.5; }
 
   @keyframes ag-pulse-dot {
     0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(62,207,142,0.5); }
@@ -3335,7 +3348,11 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   {dash.loading ? (
                     <div className="ag-trow" style={{ gridTemplateColumns: "1fr" }}><span className="ag-skeleton" /></div>
                   ) : dash.ultimasVendas.length === 0 ? (
-                    <div className="ag-empty-row">Nenhuma venda no período</div>
+                    <div className="ag-empty-state">
+                      <div className="ag-empty-icon"><TrendingDown size={18} color="var(--text-3)" /></div>
+                      <div className="ag-empty-title">Nenhuma venda no período</div>
+                      <div className="ag-empty-sub">Registre uma venda para ela aparecer aqui</div>
+                    </div>
                   ) : dash.ultimasVendas.map((v, i) => (
                     <div key={v.id || i} className="ag-trow" style={{ gridTemplateColumns: "80px 1fr 110px 110px", minWidth: 380 }}>
                       <span style={{ color: "var(--gold)", fontFamily: "var(--font-mono)", fontSize: 11 }}>{v.idVenda || v.id}</span>
@@ -3360,7 +3377,11 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     {dash.loading ? (
                       <div className="ag-trow" style={{ gridTemplateColumns: "1fr" }}><span className="ag-skeleton" /></div>
                     ) : dash.topProdutos.length === 0 ? (
-                      <div className="ag-empty-row">Sem dados</div>
+                      <div className="ag-empty-state">
+                        <div className="ag-empty-icon"><Package size={16} color="var(--text-3)" /></div>
+                        <div className="ag-empty-title">Sem dados</div>
+                        <div className="ag-empty-sub">Nenhuma venda no período</div>
+                      </div>
                     ) : dash.topProdutos.map((p, i) => (
                       <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 48px 96px", minWidth: 240 }}>
                         <span>{p.nome}</span>
@@ -3380,7 +3401,11 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     {dash.loading ? (
                       <div className="ag-trow" style={{ gridTemplateColumns: "1fr" }}><span className="ag-skeleton" /></div>
                     ) : dash.topClientes.length === 0 ? (
-                      <div className="ag-empty-row">Sem dados</div>
+                      <div className="ag-empty-state">
+                        <div className="ag-empty-icon"><Users size={16} color="var(--text-3)" /></div>
+                        <div className="ag-empty-title">Sem dados</div>
+                        <div className="ag-empty-sub">Nenhuma venda no período</div>
+                      </div>
                     ) : dash.topClientes.map((c, i) => (
                       <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 110px", minWidth: 200 }}>
                         <span>{c.nome}</span>
