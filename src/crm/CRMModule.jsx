@@ -1113,9 +1113,9 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
         top: 0, left: 0, bottom: 0,
         width: bp.isMobile ? 250 : sidebarWidth,
         zIndex: bp.isMobile ? 50 : 1,
-        background: isDark ? "rgba(5,5,5,0.96)" : T.surface,
+        background: isDark ? "rgba(5,5,5,0.96)" : "#141414",
         backdropFilter: isDark ? "blur(20px)" : "none",
-        borderRight: `1px solid ${T.border}`,
+        borderRight: isDark ? `1px solid ${T.border}` : "1px solid rgba(255,255,255,0.06)",
         display: "flex", flexDirection: "column",
         transition: "width 0.22s ease, transform 0.22s ease",
         transform: bp.isMobile ? (sidebarAberta ? "translateX(0)" : "translateX(-100%)") : "none",
@@ -1123,7 +1123,7 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
       }}>
         {/* Logo */}
         <div style={{
-          padding: "20px 16px", borderBottom: `1px solid ${T.border}`,
+          padding: "20px 16px", borderBottom: isDark ? `1px solid ${T.border}` : "1px solid rgba(255,255,255,0.06)",
           display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 64,
         }}>
           <div style={{ overflow: "hidden", opacity: sidebarAberta || bp.isMobile ? 1 : 0, transition: "opacity 0.15s ease", whiteSpace: "nowrap" }}>
@@ -1137,7 +1137,7 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
             }}>
               Assent CRM
             </div>
-            <div style={{ fontSize: 9.5, color: T.textDim, marginTop: 3, letterSpacing: "0.06em" }}>via Assent Gestão</div>
+            <div style={{ fontSize: 9.5, color: isDark ? T.textDim : "rgba(255,255,255,0.35)", marginTop: 3, letterSpacing: "0.06em" }}>via Assent Gestão</div>
           </div>
           {!bp.isMobile && (
             <button
@@ -1177,7 +1177,7 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                   background: ativo
                     ? "linear-gradient(140deg, rgba(212,175,55,0.12), rgba(212,175,55,0.03))"
                     : "transparent",
-                  color: ativo ? T.text : T.textMid,
+                  color: ativo ? (isDark ? T.text : "#fff") : (isDark ? T.textMid : "rgba(255,255,255,0.5)"),
                   fontSize: 12.5, cursor: "pointer", fontFamily: FONT,
                   fontWeight: ativo ? 500 : 400, transition: "all 0.15s ease",
                   position: "relative",
@@ -1195,7 +1195,7 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                   display: "flex", alignItems: "center", justifyContent: "center",
                   background: ativo ? T.goldDim : "transparent",
                   border: `1px solid ${ativo ? T.goldBorder : "transparent"}`,
-                  fontSize: 13, color: ativo ? T.goldLight : T.textDim,
+                  fontSize: 13, color: ativo ? T.goldLight : (isDark ? T.textDim : "rgba(255,255,255,0.35)"),
                   transition: "all 0.15s",
                 }}>
                   {a.icon}
@@ -1216,7 +1216,7 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
         </nav>
 
         {/* Footer sidebar */}
-        <div style={{ padding: "14px 14px", borderTop: `1px solid ${T.border}`, display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ padding: "14px 14px", borderTop: isDark ? `1px solid ${T.border}` : "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 8 }}>
           {sidebarAberta || bp.isMobile ? (
             <>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1229,17 +1229,17 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                   {(nomeEmpresa || "E")[0].toUpperCase()}
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: isDark ? T.text : "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>
                     {nomeEmpresa || "Empresa"}
                   </div>
-                  <div style={{ fontSize: 9.5, color: T.textDim }}>Assent CRM</div>
+                  <div style={{ fontSize: 9.5, color: isDark ? T.textDim : "rgba(255,255,255,0.35)" }}>Assent CRM</div>
                 </div>
               </div>
               <button
                 onClick={onVoltar}
                 style={{
-                  fontSize: 11, color: T.textDim,
-                  background: "transparent", border: `1px solid ${T.border}`,
+                  fontSize: 11, color: isDark ? T.textDim : "rgba(255,255,255,0.4)",
+                  background: "transparent", border: isDark ? `1px solid ${T.border}` : "1px solid rgba(255,255,255,0.1)",
                   cursor: "pointer", padding: "7px 12px", borderRadius: 8,
                   fontFamily: FONT, alignSelf: "flex-start", letterSpacing: "0.03em",
                   transition: "color 0.15s, border-color 0.15s",
