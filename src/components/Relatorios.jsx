@@ -3194,7 +3194,7 @@ function RelatorioClientes({ clientes, vendas, intervalo, aReceber = [] }) {
           { key: "id", label: "ID", render: (v, row) => <span style={{ color: "var(--gold)", fontFamily: "'Sora', sans-serif", fontSize: 11 }}>{row.idSeqFmt || v}</span> },
           { key: "nome",     label: "Nome" },
           { key: "telefone", label: "Telefone" },
-          { key: "cpf",      label: "CPF / CNPJ" },
+          { key: "cpf", label: "CPF / CNPJ", render: (v, row) => v || row.documento || "—" },
           { key: "email",    label: "E-mail" },
           { key: "nome",     label: "Valor Gasto", align: "right",
             render: (nome, row) => {
