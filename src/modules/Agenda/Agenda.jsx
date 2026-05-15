@@ -486,57 +486,41 @@ const CSS = `
   @media (max-width: 600px) {
     .ag-row-head { display: none; }
 
-    /* Fix scroll iOS: min-height:0 é obrigatório em flex child com overflow */
+    /* Fix scroll iOS */
     .ag-page { overflow: hidden; }
     .ag-content { min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
-    /* Card-style no mobile: cada evento vira um bloco empilhado */
+    /* Card mobile: grid 2 col — badge+horário | título | ações */
     .ag-row {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+      gap: 4px 8px;
       padding: 12px 14px;
       cursor: pointer;
       touch-action: manipulation;
-      -webkit-tap-highlight-color: rgba(200,165,94,0.08);
-      position: relative;
+      -webkit-tap-highlight-color: rgba(200,165,94,0.06);
+      align-items: center;
     }
-    /* Overlay invisível full-cover para garantir área de toque */
-    .ag-row::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      z-index: 0;
-    }
-    .ag-row > * { position: relative; z-index: 1; }
-    /* Ocultar colunas desnecessárias no mobile */
-    .ag-row > :nth-child(1),
-    .ag-row > :nth-child(2) { display: none; }
+    /* linha 1 col 1: badge + horário lado a lado */
+    .ag-row > :nth-child(1) { grid-column: 1; grid-row: 1; display: flex; align-items: center; gap: 6px; }
+    .ag-row > :nth-child(2) { grid-column: 1; grid-row: 1; margin-left: 4px; }
+    /* linha 1 col 2: ações */
+    .ag-actions { grid-column: 2; grid-row: 1 / 3; align-items: center; }
+    /* linha 2: título full */
+    .ag-row-titulo { grid-column: 1; grid-row: 2; white-space: normal; overflow: visible; font-size: 13.5px; pointer-events: none; }
+    /* ocultar colunas de detalhe (cliente, responsável, venda, local) */
+    .ag-row > :nth-child(4),
+    .ag-row > :nth-child(5),
     .ag-row > :nth-child(6),
     .ag-row > :nth-child(7) { display: none; }
-    /* Ações: alinha à direita dentro do card */
-    .ag-actions { justify-content: flex-end; }
-    /* Título clicável full-width */
-    .ag-row-titulo {
-      white-space: normal;
-      overflow: visible;
-      font-size: 14px;
-      pointer-events: none; /* o click vai pro ag-row pai */
-    }
 
     .ag-resumo { grid-template-columns: 1fr; }
     .form-row, .form-row-3 { grid-template-columns: 1fr; }
 
     /* Modal como bottom-sheet */
-    .modal-overlay {
-      align-items: flex-end;
-      padding: 0;
-    }
-    .modal-box {
-      border-radius: 16px 16px 0 0;
-      max-width: 100%;
-      max-height: 85vh;
-    }
+    .modal-overlay { align-items: flex-end; padding: 0; }
+    .modal-box { border-radius: 16px 16px 0 0; max-width: 100%; max-height: 85vh; }
   }
 `;
 
