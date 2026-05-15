@@ -3507,23 +3507,22 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   /* ══ RENDER GRÁFICOS ══ */
   const renderChartsView = () => {
     // ── Gráfico 1 e 2: Faturamento vs Custo e Lucro por período ──
-    // Usa os mesmos dados reais de faturamentoPorDia do hook,
-    // agrupando cada ponto como { mes/d, receita, custo, lucro }
+    // Usa os mesmos dados reais de faturamentoPorDia do hook
     const faturDia = dash.loading ? [] : (dash.faturamentoPorDia || []);
 
-    // Monta dados combinados: receita vem do hook, custo proporcional por dia
-    // O hook já filtra pelo período selecionado — usamos diretamente
+    // Receita por ponto + despesas proporcionais (sem CMV — contabilizado na compra)
     const receitaData = faturDia.map((pt) => {
-      // Proporção custo/receita total para estimar custo por ponto
-      const propCusto = dash.receitaBruta > 0 ? dash.custoTotal / dash.receitaBruta : 0;
-      const receita = pt.v || 0;
-      const custo   = Math.round(receita * propCusto);
-      return { mes: pt.d, receita, custo };
+      const propDesp = dash.receitaBruta > 0 ? (dash.valorDespesasPagas || 0) / dash.receitaBruta : 0;
+      const receita  = pt.v || 0;
+      const despesa  = Math.round(receita * propDesp);
+      return { mes: pt.d, receita, despesa };
     });
 
-    const lucroData = receitaData.map(d => ({
-      mes: d.mes,
-      lucro: d.receita - d.custo,
+    // Lucro por ponto: margem real do período
+    const margemPct = dash.receitaBruta > 0 ? dash.lucroLiquido / dash.receitaBruta : 0;
+    const lucroData = faturDia.map((pt) => ({
+      mes: pt.d,
+      lucro: Math.round((pt.v || 0) * margemPct),
     }));
 
     // ── Radar: métricas reais normalizadas 0–100 ──
@@ -3623,7 +3622,10 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
     const EmptyState = ({ msg = "Nenhuma venda no período selecionado" }) => (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, padding: "32px 0", color: "var(--text-3)" }}>
-        <div style={{ fontSize: 28, opacity: 0.3 }}>📊</div>
+        <div style={{ width: 40, height: 40, borderRadius: 10, background: "var(--s2)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 4 }}>
+          <BarChart3 size={18} color="var(--text-3)" />
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text-2)" }}>Sem dados</div>
         <div style={{ fontSize: 12, textAlign: "center", maxWidth: 200, lineHeight: 1.5 }}>{msg}</div>
       </div>
     );
@@ -3631,17 +3633,17 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     return (
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, padding: 4 }}>
 
-        {/* 1. Faturamento vs Custo — BarChart / 3D */}
+        {/* 1. Faturamento vs Despesas — BarChart / 3D */}
         <Card
-          title="Faturamento vs Custo"
+          title="Faturamento vs Despesas"
           subtitle={`Período: ${period}${period === "Personalizado" && customRange.from && customRange.to ? ` (${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")})` : ""}`}
           style={{ gridColumn: "1 / 2" }}
           headerRight={<ChartToggle value={chartsBarMode} onChange={setChartsBarMode} />}
         >
           {semDados ? <EmptyState /> : chartsBarMode === "3d" ? (
             <Chart3DBars
-              data={receitaData.map(d => ({ ...d, d: d.mes, receita: d.receita, custo: d.custo }))}
-              series={[BAR3D_SERIES[0], BAR3D_SERIES[1]]}
+              data={receitaData.map(d => ({ ...d, d: d.mes }))}
+              series={[BAR3D_SERIES[0]]}
               period={period}
               height={240}
             />
@@ -3653,8 +3655,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               <YAxis tick={{ fill: "var(--text-2)", fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip content={<GoldTooltip />} cursor={{ fill: "rgba(200,165,94,0.04)", rx: 6, stroke: "rgba(200,165,94,0.1)", strokeWidth: 1 }} />
               <Legend wrapperStyle={{ fontSize: 11, color: "var(--text-2)", paddingTop: 12 }} />
-              <Bar dataKey="receita" name="Receita" fill="#c8a55e" radius={[5, 5, 0, 0]} opacity={0.9} activeBar={{ fill: "#e8ca60", opacity: 1, filter: "drop-shadow(0 0 6px rgba(200,165,94,0.6))" }} />
-              <Bar dataKey="custo"   name="Custo"   fill="#e05252" radius={[5, 5, 0, 0]} opacity={0.75} activeBar={{ fill: "#f07070", opacity: 1, filter: "drop-shadow(0 0 6px rgba(224,82,82,0.5))" }} />
+              <Bar dataKey="receita" name="Receita"  fill="#c8a55e" radius={[5,5,0,0]} opacity={0.9}  activeBar={{ fill: "#e8ca60", opacity: 1, filter: "drop-shadow(0 0 6px rgba(200,165,94,0.6))" }} />
+              <Bar dataKey="despesa" name="Despesas" fill="#e05252" radius={[5,5,0,0]} opacity={0.75} activeBar={{ fill: "#f07070", opacity: 1, filter: "drop-shadow(0 0 6px rgba(224,82,82,0.5))" }} />
             </BarChart>
           </ResponsiveContainer>
           )}
