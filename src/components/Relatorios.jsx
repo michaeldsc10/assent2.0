@@ -3143,20 +3143,46 @@ function RelatorioClientes({ clientes, vendas, intervalo, aReceber = [] }) {
         </div>
       </div>
 
-      {dados.topClientes.length > 0 && (
-        <div className="tr-wrap">
-          <div className="tr-header">
-            <span className="tr-title">Top Clientes no Período</span>
-          </div>
-          {dados.topClientes.map((c, i) => (
-            <div key={c.chave || c.nome} className="rank-item">
-              <span className="rank-num">#{i + 1}</span>
-              <span className="rank-label">{c.nome}</span>
-              <span className="rank-val">{fmtR$(c.total)}</span>
+      {dados.topClientes.length > 0 && (() => {
+        const CORES = ["#48c78e","#C8A55E","#5b8ef0","#e05252","#9b59b6","#e67e22","#1abc9c","#e74c3c"];
+        const totalRank = dados.topClientes[0]?.total || 1;
+        return (
+          <>
+            <div className="rcr-section-title"><Users size={15} />Ranking de Clientes</div>
+            <div className="rcr-chart-card">
+              <div className="rcr-chart-header">
+                <div className="rcr-chart-title">
+                  <div className="rcr-chart-title-dot" style={{ color: "var(--green)", background: "var(--green)" }} />
+                  Clientes que Mais Geraram Receita
+                </div>
+                <span className="rcr-chart-badge">{dados.topClientes.length} clientes</span>
+              </div>
+              <div className="rcr-chart-body">
+                <div className="rcr-rank-list">
+                  {dados.topClientes.map((c, i) => {
+                    const pct = totalRank > 0 ? (c.total / totalRank) * 100 : 0;
+                    return (
+                      <div key={c.chave || c.nome} className="rcr-rank-item">
+                        <span className="rcr-rank-pos">#{i + 1}</span>
+                        <div className="rcr-rank-info">
+                          <div className="rcr-rank-name">{c.nome}</div>
+                          <div className="rcr-rank-sub">{fmtR$(c.total)} no período</div>
+                        </div>
+                        <div className="rcr-rank-bar-wrap">
+                          <div className="rcr-rank-bar-bg">
+                            <div className="rcr-rank-bar-fill" style={{ width: `${pct}%`, background: CORES[i % CORES.length] }} />
+                          </div>
+                        </div>
+                        <span className="rcr-rank-val">{fmtR$(c.total)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-          ))}
-        </div>
-      )}
+          </>
+        );
+      })()}
 
       {filtroPendentes && (
         <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
@@ -5277,39 +5303,6 @@ function RelatorioContasReceber({ aReceber = [], intervalo }) {
       )}
 
       {/* ── Ranking de clientes ── */}
-      {rankClientes.length > 0 && (
-        <>
-          <div className="rcr-section-title"><Users size={15} />Ranking de Clientes</div>
-          <div className="rcr-chart-card">
-            <div className="rcr-chart-header">
-              <div className="rcr-chart-title"><div className="rcr-chart-title-dot" style={{ color: "var(--green)", background: "var(--green)" }} />Clientes que Mais Geram Receita</div>
-              <span className="rcr-chart-badge">{rankClientes.length} clientes</span>
-            </div>
-            <div className="rcr-chart-body">
-              <div className="rcr-rank-list">
-                {rankClientes.map((cl, i) => {
-                  const tot = cl.totalPago + cl.totalPendente;
-                  const pct = totalGeral > 0 ? (tot / totalGeral) * 100 : 0;
-                  return (
-                    <div key={cl.nome} className="rcr-rank-item">
-                      <span className="rcr-rank-pos">#{i + 1}</span>
-                      <div className="rcr-rank-info">
-                        <div className="rcr-rank-name">{cl.nome}</div>
-                        <div className="rcr-rank-sub">{cl.qtd} cobranças · pago: {fmtR$(cl.totalPago)}{cl.totalPendente > 0 ? ` · pendente: ${fmtR$(cl.totalPendente)}` : ""}</div>
-                      </div>
-                      <div className="rcr-rank-bar-wrap">
-                        <div className="rcr-rank-bar-bg"><div className="rcr-rank-bar-fill" style={{ width: `${pct}%`, background: CORES[i % CORES.length] }} /></div>
-                      </div>
-                      <span className="rcr-rank-val">{fmtR$(tot)}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
       {/* ── Fluxo de caixa futuro ── */}
       {fluxoFuturo.length > 0 && (
         <>
