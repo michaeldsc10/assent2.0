@@ -485,12 +485,58 @@ const CSS = `
   }
   @media (max-width: 600px) {
     .ag-row-head { display: none; }
+
+    /* Fix scroll iOS: min-height:0 é obrigatório em flex child com overflow */
+    .ag-page { overflow: hidden; }
+    .ag-content { min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+    /* Card-style no mobile: cada evento vira um bloco empilhado */
     .ag-row {
-      grid-template-columns: auto 1fr auto;
-      grid-template-rows: auto auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 12px 14px;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(200,165,94,0.08);
+      position: relative;
     }
+    /* Overlay invisível full-cover para garantir área de toque */
+    .ag-row::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+    }
+    .ag-row > * { position: relative; z-index: 1; }
+    /* Ocultar colunas desnecessárias no mobile */
+    .ag-row > :nth-child(1),
+    .ag-row > :nth-child(2) { display: none; }
+    .ag-row > :nth-child(6),
+    .ag-row > :nth-child(7) { display: none; }
+    /* Ações: alinha à direita dentro do card */
+    .ag-actions { justify-content: flex-end; }
+    /* Título clicável full-width */
+    .ag-row-titulo {
+      white-space: normal;
+      overflow: visible;
+      font-size: 14px;
+      pointer-events: none; /* o click vai pro ag-row pai */
+    }
+
     .ag-resumo { grid-template-columns: 1fr; }
     .form-row, .form-row-3 { grid-template-columns: 1fr; }
+
+    /* Modal como bottom-sheet */
+    .modal-overlay {
+      align-items: flex-end;
+      padding: 0;
+    }
+    .modal-box {
+      border-radius: 16px 16px 0 0;
+      max-width: 100%;
+      max-height: 85vh;
+    }
   }
 `;
 
