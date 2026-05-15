@@ -490,26 +490,33 @@ const CSS = `
     .ag-page { overflow: hidden; }
     .ag-content { min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
-    /* Card mobile: grid 2 col — badge+horário | título | ações */
+    /* Card mobile:
+       col 1 (flex)  | col 2 (ações)
+       row1: badge   | ações (span 2 rows)
+       row2: horário |
+       row3: título  |
+    */
     .ag-row {
       display: grid;
       grid-template-columns: 1fr auto;
-      grid-template-rows: auto auto;
-      gap: 4px 8px;
+      grid-template-rows: auto auto auto;
+      column-gap: 8px;
+      row-gap: 2px;
       padding: 12px 14px;
       cursor: pointer;
       touch-action: manipulation;
       -webkit-tap-highlight-color: rgba(200,165,94,0.06);
-      align-items: center;
+      align-items: start;
     }
-    /* linha 1 col 1: badge + horário lado a lado */
-    .ag-row > :nth-child(1) { grid-column: 1; grid-row: 1; display: flex; align-items: center; gap: 6px; }
-    .ag-row > :nth-child(2) { grid-column: 1; grid-row: 1; margin-left: 4px; }
-    /* linha 1 col 2: ações */
-    .ag-actions { grid-column: 2; grid-row: 1 / 3; align-items: center; }
-    /* linha 2: título full */
-    .ag-row-titulo { grid-column: 1; grid-row: 2; white-space: normal; overflow: visible; font-size: 13.5px; pointer-events: none; }
-    /* ocultar colunas de detalhe (cliente, responsável, venda, local) */
+    /* col 1, row 1: badge (TipoBadge = nth-child 1) */
+    .ag-row > :nth-child(1) { grid-column: 1; grid-row: 1; }
+    /* col 1, row 2: horário (nth-child 2) */
+    .ag-row > :nth-child(2) { grid-column: 1; grid-row: 2; }
+    /* col 1, row 3: título (nth-child 3 = ag-row-titulo) */
+    .ag-row-titulo          { grid-column: 1; grid-row: 3; white-space: normal; overflow: visible; font-size: 13.5px; pointer-events: none; margin-top: 2px; }
+    /* col 2, rows 1-3: ações */
+    .ag-actions             { grid-column: 2; grid-row: 1 / 4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+    /* ocultar: cliente, responsável, venda, local */
     .ag-row > :nth-child(4),
     .ag-row > :nth-child(5),
     .ag-row > :nth-child(6),
