@@ -2462,27 +2462,50 @@ function BarChartCSS({ dados, altura = 160, cor = "#C8A55E", fmtVal }) {
   );
 }
 
-function VendaGraficos({ dados }) {
-  /* ── Faturamento por mês ── */
+function VendaGraficos({ dados, intervalo }) {
+  /* ── Granularidade baseada no intervalo ── */
+  const granularidade = useMemo(() => {
+    if (!intervalo?.de || !intervalo?.ate) return "mes";
+    const de  = new Date(intervalo.de);
+    const ate = new Date(intervalo.ate);
+    const dias = Math.round((ate - de) / 86400000);
+    if (dias <= 1)  return "hora";
+    if (dias <= 60) return "dia";
+    return "mes";
+  }, [intervalo]);
+
+  const tituloFaturamento = granularidade === "hora" ? "FATURAMENTO POR HORA"
+    : granularidade === "dia" ? "FATURAMENTO POR DIA"
+    : "FATURAMENTO POR MÊS";
+
+  /* ── Faturamento agrupado dinamicamente ── */
   const porMes = useMemo(() => {
     const map = {};
     dados.filtradas.forEach((v) => {
       const dt = parseDate(v.data);
       if (!dt) return;
-      const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
-      if (!map[key]) map[key] = { val: 0, qtd: 0 };
+      let key, label;
+      if (granularidade === "hora") {
+        const h = String(dt.getHours()).padStart(2, "0");
+        key   = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}-${h}`;
+        label = `${h}h`;
+      } else if (granularidade === "dia") {
+        key   = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}-${String(dt.getDate()).padStart(2,"0")}`;
+        label = `${String(dt.getDate()).padStart(2,"0")}/${String(dt.getMonth()+1).padStart(2,"0")}`;
+      } else {
+        key   = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,"0")}`;
+        label = MESES_CURTOS[dt.getMonth()] + "/" + String(dt.getFullYear()).slice(2);
+      }
+      if (!map[key]) map[key] = { val: 0, qtd: 0, label };
       map[key].val += Number(v.total || 0);
       map[key].qtd += 1;
     });
     return Object.entries(map)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, v]) => {
-        const [ano, mes] = key.split("-");
-        return { label: MESES_CURTOS[Number(mes) - 1] + "/" + ano.slice(2), ...v };
-      });
-  }, [dados.filtradas]);
+      .map(([, v]) => v);
+  }, [dados.filtradas, granularidade]);
 
-  /* ── Ticket médio por mês ── */
+  /* ── Ticket médio por período ── */
   const ticketPorMes = useMemo(() =>
     porMes.map((m) => ({ label: m.label, val: m.qtd > 0 ? m.val / m.qtd : 0 })),
   [porMes]);
@@ -2555,10 +2578,10 @@ function VendaGraficos({ dados }) {
             <div className="rv-chart-header">
               <span className="rv-chart-title">
                 <span className="rv-chart-title-dot" />
-                Faturamento por Mês
+                {tituloFaturamento.split(" ").map((w, i) => i === 0 ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ")}
               </span>
               <span style={{ fontSize: 11, color: "var(--text-3)" }}>
-                {porMes.length} {porMes.length === 1 ? "mês" : "meses"} · hover para detalhes
+                {porMes.length} {granularidade === "hora" ? (porMes.length === 1 ? "hora" : "horas") : granularidade === "dia" ? (porMes.length === 1 ? "dia" : "dias") : (porMes.length === 1 ? "mês" : "meses")} · hover para detalhes
               </span>
             </div>
             <div className="rv-chart-body" style={{ paddingTop: 44 }}>
@@ -2756,7 +2779,7 @@ function RelatorioVendas({ vendas, intervalo }) {
       </div>
 
       {/* ── VISTA: GRÁFICOS ── */}
-      {view === "graficos" && <VendaGraficos dados={dados} />}
+      {view === "graficos" && <VendaGraficos dados={dados} intervalo={intervalo} />}
 
       {/* ── VISTA: LISTA ── */}
       {view === "lista" && (
