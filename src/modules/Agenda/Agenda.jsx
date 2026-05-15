@@ -486,8 +486,9 @@ const CSS = `
   @media (max-width: 600px) {
     .ag-row-head { display: none; }
 
-    /* Fix scroll iOS — scroll fica no ag-main (Dashboard), não aqui */
-    .ag-content { min-height: 0; }
+    /* Fix scroll iOS */
+    .ag-page { overflow: hidden; }
+    .ag-content { min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
     /* Card mobile:
        col 1 (flex)  | col 2 (ações)
@@ -980,6 +981,20 @@ export default function Agenda({ isPro = false }) {
   const [deletando, setDeletando] = useState(null);
   const [gerenciarCat, setGerenciarCat] = useState(false);
 
+  useEffect(() => {
+    if (!podeCriarV) return;
+    const handler = (e) => {
+      if (e.key === "n" || e.key === "N") {
+        const tag = document.activeElement?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        e.preventDefault();
+        setFormEvt("novo");
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [podeCriarV]);
+
   /* ── Auth ── */
 
   /* ── Snapshot Firebase ── */
@@ -1131,7 +1146,7 @@ export default function Agenda({ isPro = false }) {
               disabled={!podeCriarV || (!isPro && eventos.length >= LIMITES_FREE.eventos)}
               title={!isPro && eventos.length >= LIMITES_FREE.eventos ? `Limite de ${LIMITES_FREE.eventos} eventos atingido no plano Free` : undefined}
             >
-              <Plus size={14} /> Novo Evento
+              <Plus size={14} /> <span><u>N</u>ovo Evento</span>
             </button>
           </div>
         </header>
