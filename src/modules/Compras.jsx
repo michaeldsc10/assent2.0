@@ -1760,7 +1760,7 @@ function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEdita
         </div>
         {podeCriarV && (
           <button className="cp-btn-new" onClick={() => setModalNova(true)} title="Atalho: N">
-            <Plus size={14}/><span style={{textDecoration:"underline"}}>N</span>ova Compra
+            <Plus size={14} /> <span><u>N</u>ova Compra</span>
           </button>
         )}
       </div>
