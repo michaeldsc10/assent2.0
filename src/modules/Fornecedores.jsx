@@ -597,6 +597,10 @@ export default function Fornecedores() {
   const [editando,      setEditando]      = useState(null);
   const [toggleAlvo,    setToggleAlvo]    = useState(null);
 
+  /* Filtros */
+  const [search,        setSearch]        = useState("");
+  const [filtroStatus,  setFiltroStatus]  = useState("todos");
+
   useEffect(() => {
     if (!podeCriarV) return;
     const handler = (e) => {
@@ -610,10 +614,6 @@ export default function Fornecedores() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [podeCriarV]);
-
-  /* Filtros */
-  const [search,        setSearch]        = useState("");
-  const [filtroStatus,  setFiltroStatus]  = useState("todos");
 
   /* ── Listener Firestore ── */
   useEffect(() => {
