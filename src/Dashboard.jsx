@@ -1893,13 +1893,12 @@ function Bar3D({ h, delay, series, active, onEnter, onLeave }) {
 
 function Chart3DBars({ data, series: seriesProp, period, height = 170 }) {
   const [tooltip, setTooltip] = useState(null);
-  // series: quais colunas mostrar. Default: só receita (key "v")
-  const useDual = !!seriesProp; // se passar series prop, usa dual
+  const isMobile = typeof window !== "undefined" && window.innerWidth <= 640;
+
+  const useDual = !!seriesProp;
   const activeSeries = seriesProp || [BAR3D_SERIES[0]];
 
-  const emptyCheck = useDual
-    ? (!data || data.length === 0)
-    : (!data || data.length === 0);
+  const emptyCheck = !data || data.length === 0;
 
   if (emptyCheck) return (
     <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--text-3)", fontSize: 12 }}>
@@ -1907,15 +1906,19 @@ function Chart3DBars({ data, series: seriesProp, period, height = 170 }) {
     </div>
   );
 
-  // max across all series
-  const max = Math.max(...data.flatMap(d =>
+  // No mobile, subsamplear para max 15 pontos para não amontoar
+  const displayData = isMobile && data.length > 15
+    ? data.filter((_, i) => i % Math.ceil(data.length / 15) === 0)
+    : data;
+
+  const max = Math.max(...displayData.flatMap(d =>
     activeSeries.map(s => d[s.key] || d.v || 0)
   ), 1);
 
   const totalReceita = data.reduce((a, b) => a + (b[activeSeries[0].key] || b.v || 0), 0);
   const totalCusto   = useDual && activeSeries[1] ? data.reduce((a, b) => a + (b[activeSeries[1].key] || 0), 0) : null;
 
-  const CONTAINER_H = height - 46;
+  const CONTAINER_H = (isMobile ? 140 : height) - 46;
 
   const getLabel = (d) => d.d || d.mes || d.l || "";
 
@@ -1949,13 +1952,13 @@ function Chart3DBars({ data, series: seriesProp, period, height = 170 }) {
         </div>
       )}
 
-      <div className="chart3d-inner" style={{ height }}>
+      <div className="chart3d-inner" style={{ height: isMobile ? 140 : height }}>
         <div className="chart3d-yaxis">
           {[1, 0.66, 0.33, 0].map((r, i) => (
             <span key={i}>R$ {Math.round(max * r).toLocaleString("pt-BR")}</span>
           ))}
         </div>
-        <div className="chart3d-stage">
+        <div className="chart3d-stage" style={{ overflow: "hidden" }}>
           <div className="chart3d-floor" />
           {[0.33, 0.66, 1].map(r => (
             <div key={r} style={{
@@ -1964,7 +1967,7 @@ function Chart3DBars({ data, series: seriesProp, period, height = 170 }) {
             }} />
           ))}
           <div className="chart3d-bars">
-            {data.map((d, i) => {
+            {displayData.map((d, i) => {
               const lbl = getLabel(d);
               const isHovered = tooltip?.label === lbl;
               return (
