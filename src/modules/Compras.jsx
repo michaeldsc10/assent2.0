@@ -1702,6 +1702,20 @@ function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEdita
   const [deletando,    setDeletando]    = useState(null);
   const [cancelando,   setCancelando]   = useState(null);
 
+  useEffect(() => {
+    if (!podeCriarV) return;
+    const handler = (e) => {
+      if (e.key === "n" || e.key === "N") {
+        const tag = document.activeElement?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        e.preventDefault();
+        setModalNova(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [podeCriarV]);
+
   const filtradas = useMemo(() => {
     const q = search.trim().toLowerCase();
     return compras.filter(c => {
@@ -1745,8 +1759,8 @@ function TabCompras({ uid, compras, fornecedores, insumos, podeCriarV, podeEdita
           ))}
         </div>
         {podeCriarV && (
-          <button className="cp-btn-new" onClick={() => setModalNova(true)}>
-            <Plus size={14}/> Nova Compra
+          <button className="cp-btn-new" onClick={() => setModalNova(true)} title="Atalho: N">
+            <Plus size={14}/><span style={{textDecoration:"underline"}}>N</span>ova Compra
           </button>
         )}
       </div>
