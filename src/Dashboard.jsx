@@ -1396,19 +1396,19 @@ const CSS = `
 
   /* ══ TEMA LIGHT ══ */
   .ag-app.light {
-    --bg:       #f0f2f5;
-    --s1:       #ffffff;
-    --s2:       #f5f6f8;
-    --s3:       #ecedf0;
+    --bg:       #eeecea;
+    --s1:       #f7f6f3;
+    --s2:       #efede9;
+    --s3:       #e5e2dc;
     --border:   rgba(0,0,0,0.07);
-    --border-h: rgba(0,0,0,0.14);
-    --gold:         #a07c1a;
-    --gold-l:       #c09a30;
-    --gold-d:       rgba(160,124,26,0.1);
-    --gold-brand:   #a07c1a;
-    --text:     #111827;
-    --text-2:   #4b5563;
-    --text-3:   #9ca3af;
+    --border-h: rgba(0,0,0,0.13);
+    --gold:         #9a7518;
+    --gold-l:       #b89030;
+    --gold-d:       rgba(154,117,24,0.10);
+    --gold-brand:   #9a7518;
+    --text:     #1c1a17;
+    --text-2:   #4a4540;
+    --text-3:   #9a9590;
     --green:    #16a34a;
     --green-d:  rgba(22,163,74,0.08);
     --red:      #dc2626;
@@ -1426,25 +1426,27 @@ const CSS = `
   .ag-app.light .ag-card-bare,
   .ag-app.light .db-panel,
   .ag-app.light .db-kpi-card {
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04);
   }
   .ag-app.light .ag-card:hover,
   .ag-app.light .db-panel:hover,
   .ag-app.light .db-kpi-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    box-shadow: 0 3px 10px rgba(0,0,0,0.09);
   }
-  .ag-app.light .ag-global-header { background: rgba(255,255,255,0.97); }
-  .ag-app.light .ag-sidebar { background: rgba(255,255,255,0.98); }
-  .ag-app.light .ag-topbar { background: rgba(248,249,250,0.9); }
-  .ag-app.light .ag-trow:hover { background: rgba(0,0,0,0.018); }
-  .ag-app.light .ag-user-dropdown { box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+  .ag-app.light .ag-global-header { background: rgba(247,246,243,0.97); border-bottom: 1px solid rgba(0,0,0,0.07); }
+  .ag-app.light .ag-sidebar { background: rgba(247,246,243,0.98); border-right: 1px solid rgba(0,0,0,0.07); }
+  .ag-app.light .ag-topbar { background: rgba(242,240,237,0.92); }
+  .ag-app.light .ag-trow:hover { background: rgba(0,0,0,0.025); }
+  .ag-app.light .ag-user-dropdown { background: var(--s1); box-shadow: 0 6px 20px rgba(0,0,0,0.10); }
   .ag-app.light .ag-avatar {
-    background: linear-gradient(135deg, rgba(160,124,26,0.15), rgba(160,124,26,0.05));
-    border-color: rgba(160,124,26,0.25);
+    background: linear-gradient(135deg, rgba(154,117,24,0.14), rgba(154,117,24,0.05));
+    border-color: rgba(154,117,24,0.22);
   }
   .ag-app.light .ag-header-logo-icon { background: linear-gradient(135deg, #b8952e, #d4af37); }
   .ag-app.light .db-stat-row:hover { background: var(--s2); }
   .ag-app.light .db-desp-row:hover { background: var(--s2); }
+  .ag-app.light .ag-notif-panel { background: rgba(247,246,243,0.97); }
+  .ag-app.light .holo-card { background: rgba(240,238,234,0.95); }
 
 /* ── CARD DE SAUDAÇÃO FLUTUANTE ── */
 .ag-saudacao-card {
