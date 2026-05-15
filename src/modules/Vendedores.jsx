@@ -698,6 +698,20 @@ export default function Vendedores() {
   const [deletando, setDeletando] = useState(null);
   const [detalhe,   setDetalhe]   = useState(null);
 
+  useEffect(() => {
+    if (!podeCriarV) return;
+    const handler = (e) => {
+      if (e.key === "n" || e.key === "N") {
+        const tag = document.activeElement?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        e.preventDefault();
+        setModalNovo(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [podeCriarV]);
+
   // ── Flags de permissão ──
   const podeCriarV   = podeCriar("vendedores");
   const podeEditarV  = podeEditar("vendedores");
@@ -804,7 +818,7 @@ export default function Vendedores() {
 
         {podeCriarV && (
           <button className="btn-novo-vd" onClick={() => setModalNovo(true)}>
-            <UserPlus size={14} /> Novo Vendedor
+            <UserPlus size={14} /> <span><u>N</u>ovo Vendedor</span>
           </button>
         )}
       </header>
