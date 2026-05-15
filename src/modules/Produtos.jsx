@@ -217,6 +217,15 @@ const CSS = `
     font-size: 10px; font-weight: 500; letter-spacing: .06em;
     text-transform: uppercase; color: var(--text-3);
   }
+  .pd-sort-btn {
+    background: none; border: none; padding: 0; margin: 0;
+    font-size: 10px; font-weight: 500; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-3);
+    cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+    transition: color .13s;
+  }
+  .pd-sort-btn:hover { color: var(--gold); }
+  .pd-sort-btn.active { color: var(--gold); }
 
   .pd-id { font-family: 'Sora', sans-serif; font-size: 11px; color: var(--gold); font-weight: 500; }
   .pd-nome-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -874,6 +883,13 @@ export default function Produtos() {
 
   const [produtoIdCnt, setProdutoIdCnt] = useState(0);
   const [search,   setSearch]   = useState("");
+  const [sortField, setSortField] = useState("id");
+  const [sortDir,   setSortDir]   = useState("asc");
+
+  const toggleSort = (field) => {
+    if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortField(field); setSortDir("asc"); }
+  };
   const [loading,  setLoading]  = useState(true);
 
   const [modalNovo, setModalNovo] = useState(false);
@@ -969,16 +985,31 @@ export default function Produtos() {
 
   /* Filtro por busca */
   const produtosFiltrados = useMemo(() => {
-    if (!search.trim()) return produtos;
-    const q = search.toLowerCase();
-    return produtos.filter(
-      (p) =>
-        p.nome?.toLowerCase().includes(q) ||
-        p.sku?.toLowerCase().includes(q) ||
-        p.codigoBarras?.toLowerCase().includes(q) ||
-        p.id?.toLowerCase().includes(q)
-    );
-  }, [produtos, search]);
+    const q = search.toLowerCase().trim();
+    const filtered = q
+      ? produtos.filter(
+          (p) =>
+            p.nome?.toLowerCase().includes(q) ||
+            p.sku?.toLowerCase().includes(q) ||
+            p.codigoBarras?.toLowerCase().includes(q) ||
+            p.id?.toLowerCase().includes(q)
+        )
+      : [...produtos];
+
+    return filtered.sort((a, b) => {
+      let va, vb;
+      if (sortField === "id") {
+        va = parseInt((a.id || "").replace(/\D/g, "") || "0", 10);
+        vb = parseInt((b.id || "").replace(/\D/g, "") || "0", 10);
+      } else {
+        va = (a.nome || "").toLowerCase();
+        vb = (b.nome || "").toLowerCase();
+      }
+      if (va < vb) return sortDir === "asc" ? -1 : 1;
+      if (va > vb) return sortDir === "asc" ?  1 : -1;
+      return 0;
+    });
+  }, [produtos, search, sortField, sortDir]);
 
   /* Badge de margem */
   const badgeMargem = (m) => {
@@ -1041,8 +1072,16 @@ export default function Produtos() {
           {/* Cabeçalho da tabela */}
           <div className="pd-row pd-row-head">
             <span />
-            <span>ID</span>
-            <span>Produto</span>
+            <span>
+              <button className={`pd-sort-btn ${sortField === "id" ? "active" : ""}`} onClick={() => toggleSort("id")}>
+                ID {sortField === "id" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+              </button>
+            </span>
+            <span>
+              <button className={`pd-sort-btn ${sortField === "nome" ? "active" : ""}`} onClick={() => toggleSort("nome")}>
+                Produto {sortField === "nome" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+              </button>
+            </span>
             <span>Preço</span>
             <span>Custo</span>
             <span>Margem</span>
