@@ -698,6 +698,11 @@ export default function Vendedores() {
   const [deletando, setDeletando] = useState(null);
   const [detalhe,   setDetalhe]   = useState(null);
 
+  // ── Flags de permissão ──
+  const podeCriarV   = podeCriar("vendedores");
+  const podeEditarV  = podeEditar("vendedores");
+  const podeExcluirV = podeExcluir("vendedores");
+
   useEffect(() => {
     if (!podeCriarV) return;
     const handler = (e) => {
@@ -711,11 +716,6 @@ export default function Vendedores() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [podeCriarV]);
-
-  // ── Flags de permissão ──
-  const podeCriarV   = podeCriar("vendedores");
-  const podeEditarV  = podeEditar("vendedores");
-  const podeExcluirV = podeExcluir("vendedores");
 
   // ── Listeners Firestore ──
   useEffect(() => {
