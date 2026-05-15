@@ -3050,6 +3050,31 @@ useEffect(() => {
       <style>{CSS}</style>
       <div id="recibo-print-root" />
 
+      {/* Topbar — search compartilhado entre abas */}
+      <header className="vd-topbar">
+        <div className="vd-topbar-title">
+          <h1>{tab === "ativas" ? "Vendas" : tab === "canceladas" ? "Vendas Canceladas" : tab === "mesas" ? "Vendas de Mesas" : "Vendas PDV"}</h1>
+          <p>{tab === "ativas" ? "Gerencie e acompanhe todas as vendas" : tab === "canceladas" ? "Histórico de vendas canceladas" : tab === "mesas" ? "Vendas finalizadas pelo módulo de Mesas" : "Vendas realizadas pelo Ponto de Venda"}</p>
+        </div>
+
+        <div className="vd-search">
+          <Search size={13} color="var(--text-3)" />
+          <input
+            placeholder="Buscar por ID ou cliente..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+
+        {tab === "ativas" && podeCriar && (
+          <button onClick={() => setModalNova(true)}
+            style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: 9, background: "var(--gold)", color: "#0a0808", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, transition: "opacity .13s" }}
+          >
+            <Plus size={14} /> <span><u>N</u>ova Venda</span>
+          </button>
+        )}
+      </header>
+
       {/* ── Tabs ── */}
       <div className="vd-tabs">
         <button
@@ -3081,31 +3106,6 @@ useEffect(() => {
           <span className="vd-tab-badge">{vendasCanceladas.length}</span>
         </button>
       </div>
-
-      {/* Topbar — search compartilhado entre abas */}
-      <header className="vd-topbar">
-        <div className="vd-topbar-title">
-          <h1>{tab === "ativas" ? "Vendas" : tab === "canceladas" ? "Vendas Canceladas" : tab === "mesas" ? "Vendas de Mesas" : "Vendas PDV"}</h1>
-          <p>{tab === "ativas" ? "Gerencie e acompanhe todas as vendas" : tab === "canceladas" ? "Histórico de vendas canceladas" : tab === "mesas" ? "Vendas finalizadas pelo módulo de Mesas" : "Vendas realizadas pelo Ponto de Venda"}</p>
-        </div>
-
-        <div className="vd-search">
-          <Search size={13} color="var(--text-3)" />
-          <input
-            placeholder="Buscar por ID ou cliente..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-
-        {tab === "ativas" && podeCriar && (
-          <button onClick={() => setModalNova(true)}
-            style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: 9, background: "var(--gold)", color: "#0a0808", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, transition: "opacity .13s" }}
-          >
-            <Plus size={14} /> <span><u>N</u>ova Venda</span>
-          </button>
-        )}
-      </header>
 
       {/* Filtros de período — compartilhado entre abas */}
       <div className="vd-periods">
