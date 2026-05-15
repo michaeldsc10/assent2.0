@@ -3013,6 +3013,18 @@ function RelatorioClientes({ clientes, vendas, intervalo, aReceber = [] }) {
       if (v.cliente)    nomesAtivos.add((v.cliente || "").trim().toLowerCase());
     });
 
+    /* Inclui clientes com aReceber pago no período como ativos */
+    aReceber
+      .filter((r) => {
+        const pago = Number(r.valorPago || 0) > 0;
+        const dentroData = dentroDoIntervalo(r.dataVencimento, intervalo) || dentroDoIntervalo(r.dataCriacao, intervalo);
+        return pago && dentroData;
+      })
+      .forEach((r) => {
+        if (r.clienteId) idsAtivos.add(r.clienteId);
+        if (r.clienteNome) nomesAtivos.add((r.clienteNome || "").trim().toLowerCase());
+      });
+
     const ativos = clientes.filter((c) =>
       idsAtivos.has(c.id) ||
       nomesAtivos.has((c.nome || "").trim().toLowerCase())
@@ -3046,14 +3058,26 @@ function RelatorioClientes({ clientes, vendas, intervalo, aReceber = [] }) {
     const comFiado = clientes.filter((c) => Number(c.fiado || c.debito || 0) > 0);
     const totalFiado = comFiado.reduce((s, c) => s + Number(c.fiado || c.debito || 0), 0);
 
-    /* Top clientes por valor gasto no período — resolve tanto por id quanto por nome */
+    /* Top clientes por valor gasto no período — vendas + aReceber pagos */
     const gastosPorCliente = {};
     vendasPeriodo.forEach((v) => {
-      /* Tenta resolver o cliente: prioriza id, fallback nome */
       const chave = v.clienteId || v.cliente_id || (v.cliente || "").trim().toLowerCase();
       if (!chave) return;
       gastosPorCliente[chave] = (gastosPorCliente[chave] || 0) + Number(v.total || 0);
     });
+
+    /* Soma entradas do aReceber pagas no período */
+    aReceber
+      .filter((r) => {
+        const pago = Number(r.valorPago || 0) > 0;
+        const dentroData = dentroDoIntervalo(r.dataVencimento, intervalo) || dentroDoIntervalo(r.dataCriacao, intervalo);
+        return pago && dentroData;
+      })
+      .forEach((r) => {
+        const chave = r.clienteId || (r.clienteNome || "").trim().toLowerCase();
+        if (!chave) return;
+        gastosPorCliente[chave] = (gastosPorCliente[chave] || 0) + Number(r.valorPago || 0);
+      });
 
     const topClientes = Object.entries(gastosPorCliente)
       .filter(([, totalGasto]) => totalGasto > 0)
