@@ -3067,10 +3067,8 @@ function RelatorioClientes({ clientes, vendas, intervalo, aReceber = [] }) {
       const chave = v.clienteId || v.cliente_id || (v.cliente || "").trim().toLowerCase();
       if (!chave) return;
       /* Usa apenas o valor efetivamente recebido, não o total da venda */
-      const statusPago = v.statusPagamento === "pago" || (!v.statusPagamento && !v.sinalRecebido);
-      const valorRecebido = statusPago
-        ? Number(v.total || 0)
-        : Number(v.sinalRecebido || v.sinal || 0);
+      const temSinalParcial = Number(v.sinalRecebido || 0) > 0 && v.statusPagamento === "parcial";
+      const valorRecebido = temSinalParcial ? Number(v.sinalRecebido) : Number(v.total || 0);
       gastosPorCliente[chave] = (gastosPorCliente[chave] || 0) + valorRecebido;
     });
 
