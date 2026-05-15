@@ -12,6 +12,9 @@ import {
   Zap, Copy, ExternalLink, BookOpen, X, CheckCircle2,
   Wallet, ArrowRight, ServerCog, Wifi, WifiOff,
   GraduationCap, Plus, Edit2, Trash2, FileText,
+  Users, Wrench, ArrowDownToLine, TrendingDown, Clock,
+  ShoppingCart, ArrowDownLeft, Truck, BarChart2, Calendar,
+  Barcode, Table2, Settings,
 } from "lucide-react";
 
 import { db, functions } from "../lib/firebase";
@@ -62,25 +65,24 @@ const validarCNPJ = (cnpj) => {
    CONSTANTES
    ══════════════════════════════════════════════════════ */
 const MENU_SECTIONS = [
-  { key: "dashboard",       label: "Dashboard",         sub: "Visão geral e KPIs",       icon: "📊", locked: true  },
-  { key: "clientes",        label: "Clientes",           sub: "Cadastro e histórico",     icon: "👥", locked: false },
-  { key: "produtos",        label: "Produtos",           sub: "Catálogo de produtos",     icon: "📦", locked: false },
-  { key: "servicos",        label: "Serviços",           sub: "Catálogo de serviços",     icon: "🔧", locked: false },
-  { key: "entrada_estoque", label: "Estoque",             sub: "Movimentação de entrada",  icon: "📥", locked: false },
-  { key: "vendas",          label: "Vendas",             sub: "PDV e registro de vendas",       icon: "🛒", locked: false },
-  { key: "pdv",            label: "PDV",                sub: "Ponto de Venda (leitor de código)", icon: "🏪", locked: false },
-  { key: "mesas",           label: "Mesas",              sub: "Gestão de mesas e comandas",     icon: "🪑", locked: false },
-  { key: "matriculas",      label: "Matrículas",         sub: "Alunos e mensalidades",          icon: "🎓", locked: false },
-  { key: "fiado",           label: "A Receber",           sub: "Contas a receber",         icon: "💳", locked: false },
-  { key: "caixa",           label: "Caixa Diário",       sub: "Abertura e fechamento",    icon: "💰", locked: false },
-  { key: "despesas",        label: "Despesas",           sub: "Controle de saídas",       icon: "📉", locked: false },
-  { key: "fornecedores",    label: "Fornecedores",       sub: "Cadastro de fornecedores", icon: "🏭", locked: false },
-  { key: "relatorios",      label: "Relatórios",         sub: "Análises e exportações",   icon: "📈", locked: false },
-  { key: "agenda",          label: "Agenda",             sub: "Compromissos e tarefas",   icon: "📅", locked: false },
-  { key: "orcamentos",         label: "Orçamentos",      sub: "Orçamentos",            icon: "⚡", locked: false },
-  { key: "vendedores",      label: "Vendedores",         sub: "Equipe de vendas",         icon: "👔", locked: false },
-   
-  { key: "config",          label: "Configurações",      sub: "Esta tela",                icon: "⚙️", locked: true  },
+  { key: "dashboard",       label: "Dashboard",         sub: "Visão geral e KPIs",            Icon: LayoutDashboard,   locked: true  },
+  { key: "clientes",        label: "Clientes",           sub: "Cadastro e histórico",          Icon: Users,             locked: false },
+  { key: "produtos",        label: "Produtos",           sub: "Catálogo de produtos",          Icon: Package,           locked: false },
+  { key: "servicos",        label: "Serviços",           sub: "Catálogo de serviços",          Icon: Wrench,            locked: false },
+  { key: "entrada_estoque", label: "Estoque",            sub: "Movimentação de entrada",       Icon: ArrowDownToLine,   locked: false },
+  { key: "vendas",          label: "Vendas",             sub: "PDV e registro de vendas",      Icon: TrendingDown,      locked: false },
+  { key: "pdv",             label: "PDV",                sub: "Ponto de Venda (leitor de código)", Icon: Barcode,        locked: false },
+  { key: "mesas",           label: "Mesas",              sub: "Gestão de mesas e comandas",    Icon: Table2,            locked: false },
+  { key: "matriculas",      label: "Matrículas",         sub: "Alunos e mensalidades",         Icon: GraduationCap,     locked: false },
+  { key: "fiado",           label: "A Receber",          sub: "Contas a receber",              Icon: Clock,             locked: false },
+  { key: "caixa",           label: "Caixa Diário",       sub: "Abertura e fechamento",         Icon: Wallet,            locked: false },
+  { key: "despesas",        label: "Despesas",           sub: "Controle de saídas",            Icon: ArrowDownLeft,     locked: false },
+  { key: "fornecedores",    label: "Fornecedores",       sub: "Cadastro de fornecedores",      Icon: Truck,             locked: false },
+  { key: "relatorios",      label: "Relatórios",         sub: "Análises e exportações",        Icon: BarChart2,         locked: false },
+  { key: "agenda",          label: "Agenda",             sub: "Compromissos e tarefas",        Icon: Calendar,          locked: false },
+  { key: "orcamentos",      label: "Orçamentos",         sub: "Orçamentos",                    Icon: Zap,               locked: false },
+  { key: "vendedores",      label: "Vendedores",         sub: "Equipe de vendas",              Icon: Users,             locked: false },
+  { key: "config",          label: "Configurações",      sub: "Esta tela",                     Icon: Settings,          locked: true  },
 ];
 
 const TAXAS_DEFAULT = {
@@ -399,7 +401,7 @@ const CSS = `
     width: 28px; height: 28px; border-radius: 7px;
     background: var(--s3); border: 1px solid var(--border-h);
     display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; font-size: 14px;
+    flex-shrink: 0; color: var(--text-3);
   }
   .menu-toggle-label { font-size: 13px; color: var(--text); font-family: 'DM Sans', sans-serif; }
   .menu-toggle-sub   { font-size: 11px; color: var(--text-3); margin-top: 1px; }
@@ -463,7 +465,7 @@ const CSS = `
     width: 28px; height: 28px; border-radius: 7px;
     background: var(--s3); border: 1px solid var(--border-h);
     display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; font-size: 14px;
+    flex-shrink: 0; color: var(--text-3);
   }
   .atalho-info { flex: 1; min-width: 0; }
   .atalho-label { font-size: 13px; color: var(--text); font-family: 'DM Sans', sans-serif; }
@@ -1631,7 +1633,7 @@ function SecaoMenu({ config, onSave }) {
         <div className="menu-toggle-list">
           {MENU_SECTIONS.map(s => (
             <div key={s.key} className="menu-toggle-item">
-              <div className="menu-toggle-icon">{s.icon}</div>
+              <div className="menu-toggle-icon"><s.Icon size={15} /></div>
               <div style={{ flex: 1 }}><div className="menu-toggle-label">{s.label}</div><div className="menu-toggle-sub">{s.sub}</div></div>
               {s.locked ? <span className="menu-toggle-locked">Sempre visível</span> : <Toggle checked={!!visivel[s.key]} onChange={val => toggle(s.key, val)} />}
             </div>
@@ -1688,7 +1690,7 @@ function SecaoAtalhos({ menuVisivel = {} }) {
             const ativo = section.locked || menuVisivel[key] !== false;
             return (
               <div key={code} className={`atalho-item${ativo ? "" : " atalho-disabled"}`}>
-                <div className="atalho-icon">{section.icon}</div>
+                <div className="atalho-icon"><section.Icon size={15} /></div>
                 <div className="atalho-info">
                   <div className="atalho-label">{section.label}</div>
                   <div className="atalho-sub">{hint}</div>
