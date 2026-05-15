@@ -597,6 +597,20 @@ export default function Fornecedores() {
   const [editando,      setEditando]      = useState(null);
   const [toggleAlvo,    setToggleAlvo]    = useState(null);
 
+  useEffect(() => {
+    if (!podeCriarV) return;
+    const handler = (e) => {
+      if (e.key === "n" || e.key === "N") {
+        const tag = document.activeElement?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        e.preventDefault();
+        setModalNovo(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [podeCriarV]);
+
   /* Filtros */
   const [search,        setSearch]        = useState("");
   const [filtroStatus,  setFiltroStatus]  = useState("todos");
@@ -732,7 +746,7 @@ export default function Fornecedores() {
             onClick={() => setModalNovo(true)}
             disabled={!podeCriarV}
           >
-            <Plus size={14} /> Novo Fornecedor
+            <Plus size={14} /> <span><u>N</u>ovo Fornecedor</span>
           </button>
         </div>
       </header>
