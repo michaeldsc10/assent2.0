@@ -1765,6 +1765,22 @@ const CSS = `
   font-family: 'JetBrains Mono', monospace;
   font-weight: 700; font-size: 13px;
 }
+
+/* ── CHART 3D MOBILE ── */
+@media (max-width: 640px) {
+  .chart3d-wrap { overflow: hidden; padding: 4px 0 0; }
+  .chart3d-inner { height: 140px !important; overflow: hidden; }
+  .chart3d-stage { overflow: hidden; }
+  .chart3d-yaxis { font-size: 8px; padding-right: 6px; min-width: 36px; max-width: 42px; }
+  .chart3d-bars { gap: 2px; padding: 0 1px; overflow: hidden; }
+  .bar3d { max-width: 18px; }
+  .bar3d-side { width: 5px; }
+  .bar3d-top { width: calc(100% + 5px); clip-path: polygon(5px 0, calc(100%) 0, calc(100% - 5px) 5px, 0 5px); }
+  .bar3d-label { font-size: 7.5px; }
+  .chart3d-legend { flex-direction: column; align-items: flex-start; gap: 4px; margin-top: 8px; font-size: 10px; }
+  .chart3d-legend-right { font-size: 10px; }
+  .chart3d-legend-right b { font-size: 11px; }
+}
 `;
 
 /* ══════════════════════════════════════════════════════
@@ -1958,9 +1974,19 @@ function Chart3DBars({ data, series: seriesProp, period, height = 170 }) {
                   onMouseEnter={e => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     const wrapRect = e.currentTarget.closest(".chart3d-wrap").getBoundingClientRect();
-                    setTooltip({ x: rect.left - wrapRect.left + rect.width / 2, y: rect.top - wrapRect.top, label: lbl, ...d });
+                    const rawX = rect.left - wrapRect.left + rect.width / 2;
+                    const clampedX = Math.max(60, Math.min(rawX, wrapRect.width - 60));
+                    setTooltip({ x: clampedX, y: rect.top - wrapRect.top, label: lbl, ...d });
+                  }}
+                  onTouchStart={e => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const wrapRect = e.currentTarget.closest(".chart3d-wrap").getBoundingClientRect();
+                    const rawX = rect.left - wrapRect.left + rect.width / 2;
+                    const clampedX = Math.max(60, Math.min(rawX, wrapRect.width - 60));
+                    setTooltip({ x: clampedX, y: rect.top - wrapRect.top, label: lbl, ...d });
                   }}
                   onMouseLeave={() => setTooltip(null)}
+                  onTouchEnd={() => setTimeout(() => setTooltip(null), 1500)}
                 >
                   {/* barras lado a lado */}
                   <div style={{ display: "flex", alignItems: "flex-end", gap: 2, width: "100%", justifyContent: "center" }}>
