@@ -21,6 +21,10 @@ import {
   setDoc,
   deleteDoc,
   onSnapshot,
+  query,
+  where,
+  getDocs,
+  orderBy,
 } from "firebase/firestore";
 
 /* ── CSS ── */
@@ -476,11 +480,42 @@ function ModalNovoCliente({ cliente, clientes, onSave, onClose }) {
   );
 }
 
-function ModalHistorico({ cliente, vendas, onClose, onVerVenda }) {
-  const clienteVendas = vendas.filter(v =>
-    (v.clienteId && v.clienteId === cliente.id) ||
-    (!v.clienteId && v.clienteNome && v.clienteNome === cliente.nome)
-  ).sort((a, b) => new Date(b.data) - new Date(a.data));
+function ModalHistorico({ cliente, tenantUid, onClose, onVerVenda }) {
+  const [clienteVendas, setClienteVendas] = useState([]);
+  const [loadingVendas, setLoadingVendas] = useState(true);
+
+  useEffect(() => {
+    if (!tenantUid || !cliente?.id) { setLoadingVendas(false); return; }
+    let cancelled = false;
+
+    const vendasCol = collection(db, "users", tenantUid, "vendas");
+
+    // Busca por clienteId (vendas vinculadas)
+    const qId = query(vendasCol, where("clienteId", "==", cliente.id));
+    // Busca por nome (fallback para vendas antigas sem clienteId, campo "cliente")
+    const qNome = query(vendasCol, where("clienteId", "==", null), where("cliente", "==", cliente.nome));
+
+    Promise.all([getDocs(qId), getDocs(qNome)])
+      .then(([snapId, snapNome]) => {
+        if (cancelled) return;
+        const ids = new Set();
+        const arr = [];
+        for (const snap of [snapId, snapNome]) {
+          snap.docs.forEach(d => {
+            if (!ids.has(d.id)) { ids.add(d.id); arr.push({ id: d.id, ...d.data() }); }
+          });
+        }
+        arr.sort((a, b) => {
+          const toDate = v => v?.toDate ? v.toDate() : new Date(v || 0);
+          return toDate(b.data) - toDate(a.data);
+        });
+        setClienteVendas(arr);
+        setLoadingVendas(false);
+      })
+      .catch(() => setLoadingVendas(false));
+
+    return () => { cancelled = true; };
+  }, [tenantUid, cliente?.id, cliente?.nome]);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -497,7 +532,11 @@ function ModalHistorico({ cliente, vendas, onClose, onVerVenda }) {
             <div className="modal-section-title">Histórico de Vendas</div>
             <div className="modal-vendas-container">
               <div className="modal-vendas-list">
-                {clienteVendas.length === 0 ? (
+                {loadingVendas ? (
+                  <div style={{ padding: "30px 20px", textAlign: "center", color: "var(--text-3)", fontSize: "12px" }}>
+                    Carregando...
+                  </div>
+                ) : clienteVendas.length === 0 ? (
                   <div style={{ padding: "30px 20px", textAlign: "center", color: "var(--text-3)", fontSize: "12px" }}>
                     Nenhuma venda registrada.
                   </div>
@@ -585,7 +624,6 @@ export default function Clientes() {
   const podeExcluirV = podeExcluir("clientes");
   const [loading, setLoading] = useState(true);
   const [clientes, setClientes] = useState([]);
-  const [vendas, setVendas] = useState([]);
   const [clienteIdCnt, setClienteIdCnt] = useState(0);
   const [search, setSearch] = useState("");
   const [perfilFilter, setPerfilFilter] = useState("todos");
@@ -627,7 +665,6 @@ export default function Clientes() {
 
     const userRef     = doc(db, "users", tenantUid);
     const clientesCol = collection(db, "users", tenantUid, "clientes");
-    const vendasCol   = collection(db, "users", tenantUid, "vendas");
 
     const unsubUser = onSnapshot(userRef, (snap) => {
       if (snap.exists()) setClienteIdCnt(snap.data().clienteIdCnt || 0);
@@ -638,11 +675,7 @@ export default function Clientes() {
       setLoading(false);
     }, fsSnapshotError("Clientes:clientes"));
 
-    const unsubVendas = onSnapshot(vendasCol, (snap) => {
-      setVendas(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    }, fsSnapshotError("Clientes:vendas"));
-
-    return () => { unsubUser(); unsubClientes(); unsubVendas(); };
+    return () => { unsubUser(); unsubClientes(); };
   }, [tenantUid]);
 
   const handleAdd = async (form) => {
@@ -650,6 +683,7 @@ export default function Clientes() {
     const newId = gerarIdCliente(clienteIdCnt);
     await setDoc(doc(db, "users", tenantUid, "clientes", newId), {
       ...form,
+      id: newId,
       perfis: ["cliente"],
       criadoEm: new Date().toISOString(),
     });
@@ -660,7 +694,7 @@ export default function Clientes() {
 
   const handleEdit = async (form) => {
     if (!tenantUid || !editando) return;
-    await setDoc(doc(db, "users", tenantUid, "clientes", editando.id), form, { merge: true });
+    await setDoc(doc(db, "users", tenantUid, "clientes", editando.id), { ...form, id: editando.id }, { merge: true });
     await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.CLIENTES, descricao: montarDescricao("editar", "Cliente", form.nome, editando.id) });
     setEditando(null);
   };
@@ -835,7 +869,7 @@ export default function Clientes() {
       {modalNovo    && podeCriarV   && <ModalNovoCliente clientes={clientes} onSave={handleAdd}  onClose={() => setModalNovo(false)} />}
       {editando     && podeEditarV  && <ModalNovoCliente cliente={editando} clientes={clientes} onSave={handleEdit} onClose={() => setEditando(null)} />}
       {deletando    && podeExcluirV && <ModalConfirmDelete cliente={deletando} onConfirm={handleDelete} onClose={() => setDeletando(null)} />}
-      {historico    && <ModalHistorico cliente={historico} vendas={vendas} onClose={() => setHistorico(null)} onVerVenda={setVendaDetalhe} />}
+      {historico    && <ModalHistorico cliente={historico} tenantUid={tenantUid} onClose={() => setHistorico(null)} onVerVenda={setVendaDetalhe} />}
       {vendaDetalhe && <ModalDetalheVenda venda={vendaDetalhe} onClose={() => setVendaDetalhe(null)} />}
     </>
   );
