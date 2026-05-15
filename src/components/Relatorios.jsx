@@ -3191,7 +3191,7 @@ function RelatorioClientes({ clientes, vendas, intervalo, aReceber = [] }) {
         empty="Nenhum cliente cadastrado."
         data={dados.listaCompleta}
         columns={[
-          { key: "id",       label: "ID", render: (v) => <span style={{ color: "var(--gold)", fontFamily: "'Sora', sans-serif", fontSize: 11 }}>{v}</span> },
+          { key: "id", label: "ID", render: (v, row) => <span style={{ color: "var(--gold)", fontFamily: "'Sora', sans-serif", fontSize: 11 }}>{row.idSeqFmt || v}</span> },
           { key: "nome",     label: "Nome" },
           { key: "telefone", label: "Telefone" },
           { key: "cpf",      label: "CPF / CNPJ" },
