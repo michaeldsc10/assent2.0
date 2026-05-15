@@ -112,7 +112,7 @@ function getT(isDark) {
 const FlowThemeCtx = createContext({ T: getT(true), S: null });
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
-function getS(T) { return {
+function getS(T, isDark=true) { return {
   root: {
     display:"flex", height:"100dvh",
     background: T.ink,
@@ -124,8 +124,8 @@ function getS(T) { return {
 
   sidebar: {
     width:228, minWidth:228,
-    background: T.ink2,
-    borderRight:`1px solid ${T.line}`,
+    background: isDark ? T.ink2 : "#141414",
+    borderRight: isDark ? `1px solid ${T.line}` : "1px solid rgba(255,255,255,0.06)",
     display:"flex", flexDirection:"column",
     padding:"0 0 20px 0",
     position:"relative",
@@ -134,7 +134,7 @@ function getS(T) { return {
   },
   sidebarHeader: {
     padding:"28px 22px 24px",
-    borderBottom:`1px solid ${T.line}`,
+    borderBottom: isDark ? `1px solid ${T.line}` : "1px solid rgba(255,255,255,0.06)",
     marginBottom:8,
   },
   logoRow: { display:"flex", alignItems:"center", gap:12, marginBottom:4 },
@@ -147,11 +147,11 @@ function getS(T) { return {
     letterSpacing:-1,
   },
   logoText: {
-    fontSize:11, fontWeight:700, color: T.gold,
+    fontSize:11, fontWeight:700, color: isDark ? T.gold : "#C09B52",
     letterSpacing:"4px", textTransform:"uppercase",
   },
   logoSub: {
-    fontSize:9, color: T.text35,
+    fontSize:9, color: isDark ? T.text35 : "rgba(255,255,255,0.35)",
     letterSpacing:"2px", textTransform:"uppercase", marginTop:2,
   },
 
@@ -161,7 +161,7 @@ function getS(T) { return {
     cursor:"pointer",
     background: a ? T.goldA06 : "transparent",
     borderLeft: a ? `2px solid ${T.gold}` : `2px solid transparent`,
-    color: a ? T.gold : T.text35,
+    color: isDark ? (a ? T.gold : T.text35) : (a ? "#C09B52" : "rgba(255,255,255,0.5)"),
     fontSize:13, fontWeight: a ? 600 : 400,
     transition:"all 0.2s cubic-bezier(0.22,1,0.36,1)",
     userSelect:"none",
@@ -174,10 +174,10 @@ function getS(T) { return {
   },
   btnSidebarSecondary: {
     padding:"9px 14px",
-    background: T.text08,
-    border:`1px solid ${T.line}`,
+    background: isDark ? T.text08 : "rgba(255,255,255,0.06)",
+    border: isDark ? `1px solid ${T.line}` : "1px solid rgba(255,255,255,0.1)",
     borderRadius:10,
-    color: T.text35,
+    color: isDark ? T.text35 : "rgba(255,255,255,0.5)",
     fontSize:12, cursor:"pointer",
     display:"flex", alignItems:"center", gap:7,
     width:"100%",
@@ -2088,7 +2088,7 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
   // ── Tema reativo ──
   const isDark = theme !== "light";
   const T = useMemo(() => getT(isDark), [isDark]);
-  const S = useMemo(() => getS(T), [T]);
+  const S = useMemo(() => getS(T, isDark), [T, isDark]);
   const themeCtx = useMemo(() => ({ T, S }), [T, S]);
 
   const isEssencial = plano === "essencial";
