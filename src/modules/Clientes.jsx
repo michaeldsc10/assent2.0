@@ -199,6 +199,14 @@ const CSS = `
     background: var(--s2); font-weight: 600; color: var(--text);
     border-bottom: 1px solid var(--border-h);
   }
+  .cl-sort-btn {
+    background: none; border: none; padding: 0; margin: 0;
+    font: inherit; font-weight: 600; color: var(--text);
+    cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
+    transition: color .13s;
+  }
+  .cl-sort-btn:hover { color: var(--gold); }
+  .cl-sort-btn.active { color: var(--gold); }
   .cl-id { font-family: 'Courier New', monospace; font-weight: 600; color: var(--text); }
   .cl-nome { color: var(--text); cursor: pointer; font-weight: 500; }
   .cl-nome:hover { color: var(--gold); text-decoration: underline; }
@@ -469,7 +477,10 @@ function ModalNovoCliente({ cliente, clientes, onSave, onClose }) {
 }
 
 function ModalHistorico({ cliente, vendas, onClose, onVerVenda }) {
-  const clienteVendas = vendas.filter(v => v.clienteId === cliente.id).sort((a, b) => new Date(b.data) - new Date(a.data));
+  const clienteVendas = vendas.filter(v =>
+    (v.clienteId && v.clienteId === cliente.id) ||
+    (!v.clienteId && v.clienteNome && v.clienteNome === cliente.nome)
+  ).sort((a, b) => new Date(b.data) - new Date(a.data));
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -583,6 +594,13 @@ export default function Clientes() {
   const [deletando, setDeletando] = useState(null);
   const [historico, setHistorico] = useState(null);
   const [vendaDetalhe, setVendaDetalhe] = useState(null);
+  const [sortField, setSortField] = useState("id");
+  const [sortDir, setSortDir]   = useState("asc");
+
+  const toggleSort = (field) => {
+    if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortField(field); setSortDir("asc"); }
+  };
 
   /* ── Atalho de teclado: N → Novo Cliente ── */
   useEffect(() => {
@@ -677,8 +695,20 @@ export default function Clientes() {
         docNumber.toLowerCase().includes(q) ||
         c.telefone?.toLowerCase().includes(q)
       );
+    }).sort((a, b) => {
+      let va, vb;
+      if (sortField === "id") {
+        va = parseInt((a.idSeqFmt || a.id || "").replace(/\D/g, "") || "0", 10);
+        vb = parseInt((b.idSeqFmt || b.id || "").replace(/\D/g, "") || "0", 10);
+      } else {
+        va = (a.nome || "").toLowerCase();
+        vb = (b.nome || "").toLowerCase();
+      }
+      if (va < vb) return sortDir === "asc" ? -1 : 1;
+      if (va > vb) return sortDir === "asc" ?  1 : -1;
+      return 0;
     });
-  }, [clientes, search, perfilFilter]);
+  }, [clientes, search, perfilFilter, sortField, sortDir]);
 
   /* Contadores por perfil para exibir nos botões */
   const contadores = useMemo(() => {
@@ -746,8 +776,16 @@ export default function Clientes() {
           </div>
 
           <div className="cl-row cl-row-head">
-            <span>ID</span>
-            <span>Nome</span>
+            <span>
+              <button className={`cl-sort-btn ${sortField === "id" ? "active" : ""}`} onClick={() => toggleSort("id")}>
+                ID {sortField === "id" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+              </button>
+            </span>
+            <span>
+              <button className={`cl-sort-btn ${sortField === "nome" ? "active" : ""}`} onClick={() => toggleSort("nome")}>
+                Nome {sortField === "nome" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+              </button>
+            </span>
             <span>Telefone</span>
             <span>CPF / CNPJ</span>
             <span>Perfil</span>
