@@ -3514,8 +3514,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     const receitaData = faturDia.map((pt) => {
       const propDesp = dash.receitaBruta > 0 ? (dash.valorDespesasPagas || 0) / dash.receitaBruta : 0;
       const receita  = pt.v || 0;
-      const despesa  = Math.round(receita * propDesp);
-      return { mes: pt.d, receita, despesa };
+      const custo    = Math.round(receita * propDesp);
+      return { mes: pt.d, receita, custo };
     });
 
     // Lucro por ponto: margem real do período
@@ -3610,8 +3610,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 <span style={{ color: "var(--text-2)", fontSize: 11 }}>{p.name}</span>
               </div>
               <span style={{ color: p.color || "var(--gold)", fontWeight: 700, fontSize: 13, fontVariantNumeric: "tabular-nums" }}>
-                {typeof p.value === "number" && p.value > 1000
-                  ? `R$ ${p.value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                {typeof p.value === "number"
+                  ? `R$ ${p.value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                   : p.value}
               </span>
             </div>
@@ -3643,7 +3643,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           {semDados ? <EmptyState /> : chartsBarMode === "3d" ? (
             <Chart3DBars
               data={receitaData.map(d => ({ ...d, d: d.mes }))}
-              series={[BAR3D_SERIES[0]]}
+              series={[BAR3D_SERIES[0], BAR3D_SERIES[1]]}
               period={period}
               height={240}
             />
@@ -3652,11 +3652,11 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             <BarChart data={dash.loading ? [] : receitaData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }} barSize={14} barGap={3}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
               <XAxis dataKey="mes" tick={{ fill: "var(--text-2)", fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fill: "var(--text-2)", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "var(--text-2)", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => v >= 1000 ? `R$${(v/1000).toFixed(1)}k` : `R$${v}`} />
               <Tooltip content={<GoldTooltip />} cursor={{ fill: "rgba(200,165,94,0.04)", rx: 6, stroke: "rgba(200,165,94,0.1)", strokeWidth: 1 }} />
               <Legend wrapperStyle={{ fontSize: 11, color: "var(--text-2)", paddingTop: 12 }} />
               <Bar dataKey="receita" name="Receita"  fill="#c8a55e" radius={[5,5,0,0]} opacity={0.9}  activeBar={{ fill: "#e8ca60", opacity: 1, filter: "drop-shadow(0 0 6px rgba(200,165,94,0.6))" }} />
-              <Bar dataKey="despesa" name="Despesas" fill="#e05252" radius={[5,5,0,0]} opacity={0.75} activeBar={{ fill: "#f07070", opacity: 1, filter: "drop-shadow(0 0 6px rgba(224,82,82,0.5))" }} />
+              <Bar dataKey="custo"   name="Despesas" fill="#e05252" radius={[5,5,0,0]} opacity={0.75} activeBar={{ fill: "#f07070", opacity: 1, filter: "drop-shadow(0 0 6px rgba(224,82,82,0.5))" }} />
             </BarChart>
           </ResponsiveContainer>
           )}
@@ -3665,7 +3665,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         {/* 2. Lucro Líquido — AreaChart */}
         <Card
           title="Evolução do Lucro Líquido"
-          subtitle={`Período: ${period}`}
+          subtitle={`Período: ${period} · valores estimados por dia`}
           style={{ gridColumn: "2 / 3" }}
         >
           {semDados ? <EmptyState /> : (
@@ -3679,9 +3679,10 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
               <XAxis dataKey="mes" tick={{ fill: "var(--text-2)", fontSize: 11 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fill: "var(--text-2)", fontSize: 10 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "var(--text-2)", fontSize: 10 }} axisLine={false} tickLine={false}
+                tickFormatter={(v) => v >= 1000 ? `R$${(v/1000).toFixed(1)}k` : `R$${v}`} />
               <Tooltip content={<GoldTooltip />} cursor={{ stroke: "rgba(62,207,142,0.2)", strokeWidth: 1, strokeDasharray: "4 3" }} />
-              <Area type="monotone" dataKey="lucro" name="Lucro" stroke="#3ecf8e" strokeWidth={2.5} fill="url(#gLucro)"
+              <Area type="monotone" dataKey="lucro" name="Lucro estimado" stroke="#3ecf8e" strokeWidth={2.5} fill="url(#gLucro)"
                 dot={{ fill: "#3ecf8e", r: 3, strokeWidth: 0, opacity: 0.7 }}
                 activeDot={{ r: 6, fill: "#3ecf8e", stroke: "rgba(62,207,142,0.3)", strokeWidth: 6 }} />
             </AreaChart>
