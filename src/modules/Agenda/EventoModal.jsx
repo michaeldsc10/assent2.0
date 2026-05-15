@@ -23,13 +23,13 @@ function DetalheCard({ icon: Icon, label, value, valueStyle, fullWidth = false, 
       <div style={{
         display: "flex", alignItems: "center", gap: 6,
         fontSize: 10, fontWeight: 700, textTransform: "uppercase",
-        letterSpacing: ".08em", color: "var(--text-3, #888)",
+        letterSpacing: ".08em", color: "var(--text-3, #777)",
       }}>
         {Icon && <Icon size={11} strokeWidth={2.5} />}
         {label}
       </div>
       <div style={{
-        fontSize: 13.5, color: "var(--text-1, #fff)",
+        fontSize: 13.5, color: "var(--text-1, #111)",
         fontWeight: 500, lineHeight: 1.5,
         ...valueStyle,
       }}>
@@ -256,7 +256,7 @@ export default function EventoModal({ evento, onClose, onConcluir, onEditar, onE
             {/* Sub — data + hora */}
             <div style={{
               display: "flex", alignItems: "center", gap: 6,
-              fontSize: 12.5, color: "var(--text-3)",
+              fontSize: 12.5, color: "var(--text-3, #666)",
             }}>
               <Calendar size={11} strokeWidth={2} />
               <span>{fmtDataLonga(evento.data)}</span>
@@ -315,7 +315,7 @@ export default function EventoModal({ evento, onClose, onConcluir, onEditar, onE
                 day: "2-digit", month: "long", year: "numeric",
               })}
               fullWidth
-              valueStyle={{ color: "var(--text-3)", fontSize: 12, fontWeight: 400 }}
+              valueStyle={{ color: "var(--text-3, #666)", fontSize: 12, fontWeight: 400 }}
             />
           )}
         </div>
