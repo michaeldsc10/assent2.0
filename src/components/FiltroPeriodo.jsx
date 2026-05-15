@@ -42,7 +42,9 @@ export function getIntervalo(periodo, dataInicio, dataFim) {
     case "mes": {
       const de = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
       de.setHours(0, 0, 0, 0);
-      return { de, ate: hoje };
+      const ate = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+      ate.setHours(23, 59, 59, 999);
+      return { de, ate };
     }
     case "custom": {
       if (dataInicio && dataFim) {
