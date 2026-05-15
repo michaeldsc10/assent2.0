@@ -3013,9 +3013,10 @@ function RelatorioClientes({ clientes, vendas, intervalo, aReceber = [] }) {
       if (v.cliente)    nomesAtivos.add((v.cliente || "").trim().toLowerCase());
     });
 
-    /* Inclui clientes com aReceber pago no período como ativos */
+    /* Inclui clientes com aReceber pago no período como ativos (exclui origem venda — já coberto) */
     aReceber
       .filter((r) => {
+        if (r.origem === "venda") return false;
         const pago = Number(r.valorPago || 0) > 0;
         const dentroData = dentroDoIntervalo(r.dataVencimento, intervalo) || dentroDoIntervalo(r.dataCriacao, intervalo);
         return pago && dentroData;
@@ -3066,9 +3067,11 @@ function RelatorioClientes({ clientes, vendas, intervalo, aReceber = [] }) {
       gastosPorCliente[chave] = (gastosPorCliente[chave] || 0) + Number(v.total || 0);
     });
 
-    /* Soma entradas do aReceber pagas no período */
+    /* Soma entradas do aReceber pagas no período — exclui origem "venda"
+       pois o v.total já cobre sinal + restante (evita dupla contagem) */
     aReceber
       .filter((r) => {
+        if (r.origem === "venda") return false;
         const pago = Number(r.valorPago || 0) > 0;
         const dentroData = dentroDoIntervalo(r.dataVencimento, intervalo) || dentroDoIntervalo(r.dataCriacao, intervalo);
         return pago && dentroData;
