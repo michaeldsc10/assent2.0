@@ -486,9 +486,8 @@ const CSS = `
   @media (max-width: 600px) {
     .ag-row-head { display: none; }
 
-    /* Fix scroll iOS */
-    .ag-page { overflow: hidden; }
-    .ag-content { min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    /* Fix scroll iOS — scroll fica no ag-main (Dashboard), não aqui */
+    .ag-content { min-height: 0; }
 
     /* Card mobile:
        col 1 (flex)  | col 2 (ações)
