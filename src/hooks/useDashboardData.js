@@ -282,6 +282,25 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
     }, 0);
 
     /* ── Faturamento por período (respeita o filtro ativo) ── */
+
+    // Helper: soma A Receber recebidos dentro de uma janela de tempo
+    const aReceberNaJanela = (inicio, fim) =>
+      aReceber.reduce((s, r) => {
+        // Com histórico de pagamentos (novo padrão)
+        if (Array.isArray(r.historicoPagamentos) && r.historicoPagamentos.length > 0) {
+          return s + r.historicoPagamentos.reduce((acc, p) => {
+            const dt = toDate(p.data);
+            if (!dt || dt < inicio || dt > fim) return acc;
+            return acc + Number(p.valor || 0);
+          }, 0);
+        }
+        // Legado: campo dataPagamento direto
+        if (Number(r.valorPago || 0) <= 0) return s;
+        const dt = toDate(r.dataPagamento) || toDate(r.dataCriacao);
+        if (!dt || dt < inicio || dt > fim) return s;
+        return s + Number(r.valorPago || 0);
+      }, 0);
+
     let faturamentoPorDia = [];
 
     if (period === "Hoje") {
@@ -289,22 +308,22 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
       faturamentoPorDia = Array.from({ length: 24 }, (_, h) => {
         const inicio = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, 0, 0, 0);
         const fim    = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, 59, 59, 999);
-        const total  = vendas
+        const totalVendas = vendas
           .filter((v) => { const dt = toDate(v.data); return dt && dt >= inicio && dt <= fim; })
           .reduce((s, v) => s + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0)), 0);
-        return { d: `${String(h).padStart(2, "0")}h`, v: total };
+        return { d: `${String(h).padStart(2, "0")}h`, v: totalVendas + aReceberNaJanela(inicio, fim) };
       });
     } else if (period === "Todos") {
       /* Agrupa por mês (últimos 12 meses) */
       faturamentoPorDia = Array.from({ length: 12 }, (_, i) => {
-        const ref   = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+        const ref    = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
         const inicio = new Date(ref.getFullYear(), ref.getMonth(), 1);
         const fim    = new Date(ref.getFullYear(), ref.getMonth() + 1, 0, 23, 59, 59, 999);
-        const total  = vendas
+        const totalVendas = vendas
           .filter((v) => { const dt = toDate(v.data); return dt && dt >= inicio && dt <= fim; })
           .reduce((s, v) => s + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0)), 0);
         const meses = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
-        return { d: `${meses[ref.getMonth()]}/${String(ref.getFullYear()).slice(2)}`, v: total };
+        return { d: `${meses[ref.getMonth()]}/${String(ref.getFullYear()).slice(2)}`, v: totalVendas + aReceberNaJanela(inicio, fim) };
       });
     } else if (period === "Personalizado" && periodStart) {
       /* Personalizado: agrupa por dia entre from e to */
@@ -312,13 +331,13 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
       const dias = Math.min(totalDias, 60);
       faturamentoPorDia = Array.from({ length: dias }, (_, i) => {
         const d    = new Date(periodStart.getTime() + i * 86_400_000);
-        const next = new Date(d.getTime() + 86_400_000);
-        const total = vendas
-          .filter((v) => { const dt = toDate(v.data); return dt && dt >= d && dt < next; })
+        const next = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+        const totalVendas = vendas
+          .filter((v) => { const dt = toDate(v.data); return dt && dt >= d && dt <= next; })
           .reduce((s, v) => s + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0)), 0);
         return {
           d: `${String(d.getDate()).padStart(2, "0")}/${d.getMonth() + 1}`,
-          v: total,
+          v: totalVendas + aReceberNaJanela(d, next),
         };
       });
     } else {
@@ -326,16 +345,16 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
       const start = periodStart ?? new Date(now.getFullYear(), now.getMonth(), 1);
       const end   = periodEnd ?? now;
       const totalDias = Math.round((end - start) / 86_400_000) + 1;
-      const dias = Math.min(totalDias, 60); /* máximo 60 pontos */
+      const dias = Math.min(totalDias, 60);
       faturamentoPorDia = Array.from({ length: dias }, (_, i) => {
-        const d    = new Date(start.getTime() + i * 86_400_000);
-        const next = new Date(d.getTime() + 86_400_000);
-        const total = vendas
-          .filter((v) => { const dt = toDate(v.data); return dt && dt >= d && dt < next; })
+        const d    = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i, 0, 0, 0, 0);
+        const next = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+        const totalVendas = vendas
+          .filter((v) => { const dt = toDate(v.data); return dt && dt >= d && dt <= next; })
           .reduce((s, v) => s + Math.max(0, (Number(v.total) || 0) - (Number(v.valorRestante) || 0)), 0);
         return {
           d: `${String(d.getDate()).padStart(2, "0")}/${d.getMonth() + 1}`,
-          v: total,
+          v: totalVendas + aReceberNaJanela(d, next),
         };
       });
     }
