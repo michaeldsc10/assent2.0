@@ -3059,22 +3059,35 @@ function RelatorioClientes({ clientes, vendas, intervalo, aReceber = [] }) {
     const comFiado = clientes.filter((c) => Number(c.fiado || c.debito || 0) > 0);
     const totalFiado = comFiado.reduce((s, c) => s + Number(c.fiado || c.debito || 0), 0);
 
-    /* Top clientes por valor gasto no período — vendas + aReceber pagos */
+    /* Top clientes por valor gasto no período — vendas (valor recebido) + aReceber pagos */
     const gastosPorCliente = {};
+    const vendasPeriodoIds = new Set(vendasPeriodo.map((v) => v.id));
+
     vendasPeriodo.forEach((v) => {
       const chave = v.clienteId || v.cliente_id || (v.cliente || "").trim().toLowerCase();
       if (!chave) return;
-      gastosPorCliente[chave] = (gastosPorCliente[chave] || 0) + Number(v.total || 0);
+      /* Usa apenas o valor efetivamente recebido, não o total da venda */
+      const statusPago = v.statusPagamento === "pago" || (!v.statusPagamento && !v.sinalRecebido);
+      const valorRecebido = statusPago
+        ? Number(v.total || 0)
+        : Number(v.sinalRecebido || v.sinal || 0);
+      gastosPorCliente[chave] = (gastosPorCliente[chave] || 0) + valorRecebido;
     });
 
-    /* Soma entradas do aReceber pagas no período — exclui origem "venda"
-       pois o v.total já cobre sinal + restante (evita dupla contagem) */
+    /* Soma entradas do aReceber pagas no período.
+       - origem "venda": inclui se a venda original NÃO está no vendasPeriodo
+         (evita dupla contagem do sinal, mas captura pagamentos de vendas de outros períodos)
+       - outras origens: sempre inclui se pago no período */
     aReceber
       .filter((r) => {
-        if (r.origem === "venda") return false;
         const pago = Number(r.valorPago || 0) > 0;
         const dentroData = dentroDoIntervalo(r.dataVencimento, intervalo) || dentroDoIntervalo(r.dataCriacao, intervalo);
-        return pago && dentroData;
+        if (!pago || !dentroData) return false;
+        if (r.origem === "venda") {
+          /* Só conta se a venda original não foi contada no período */
+          return r.referenciaId ? !vendasPeriodoIds.has(r.referenciaId) : true;
+        }
+        return true;
       })
       .forEach((r) => {
         const chave = r.clienteId || (r.clienteNome || "").trim().toLowerCase();
