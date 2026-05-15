@@ -100,7 +100,14 @@ const CSS = `
   }
   .ag-topbar-title p { font-size: 11px; color: var(--text-2); margin-top: 2px; }
 
-  .ag-topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .ag-topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+
+  @media (max-width: 480px) {
+    .ag-topbar { padding: 10px 14px; gap: 8px; }
+    .ag-topbar-title h1 { font-size: 15px; }
+    .ag-topbar-right { gap: 6px; }
+    .btn-novo-evento-label { display: none; }
+  }
 
   .ag-mode-toggle {
     display: flex; align-items: center; gap: 3px;
@@ -1146,7 +1153,7 @@ export default function Agenda({ isPro = false }) {
               disabled={!podeCriarV || (!isPro && eventos.length >= LIMITES_FREE.eventos)}
               title={!isPro && eventos.length >= LIMITES_FREE.eventos ? `Limite de ${LIMITES_FREE.eventos} eventos atingido no plano Free` : undefined}
             >
-              <Plus size={14} /> <span><u>N</u>ovo Evento</span>
+              <Plus size={14} /> <span className="btn-novo-evento-label"><u>N</u>ovo Evento</span>
             </button>
           </div>
         </header>
