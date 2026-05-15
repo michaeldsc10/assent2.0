@@ -1434,7 +1434,19 @@ const CSS = `
     box-shadow: 0 3px 10px rgba(0,0,0,0.09);
   }
   .ag-app.light .ag-global-header { background: rgba(247,246,243,0.97); border-bottom: 1px solid rgba(0,0,0,0.07); }
-  .ag-app.light .ag-sidebar { background: rgba(247,246,243,0.98); border-right: 1px solid rgba(0,0,0,0.07); }
+  .ag-app.light .ag-sidebar {
+    background: #141414;
+    border-right: 1px solid rgba(255,255,255,0.06);
+  }
+  .ag-app.light .ag-sidebar .ag-sec-label { color: rgba(255,255,255,0.28); }
+  .ag-app.light .ag-sidebar .ag-nav-item { color: rgba(255,255,255,0.55); }
+  .ag-app.light .ag-sidebar .ag-nav-item:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.88); }
+  .ag-app.light .ag-sidebar .ag-nav-item.active {
+    background: linear-gradient(90deg, rgba(200,165,94,0.15) 0%, rgba(200,165,94,0.05) 100%);
+    color: var(--gold-brand);
+    border-left-color: var(--gold-brand);
+  }
+  .ag-app.light .ag-sidebar .ag-nav-item.active svg { color: var(--gold-brand); }
   .ag-app.light .ag-topbar { background: rgba(242,240,237,0.92); }
   .ag-app.light .ag-trow:hover { background: rgba(0,0,0,0.025); }
   .ag-app.light .ag-user-dropdown { background: var(--s1); box-shadow: 0 6px 20px rgba(0,0,0,0.10); }
