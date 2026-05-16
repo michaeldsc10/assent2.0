@@ -688,8 +688,11 @@ const CSS = `
 }
 @media (max-width: 480px) {
   .ag-notif-panel {
-    width: calc(100vw - 24px);
-    right: -8px;
+    position: fixed;
+    top: 60px;
+    left: 12px;
+    right: 12px;
+    width: auto;
     max-height: 70vh;
   }
 }
