@@ -543,7 +543,7 @@ const RESPONSIVE_CSS = `
    CSS DO DASHBOARD (layout base)
    ═══════════════════════════════════════════════ */
 const CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   html, body, #root { height: 100%; width: 100%; margin: 0; padding: 0; }
@@ -582,7 +582,7 @@ const CSS = `
     --grid-line:    rgba(200,165,94,0.025);
     font-family: 'Sora', system-ui, sans-serif;
     --font-display: 'Sora', system-ui, sans-serif;
-    --font-mono:    'JetBrains Mono', monospace;
+    --font-mono:    'DM Mono', monospace;
     color-scheme: dark;
   }
 
@@ -670,7 +670,7 @@ const CSS = `
     position: absolute; top: -5px; right: -5px;
     background: var(--red); color: #fff;
     border-radius: 10px; font-size: 9px; font-weight: 700;
-    padding: 1px 5px; font-family: 'JetBrains Mono', monospace;
+    padding: 1px 5px; font-family: 'DM Mono', monospace;
     line-height: 1.6; pointer-events: none;
     border: 2px solid var(--bg);
   }
@@ -837,7 +837,7 @@ const CSS = `
 }
 .holo-meta span:last-child {
   font-size: 10px; color: var(--text-3);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'DM Mono', monospace;
 }
 
 /* close */
@@ -904,7 +904,7 @@ const CSS = `
 
 .ag-notif-item-meta {
   font-size: 10px; color: var(--text-3);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'DM Mono', monospace;
 }
 
 .ag-notif-empty {
@@ -1663,7 +1663,7 @@ const CSS = `
   flex-shrink: 0;
   font-size: 9px;
   color: var(--text-3);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'DM Mono', monospace;
   line-height: 1;
   padding-bottom: 20px;
 }
@@ -1748,7 +1748,7 @@ const CSS = `
 .bar3d-label {
   font-size: 9px;
   color: var(--text-3);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'DM Mono', monospace;
   margin-top: 5px;
   text-align: center;
   white-space: nowrap;
@@ -1775,7 +1775,7 @@ const CSS = `
 }
 .chart3d-legend-right b {
   color: var(--gold);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: 'DM Mono', monospace;
   font-weight: 700; font-size: 13px;
 }
 
