@@ -518,13 +518,17 @@ const RESPONSIVE_CSS = `
   .ag-period-mobile { display: flex !important; }
   .db-kpi-strip { grid-template-columns: repeat(2, 1fr) !important; }
   .db-body { grid-template-columns: 1fr !important; }
-  .db-aside { display: none !important; }
+  .db-aside { display: flex !important; }
 }
 @media (min-width: 721px) {
   .ag-period-mobile { display: none !important; }
 }
 @media (max-width: 480px) {
   .db-kpi-strip { grid-template-columns: 1fr 1fr !important; }
+  .db-kpi-val { font-size: 16px !important; }
+  .db-kpi-card { padding: 12px 14px !important; }
+  .db-panel { overflow: hidden; }
+  .db-aside { min-width: 0; }
 }
 
 /* ── MOBILE BOTTOM NAV ── */
@@ -2089,7 +2093,7 @@ function Chart3DDonut({ data, height = 200 }) {
   const SVG_W = CX * 2, SVG_H = CY * 2 + DEPTH + 16;
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 20, height, minHeight: height }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, minHeight: height }}>
       <div style={{ flexShrink: 0 }}>
         <svg width={SVG_W} height={SVG_H} style={{ overflow: "visible" }}>
           <defs>
@@ -2169,7 +2173,7 @@ function Chart3DDonut({ data, height = 200 }) {
       </div>
 
       {/* Legend */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 8 }}>
         {slices.map((s, i) => (
           <div key={i}
             style={{ cursor: "pointer", opacity: hovered !== null && hovered !== i ? 0.4 : 1, transition: "opacity 0.15s" }}
@@ -3529,7 +3533,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 </div>
                 <div style={{ padding: "14px 16px" }}>
                   {mixModeOverview === "3d" ? (
-                    <Chart3DDonut data={dash.mixData || []} height={120} />
+                    <Chart3DDonut data={dash.mixData || []} height={200} />
                   ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                       {(dash.mixData || []).map((item, i) => {
