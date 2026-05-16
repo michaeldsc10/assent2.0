@@ -1184,14 +1184,6 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
               style={{...S.input,paddingLeft:30,fontSize:12,height:36,padding:"0 10px 0 30px",color:buscarData?T.text100:T.text35}}
             />
           </div>
-          <button
-            onClick={()=>{setFiltroHoje(h=>!h); setBuscarData("");}}
-            style={{...S.btnGhost,fontSize:11,padding:"0 12px",height:36,gap:4,whiteSpace:"nowrap",
-              ...(filtroHoje?{background:T.goldA12,color:T.gold,border:`1px solid ${T.goldA22}`}:{})
-            }}
-          >
-            <CalendarDays size={12}/> Hoje
-          </button>
           {temBusca&&(
             <button onClick={limparBusca} style={{...S.btnGhost,fontSize:11,padding:"0 12px",height:36,gap:4,whiteSpace:"nowrap"}}>
               ✕ Limpar
@@ -1204,6 +1196,14 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
           <span style={{fontSize:10.5,fontWeight:700,color:T.text18,textTransform:"uppercase",letterSpacing:"1px",whiteSpace:"nowrap"}}>Ordenar:</span>
           <button onClick={()=>toggleSort("data")}  style={sortBtnStyle("data")}>
             {IcR.cal} Data{sortArrow("data")}
+          </button>
+          <button
+            onClick={()=>{setFiltroHoje(h=>!h); setBuscarData("");}}
+            style={{...sortBtnStyle("hoje"),
+              ...(filtroHoje?{background:T.goldA12,color:T.gold,border:`1px solid ${T.goldA22}`}:{})
+            }}
+          >
+            <CalendarDays size={12}/> Hoje
           </button>
           <button onClick={()=>toggleSort("nome")} style={sortBtnStyle("nome")}>
             {IcR.user} Nome{sortArrow("nome")}
