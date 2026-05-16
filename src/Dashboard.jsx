@@ -4375,7 +4375,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
                 <button
                   className="ag-dropdown-item"
-                  onClick={() => { setModule("Configurações"); setDropdownOpen(false); }}
+                  onClick={() => { setSistemaAtivo("gestao"); setModule("Configurações"); setDropdownOpen(false); }}
                 >
                   <Settings size={13} /> Configurações
                 </button>
