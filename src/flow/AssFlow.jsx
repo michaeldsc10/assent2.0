@@ -11,6 +11,7 @@
 //   ?tenant=X&prestador=Y  → prestador específico
 
 import { useState, useEffect, useMemo, createContext, useContext } from "react";
+import { CalendarDays, CalendarRange, Clock, Settings, Users, Ban, Inbox, Link, Lightbulb, ClipboardList, Zap } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import {
   getFirestore, collection, doc, onSnapshot,
@@ -526,10 +527,10 @@ function TelaVisaoGeral({tenantUid,prestadores,meuPrestadorId,isAdmin}){
       {/* grid responsivo via className */}
       <div className="flow-grid4">
         {[
-          {icon:"📋", value:total,        label:"Total de Reservas", color:T.gold,    glow:T.goldA12},
-          {icon:"📅", value:hojeR.length, label:"Hoje",              color:T.blue,    glow:T.blueA10},
-          {icon:"📆", value:semanaR.length,label:"Esta Semana",      color:T.goldHi,  glow:T.goldA12},
-          {icon:"⏳", value:pendentes,    label:"Pendentes",         color:T.emerald, glow:T.emeraldA10},
+          {icon:<ClipboardList size={20}/>, value:total,        label:"Total de Reservas", color:T.gold,    glow:T.goldA12},
+          {icon:<CalendarDays size={20}/>, value:hojeR.length, label:"Hoje",              color:T.blue,    glow:T.blueA10},
+          {icon:<CalendarRange size={20}/>, value:semanaR.length,label:"Esta Semana",      color:T.goldHi,  glow:T.goldA12},
+          {icon:<Clock size={20}/>, value:pendentes,    label:"Pendentes",         color:T.emerald, glow:T.emeraldA10},
         ].map(({icon,value,label,color,glow})=>(
           <div key={label} style={{
             ...S.statCard,
@@ -697,7 +698,7 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
             <button style={{...S.btnGhost,color:copied==="admin"?T.emerald:T.text35,fontSize:11}} onClick={()=>copiar("admin")}>
               {copied==="admin"?<>{Ic.check} Copiado!</>:<>{Ic.copy} Link</>}
             </button>
-            <button style={{...S.btnGhost,fontSize:11}} onClick={()=>onConfigurar("admin")}>⚙ Configurar</button>
+            <button style={{...S.btnGhost,fontSize:11}} onClick={()=>onConfigurar("admin")}><Settings size={11}/> Configurar</button>
           </div>
         </div>
       )}
@@ -705,7 +706,7 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
       {/* Demais usuários do AG */}
       {usuarios.length===0?(
         <div style={{...S.emptyState}}>
-          <p style={{fontSize:22,marginBottom:8}}>👥</p>
+          <Users size={22} style={{marginBottom:8,color:"inherit"}}/>
           <p style={{fontSize:13,fontWeight:600,color:T.text100,marginBottom:4}}>Nenhum colaborador cadastrado</p>
           <p style={{fontSize:12,color:T.text35}}>Adicione usuários no módulo Usuários do AG para ativá-los aqui.</p>
         </div>
@@ -742,7 +743,7 @@ function TelaEquipe({tenantUid,user,prestadores,onConfigurar}){
                     {ativoFlow&&(
                       <>
                         <button style={{...S.btnGhost,fontSize:11}} onClick={()=>setEditando({prestadorId:usr.uid,esp:prestador?.especialidade||""})}>✏ Especialidade</button>
-                        <button style={{...S.btnGhost,fontSize:11}} onClick={()=>onConfigurar(usr.uid)}>⚙ Configurar</button>
+                        <button style={{...S.btnGhost,fontSize:11}} onClick={()=>onConfigurar(usr.uid)}><Settings size={11}/> Configurar</button>
                         <button style={{...S.btnGhost,color:copied===usr.uid?T.emerald:T.text35,fontSize:11}} onClick={()=>copiar(usr.uid)}>
                           {copied===usr.uid?<>{Ic.check} Copiado!</>:<>{Ic.copy} Link</>}
                         </button>
@@ -1118,7 +1119,7 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
       {/* ══ ABAS PRINCIPAIS ══ */}
       <div style={{display:"flex",gap:0,background:T.text08,border:"1px solid ${T.line}",borderRadius:14,padding:4,alignSelf:"flex-start"}}>
         {[
-          {key:"ativas",    label:"Ativas",     count:ativas.length,    cor:T.emerald, icon:"✦"},
+          {key:"ativas",    label:"Ativas",     count:ativas.length,    cor:T.emerald, icon:<Zap size={12}/>},
           {key:"canceladas",label:"Canceladas", count:canceladas.length,cor:"#F87171", icon:"✕"},
         ].map(({key,label,count,cor,icon})=>{
           const on=aba===key;
@@ -1236,7 +1237,7 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
       {listaAtual.length===0?(
         <div style={{...S.card,textAlign:"center",padding:"60px 24px",display:"flex",flexDirection:"column",alignItems:"center",gap:12}}>
           <div style={{width:52,height:52,borderRadius:16,background:T.text08,border:"1px solid ${T.line}",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>
-            {aba==="canceladas"?"🚫":"📭"}
+            {aba==="canceladas"?<Ban size={22}/>:<Inbox size={22}/>}
           </div>
           <p style={{fontSize:14,fontWeight:700,color:T.text65,letterSpacing:"-0.1px"}}>
             {temBusca?"Nenhum resultado encontrado":"Nenhuma reserva aqui"}
@@ -1389,7 +1390,7 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
 
   if(!isAdmin&&!meuPrestadorId) return (
     <div style={S.emptyState}>
-      <p style={{fontSize:32,marginBottom:8}}>🔗</p>
+      <Link size={32} style={{marginBottom:8,color:"inherit"}}/>
       <p style={{fontSize:13,fontWeight:600,color:T.text100,marginBottom:4}}>Conta não vinculada ao Flow</p>
       <p style={{fontSize:12,color:T.text35}}>Peça ao administrador para ativar você na tela Equipe.</p>
     </div>
@@ -1496,7 +1497,7 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
             </div>
           </div>
           <div style={{marginTop:14,padding:"10px 14px",background:T.goldA06,border:`1px solid ${T.goldA12}`,borderRadius:10,fontSize:11.5,color:T.text35,lineHeight:1.65,display:"flex",gap:8,alignItems:"flex-start"}}>
-            <span style={{flexShrink:0,marginTop:1}}>💡</span>
+            <Lightbulb size={14} style={{flexShrink:0,marginTop:1,color:"inherit"}}/>
             <span>O intervalo define o passo entre os horários disponíveis para o cliente — a duração real de cada serviço é sempre respeitada.</span>
           </div>
         </div>
@@ -1776,7 +1777,7 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
       {isAdmin&&(
         <div style={{background:T.cardBg,border:`1px solid ${T.line}`,borderLeft:`3px solid ${T.gold}`,borderRadius:14,padding:"16px 20px",backdropFilter:"blur(12px)",position:"relative",overflow:"hidden",display:"flex",alignItems:"flex-start",gap:14}}>
           <div style={{position:"absolute",top:0,left:0,width:120,height:"100%",background:`linear-gradient(90deg,${T.goldA06} 0%,transparent 100%)`,pointerEvents:"none"}}/>
-          <div style={{width:36,height:36,borderRadius:10,background:T.goldA06,border:`1px solid ${T.goldA22}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.gold,flexShrink:0,fontSize:16}}>🔗</div>
+          <div style={{width:36,height:36,borderRadius:10,background:T.goldA06,border:`1px solid ${T.goldA22}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.gold,flexShrink:0,fontSize:16}}><Link size={12}/></div>
           <div style={{flex:1}}>
             <p style={{fontSize:13,fontWeight:700,color:T.text100,marginBottom:4}}>Links de Agendamento Público</p>
             <p style={{fontSize:12,color:T.text35,lineHeight:1.65}}>
@@ -1789,7 +1790,7 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
 
       {lista.length===0?(
         <div style={{background:T.cardBg,border:`1px solid ${T.line}`,borderRadius:14,padding:"52px 24px",textAlign:"center",backdropFilter:"blur(12px)"}}>
-          <p style={{fontSize:22,marginBottom:8}}>📭</p>
+          <Inbox size={22} style={{marginBottom:8,color:"inherit"}}/>
           <p style={{fontSize:13,fontWeight:700,color:T.text35}}>Nenhum prestador ativo no momento.</p>
         </div>
       ):(
@@ -1854,7 +1855,7 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
 
               {/* URL */}
               <div style={{margin:"0 22px 16px",padding:"10px 14px",background:T.rowAlt,border:`1px solid ${T.line}`,borderRadius:10,display:"flex",alignItems:"center",gap:10}}>
-                <div style={{width:22,height:22,borderRadius:6,background:T.goldA06,border:`1px solid ${T.goldA12}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.gold,flexShrink:0,fontSize:10}}>🔗</div>
+                <div style={{width:22,height:22,borderRadius:6,background:T.goldA06,border:`1px solid ${T.goldA12}`,display:"flex",alignItems:"center",justifyContent:"center",color:T.gold,flexShrink:0,fontSize:10}}><Link size={12}/></div>
                 <span style={{fontSize:11.5,color:T.text35,flex:1,wordBreak:"break-all",fontFamily:"'JetBrains Mono', monospace"}}>{link}</span>
               </div>
 
