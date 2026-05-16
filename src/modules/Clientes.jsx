@@ -545,7 +545,7 @@ function ModalHistorico({ cliente, tenantUid, onClose, onVerVenda }) {
                     <div key={v.id} className="modal-venda-item" onClick={() => onVerVenda(v)}>
                       <div className="modal-venda-id">ID: {v.id}</div>
                       <div className="modal-venda-data">
-                        <span>{new Date(v.data).toLocaleDateString("pt-BR")}</span>
+                        <span>{(v.data?.toDate ? v.data.toDate() : new Date(v.data || 0)).toLocaleDateString("pt-BR")}</span>
                         <span className="modal-venda-valor">R$ {(v.total || 0).toFixed(2)}</span>
                       </div>
                     </div>
@@ -596,7 +596,7 @@ function ModalDetalheVenda({ venda, onClose }) {
         <div className="modal-body modal-venda-detalhe">
           <div className="modal-venda-row">
             <span className="modal-venda-row-label">Data:</span>
-            <span className="modal-venda-row-value">{new Date(venda.data).toLocaleDateString("pt-BR")}</span>
+            <span className="modal-venda-row-value">{(venda.data?.toDate ? venda.data.toDate() : new Date(venda.data || 0)).toLocaleDateString("pt-BR")}</span>
           </div>
           <div className="modal-venda-row">
             <span className="modal-venda-row-label">Total:</span>
