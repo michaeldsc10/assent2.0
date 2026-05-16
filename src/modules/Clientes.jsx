@@ -8,7 +8,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Search, UserPlus, Edit2, Trash2, X, ChevronRight, Printer,
-  GraduationCap,
+  GraduationCap, Package,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
@@ -68,6 +68,26 @@ const CSS = `
     cursor: pointer; margin-top: 2px; transition: background .13s;
   }
   .modal-close:hover { background: var(--s2); border-color: var(--border-h); }
+
+  /* ── Detalhe Venda ── */
+  .dv-meta { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+  .dv-meta-card { background: var(--s2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 13px; }
+  .dv-meta-label { font-size: 9px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--text-3); margin-bottom: 4px; }
+  .dv-meta-val { font-size: 13px; color: var(--text); font-weight: 500; }
+  .dv-meta-obs { background: var(--s2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 13px; margin-bottom: 18px; }
+  .dv-table { background: var(--s2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
+  .dv-thead { display: grid; grid-template-columns: 1fr 60px 110px 110px 100px 110px; padding: 8px 12px; background: var(--s3); border-bottom: 1px solid var(--border); gap: 8px; }
+  .dv-thead span { font-size: 9px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .dv-trow { display: grid; grid-template-columns: 1fr 60px 110px 110px 100px 110px; padding: 10px 12px; border-bottom: 1px solid var(--border); gap: 8px; font-size: 12px; color: var(--text-2); align-items: center; }
+  .dv-trow:last-child { border-bottom: none; }
+  .dv-nome { color: var(--text); font-weight: 500; display: flex; align-items: center; gap: 6px; }
+  .dv-totals { display: flex; gap: 12px; padding: 12px 14px; background: var(--s2); border: 1px solid var(--border); border-radius: 10px; flex-wrap: wrap; }
+  .dv-total-cell { display: flex; flex-direction: column; gap: 2px; }
+  .dv-total-label { font-size: 9px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .dv-total-val { font-family: 'Sora', sans-serif; font-size: 13px; font-weight: 600; }
+  .dv-imprimir { display: flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--s3); color: var(--text-2); font-family: 'DM Sans', sans-serif; transition: all .13s; margin-bottom: 16px; }
+  .dv-imprimir:hover { background: var(--s2); color: var(--text); }
+
   .modal-body   { padding: 20px 22px; }
   .modal-footer {
     padding: 14px 22px; border-top: 1px solid var(--border);
@@ -585,26 +605,231 @@ function ModalConfirmDelete({ cliente, onConfirm, onClose }) {
   );
 }
 
+const fmtR$ = (v) =>
+  `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+
+const fmtData = (d) => {
+  if (!d) return "—";
+  try {
+    const dt = d?.toDate ? d.toDate() : new Date(d);
+    return dt.toLocaleDateString("pt-BR");
+  } catch { return String(d); }
+};
+
+function escapeHtml(text) {
+  if (!text) return "";
+  const map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" };
+  return String(text).replace(/[&<>"']/g, (char) => map[char]);
+}
+
+function imprimirRecibo(venda) {
+  const el = document.getElementById("recibo-print-root");
+  if (!el) return;
+  const itens = venda.itens || [];
+  const descontos = itens.reduce((s, i) => s + (i.desconto || 0), 0);
+  const temTaxa = venda.valorTaxa > 0;
+  const temParc = venda.parcelas > 1;
+  const isSinal = venda.formaPagamento === "Sinal" && venda.valorPago != null;
+  const pagamentos = venda.pagamentos && venda.pagamentos.length > 0
+    ? venda.pagamentos
+    : [{ label: venda.formaPagamento || "—", valor: isSinal ? venda.valorPago : venda.total }];
+  const pgtoLinhas = pagamentos.map(p => {
+    const label = temParc && pagamentos.length === 1
+      ? `${p.label} — ${venda.parcelas}x de ${fmtR$(venda.total / venda.parcelas)}`
+      : p.label;
+    return `<div style="display:flex;justify-content:space-between;font-size:12px;"><span>${label}</span><span style="font-weight:bold;">${fmtR$(p.valor ?? venda.total)}</span></div>`;
+  }).join("");
+  el.innerHTML = `
+    <div class="recibo-print">
+      <div style="text-align:center;font-weight:bold;font-size:14px;margin-bottom:3px;">ASSENT</div>
+      <div style="text-align:center;font-size:11px;margin:6px 0 10px;">Recibo de Venda</div>
+      <div style="border-top:1px dashed #000;margin:6px 0;"></div>
+      <div style="font-size:12px;"><strong>ID:</strong> ${escapeHtml(venda.idVenda || venda.id)}</div>
+      <div style="font-size:12px;"><strong>Data:</strong> ${fmtData(venda.data)}</div>
+      <div style="font-size:12px;"><strong>Cliente:</strong> ${escapeHtml(venda.cliente || "—")}</div>
+      ${venda.vendedor ? `<div style="font-size:12px;"><strong>Vendedor:</strong> ${escapeHtml(venda.vendedor)}</div>` : ""}
+      <div style="border-top:1px dashed #000;margin:8px 0;"></div>
+      <div style="display:grid;grid-template-columns:1fr auto auto;gap:2px 8px;font-size:11px;font-weight:bold;margin-bottom:4px;"><span>PRODUTO / SERVIÇO</span><span style="text-align:right;">QTD</span><span style="text-align:right;">TOTAL</span></div>
+      ${itens.map(i => {
+        const totalItem = (i.preco || 0) * (i.qtd || 1) - (i.desconto || 0);
+        return `<div style="display:grid;grid-template-columns:1fr auto auto;gap:1px 8px;font-size:11px;margin-bottom:5px;"><span style="font-weight:bold;">${escapeHtml(i.nome || i.produto || "Item livre")}</span><span style="text-align:right;font-weight:bold;">${i.qtd}x</span><span style="text-align:right;font-weight:bold;">${fmtR$(totalItem)}</span><span style="font-size:10px;color:#444;grid-column:1/-1;">Unitário: ${fmtR$(i.preco)}</span>${i.desconto > 0 ? `<span style="font-size:10px;color:#444;grid-column:1/-1;">Desconto: -${fmtR$(i.desconto)}</span>` : ""}</div>`;
+      }).join("")}
+      <div style="border-top:1px dashed #000;margin:8px 0;"></div>
+      ${descontos > 0 ? `<div style="display:flex;justify-content:space-between;font-size:11px;"><span>Descontos</span><span>-${fmtR$(descontos)}</span></div>` : ""}
+      ${temTaxa ? `<div style="display:flex;justify-content:space-between;font-size:11px;color:#444;"><span>Taxa cartão (${venda.taxaPercentual}%)</span><span>${fmtR$(venda.valorTaxa)}</span></div>` : ""}
+      <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:14px;margin-top:4px;"><span>TOTAL</span><span>${fmtR$(venda.total)}</span></div>
+      ${isSinal ? `<div style="border-top:1px dashed #000;margin:8px 0;"></div><div style="display:flex;justify-content:space-between;font-size:12px;"><span>Sinal recebido</span><span>${fmtR$(venda.valorPago)}</span></div><div style="display:flex;justify-content:space-between;font-size:12px;font-weight:bold;"><span>Restante a pagar</span><span>${fmtR$(venda.valorRestante)}</span></div>` : ""}
+      <div style="border-top:1px dashed #000;margin:8px 0;"></div>
+      <div style="font-size:12px;font-weight:bold;margin-bottom:4px;">FORMA DE PAGAMENTO</div>
+      ${pgtoLinhas}
+      ${venda.observacao ? `<div style="border-top:1px dashed #000;margin:8px 0;"></div><div style="font-size:11px;"><strong>Obs:</strong> ${escapeHtml(venda.observacao)}</div>` : ""}
+      <div style="text-align:center;font-size:10px;margin-top:14px;">Obrigado!</div>
+    </div>
+  `;
+  window.print();
+}
+
 function ModalDetalheVenda({ venda, onClose }) {
+  if (!venda) return null;
+  const itens = venda.itens || [];
+  const subtotal   = itens.reduce((s, i) => s + (i.preco || 0) * (i.qtd || 1), 0);
+  const descontos  = itens.reduce((s, i) => s + (i.desconto || 0), 0);
+  const custoTotal = itens.reduce((s, i) => s + (i.custo || 0) * (i.qtd || 1), 0);
+  const total      = typeof venda.total === "number" ? venda.total : subtotal - descontos;
+  const lucro      = total - custoTotal;
+
   return (
-    <div className="modal-overlay modal-overlay-top" onClick={onClose}>
-      <div className="modal-box modal-box-md" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay modal-overlay-top" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box modal-box-lg">
         <div className="modal-header">
-          <div className="modal-title">Venda #{venda.id}</div>
-          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+          <div>
+            <div className="modal-title" style={{ color: "var(--gold)" }}>{venda.idVenda || venda.id}</div>
+            <div className="modal-sub">Detalhes da venda</div>
+          </div>
+          <button className="modal-close" onClick={onClose}>
+            <X size={14} color="var(--text-2)" />
+          </button>
         </div>
-        <div className="modal-body modal-venda-detalhe">
-          <div className="modal-venda-row">
-            <span className="modal-venda-row-label">Data:</span>
-            <span className="modal-venda-row-value">{(venda.data?.toDate ? venda.data.toDate() : new Date(venda.data || 0)).toLocaleDateString("pt-BR")}</span>
+
+        <div className="modal-body">
+          {/* Meta cards */}
+          <div className="dv-meta">
+            <div className="dv-meta-card">
+              <div className="dv-meta-label">Cliente</div>
+              <div className="dv-meta-val">{venda.cliente || "—"}</div>
+            </div>
+            <div className="dv-meta-card">
+              <div className="dv-meta-label">Data</div>
+              <div className="dv-meta-val">{fmtData(venda.data)}</div>
+            </div>
+            <div className="dv-meta-card">
+              <div className="dv-meta-label">Pagamento</div>
+              <div className="dv-meta-val">
+                {venda.formaPagamento || "—"}
+                {venda.parcelas > 1 && (
+                  <span style={{ marginLeft: 6, fontSize: 11, color: "var(--gold)" }}>
+                    {venda.parcelas}x
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
-          <div className="modal-venda-row">
-            <span className="modal-venda-row-label">Total:</span>
-            <span className="modal-venda-row-value">R$ {(venda.total || 0).toFixed(2)}</span>
+
+          {venda.valorTaxa > 0 && (
+            <div className="dv-meta" style={{ gridTemplateColumns: "1fr 1fr", marginTop: -6 }}>
+              <div className="dv-meta-card">
+                <div className="dv-meta-label">
+                  Taxa {venda.formaPagamento === "Pix" ? "PIX" : "Cartão"} ({venda.taxaPercentual}%)
+                </div>
+                <div className="dv-meta-val" style={{ color: "var(--red)" }}>{fmtR$(venda.valorTaxa)}</div>
+              </div>
+              {venda.parcelas > 1 && (
+                <div className="dv-meta-card">
+                  <div className="dv-meta-label">Valor por Parcela</div>
+                  <div className="dv-meta-val">{fmtR$(venda.total / venda.parcelas)}</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {venda.vendedor && (
+            <div className="dv-meta" style={{ gridTemplateColumns: "1fr", marginTop: -6 }}>
+              <div className="dv-meta-card">
+                <div className="dv-meta-label">Vendedor</div>
+                <div className="dv-meta-val">{venda.vendedor}</div>
+              </div>
+            </div>
+          )}
+
+          {venda.observacao && (
+            <div className="dv-meta-obs" style={{ marginTop: 6 }}>
+              <div className="dv-meta-label" style={{ marginBottom: 4 }}>Observação</div>
+              <div style={{ fontSize: 13, color: "var(--text-2)" }}>{venda.observacao}</div>
+            </div>
+          )}
+
+          <button className="dv-imprimir" onClick={() => imprimirRecibo(venda)}>
+            <Printer size={13} /> Reimprimir Recibo
+          </button>
+
+          {/* Tabela de itens */}
+          <div className="dv-table">
+            <div className="dv-thead">
+              <span>PRODUTO / SERVIÇO</span>
+              <span style={{ textAlign: "center" }}>QTD</span>
+              <span style={{ textAlign: "right" }}>PREÇO UNIT.</span>
+              <span style={{ textAlign: "right" }}>CUSTO UNIT.</span>
+              <span style={{ textAlign: "right" }}>DESCONTO</span>
+              <span style={{ textAlign: "right" }}>TOTAL ITEM</span>
+            </div>
+            {itens.length === 0 ? (
+              <div style={{ padding: 18, textAlign: "center", color: "var(--text-3)", fontSize: 12 }}>
+                Nenhum item nesta venda.
+              </div>
+            ) : itens.map((item, i) => {
+              const totalItem = (item.preco || 0) * (item.qtd || 1) - (item.desconto || 0);
+              return (
+                <div key={i} className="dv-trow">
+                  <span className="dv-nome">
+                    {item.tipo === "servico" ? "🎯" : <Package size={11} color="var(--text-3)" />}
+                    {item.nome || item.produto || "—"}
+                  </span>
+                  <span style={{ textAlign: "center" }}>{item.qtd || 1}</span>
+                  <span style={{ textAlign: "right" }}>{fmtR$(item.preco)}</span>
+                  <span style={{ textAlign: "right", color: "var(--red)" }}>{fmtR$(item.custo)}</span>
+                  <span style={{ textAlign: "right" }}>{item.desconto ? fmtR$(item.desconto) : "—"}</span>
+                  <span style={{ textAlign: "right", color: "var(--green)", fontFamily: "Sora, sans-serif", fontWeight: 500 }}>
+                    {fmtR$(totalItem)}
+                  </span>
+                </div>
+              );
+            })}
           </div>
-          <div className="modal-venda-row">
-            <span className="modal-venda-row-label">Status:</span>
-            <span className="modal-venda-row-value">{venda.status || "Finalizada"}</span>
+
+          {/* Totais */}
+          <div className="dv-totals">
+            <div className="dv-total-cell">
+              <div className="dv-total-label">Subtotal</div>
+              <div className="dv-total-val" style={{ color: "var(--text)" }}>{fmtR$(subtotal)}</div>
+            </div>
+            <div className="dv-total-cell">
+              <div className="dv-total-label">Descontos</div>
+              <div className="dv-total-val" style={{ color: "var(--red)" }}>{fmtR$(descontos)}</div>
+            </div>
+            <div className="dv-total-cell">
+              <div className="dv-total-label">Custo Total</div>
+              <div className="dv-total-val" style={{ color: "var(--red)" }}>{fmtR$(custoTotal)}</div>
+            </div>
+            {venda.valorTaxa > 0 && (
+              <div className="dv-total-cell">
+                <div className="dv-total-label">
+                  Taxa {venda.formaPagamento === "Pix" ? "PIX" : "Cartão"} ({venda.taxaPercentual}%)
+                </div>
+                <div className="dv-total-val" style={{ color: "var(--red)" }}>{fmtR$(venda.valorTaxa)}</div>
+              </div>
+            )}
+            <div className="dv-total-cell">
+              <div className="dv-total-label">Total</div>
+              <div className="dv-total-val" style={{ color: "var(--green)" }}>{fmtR$(total)}</div>
+            </div>
+            {venda.formaPagamento === "Sinal" && venda.valorPago != null && (
+              <>
+                <div className="dv-total-cell">
+                  <div className="dv-total-label">Sinal Recebido</div>
+                  <div className="dv-total-val" style={{ color: "var(--green)" }}>{fmtR$(venda.valorPago)}</div>
+                </div>
+                <div className="dv-total-cell">
+                  <div className="dv-total-label">A Receber</div>
+                  <div className="dv-total-val" style={{ color: "var(--blue, #5b8ef0)" }}>{fmtR$(venda.valorRestante)}</div>
+                </div>
+              </>
+            )}
+            <div className="dv-total-cell">
+              <div className="dv-total-label">Lucro Est.</div>
+              <div className="dv-total-val" style={{ color: "var(--gold)" }}>
+                {fmtR$(typeof venda.lucroEstimado === "number" ? venda.lucroEstimado : lucro)}
+              </div>
+            </div>
           </div>
         </div>
       </div>
