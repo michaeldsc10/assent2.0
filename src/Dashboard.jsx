@@ -686,6 +686,13 @@ const CSS = `
   border-radius: 20px; box-shadow: 0 20px 60px rgba(0,0,0,.50), 0 0 0 1px rgba(255,255,255,0.03) inset;
   z-index: 200; overflow: hidden; display: flex; flex-direction: column;
 }
+@media (max-width: 480px) {
+  .ag-notif-panel {
+    width: calc(100vw - 24px);
+    right: -8px;
+    max-height: 70vh;
+  }
+}
 
 .ag-notif-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -1410,7 +1417,6 @@ const CSS = `
   }
   @media (max-width: 480px) {
     .ag-header-logo { padding: 0 10px; }
-    .ag-notif       { display: none; }
   }
 
   /* ══ BOTÃO DE TEMA ══ */
