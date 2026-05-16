@@ -999,6 +999,7 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
   const [buscarData,setBuscarData]=useState("");
   const [sortBy,setSortBy]=useState("data");
   const [sortDir,setSortDir]=useState("desc");
+  const [filtroHoje,setFiltroHoje]=useState(false);
 
   useEffect(()=>{
     if(!tenantUid||!prestadores.length) return;
@@ -1075,6 +1076,17 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
         return d>=d0&&d<=d1;
       });
     }
+    // Filtro hoje
+    if(filtroHoje){
+      const agora=new Date();
+      const h0=new Date(agora.getFullYear(),agora.getMonth(),agora.getDate(),0,0,0);
+      const h1=new Date(agora.getFullYear(),agora.getMonth(),agora.getDate(),23,59,59);
+      f=f.filter(r=>{
+        if(!r.data_hora_inicio) return false;
+        const d=r.data_hora_inicio.toDate?r.data_hora_inicio.toDate():new Date(r.data_hora_inicio);
+        return d>=h0&&d<=h1;
+      });
+    }
     f=[...f].sort((a,b)=>{
       if(sortBy==="nome"){
         const na=(a.cliente_nome||"").toLowerCase(),nb=(b.cliente_nome||"").toLowerCase();
@@ -1097,8 +1109,8 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
   ];
   const SUB_COLORS={todos:T.gold,pendente:T.goldHi,confirmado:T.emerald};
 
-  const limparBusca=()=>{ setBusca(""); setBuscarData(""); };
-  const temBusca=busca.trim()||buscarData;
+  const limparBusca=()=>{ setBusca(""); setBuscarData(""); setFiltroHoje(false); };
+  const temBusca=busca.trim()||buscarData||filtroHoje;
 
   const sortBtnStyle=(campo)=>({
     display:"flex",alignItems:"center",gap:5,
@@ -1172,6 +1184,14 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
               style={{...S.input,paddingLeft:30,fontSize:12,height:36,padding:"0 10px 0 30px",color:buscarData?T.text100:T.text35}}
             />
           </div>
+          <button
+            onClick={()=>{setFiltroHoje(h=>!h); setBuscarData("");}}
+            style={{...S.btnGhost,fontSize:11,padding:"0 12px",height:36,gap:4,whiteSpace:"nowrap",
+              ...(filtroHoje?{background:T.goldA12,color:T.gold,border:`1px solid ${T.goldA22}`}:{})
+            }}
+          >
+            <CalendarDays size={12}/> Hoje
+          </button>
           {temBusca&&(
             <button onClick={limparBusca} style={{...S.btnGhost,fontSize:11,padding:"0 12px",height:36,gap:4,whiteSpace:"nowrap"}}>
               ✕ Limpar
