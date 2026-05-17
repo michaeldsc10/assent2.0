@@ -65,16 +65,19 @@ exports.enviarNotificacaoReserva = onDocumentCreated(
       }
 
       const mensagemBase = {
-        notification: { title: notifTitulo, body: notifMensagem },
+        notification: { title: notifTitulo, body: notifMensagem, icon: '/icons/icon-192x192.png' },
         data: {
           tipo: tipo || 'notificacao',
           assuntoId: assuntoId || '',
           tenantUid,
           timestamp: new Date().toISOString(),
         },
+        webpush: {
+          notification: { icon: '/icons/icon-192x192.png', badge: '/icons/badge-72x72.png' },
+        },
         android: {
           priority: 'high',
-          notification: { sound: 'default', defaultSound: true },
+          notification: { sound: 'default', defaultSound: true, icon: 'ic_notification' },
         },
         apns: {
           payload: { aps: { sound: 'default', badge: 1 } },
@@ -88,7 +91,6 @@ exports.enviarNotificacaoReserva = onDocumentCreated(
       const tokensInvalidos = [];
       resultados.forEach((res, i) => {
         if (res.status === 'fulfilled') {
-          console.log(`[FCM] Push enviado: ${res.value}`);
         } else {
           const code = res.reason?.code;
           console.error(`[FCM] Erro token[${i}]:`, code, res.reason?.message);
@@ -102,7 +104,6 @@ exports.enviarNotificacaoReserva = onDocumentCreated(
         await db.collection('usuarios').doc(destinatarioUid).update({
           fcmTokens: tokensValidos,
         });
-        console.log(`[FCM] ${tokensInvalidos.length} token(s) inválido(s) removido(s)`);
       }
 
       await db.collection('logs-fcm').doc().set({
@@ -208,7 +209,6 @@ async function processarAgendaTenants(dataISO, buildTitulo) {
           criadoEm        : admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        console.log(`[Agenda] Notif criada — tenant:${tenantUid} data:${dataISO} qtd:${qtd}`);
       } catch (err) {
         console.error(`[Agenda] Erro tenant:${tenantUid}`, err.message);
       }
