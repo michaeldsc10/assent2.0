@@ -82,7 +82,6 @@ async function salvarTokenFCM(uid, vapidKey) {
       },
       { merge: true }
     );
-    console.log('[FCM] Token salvo');
   } catch (err) {
     console.error('[FCM] Erro ao salvar token:', err.message);
   }
@@ -124,7 +123,6 @@ export function useNotificacoes(tenantUid, user) {
     setupToken();
 
     const handleControllerChange = () => {
-      console.log('[FCM] SW trocado — renovando token');
       salvarTokenFCM(user.uid, vapidKey);
     };
     navigator.serviceWorker?.addEventListener('controllerchange', handleControllerChange);
