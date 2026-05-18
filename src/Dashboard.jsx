@@ -2326,6 +2326,302 @@ function LoadingCubes() {
 }
 
 /* ══════════════════════════════════════════════════════
+   AGENDA FINANCEIRA — helpers internos
+═══════════════════════════════════════════════════════ */
+const MESES_AF = [
+  "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+  "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro",
+];
+const DIAS_SEM_AF = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+
+function parseYMD_AF(raw) {
+  if (!raw) return null;
+  if (raw?.toDate) return raw.toDate();
+  if (typeof raw === "string") {
+    const [y, m, d] = raw.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+  return null;
+}
+function toYMD_AF(date) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+}
+function fmtCompact_AF(v) {
+  if (v >= 1000) return `R$${(v/1000).toFixed(1)}k`;
+  return `R$${v.toFixed(0)}`;
+}
+function fmtR$_AF(v) {
+  return (v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+function fmtVenc_AF(dt) {
+  if (!dt) return "—";
+  return `${String(dt.getDate()).padStart(2,"0")}/${String(dt.getMonth()+1).padStart(2,"0")}/${dt.getFullYear()}`;
+}
+function fmtLabel_AF(date) {
+  const d = date.getDate(), m = date.getMonth(), y = date.getFullYear();
+  return `${String(d).padStart(2,"0")}/${String(m+1).padStart(2,"0")}/${y}`;
+}
+
+function ModalDiaFinanceiro({ data, despesas, aReceber, onClose }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, [onClose]);
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [onClose]);
+
+  const label = fmtLabel_AF(data);
+  const totalDesp = despesas.reduce((s, x) => s + (x.valor || 0), 0);
+  const totalAR   = aReceber.reduce((s, x) => s + (x.valorRestante ?? x.valorTotal ?? 0), 0);
+
+  return (
+    <div style={{
+      position:"fixed", inset:0, zIndex:9999,
+      background:"rgba(0,0,0,0.6)", backdropFilter:"blur(4px)",
+      display:"flex", alignItems:"center", justifyContent:"center", padding:16,
+    }}>
+      <div ref={ref} style={{
+        background:"var(--s2)", border:"1px solid var(--border)",
+        borderRadius:12, width:"100%", maxWidth:480,
+        maxHeight:"80vh", display:"flex", flexDirection:"column",
+        boxShadow:"0 24px 64px rgba(0,0,0,0.5)",
+      }}>
+        <div style={{
+          display:"flex", alignItems:"center", justifyContent:"space-between",
+          padding:"14px 18px", borderBottom:"1px solid var(--border)",
+        }}>
+          <div>
+            <div style={{ fontSize:14, fontWeight:600, color:"var(--text)" }}>{label}</div>
+            <div style={{ fontSize:11, color:"var(--text-3)", marginTop:2 }}>
+              {despesas.length > 0 && <span style={{ color:"var(--red)" }}>−{fmtR$_AF(totalDesp)} despesas</span>}
+              {despesas.length > 0 && aReceber.length > 0 && <span style={{ color:"var(--text-3)" }}> · </span>}
+              {aReceber.length > 0 && <span style={{ color:"var(--green)" }}>+{fmtR$_AF(totalAR)} a receber</span>}
+            </div>
+          </div>
+          <button onClick={onClose} style={{
+            background:"none", border:"none", cursor:"pointer",
+            color:"var(--text-3)", padding:4, borderRadius:6,
+            display:"flex", alignItems:"center",
+          }}>
+            <X size={16} />
+          </button>
+        </div>
+        <div style={{ overflowY:"auto", padding:"14px 18px", display:"flex", flexDirection:"column", gap:16 }}>
+          {/* A Receber */}
+          {aReceber.length > 0 && (
+            <div>
+              <div style={{ fontSize:11, fontWeight:600, color:"var(--green)", letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:8 }}>A Receber</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                {aReceber.map((item) => {
+                  const valor = item.valorRestante ?? item.valorTotal ?? 0;
+                  const venc  = parseYMD_AF(item.dataVencimento);
+                  return (
+                    <div key={item.id} style={{
+                      background:"rgba(74,186,130,0.06)", border:"1px solid rgba(74,186,130,0.18)",
+                      borderRadius:8, padding:"10px 12px",
+                      display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8,
+                    }}>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:13, color:"var(--text)", fontWeight:500, lineHeight:1.3 }}>
+                          {item.clienteNome || item.descricao || "—"}
+                        </div>
+                        {item.descricao && item.clienteNome && (
+                          <div style={{ fontSize:11, color:"var(--text-3)", marginTop:2 }}>{item.descricao}</div>
+                        )}
+                        <div style={{ fontSize:11, color:"var(--text-3)", marginTop:4 }}>Vencimento: {fmtVenc_AF(venc)}</div>
+                      </div>
+                      <div style={{ fontSize:13, fontWeight:700, color:"var(--green)", whiteSpace:"nowrap" }}>{fmtR$_AF(valor)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {/* Despesas */}
+          {despesas.length > 0 && (
+            <div>
+              <div style={{ fontSize:11, fontWeight:600, color:"var(--red)", letterSpacing:"0.06em", textTransform:"uppercase", marginBottom:8 }}>Despesas</div>
+              <div style={{ display:"flex", flexDirection:"column", gap:6 }}>
+                {despesas.map((item) => {
+                  const venc = parseYMD_AF(item.vencimento);
+                  return (
+                    <div key={item.id} style={{
+                      background:"rgba(224,82,82,0.06)", border:"1px solid rgba(224,82,82,0.18)",
+                      borderRadius:8, padding:"10px 12px",
+                      display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8,
+                    }}>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:13, color:"var(--text)", fontWeight:500, lineHeight:1.3 }}>{item.descricao || "—"}</div>
+                        {item.categoria && <div style={{ fontSize:11, color:"var(--text-3)", marginTop:2 }}>{item.categoria}</div>}
+                        {item.fornecedor && <div style={{ fontSize:11, color:"var(--text-3)" }}>{item.fornecedor}</div>}
+                        <div style={{ fontSize:11, color:"var(--text-3)", marginTop:4 }}>Vencimento: {fmtVenc_AF(venc)}</div>
+                      </div>
+                      <div style={{ fontSize:13, fontWeight:700, color:"var(--red)", whiteSpace:"nowrap" }}>{fmtR$_AF(item.valor)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {despesas.length === 0 && aReceber.length === 0 && (
+            <div style={{ textAlign:"center", color:"var(--text-3)", fontSize:13, padding:"24px 0" }}>Nenhum lançamento neste dia.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AgendaFinanceira({ uid }) {
+  const hoje = new Date();
+  const [mesRef, setMesRef] = useState({ y: hoje.getFullYear(), m: hoje.getMonth() });
+  const [despesas, setDespesas] = useState([]);
+  const [aReceber, setAReceber] = useState([]);
+  const [diaSel, setDiaSel] = useState(null);
+
+  useEffect(() => {
+    if (!uid) return;
+    const unsubD = onSnapshot(
+      query(collection(db, "users", uid, "despesas")),
+      (snap) => setDespesas(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      fsSnapshotError("AgendaFin:despesas")
+    );
+    const unsubA = onSnapshot(
+      query(collection(db, "users", uid, "a_receber")),
+      (snap) => setAReceber(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      fsSnapshotError("AgendaFin:aReceber")
+    );
+    return () => { unsubD(); unsubA(); };
+  }, [uid]);
+
+  const indexDesp = useMemo(() => {
+    const map = {};
+    despesas.forEach((d) => {
+      if (d.status === "pago" || d.status === "cancelado") return;
+      const dt = parseYMD_AF(d.vencimento); if (!dt) return;
+      const k = toYMD_AF(dt);
+      if (!map[k]) map[k] = [];
+      map[k].push(d);
+    });
+    return map;
+  }, [despesas]);
+
+  const indexAR = useMemo(() => {
+    const map = {};
+    aReceber.forEach((d) => {
+      if (d.status === "pago" || d.status === "cancelado") return;
+      if ((d.valorRestante ?? d.valorTotal ?? 0) <= 0) return;
+      const dt = parseYMD_AF(d.dataVencimento); if (!dt) return;
+      const k = toYMD_AF(dt);
+      if (!map[k]) map[k] = [];
+      map[k].push(d);
+    });
+    return map;
+  }, [aReceber]);
+
+  const { y, m } = mesRef;
+  const primeiroDia  = new Date(y, m, 1);
+  const ultimoDia    = new Date(y, m + 1, 0);
+  const offsetInicio = primeiroDia.getDay();
+  const totalCelulas = offsetInicio + ultimoDia.getDate();
+  const celulas = Array.from({ length: Math.ceil(totalCelulas / 7) * 7 }, (_, i) => {
+    const dn = i - offsetInicio + 1;
+    return (dn < 1 || dn > ultimoDia.getDate()) ? null : dn;
+  });
+  const hojeYMD = toYMD_AF(hoje);
+  const navMes = (delta) => setMesRef(({ y: cy, m: cm }) => {
+    const n = new Date(cy, cm + delta, 1);
+    return { y: n.getFullYear(), m: n.getMonth() };
+  });
+
+  const modalDesp = diaSel ? (indexDesp[toYMD_AF(diaSel)] || []) : [];
+  const modalAR   = diaSel ? (indexAR[toYMD_AF(diaSel)]   || []) : [];
+
+  return (
+    <>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+        <span style={{ fontSize:13, fontWeight:600, color:"var(--text)" }}>
+          Agenda financeira — {MESES_AF[m]} {y}
+        </span>
+        <div style={{ display:"flex", gap:4 }}>
+          {[["prev", <ChevronLeft size={14} />, () => navMes(-1)],
+            ["hoje", "Hoje", () => setMesRef({ y: hoje.getFullYear(), m: hoje.getMonth() })],
+            ["next", <ChevronRight size={14} />, () => navMes(1)]
+          ].map(([k, label, fn]) => (
+            <button key={k} onClick={fn} style={{
+              background:"var(--s3)", border:"1px solid var(--border)", borderRadius:6,
+              cursor:"pointer", color: k === "hoje" ? "var(--gold)" : "var(--text-2)",
+              display:"flex", alignItems:"center", justifyContent:"center",
+              padding: k === "hoje" ? "3px 8px" : "3px 6px", fontSize:10,
+              borderColor: k === "hoje" ? "rgba(200,165,94,0.3)" : "var(--border)",
+            }}>{label}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:3, marginBottom:3 }}>
+        {DIAS_SEM_AF.map((d) => (
+          <div key={d} style={{ textAlign:"center", fontSize:10, color:"var(--text-3)", fontWeight:600, letterSpacing:"0.04em", padding:"2px 0" }}>{d}</div>
+        ))}
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(7,1fr)", gap:3 }}>
+        {celulas.map((dayNum, idx) => {
+          if (!dayNum) return <div key={idx} />;
+          const cellDate = new Date(y, m, dayNum);
+          const key  = toYMD_AF(cellDate);
+          const desp = indexDesp[key] || [];
+          const ar   = indexAR[key]   || [];
+          const isHoje  = key === hojeYMD;
+          const hasData = desp.length > 0 || ar.length > 0;
+          const totalD  = desp.reduce((s, x) => s + (x.valor || 0), 0);
+          const totalA  = ar.reduce((s, x) => s + (x.valorRestante ?? x.valorTotal ?? 0), 0);
+          return (
+            <button key={key} onClick={() => hasData && setDiaSel(cellDate)} style={{
+              background: isHoje ? "rgba(200,165,94,0.08)" : "transparent",
+              border: isHoje ? "1px solid rgba(200,165,94,0.35)" : "1px solid var(--border)",
+              borderRadius:7, padding:"5px 4px", minHeight:52,
+              cursor: hasData ? "pointer" : "default",
+              textAlign:"left", display:"flex", flexDirection:"column", gap:2,
+              transition:"background 0.15s",
+            }}
+              onMouseEnter={(e) => { if (hasData) e.currentTarget.style.background = "var(--s3)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = isHoje ? "rgba(200,165,94,0.08)" : "transparent"; }}
+            >
+              <span style={{ fontSize:11, fontWeight: isHoje ? 700 : 500, color: isHoje ? "var(--gold)" : "var(--text-2)", lineHeight:1 }}>{dayNum}</span>
+              {ar.length > 0 && (
+                <span style={{ fontSize:9, fontWeight:600, color:"var(--green)", background:"rgba(74,186,130,0.12)", borderRadius:3, padding:"1px 3px", lineHeight:1.4, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:"100%", display:"block" }}>
+                  +{fmtCompact_AF(totalA)}
+                </span>
+              )}
+              {desp.length > 0 && (
+                <span style={{ fontSize:9, fontWeight:600, color:"var(--red)", background:"rgba(224,82,82,0.12)", borderRadius:3, padding:"1px 3px", lineHeight:1.4, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", maxWidth:"100%", display:"block" }}>
+                  −{fmtCompact_AF(totalD)}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {diaSel && (
+        <ModalDiaFinanceiro
+          data={diaSel}
+          despesas={modalDesp}
+          aReceber={modalAR}
+          onClose={() => setDiaSel(null)}
+        />
+      )}
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
 ═══════════════════════════════════════════════════════ */
 export default function Dashboard() {
@@ -3374,40 +3670,9 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             {/* MAIN */}
             <div className="db-main">
 
-              {/* Gráfico */}
-              <div className="db-panel">
-                <div className="db-panel-header">
-                  <span className="db-panel-title">Faturamento por período</span>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: 11, color: "var(--text-3)" }}>
-                      {period === "Personalizado" && customRange.from && customRange.to
-                        ? `${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")}`
-                        : period}
-                    </span>
-                    <ChartToggle value={faturMode} onChange={setFaturMode} />
-                  </div>
-                </div>
-                <div style={{ padding: "16px 16px 10px" }}>
-                  {faturMode === "3d" ? (
-                    <Chart3DBars data={dash.loading ? [] : dash.faturamentoPorDia} period={period} height={180} />
-                  ) : (
-                    <ResponsiveContainer width="100%" height={168}>
-                      <AreaChart data={dash.loading ? [] : dash.faturamentoPorDia} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                        <defs>
-                          <linearGradient id="gGold" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%"  stopColor="#c8a55e" stopOpacity={0.18} />
-                            <stop offset="95%" stopColor="#c8a55e" stopOpacity={0}    />
-                          </linearGradient>
-                        </defs>
-                        <XAxis dataKey="d" tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                        <YAxis tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} />
-                        <Tooltip content={<CustomTooltip />} cursor={{ stroke: "rgba(200,165,94,0.15)", strokeWidth: 1, strokeDasharray: "4 3" }} />
-                        <Area type="monotone" dataKey="v" stroke="#c8a55e" strokeWidth={2} fill="url(#gGold)" dot={false}
-                          activeDot={{ r: 4, fill: "#c8a55e", stroke: "rgba(200,165,94,0.3)", strokeWidth: 5 }} />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  )}
-                </div>
+              {/* Agenda Financeira */}
+              <div style={{ padding: "0 0 4px" }}>
+                <AgendaFinanceira uid={uid} />
               </div>
 
               {/* Últimas Vendas */}
