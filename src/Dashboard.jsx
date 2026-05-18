@@ -23,7 +23,7 @@ import {
   LayoutDashboard, Users, Package, Wrench, ArrowDownToLine,
   ShoppingCart, Clock, Wallet, TrendingDown, Truck, BarChart3,
   Calendar, Settings, Zap, UserCheck, UserPlus, Search, ArrowUpRight,
-  ArrowDownRight, ChevronRight, Bell, LogOut, ChevronDown,
+  ArrowDownRight, ChevronLeft, ChevronRight, Bell, LogOut, ChevronDown,
   PanelLeftClose, PanelLeftOpen, Menu, X, Sun, Moon, LayoutGrid, GraduationCap, TrendingUp, Barcode, CreditCard,
 } from "lucide-react";
 
