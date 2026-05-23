@@ -2568,7 +2568,7 @@ function AgendaFinanceira({ uid }) {
   const modalAR   = diaSel ? (indexAR[toYMD_AF(diaSel)]   || []) : [];
 
   return (
-    <>
+    <div className="db-panel" style={{ padding: "16px 18px" }}>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
         <span style={{ fontSize:13, fontWeight:600, color:"var(--text)" }}>
           Agenda financeira — {MESES_AF[m]} {y}
@@ -2642,7 +2642,7 @@ function AgendaFinanceira({ uid }) {
           onClose={() => setDiaSel(null)}
         />
       )}
-    </>
+    </div>
   );
 }
 
