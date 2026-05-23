@@ -1151,127 +1151,109 @@ const CSS = `
   }
 
   /* ══ CONTENT ══ */
-  .ag-content { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 22px 40px; -webkit-overflow-scrolling: touch; }
-  .ag-content::-webkit-scrollbar { width: 3px; }
-  .ag-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+  .ag-content { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 24px 36px; -webkit-overflow-scrolling: touch; }
+  .ag-content::-webkit-scrollbar { width: 4px; }
+  .ag-content::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
 
-  /* ══ KPI STRIP — editorial bar ══ */
+  /* ══ KPI STRIP ══ */
   .db-kpi-strip {
-    display: flex;
-    gap: 0;
-    margin-bottom: 24px;
-    background: var(--s1);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    overflow: hidden;
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
   }
   .db-kpi-card {
-    flex: 1;
-    padding: 20px 22px 18px;
-    position: relative;
-    transition: background .15s;
-    cursor: default;
+    background: var(--s1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+    transition: box-shadow .15s, border-color .15s;
   }
-  .db-kpi-card + .db-kpi-card {
-    border-left: 1px solid var(--border);
-  }
-  .db-kpi-card:hover { background: rgba(255,255,255,0.018); }
-  .db-kpi-card-accent {
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    height: 2px;
-    opacity: 0;
-    transition: opacity .2s;
-  }
-  .db-kpi-card:hover .db-kpi-card-accent { opacity: 1; }
+  .db-kpi-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.22); border-color: var(--border-h); }
   .db-kpi-label {
-    font-size: 9px; font-weight: 600; letter-spacing: .12em;
-    text-transform: uppercase; color: var(--text-3); margin-bottom: 10px;
-    white-space: nowrap;
+    font-size: 10px; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--text-3); margin-bottom: 8px;
   }
   .db-kpi-val {
-    font-family: var(--font-mono); font-size: 22px; font-weight: 600;
-    line-height: 1; letter-spacing: -0.03em;
-    margin-bottom: 8px;
-    white-space: nowrap;
+    font-family: var(--font-mono); font-size: 20px; font-weight: 700;
+    color: var(--text); line-height: 1; letter-spacing: -0.02em;
+    margin-bottom: 6px;
   }
   .db-kpi-meta { display: flex; align-items: center; gap: 4px; }
-  .db-kpi-trend { font-size: 10px; font-weight: 600; display: flex; align-items: center; gap: 2px; }
-  .db-kpi-sub { font-size: 10px; color: var(--text-3); }
+  .db-kpi-trend { font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 2px; }
+  .db-kpi-sub { font-size: 11px; color: var(--text-3); }
 
   /* ══ LAYOUT BODY ══ */
-  .db-body { display: grid; grid-template-columns: 1fr 248px; gap: 16px; }
-  .db-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-  .db-aside { display: flex; flex-direction: column; gap: 14px; }
+  .db-body { display: grid; grid-template-columns: 1fr 256px; gap: 16px; }
+  .db-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .db-aside { display: flex; flex-direction: column; gap: 16px; }
 
-  /* ══ PANEL ══ */
+  /* ══ PANEL (substitui ag-card) ══ */
   .db-panel {
     background: var(--s1);
     border: 1px solid var(--border);
     border-radius: 12px;
-    transition: border-color .15s;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+    transition: box-shadow .15s;
     position: relative;
-    overflow: hidden;
   }
-  .db-panel:hover { border-color: var(--border-h); }
   .db-panel-table { overflow: hidden; }
+  .db-panel:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.2); }
   .db-panel-header {
-    padding: 14px 18px 12px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
   }
-  .db-panel-title {
-    font-size: 11px; font-weight: 600; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--text-3);
-  }
-  .db-panel-body { padding: 14px 18px; }
+  .db-panel-title { font-size: 12px; font-weight: 600; color: var(--text); }
+  .db-panel-body { padding: 14px 16px; }
   .db-view-all {
-    font-size: 10px; color: var(--text-3); letter-spacing: .04em;
+    font-size: 11px; color: var(--gold);
     background: transparent; border: none; cursor: pointer;
-    font-family: 'Sora', system-ui, sans-serif; text-transform: uppercase;
-    display: flex; align-items: center; gap: 3px; transition: color .13s;
+    font-family: 'Sora', system-ui, sans-serif;
+    display: flex; align-items: center; gap: 3px; transition: opacity .13s;
   }
-  .db-view-all:hover { color: var(--gold); }
+  .db-view-all:hover { opacity: .75; }
 
   /* ══ TABELAS ══ */
   .ag-trow {
-    display: grid; padding: 9px 18px;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
+    display: grid; padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
     font-size: 12px; color: var(--text-2); transition: background .1s;
     align-items: center;
   }
-  .ag-trow:hover   { background: rgba(255,255,255,0.018); }
+  .ag-trow:hover   { background: rgba(255,255,255,0.022); }
   .ag-trow:last-child { border-bottom: none; }
-  .ag-thead { background: transparent; }
-  .ag-th { font-size: 9px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); padding-bottom: 2px; }
-  .ag-empty-row { padding: 20px 18px; text-align: center; font-size: 12px; color: var(--text-3); }
+  .ag-thead { background: var(--s2); }
+  .ag-th { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); }
+  .ag-empty-row { padding: 20px 16px; text-align: center; font-size: 12px; color: var(--text-3); }
 
   /* ══ ASIDE STATS ══ */
   .db-stat-row {
-    display: flex; align-items: center; gap: 12px;
-    padding: 11px 18px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px; border-bottom: 1px solid var(--border);
     cursor: pointer; transition: background .1s;
   }
   .db-stat-row:last-child { border-bottom: none; }
-  .db-stat-row:hover { background: rgba(255,255,255,0.02); }
+  .db-stat-row:hover { background: var(--s2); }
   .db-stat-icon {
-    width: 28px; height: 28px; border-radius: 7px; flex-shrink: 0;
+    width: 30px; height: 30px; border-radius: 8px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
   }
   .db-stat-label { font-size: 12px; color: var(--text-2); flex: 1; }
-  .db-stat-val { font-family: var(--font-mono); font-size: 14px; font-weight: 600; }
+  .db-stat-val { font-family: var(--font-mono); font-size: 15px; font-weight: 700; }
 
   /* ══ DESPESAS ASIDE ══ */
   .db-desp-row {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 18px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 16px; border-bottom: 1px solid var(--border);
     font-size: 12px; transition: background .1s;
   }
   .db-desp-row:last-child { border-bottom: none; }
-  .db-desp-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+  .db-desp-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
   .db-desp-label { flex: 1; color: var(--text-2); }
-  .db-desp-count { font-family: var(--font-mono); font-weight: 600; font-size: 13px; }
-  .db-desp-val { font-size: 10px; color: var(--text-3); text-align: right; }
+  .db-desp-count { font-family: var(--font-mono); font-weight: 700; font-size: 13px; }
+  .db-desp-val { font-size: 11px; color: var(--text-3); width: 60px; text-align: right; }
 
   /* ══ GRIDS (legado charts view + módulos) ══ */
   .g4  { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 14px; }
@@ -1284,9 +1266,10 @@ const CSS = `
   .ag-card {
     background: var(--s1); border: 1px solid var(--border);
     border-radius: 12px; padding: 18px;
-    transition: border-color .15s;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.15);
+    transition: box-shadow .15s, border-color .15s;
   }
-  .ag-card:hover { border-color: var(--border-h); }
+  .ag-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.2); border-color: var(--border-h); }
   .ag-card-click { cursor: pointer; }
   .ag-card-click:hover { border-color: rgba(200,165,94,0.3); }
   .ag-card-bare {
@@ -3542,38 +3525,39 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   /* ══ RENDER DASHBOARD ══ */
   const renderDashboard = () => (
     <>
-      <header className="ag-topbar" style={{ borderBottom: "1px solid var(--border)", gap: 12 }}>
+      <header className="ag-topbar">
         <div className="ag-topbar-title">
-          <h1 style={{ fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em" }}>Painel</h1>
-          <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-3)" }}><span className="ag-live-dot" />Visão geral do negócio</p>
+          <h1>Dashboard</h1>
+          <p><span className="ag-live-dot" />Visão geral do negócio</p>
         </div>
 
-        <div style={{ display: "flex", background: "transparent", border: "1px solid var(--border)", borderRadius: 8, padding: 2, gap: 2, flexShrink: 0 }}>
+        <div style={{ display: "flex", background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 8, padding: 3, gap: 2, flexShrink: 0 }}>
           <button
             onClick={() => setDashView("overview")}
             style={{
-              display: "flex", alignItems: "center", gap: 5,
-              padding: "5px 11px", borderRadius: 6, border: "none", cursor: "pointer",
-              fontSize: 11, fontWeight: 500, fontFamily: "'Sora', system-ui, sans-serif",
-              background: dashView === "overview" ? "rgba(200,165,94,0.1)" : "transparent",
-              color: dashView === "overview" ? "var(--gold)" : "var(--text-3)",
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "5px 12px", borderRadius: 6, border: "none", cursor: "pointer",
+              fontSize: 12, fontWeight: 500, fontFamily: "'Sora', system-ui, sans-serif",
+              background: dashView === "overview" ? "var(--s1)" : "transparent",
+              color: dashView === "overview" ? "var(--text)" : "var(--text-3)",
+              boxShadow: dashView === "overview" ? "0 1px 3px rgba(0,0,0,0.15)" : "none",
               transition: "all .15s",
             }}
           >
-            <LayoutDashboard size={12} /> Visão Geral
+            <LayoutDashboard size={13} /> Visão Geral
           </button>
           <button
             onClick={() => setDashView("charts")}
             style={{
-              display: "flex", alignItems: "center", gap: 5,
-              padding: "5px 11px", borderRadius: 6, border: "none", cursor: "pointer",
-              fontSize: 11, fontWeight: 500, fontFamily: "'Sora', system-ui, sans-serif",
-              background: dashView === "charts" ? "rgba(200,165,94,0.1)" : "transparent",
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "5px 12px", borderRadius: 6, border: "none", cursor: "pointer",
+              fontSize: 12, fontWeight: 500, fontFamily: "'Sora', system-ui, sans-serif",
+              background: dashView === "charts" ? "var(--gold-d)" : "transparent",
               color: dashView === "charts" ? "var(--gold)" : "var(--text-3)",
               transition: "all .15s",
             }}
           >
-            <BarChart3 size={12} /> Gráficos
+            <BarChart3 size={13} /> Gráficos
           </button>
         </div>
 
@@ -3657,11 +3641,10 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       <div className="ag-content">
         {dashView === "charts" ? renderChartsView() : (<>
 
-          {/* ── KPI BAR ── */}
+          {/* ── KPI CARDS ── */}
           <div className="db-kpi-strip">
             {[...kpiMain, ...kpiSec].map((k) => (
               <div key={k.label} className="db-kpi-card">
-                <div className="db-kpi-card-accent" style={{ background: `linear-gradient(90deg, ${k.accent || "var(--text-3)"}, transparent)` }} />
                 <div className="db-kpi-label">{k.label}</div>
                 <div className="db-kpi-val" style={{ color: k.accent || "var(--text)" }}>
                   <Val v={k.value} loading={dash.loading} />
@@ -3669,8 +3652,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 <div className="db-kpi-meta">
                   {k.trend ? (
                     <span className="db-kpi-trend" style={{ color: k.up ? "var(--green)" : k.up === false ? "var(--red)" : "var(--text-3)" }}>
-                      {k.up === true && <ArrowUpRight size={10} />}
-                      {k.up === false && <ArrowDownRight size={10} />}
+                      {k.up === true && <ArrowUpRight size={11} />}
+                      {k.up === false && <ArrowDownRight size={11} />}
                       {k.trend}
                     </span>
                   ) : (
@@ -3688,13 +3671,15 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             <div className="db-main">
 
               {/* Agenda Financeira */}
-              <AgendaFinanceira uid={uid} />
+              <div style={{ padding: "0 0 4px" }}>
+                <AgendaFinanceira uid={uid} />
+              </div>
 
               {/* Últimas Vendas */}
               <div className="db-panel db-panel-table">
                 <div className="db-panel-header">
                   <span className="db-panel-title">Últimas vendas</span>
-                  <button className="db-view-all" onClick={() => setModule("Vendas")}>Ver todas <ChevronRight size={10} /></button>
+                  <button className="db-view-all" onClick={() => setModule("Vendas")}>Ver todas <ChevronRight size={11} /></button>
                 </div>
                 <div style={{ overflowX: "auto" }}>
                   <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "80px 1fr 110px 110px", minWidth: 380 }}>
@@ -3722,13 +3707,11 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               </div>
 
               {/* Produtos + Clientes */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                 <div className="db-panel db-panel-table">
-                  <div className="db-panel-header">
-                    <span className="db-panel-title">Top Produtos</span>
-                  </div>
+                  <div className="db-panel-header"><span className="db-panel-title">Produtos mais vendidos</span></div>
                   <div style={{ overflowX: "auto" }}>
-                    <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 36px 88px", minWidth: 220 }}>
+                    <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 48px 96px", minWidth: 240 }}>
                       <span className="ag-th">Produto</span>
                       <span className="ag-th" style={{ textAlign: "center" }}>Qtd</span>
                       <span className="ag-th" style={{ textAlign: "right" }}>Total</span>
@@ -3737,24 +3720,23 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                       <div className="ag-trow" style={{ gridTemplateColumns: "1fr" }}><span className="ag-skeleton" /></div>
                     ) : dash.topProdutos.length === 0 ? (
                       <div className="ag-empty-state">
-                        <div className="ag-empty-icon"><Package size={15} color="var(--text-3)" /></div>
+                        <div className="ag-empty-icon"><Package size={16} color="var(--text-3)" /></div>
                         <div className="ag-empty-title">Sem dados</div>
+                        <div className="ag-empty-sub">Nenhuma venda no período</div>
                       </div>
                     ) : dash.topProdutos.map((p, i) => (
-                      <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 36px 88px", minWidth: 220 }}>
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.nome}</span>
-                        <span style={{ textAlign: "center", color: "var(--text-3)" }}>{p.qtd}</span>
+                      <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 48px 96px", minWidth: 240 }}>
+                        <span>{p.nome}</span>
+                        <span style={{ textAlign: "center" }}>{p.qtd}</span>
                         <span style={{ color: "var(--green)", textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 11 }}>{fmtR$(p.total)}</span>
                       </div>
                     ))}
                   </div>
                 </div>
                 <div className="db-panel db-panel-table">
-                  <div className="db-panel-header">
-                    <span className="db-panel-title">Top Clientes</span>
-                  </div>
+                  <div className="db-panel-header"><span className="db-panel-title">Clientes que mais compram</span></div>
                   <div style={{ overflowX: "auto" }}>
-                    <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 100px", minWidth: 180 }}>
+                    <div className="ag-trow ag-thead" style={{ gridTemplateColumns: "1fr 110px", minWidth: 200 }}>
                       <span className="ag-th">Cliente</span>
                       <span className="ag-th" style={{ textAlign: "right" }}>Total</span>
                     </div>
@@ -3762,12 +3744,13 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                       <div className="ag-trow" style={{ gridTemplateColumns: "1fr" }}><span className="ag-skeleton" /></div>
                     ) : dash.topClientes.length === 0 ? (
                       <div className="ag-empty-state">
-                        <div className="ag-empty-icon"><Users size={15} color="var(--text-3)" /></div>
+                        <div className="ag-empty-icon"><Users size={16} color="var(--text-3)" /></div>
                         <div className="ag-empty-title">Sem dados</div>
+                        <div className="ag-empty-sub">Nenhuma venda no período</div>
                       </div>
                     ) : dash.topClientes.map((c, i) => (
-                      <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 100px", minWidth: 180 }}>
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nome}</span>
+                      <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 110px", minWidth: 200 }}>
+                        <span>{c.nome}</span>
                         <span style={{ color: "var(--gold)", textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 11 }}>{fmtR$(c.total)}</span>
                       </div>
                     ))}
@@ -3780,7 +3763,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             {/* ASIDE */}
             <div className="db-aside">
 
-              {/* Cadastros — sem borda redundante, ícones menores */}
+              {/* Mini stats */}
               <div className="db-panel db-panel-table">
                 <div className="db-panel-header">
                   <span className="db-panel-title">Cadastros</span>
@@ -3788,7 +3771,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 {miniStats.map((s) => (
                   <div key={s.label} className="db-stat-row" onClick={() => setModule(s.nav)}>
                     <div className="db-stat-icon" style={{ background: s.dim }}>
-                      <s.icon size={13} color={s.color} />
+                      <s.icon size={15} color={s.color} />
                     </div>
                     <span className="db-stat-label">{s.label}</span>
                     <span className="db-stat-val" style={{ color: s.color }}>
@@ -3802,7 +3785,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               <div className="db-panel db-panel-table">
                 <div className="db-panel-header">
                   <span className="db-panel-title">Despesas</span>
-                  <button className="db-view-all" onClick={() => setModule("Despesas")}>Ver todas <ChevronRight size={10} /></button>
+                  <button className="db-view-all" onClick={() => setModule("Despesas")}>Ver todas <ChevronRight size={11} /></button>
                 </div>
                 {despesasCards.map((d) => (
                   <div key={d.label} className="db-desp-row">
@@ -3822,32 +3805,32 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   <span className="db-panel-title">Mix de receita</span>
                   <ChartToggle value={mixModeOverview} onChange={setMixModeOverview} />
                 </div>
-                <div style={{ padding: "14px 18px" }}>
+                <div style={{ padding: "14px 16px" }}>
                   {mixModeOverview === "3d" ? (
-                    <Chart3DDonut data={dash.mixData || []} height={190} />
+                    <Chart3DDonut data={dash.mixData || []} height={200} />
                   ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                       {(dash.mixData || []).map((item, i) => {
                         const clr = i === 0 ? "#c8a55e" : "#3ecf8e";
                         return (
                           <div key={i}>
-                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 6 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, marginBottom: 5 }}>
                               <span style={{ color: "var(--text-2)", display: "flex", alignItems: "center", gap: 6 }}>
-                                <span style={{ width: 6, height: 6, borderRadius: 2, background: clr, display: "inline-block", flexShrink: 0 }} />
+                                <span style={{ width: 8, height: 8, borderRadius: 3, background: clr, display: "inline-block" }} />
                                 {item.name}
                               </span>
-                              <span style={{ color: "var(--text)", fontWeight: 600, fontFamily: "var(--font-mono)", fontSize: 11 }}>
+                              <span style={{ color: "var(--text)", fontWeight: 600, fontFamily: "var(--font-mono)" }}>
                                 {dash.loading ? "—" : `${item.value}%`}
                               </span>
                             </div>
-                            <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 3, height: 3, overflow: "hidden" }}>
-                              <div style={{ width: `${item.value || 0}%`, height: "100%", background: clr, borderRadius: 3, transition: "width 0.6s ease" }} />
+                            <div style={{ background: "var(--s3)", borderRadius: 4, height: 5, overflow: "hidden" }}>
+                              <div style={{ width: `${item.value || 0}%`, height: "100%", background: clr, borderRadius: 4, transition: "width 0.5s ease" }} />
                             </div>
                           </div>
                         );
                       })}
                       {(!dash.mixData || dash.mixData.length === 0) && (
-                        <div style={{ fontSize: 11, color: "var(--text-3)", textAlign: "center", padding: "6px 0" }}>Sem dados no período</div>
+                        <div style={{ fontSize: 12, color: "var(--text-3)", textAlign: "center", padding: "8px 0" }}>Sem dados no período</div>
                       )}
                     </div>
                   )}
