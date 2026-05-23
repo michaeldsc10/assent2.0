@@ -1170,24 +1170,22 @@ const CSS = `
   .db-kpi-strip {
     display: grid;
     grid-template-columns: repeat(3, 1fr) repeat(3, 0.72fr);
-    gap: 0;
+    gap: 10px;
     margin-bottom: 22px;
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    overflow: hidden;
-    background: var(--s1);
   }
   .db-kpi-card {
     padding: 20px 20px 16px;
     position: relative;
-    transition: background .15s;
+    transition: background .15s, border-color .15s;
     cursor: default;
     min-width: 0;
+    background: var(--s1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
   }
-  .db-kpi-card + .db-kpi-card { border-left: 1px solid var(--border); }
-  /* divisor mais grosso entre grupo primário e secundário */
-  .db-kpi-card:nth-child(4) { border-left: 1px solid var(--border-h); }
-  .db-kpi-card:hover { background: rgba(255,255,255,0.016); }
+  .db-kpi-card + .db-kpi-card { border-left: none; }
+  .db-kpi-card:nth-child(4) { border-left: none; }
+  .db-kpi-card:hover { background: rgba(255,255,255,0.016); border-color: var(--border-h); }
   .db-kpi-card-accent {
     position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
     opacity: 0; transition: opacity .2s;
