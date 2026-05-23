@@ -1155,9 +1155,34 @@ const CSS = `
   }
 
   /* ══ CONTENT ══ */
-  .ag-content { flex: 1; min-height: 0; overflow-y: auto; padding: 0; -webkit-overflow-scrolling: touch; }
+  .ag-content {
+    flex: 1; min-height: 0; overflow-y: auto;
+    padding: 0;
+    -webkit-overflow-scrolling: touch;
+  }
   .ag-content::-webkit-scrollbar { width: 3px; }
   .ag-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+  /* ══ CONSTRAINT GLOBAL — módulos ══ */
+  /* Wrapper interno centralizado — aplica em todos os ag-content */
+  .ag-content > *:not(.modal-overlay):not([class*="overlay"]) {
+    max-width: 1180px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  /* Padding interno do conteúdo dos módulos */
+  .ag-content > div:not(.modal-overlay) {
+    padding: 22px 28px 48px;
+  }
+  /* Topbars dos módulos — padding consistente */
+  .pd-topbar, .cl-topbar, .vd-topbar, .sv-topbar,
+  .fr-topbar, .vdr-topbar, .cp-topbar, .cd-topbar,
+  .dp-topbar, .mt-topbar, .mc-topbar, .oc-topbar,
+  .rl-topbar, .ag-topbar {
+    padding-left: 28px !important;
+    padding-right: 28px !important;
+    max-width: 100%;
+  }
 
   /* Wrapper interno — centraliza e limita largura */
   .db-page {
