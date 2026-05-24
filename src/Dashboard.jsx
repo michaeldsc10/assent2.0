@@ -1164,13 +1164,6 @@ const CSS = `
   .ag-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
 
   /* ══ CONSTRAINT GLOBAL — módulos ══ */
-  /* Wrapper interno centralizado — aplica em todos os ag-content */
-  .ag-content > *:not(.modal-overlay):not([class*="overlay"]) {
-    max-width: 1180px;
-    margin-left: auto;
-    margin-right: auto;
-  }
-  /* Padding interno do conteúdo dos módulos */
   .ag-content > div:not(.modal-overlay) {
     padding: 22px 28px 48px;
   }
@@ -1178,10 +1171,24 @@ const CSS = `
   .pd-topbar, .cl-topbar, .vd-topbar, .sv-topbar,
   .fr-topbar, .vdr-topbar, .cp-topbar, .cd-topbar,
   .dp-topbar, .mt-topbar, .mc-topbar, .oc-topbar,
-  .rl-topbar, .ag-topbar {
+  .rl-topbar {
     padding-left: 28px !important;
     padding-right: 28px !important;
-    max-width: 100%;
+  }
+
+  /* ══ AGENDA — restaura layout original ══ */
+  /* A Agenda tem seu próprio ag-content com flex column; não herda o constraint global */
+  .ag-content.agenda-content,
+  header.ag-topbar ~ .ag-content {
+    padding: 20px 22px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 18px !important;
+  }
+  header.ag-topbar ~ .ag-content > div {
+    padding: 0 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
   }
 
   /* Wrapper interno — centraliza e limita largura */
