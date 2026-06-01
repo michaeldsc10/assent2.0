@@ -15,7 +15,6 @@ import { useAuth as useAuthCargo }           from "./contexts/AuthContext";
 import LoginForm         from "./components/LoginForm";
 import BrandAnimation    from "./components/BrandAnimation";
 import Dashboard         from "./Dashboard";
-import AnnouncementModal from "./components/AnnouncementModal";
 import { usePWAManifest } from "./hooks/usePWAManifest";
 
 /* ─────────────────────────────────────────
@@ -28,12 +27,9 @@ function AppShell() {
 
   // contexts/AuthContext: source of truth para autenticação no nível de aplicação.
   // tenantUid só é preenchido após carregarPerfil validar o usuário no Firestore.
-  const { tenantUid, loadingAuth, cargo } = useAuthCargo();
+  const { tenantUid, loadingAuth } = useAuthCargo();
 
   usePWAManifest(tenantUid);
-
-  // Plano do usuário para filtrar destinatários do AnnouncementModal
-  const userPlan = cargo === "pro" ? "pro" : "free";
 
   // ── Aguarda AMBOS os sistemas resolverem antes de qualquer decisão ──
   // loadingAuth cobre o caso principal (carregarPerfil em andamento).
@@ -61,12 +57,7 @@ function AppShell() {
   // perfil válido (admin/licença/convidado ativo). Isso elimina o flash
   // de dashboard para usuários com conta Firebase mas sem registro.
   if (tenantUid) {
-    return (
-      <>
-        <Dashboard />
-        <AnnouncementModal userPlan={userPlan} />
-      </>
-    );
+    return <Dashboard />;
   }
 
   return (
