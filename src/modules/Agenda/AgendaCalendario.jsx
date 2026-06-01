@@ -3,9 +3,19 @@
    Layout: calendário compacto + painel do dia lateral
    ═══════════════════════════════════════════════════ */
 
-import { useState, useMemo, useCallback } from "react";
-import { Clock, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useMemo, useCallback, useEffect } from "react";
+import { Clock, Plus } from "lucide-react";
 import { TIPO_ESTILO, todayISO, resolverEstiloTipo } from "./Agenda";
+
+function useIsMobile() {
+  const [mobile, setMobile] = useState(window.innerWidth < 720);
+  useEffect(() => {
+    const h = () => setMobile(window.innerWidth < 720);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+  return mobile;
+}
 
 const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
 
@@ -51,7 +61,7 @@ function PainelDia({ iso, eventos, onVerDetalhes, onNovo, categorias }) {
 
   return (
     <div style={{
-      width: 280, flexShrink: 0,
+      width: mobile ? "100%" : 280, flexShrink: 0,
       background: "var(--s1)", border: "1px solid var(--border)",
       borderRadius: 14, display: "flex", flexDirection: "column",
       overflow: "hidden",
@@ -144,8 +154,9 @@ function PainelDia({ iso, eventos, onVerDetalhes, onNovo, categorias }) {
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════ */
 export default function AgendaCalendario({ eventos, onVerDetalhes, onNovo, categorias = [] }) {
-  const hoje = todayISO();
-  const now  = new Date();
+  const hoje   = todayISO();
+  const now    = new Date();
+  const mobile = useIsMobile();
 
   const [ano, setAno]         = useState(now.getFullYear());
   const [mes, setMes]         = useState(now.getMonth());
@@ -181,7 +192,12 @@ export default function AgendaCalendario({ eventos, onVerDetalhes, onNovo, categ
   const evsDiaSel = eventosPorDia[diaSel] || [];
 
   return (
-    <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+    <div style={{
+      display: "flex",
+      flexDirection: mobile ? "column" : "row",
+      gap: 16,
+      alignItems: "flex-start",
+    }}>
 
       {/* Calendário */}
       <div style={{
@@ -262,18 +278,18 @@ export default function AgendaCalendario({ eventos, onVerDetalhes, onNovo, categ
                 style={{
                   borderRight: isLast ? "none" : "1px solid var(--border)",
                   borderBottom: isLastRow ? "none" : "1px solid var(--border)",
-                  padding: "8px 6px",
-                  display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
+                  padding: mobile ? "6px 2px" : "8px 6px",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
                   cursor: "pointer", transition: "background .1s",
                   background: isSel ? "var(--s2)" : "transparent",
-                  minHeight: 64,
+                  minHeight: mobile ? 44 : 64,
                 }}
               >
                 {/* Número do dia */}
                 <div style={{
-                  width: 28, height: 28, borderRadius: "50%",
+                  width: mobile ? 24 : 28, height: mobile ? 24 : 28, borderRadius: "50%",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 13, fontWeight: isHoje || isSel ? 700 : 500,
+                  fontSize: mobile ? 11 : 13, fontWeight: isHoje || isSel ? 700 : 500,
                   background: isHoje ? "var(--gold)" : "transparent",
                   color: isHoje
                     ? "#0a0808"
