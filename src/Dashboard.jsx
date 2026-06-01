@@ -5036,15 +5036,24 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 )}
               </div>
             ) : anuncioModal.imageUrl ? (
-              <div style={{ width: "100%", height: 220, overflow: "hidden", background: "var(--s2)" }}>
+              <div style={{ width: "100%", overflow: "hidden", background: "#000", lineHeight: 0 }}>
                 <img
                   src={anuncioModal.imageUrl}
                   alt=""
                   style={{
-                    width: "100%", height: "100%", objectFit: "cover", display: "block",
-                    objectPosition: `${anuncioModal.imgPosX ?? 50}% ${anuncioModal.imgPosY ?? 50}%`,
-                    transform: anuncioModal.imgZoom > 100 ? `scale(${anuncioModal.imgZoom / 100})` : undefined,
-                    transformOrigin: `${anuncioModal.imgPosX ?? 50}% ${anuncioModal.imgPosY ?? 50}%`,
+                    width: "100%", height: "auto", display: "block",
+                    objectFit: "contain",
+                    ...(anuncioModal.imgZoom > 100 ? (() => {
+                      const scale = anuncioModal.imgZoom / 100;
+                      const px = anuncioModal.imgPosX ?? 50;
+                      const py = anuncioModal.imgPosY ?? 50;
+                      const tx = (px - 50) * (scale - 1) * 0.6;
+                      const ty = (py - 50) * (scale - 1) * 0.6;
+                      return {
+                        transform: `scale(${scale}) translate(${tx.toFixed(1)}%, ${ty.toFixed(1)}%)`,
+                        transformOrigin: "center center",
+                      };
+                    })() : {}),
                   }}
                 />
               </div>
