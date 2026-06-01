@@ -1188,9 +1188,9 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
         </div>
 
         {/* Nav */}
-        <nav style={{ flex: 1, padding: "10px 10px", overflowY: "auto" }}>
+        <nav style={{ flex: 1, padding: "8px 10px", overflowY: "auto" }}>
           {abas.map((a) => {
-            const ativo        = aba === a.id;
+            const ativo = aba === a.id;
             const mostrarLabel = sidebarAberta || bp.isMobile;
             return (
               <button
@@ -1199,47 +1199,52 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                 onClick={() => { setAba(a.id); if (bp.isMobile) setSidebarAberta(false); }}
                 title={!mostrarLabel ? a.labelFull : undefined}
                 style={{
-                  display: "flex", alignItems: "center",
-                  gap: mostrarLabel ? 10 : 0,
-                  justifyContent: mostrarLabel ? "flex-start" : "center",
-                  width: "100%", padding: mostrarLabel ? "10px 12px" : "10px",
-                  borderRadius: 10, marginBottom: 2,
+                  display: "flex", alignItems: "center", gap: 10,
+                  width: "100%", padding: "8px 10px",
+                  borderRadius: 10, marginBottom: 1,
                   border: `1px solid ${ativo ? T.goldBorder : "transparent"}`,
-                  background: ativo
-                    ? "linear-gradient(140deg, rgba(212,175,55,0.12), rgba(212,175,55,0.03))"
-                    : "transparent",
-                  color: ativo ? "#ffffff" : "rgba(235,235,245,0.5)",
-                  fontSize: 13, cursor: "pointer", fontFamily: FONT,
-                  fontWeight: ativo ? 500 : 400, transition: "all 0.15s ease",
-                  position: "relative",
+                  background: ativo ? "rgba(41,151,255,0.1)" : "transparent",
+                  cursor: "pointer", fontFamily: FONT,
+                  transition: "all 0.15s ease", position: "relative",
+                  textAlign: "left",
                 }}
               >
+                {/* Indicador ativo */}
                 {ativo && (
                   <div style={{
                     position: "absolute", left: 0, top: "20%", height: "60%",
                     width: 2.5, background: T.gold, borderRadius: "0 2px 2px 0",
-                    boxShadow: `0 0 8px ${T.gold}88`,
                   }} />
                 )}
+
+                {/* Ícone */}
                 <div style={{
                   width: 28, height: 28, borderRadius: 7, flexShrink: 0,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   background: ativo ? T.goldDim : "transparent",
-                  border: `1px solid ${ativo ? T.goldBorder : "transparent"}`,
-                  fontSize: 13, color: ativo ? T.gold : "rgba(235,235,245,0.35)",
+                  fontSize: 13, color: ativo ? T.gold : "rgba(235,235,245,0.4)",
                   transition: "all 0.15s",
                 }}>
                   {a.icon}
                 </div>
+
+                {/* Label */}
                 {mostrarLabel && (
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                  <span style={{
+                    flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    fontSize: 13, fontWeight: ativo ? 500 : 400,
+                    color: ativo ? "#ffffff" : "rgba(235,235,245,0.55)",
+                    letterSpacing: "-0.01em",
+                  }}>
                     {a.labelFull}
                   </span>
                 )}
-                {a.badge && mostrarLabel ? (
-                  <span style={{ fontSize: 9.5, fontWeight: 700, background: T.red, color: "#fff", borderRadius: 999, padding: "1px 7px", flexShrink: 0 }}>{a.badge}</span>
-                ) : a.badge && !mostrarLabel ? (
-                  <span style={{ position: "absolute", top: 6, right: 6, width: 6, height: 6, borderRadius: "50%", background: T.red }} />
+
+                {/* Badge */}
+                {a.badge ? (
+                  mostrarLabel
+                    ? <span style={{ fontSize: 10, fontWeight: 700, background: T.red, color: "#fff", borderRadius: 9999, padding: "1px 7px", flexShrink: 0 }}>{a.badge}</span>
+                    : <span style={{ position: "absolute", top: 5, right: 5, width: 6, height: 6, borderRadius: "50%", background: T.red }} />
                 ) : null}
               </button>
             );
