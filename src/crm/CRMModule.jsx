@@ -893,7 +893,7 @@ const CAT_COR = {
   "Operacional": "rgba(255,255,255,0.4)",
 };
 
-function InsightCrescimentoCard({ insight, idx, T }) {
+function InsightCrescimentoCard({ insight, T }) {
   const [expandido, setExpandido] = useState(false);
   const catCor = CAT_COR[insight.categoria] || T.gold;
 
@@ -902,49 +902,69 @@ function InsightCrescimentoCard({ insight, idx, T }) {
       onClick={() => setExpandido(v => !v)}
       style={{
         background: T.surface,
-        border: `1px solid ${expandido ? `${catCor}40` : T.border}`,
+        border: `1px solid ${expandido ? `${catCor}35` : T.border}`,
         borderRadius: 18, overflow: "hidden", cursor: "pointer",
         transition: "border-color 0.2s", fontFamily: FONT,
+        display: "flex", flexDirection: "column",
       }}
     >
-      <div style={{ height: 2, background: catCor, opacity: 0.9 }} />
-      <div style={{ padding: "20px 22px" }}>
+      {/* Barra de cor topo */}
+      <div style={{ height: 3, background: catCor, flexShrink: 0 }} />
+
+      <div style={{ padding: "20px 20px 0", flex: 1 }}>
+        {/* Categoria + métrica */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14 }}>
-          <span style={{ fontSize: 9, fontWeight: 700, color: catCor, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+          <span style={{
+            fontSize: 11, fontWeight: 600, color: catCor,
+            letterSpacing: "-0.01em", fontFamily: FONT,
+          }}>
             {insight.categoria}
           </span>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: catCor, fontFamily: FONT_MONO, lineHeight: 1, letterSpacing: "-0.02em" }}>
+          <div style={{
+            textAlign: "right", background: `${catCor}10`,
+            border: `1px solid ${catCor}25`, borderRadius: 10,
+            padding: "6px 12px",
+          }}>
+            <div style={{ fontSize: 20, fontWeight: 700, color: catCor, fontFamily: FONT_MONO, lineHeight: 1, letterSpacing: "-0.03em" }}>
               {insight.metrica.valor}
             </div>
-            <div style={{ fontSize: 9, color: T.textDim, marginTop: 2, letterSpacing: "0.04em" }}>
+            <div style={{ fontSize: 10, color: T.textDim, marginTop: 3, letterSpacing: "-0.01em" }}>
               {insight.metrica.label}
             </div>
           </div>
         </div>
-        <div style={{ fontSize: 14, fontWeight: 600, color: T.text, lineHeight: 1.35, marginBottom: 10, letterSpacing: "-0.01em" }}>
+
+        {/* Título */}
+        <div style={{ fontSize: 15, fontWeight: 600, color: T.text, lineHeight: 1.3, marginBottom: 10, letterSpacing: "-0.02em" }}>
           {insight.titulo}
         </div>
-        <p style={{ fontSize: 12.5, color: T.textMid, lineHeight: 1.65, margin: 0, fontWeight: 300 }}>
+
+        {/* Diagnóstico */}
+        <p style={{ fontSize: 13, color: T.textMid, lineHeight: 1.55, margin: "0 0 16px", fontWeight: 400 }}>
           {insight.diagnostico}
         </p>
-        <div style={{ maxHeight: expandido ? 200 : 0, overflow: "hidden", transition: "max-height 0.25s ease" }}>
-          <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${T.border}` }}>
-            <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 8 }}>
+
+        {/* Recomendação expansível */}
+        {expandido && (
+          <div style={{ paddingTop: 14, marginTop: 0, borderTop: `1px solid ${T.border}`, marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: T.textDim, letterSpacing: "-0.01em", marginBottom: 8 }}>
               Próximo passo
             </div>
-            <p style={{ fontSize: 12.5, color: T.text, lineHeight: 1.7, margin: "0 0 16px", fontWeight: 300 }}>
+            <p style={{ fontSize: 13, color: T.text, lineHeight: 1.6, margin: 0, fontWeight: 400 }}>
               {insight.recomendacao}
             </p>
           </div>
-        </div>
-        <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6 }}>
-          <div style={{ flex: 1, height: 1, background: T.border }} />
-          <span style={{ fontSize: 9, color: T.textDim, letterSpacing: "0.08em" }}>
-            {expandido ? "RECOLHER" : "VER RECOMENDAÇÃO"}
-          </span>
-          <div style={{ flex: 1, height: 1, background: T.border }} />
-        </div>
+        )}
+      </div>
+
+      {/* Rodapé */}
+      <div style={{
+        padding: "12px 20px", borderTop: `1px solid ${T.border}`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+      }}>
+        <span style={{ fontSize: 12, color: T.textDim, letterSpacing: "-0.01em", fontFamily: FONT }}>
+          {expandido ? "Recolher" : "Ver recomendação"}
+        </span>
       </div>
     </div>
   );
@@ -955,14 +975,14 @@ function CrescimentoPage({ crescimento, T, bp }) {
   const fase = FASES_LABEL[momento?.fase] || { label: "Analisando...", cor: T.textDim };
 
   if (!momento) return (
-    <div style={{ textAlign: "center", padding: "60px 0", color: T.textDim, fontSize: 13, fontFamily: FONT, fontWeight: 300, border: `1px dashed ${T.border}`, borderRadius: 14 }}>
+    <div style={{ textAlign: "center", padding: "60px 0", color: T.textDim, fontSize: 15, fontFamily: FONT, fontWeight: 400, border: `1px solid ${T.border}`, borderRadius: 18, letterSpacing: "-0.01em" }}>
       Carregando diagnóstico do negócio...
     </div>
   );
 
   if (ativos.length === 0) return (
-    <div style={{ textAlign: "center", padding: "60px 0", color: T.textDim, fontSize: 13, fontFamily: FONT, fontWeight: 300, border: `1px dashed ${T.border}`, borderRadius: 14 }}>
-      Nenhum insight disponível para o momento atual. Cadastre mais clientes e vendas no Assent Gestão.
+    <div style={{ textAlign: "center", padding: "60px 0", color: T.textDim, fontSize: 15, fontFamily: FONT, fontWeight: 400, border: `1px solid ${T.border}`, borderRadius: 18, letterSpacing: "-0.01em" }}>
+      Nenhum insight disponível. Cadastre mais clientes e vendas no Assent Gestão.
     </div>
   );
 
@@ -970,55 +990,64 @@ function CrescimentoPage({ crescimento, T, bp }) {
 
   return (
     <div style={{ fontFamily: FONT }}>
-      {/* Diagnóstico do momento */}
+      {/* Banner momento do negócio */}
       <div style={{
-        background: T.surface, border: `1px solid ${fase.cor}28`,
-        borderLeft: `3px solid ${fase.cor}`,
-        borderRadius: 14, padding: "20px 24px", marginBottom: 28,
-        position: "relative", overflow: "hidden",
+        background: T.surface, border: `1px solid ${T.border}`,
+        borderRadius: 18, padding: "22px 24px", marginBottom: 28,
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        flexWrap: "wrap", gap: 16, overflow: "hidden", position: "relative",
       }}>
         <div style={{
-          position: "absolute", top: -30, right: -30, width: 100, height: 100,
-          borderRadius: "50%", background: `${fase.cor}12`, filter: "blur(30px)",
+          position: "absolute", inset: 0, borderRadius: 18,
+          background: `linear-gradient(135deg, ${fase.cor}08 0%, transparent 60%)`,
           pointerEvents: "none",
         }} />
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12 }}>
-          <div>
-            <div style={{ fontSize: 9, fontWeight: 700, color: T.textDim, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 8 }}>
-              Momento do negócio
-            </div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: fase.cor, letterSpacing: "-0.01em" }}>
-              {fase.label}
-            </div>
+        <div style={{ position: "relative" }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: T.textDim, letterSpacing: "-0.01em", marginBottom: 6 }}>
+            Momento do negócio
           </div>
-          <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
-            {[
-              { val: momento.totalClientes, label: "Clientes" },
-              { val: momento.fieis,         label: "Fiéis"    },
-              { val: momento.emRisco,       label: "Em risco" },
-            ].map(m => (
-              <div key={m.label} style={{ textAlign: "right" }}>
-                <div style={{ fontSize: 22, fontWeight: 700, color: T.text, fontFamily: FONT_MONO, lineHeight: 1 }}>{m.val}</div>
-                <div style={{ fontSize: 9, color: T.textDim, marginTop: 4, letterSpacing: "0.08em", textTransform: "uppercase" }}>{m.label}</div>
-              </div>
-            ))}
+          <div style={{ fontSize: 22, fontWeight: 600, color: fase.cor, letterSpacing: "-0.02em" }}>
+            {fase.label}
           </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, position: "relative" }}>
+          {[
+            { val: momento.totalClientes, label: "Clientes" },
+            { val: momento.fieis,         label: "Fiéis"    },
+            { val: momento.emRisco,       label: "Em risco" },
+          ].map((m, i) => (
+            <div key={m.label} style={{
+              textAlign: "center", padding: "12px 18px",
+              background: T.surfaceAlt, border: `1px solid ${T.border}`,
+              borderRadius: 12,
+            }}>
+              <div style={{ fontSize: 22, fontWeight: 600, color: T.text, fontFamily: FONT_MONO, lineHeight: 1, letterSpacing: "-0.03em" }}>{m.val}</div>
+              <div style={{ fontSize: 11, color: T.textDim, marginTop: 4, letterSpacing: "-0.01em" }}>{m.label}</div>
+            </div>
+          ))}
         </div>
       </div>
 
+      {/* Cards por categoria — grid 2 colunas */}
       {categorias.map(cat => (
-        <div key={cat} style={{ marginBottom: 24 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
-            <div style={{ width: 3, height: 14, borderRadius: 2, background: CAT_COR[cat] || T.gold, flexShrink: 0 }} />
-            <span style={{ fontSize: 9, fontWeight: 700, color: CAT_COR[cat] || T.textDim, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+        <div key={cat} style={{ marginBottom: 28 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+            <div style={{ width: 3, height: 16, borderRadius: 2, background: CAT_COR[cat] || T.gold, flexShrink: 0 }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: CAT_COR[cat] || T.textDim, letterSpacing: "-0.01em" }}>
               {cat}
             </span>
-            <div style={{ flex: 1, height: 1, background: T.border }} />
-            <span style={{ fontSize: 9, color: T.textDim }}>{ativos.filter(a => a.categoria === cat).length}</span>
+            <span style={{ fontSize: 12, color: T.textDim, marginLeft: 2 }}>
+              · {ativos.filter(a => a.categoria === cat).length}
+            </span>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: bp.isDesktop ? "repeat(2, 1fr)" : "1fr",
+            gap: 14,
+            alignItems: "start",
+          }}>
             {ativos.filter(a => a.categoria === cat).map((ins, i) => (
-              <InsightCrescimentoCard key={ins.id} insight={ins} idx={i} T={T} />
+              <InsightCrescimentoCard key={ins.id} insight={ins} T={T} />
             ))}
           </div>
         </div>
@@ -1218,47 +1247,30 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
         </nav>
 
         {/* Footer sidebar */}
-        <div style={{ padding: "14px 14px", borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ padding: "12px 10px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           {sidebarAberta || bp.isMobile ? (
-            <>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{
-                  width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-                  background: T.goldDim, border: `1px solid ${T.goldBorder}`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 12, fontWeight: 700, color: T.gold, fontFamily: FONT_MONO,
-                }}>
-                  {(nomeEmpresa || "E")[0].toUpperCase()}
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>
-                    {nomeEmpresa || "Empresa"}
-                  </div>
-                  <div style={{ fontSize: 11, color: "rgba(235,235,245,0.4)", letterSpacing: "-0.01em" }}>Assent CRM</div>
-                </div>
-              </div>
-              <button
-                onClick={onVoltar}
-                style={{
-                  fontSize: 13, color: "rgba(235,235,245,0.5)",
-                  background: "transparent", border: "1px solid rgba(255,255,255,0.1)",
-                  cursor: "pointer", padding: "8px 16px", borderRadius: 9999,
-                  fontFamily: FONT, alignSelf: "flex-start", letterSpacing: "0.03em",
-                  transition: "color 0.15s, border-color 0.15s",
-                }}
-              >
-                ← Assent Gestão
-              </button>
-            </>
+            <button
+              onClick={onVoltar}
+              style={{
+                width: "100%", fontSize: 13, color: "rgba(235,235,245,0.45)",
+                background: "transparent", border: "1px solid rgba(255,255,255,0.08)",
+                cursor: "pointer", padding: "9px 14px", borderRadius: 9999,
+                fontFamily: FONT, letterSpacing: "-0.01em",
+                transition: "color 0.15s, border-color 0.15s",
+                display: "flex", alignItems: "center", gap: 6,
+              }}
+            >
+              <span style={{ fontSize: 14 }}>←</span> Assent Gestão
+            </button>
           ) : (
             <button
               onClick={onVoltar}
               title="Voltar ao Assent Gestão"
               style={{
-                width: 36, height: 36, borderRadius: 9, border: `1px solid ${T.border}`,
-                background: "transparent", cursor: "pointer", color: T.textMid,
+                width: 36, height: 36, borderRadius: 9999, border: "1px solid rgba(255,255,255,0.08)",
+                background: "transparent", cursor: "pointer", color: "rgba(235,235,245,0.45)",
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 14, margin: "0 auto", transition: "border-color 0.15s",
+                fontSize: 14, margin: "0 auto",
               }}
             >←</button>
           )}
