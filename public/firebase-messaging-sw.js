@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════
-   public/firebase-messaging-sw.js v2
+   public/firebase-messaging-sw.js v3
    ═══════════════════════════════════════════════════ */
 
 self.addEventListener('install', (event) => {
