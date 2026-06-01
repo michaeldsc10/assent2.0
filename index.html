@@ -17,6 +17,13 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- Captura o beforeinstallprompt antes do React montar -->
+    <script>
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.__pwaInstallPrompt = e;
+      });
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

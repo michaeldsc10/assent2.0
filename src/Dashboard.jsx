@@ -2699,7 +2699,7 @@ export default function Dashboard() {
   const [secaoAberta, setSecaoAberta] = useState(
     () => { try { return JSON.parse(localStorage.getItem("ag_sec_aberta") || "{}"); } catch { return {}; } }
   );
-  const [pwaPrompt, setPwaPrompt] = useState(null);
+  const [pwaPrompt, setPwaPrompt] = useState(() => window.__pwaInstallPrompt || null);
   const [dropdownOpen,  setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifOpen,     setNotifOpen]    = useState(false);
@@ -3128,9 +3128,10 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     el.textContent = RESPONSIVE_CSS;
   }, []);
 
-  /* ── Captura evento de instalação PWA ── */
+  /* ── Sincroniza pwaPrompt caso o evento chegue depois do mount ── */
   useEffect(() => {
-    const handler = (e) => { e.preventDefault(); setPwaPrompt(e); };
+    if (window.__pwaInstallPrompt) setPwaPrompt(window.__pwaInstallPrompt);
+    const handler = (e) => { e.preventDefault(); window.__pwaInstallPrompt = e; setPwaPrompt(e); };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
