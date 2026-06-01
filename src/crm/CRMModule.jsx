@@ -20,18 +20,9 @@ import ConfigPage         from "./ConfigPage";
 import NotificacoesLeads  from "./NotificacoesLeads";
 import { useLeads }       from "./useLeads";
 
-// ── Fontes ────────────────────────────────────────────────────────────────────
-if (!document.getElementById("crm-fonts")) {
-  const link = document.createElement("link");
-  link.id   = "crm-fonts";
-  link.rel  = "stylesheet";
-  link.href = "https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap";
-  document.head.appendChild(link);
-}
-
-const FONT       = "'Inter', system-ui, sans-serif";
-const FONT_BRAND = "'Cinzel', serif";
-const FONT_MONO  = "'JetBrains Mono', monospace";
+const FONT       = "-apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif";
+const FONT_BRAND = "-apple-system, BlinkMacSystemFont, 'SF Pro Display', system-ui, sans-serif";
+const FONT_MONO  = "'SF Mono', ui-monospace, 'Cascadia Code', monospace";
 
 // ─── Hook de Breakpoint ───────────────────────────────────────────────────────
 function useBreakpoint() {
@@ -52,60 +43,60 @@ function useBreakpoint() {
 // ─── Temas ────────────────────────────────────────────────────────────────────
 const TEMAS = {
   dark: {
-    bg: "#070707",
-    surface: "#0f0f12",
-    surfaceAlt: "#16161a",
-    border: "rgba(255,255,255,0.07)",
-    borderAlt: "rgba(255,255,255,0.12)",
+    bg: "#000000",
+    surface: "#1c1c1e",
+    surfaceAlt: "#2c2c2e",
+    border: "rgba(255,255,255,0.08)",
+    borderAlt: "rgba(255,255,255,0.14)",
     text: "#ffffff",
-    textMid: "rgba(255,255,255,0.55)",
-    textDim: "rgba(255,255,255,0.28)",
-    gold: "#d4af37",
-    goldLight: "#f4d77a",
-    goldDim: "rgba(212,175,55,0.08)",
-    goldGlow: "rgba(212,175,55,0.15)",
-    goldBorder: "rgba(212,175,55,0.22)",
-    goldGradient: "linear-gradient(135deg,#f4d77a 0%,#d4af37 50%,#a47d1f 100%)",
-    red: "#e05252",
-    redDim: "rgba(224,82,82,0.08)",
-    redBorder: "rgba(224,82,82,0.22)",
-    yellow: "#d4903a",
-    yellowDim: "rgba(212,144,58,0.08)",
-    yellowBorder: "rgba(212,144,58,0.22)",
-    green: "#3aad78",
-    greenDim: "rgba(58,173,120,0.08)",
-    greenBorder: "rgba(58,173,120,0.22)",
-    blue: "#4a8fd4",
-    blueDim: "rgba(74,143,212,0.08)",
-    blueBorder: "rgba(74,143,212,0.22)",
+    textMid: "rgba(235,235,245,0.6)",
+    textDim: "rgba(235,235,245,0.3)",
+    gold: "#2997ff",
+    goldLight: "#5ac8fa",
+    goldDim: "rgba(41,151,255,0.1)",
+    goldGlow: "rgba(41,151,255,0.15)",
+    goldBorder: "rgba(41,151,255,0.28)",
+    goldGradient: "#0066cc",
+    red: "#ff453a",
+    redDim: "rgba(255,69,58,0.1)",
+    redBorder: "rgba(255,69,58,0.28)",
+    yellow: "#ff9f0a",
+    yellowDim: "rgba(255,159,10,0.1)",
+    yellowBorder: "rgba(255,159,10,0.28)",
+    green: "#30d158",
+    greenDim: "rgba(48,209,88,0.1)",
+    greenBorder: "rgba(48,209,88,0.28)",
+    blue: "#0a84ff",
+    blueDim: "rgba(10,132,255,0.1)",
+    blueBorder: "rgba(10,132,255,0.28)",
   },
   light: {
-    bg: "#f4f4f6",
+    bg: "#f5f5f7",
     surface: "#ffffff",
-    surfaceAlt: "#f0f0f4",
-    border: "#e4e4ea",
-    borderAlt: "#d0d0d8",
-    text: "#0f0f12",
-    textMid: "#56566a",
-    textDim: "#a0a0b8",
-    gold: "#a07828",
-    goldLight: "#c8982a",
-    goldDim: "rgba(160,120,40,0.08)",
-    goldGlow: "rgba(160,120,40,0.08)",
-    goldBorder: "rgba(160,120,40,0.25)",
-    goldGradient: "linear-gradient(135deg,#c8982a 0%,#a07828 50%,#7a5a1a 100%)",
-    red: "#c03030",
-    redDim: "#fde8e8",
-    redBorder: "rgba(192,48,48,0.22)",
-    yellow: "#b06010",
-    yellowDim: "#fdf0e0",
-    yellowBorder: "rgba(176,96,16,0.22)",
-    green: "#1e7a50",
-    greenDim: "#e0f5ea",
-    greenBorder: "rgba(30,122,80,0.22)",
-    blue: "#1a5fa0",
-    blueDim: "#e0edf8",
-    blueBorder: "rgba(26,95,160,0.22)",
+    surfaceAlt: "#f5f5f7",
+    border: "#e0e0e0",
+    borderAlt: "#d2d2d7",
+    text: "#1d1d1f",
+    textMid: "#6e6e73",
+    textDim: "#aeaeb2",
+    gold: "#0066cc",
+    goldLight: "#0071e3",
+    goldDim: "rgba(0,102,204,0.06)",
+    goldGlow: "rgba(0,102,204,0.08)",
+    goldBorder: "rgba(0,102,204,0.22)",
+    goldGradient: "#0066cc",
+    red: "#ff3b30",
+    redDim: "rgba(255,59,48,0.06)",
+    redBorder: "rgba(255,59,48,0.22)",
+    yellow: "#ff9500",
+    yellowDim: "rgba(255,149,0,0.06)",
+    yellowBorder: "rgba(255,149,0,0.22)",
+    green: "#34c759",
+    greenDim: "rgba(52,199,89,0.06)",
+    greenBorder: "rgba(52,199,89,0.22)",
+    blue: "#007aff",
+    blueDim: "rgba(0,122,255,0.06)",
+    blueBorder: "rgba(0,122,255,0.22)",
   },
 };
 
@@ -149,13 +140,13 @@ function RiscoBadge({ risco, T }) {
   const s = map[risco] || map.indefinido;
   return (
     <span style={{
-      fontSize: 9, fontWeight: 600, padding: "3px 10px", borderRadius: 999,
+      fontSize: 11, fontWeight: 600, padding: "4px 11px", borderRadius: 9999,
       background: s.bg, color: s.color, border: `1px solid ${s.border}`,
-      letterSpacing: "0.10em", textTransform: "uppercase",
+      letterSpacing: "-0.01em",
       display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
       fontFamily: FONT,
     }}>
-      <span style={{ width: 4, height: 4, borderRadius: "50%", background: s.color, display: "inline-block", flexShrink: 0 }} />
+      <span style={{ width: 5, height: 5, borderRadius: "50%", background: s.color, display: "inline-block", flexShrink: 0 }} />
       {s.label}
     </span>
   );
@@ -167,7 +158,7 @@ function MetricCard({ val, label, color, T }) {
     <div style={{
       background: T.surface,
       border: `1px solid ${color ? `${color}28` : T.border}`,
-      borderRadius: 16, padding: "20px 22px 18px",
+      borderRadius: 18, padding: "20px 22px 18px",
       position: "relative", overflow: "hidden",
       transition: "border-color 0.2s, box-shadow 0.2s",
     }}>
@@ -187,12 +178,11 @@ function MetricCard({ val, label, color, T }) {
       )}
       <div style={{
         fontSize: 28, fontWeight: 600, color: color || T.text,
-        fontFamily: FONT_MONO, letterSpacing: "-0.02em", lineHeight: 1,
+        fontFamily: FONT_MONO, letterSpacing: "-0.03em", lineHeight: 1,
         marginBottom: 8,
       }}>{val}</div>
       <div style={{
-        fontSize: 9, color: T.textDim, textTransform: "uppercase",
-        letterSpacing: "0.12em", fontWeight: 600, fontFamily: FONT,
+        fontSize: 11, color: T.textDim, letterSpacing: "-0.01em", fontWeight: 400, fontFamily: FONT,
       }}>{label}</div>
     </div>
   );
@@ -246,7 +236,7 @@ function InsightCard({ insight, empresaNome, empresaId, T }) {
     <div style={{
       background: T.surface,
       border: `1px solid ${T.border}`,
-      borderRadius: 16, marginBottom: 10, overflow: "hidden",
+      borderRadius: 18, marginBottom: 10, overflow: "hidden",
       transition: "border-color 0.2s",
     }}>
       <div style={{ display: "flex" }}>
@@ -309,27 +299,27 @@ function InsightCard({ insight, empresaNome, empresaId, T }) {
           {/* Actions */}
           <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap", alignItems: "center" }}>
             <button onClick={gerarMensagem} style={{
-              fontSize: 11.5, fontWeight: 600, padding: "8px 18px", borderRadius: 9,
-              background: T.goldGradient, color: "#1a1100", border: "none",
-              cursor: "pointer", letterSpacing: "0.06em", fontFamily: FONT,
-              boxShadow: "0 4px 18px rgba(212,175,55,0.28)", transition: "all 0.18s",
+              fontSize: 14, fontWeight: 400, padding: "9px 22px", borderRadius: 9999,
+              background: T.goldGradient, color: "#ffffff", border: "none",
+              cursor: "pointer", letterSpacing: "-0.01em", fontFamily: FONT,
+              transition: "opacity 0.15s",
             }}>
-              ✦ Mensagem rápida
+              Mensagem rápida
             </button>
             {insight.telefone && (
               <button onClick={() => window.open(`https://wa.me/55${telLimpo}`, "_blank")} style={{
-                fontSize: 11.5, fontWeight: 500, padding: "8px 16px", borderRadius: 9,
-                background: "transparent", border: `1px solid ${T.border}`,
-                cursor: "pointer", color: T.textMid, letterSpacing: "0.04em", fontFamily: FONT,
-                transition: "border-color 0.15s",
+                fontSize: 14, fontWeight: 400, padding: "9px 18px", borderRadius: 9999,
+                background: "transparent", border: `1px solid ${T.gold}`,
+                cursor: "pointer", color: T.gold, letterSpacing: "-0.01em", fontFamily: FONT,
+                transition: "opacity 0.15s",
               }}>WhatsApp</button>
             )}
             <button onClick={handleIgnorar} disabled={ignorando} title="Ignorar nos alertas futuros" style={{
-              fontSize: 11.5, fontWeight: 500, padding: "8px 14px", borderRadius: 9,
+              fontSize: 14, fontWeight: 400, padding: "9px 15px", borderRadius: 9999,
               background: "transparent", border: `1px solid ${T.border}`,
               cursor: ignorando ? "not-allowed" : "pointer",
               color: ignorando ? T.textDim : T.textMid,
-              letterSpacing: "0.04em", fontFamily: FONT, marginLeft: "auto", transition: "all 0.15s",
+              letterSpacing: "-0.01em", fontFamily: FONT, marginLeft: "auto", transition: "opacity 0.15s",
             }}>
               {ignorando ? "Ignorando..." : "Ignorar"}
             </button>
@@ -338,32 +328,32 @@ function InsightCard({ insight, empresaNome, empresaId, T }) {
           {/* Mensagem gerada */}
           {msg && (
             <div style={{
-              marginTop: 14, background: T.surfaceAlt, borderRadius: 12,
+              marginTop: 14, background: T.surfaceAlt, borderRadius: 14,
               padding: "16px 18px", border: `1px solid ${T.borderAlt}`,
             }}>
-              <p style={{ fontSize: 13, lineHeight: 1.8, margin: 0, color: T.text, whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: FONT, fontWeight: 300 }}>{msg}</p>
+              <p style={{ fontSize: 15, lineHeight: 1.6, margin: 0, color: T.text, whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: FONT, fontWeight: 400, letterSpacing: "-0.01em" }}>{msg}</p>
               <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
                 {telLimpo && (
                   <button onClick={() => window.open(`https://wa.me/55${telLimpo}?text=${encodeURIComponent(msg)}`, "_blank")} style={{
-                    fontSize: 11.5, fontWeight: 600, padding: "8px 16px", borderRadius: 9,
+                    fontSize: 14, fontWeight: 400, padding: "9px 18px", borderRadius: 9999,
                     background: T.greenDim, color: T.green,
                     border: `1px solid ${T.greenBorder}`, cursor: "pointer",
-                    letterSpacing: "0.04em", fontFamily: FONT,
-                  }}>↗ Enviar no WhatsApp</button>
+                    letterSpacing: "-0.01em", fontFamily: FONT,
+                  }}>Enviar no WhatsApp</button>
                 )}
                 <button onClick={copiarMsg} style={{
-                  fontSize: 11.5, padding: "8px 16px", borderRadius: 9,
+                  fontSize: 14, padding: "9px 18px", borderRadius: 9999,
                   background: copiado ? T.goldDim : "transparent",
                   border: `1px solid ${copiado ? T.goldBorder : T.border}`,
                   cursor: "pointer",
                   color: copiado ? T.gold : T.textMid,
-                  fontFamily: FONT, transition: "all 0.2s",
-                }}>{copiado ? "✓ Copiado!" : "⎘ Copiar"}</button>
+                  fontFamily: FONT, transition: "all 0.2s", letterSpacing: "-0.01em",
+                }}>{copiado ? "Copiado" : "Copiar"}</button>
                 <button onClick={gerarMensagem} style={{
-                  fontSize: 11.5, padding: "8px 16px", borderRadius: 9,
+                  fontSize: 14, padding: "9px 18px", borderRadius: 9999,
                   background: "transparent", border: `1px solid ${T.border}`,
-                  cursor: "pointer", color: T.textMid, fontFamily: FONT,
-                }}>↺ Nova variação</button>
+                  cursor: "pointer", color: T.textMid, fontFamily: FONT, letterSpacing: "-0.01em",
+                }}>Nova variação</button>
               </div>
             </div>
           )}
@@ -554,7 +544,7 @@ function PainelDiagnostico({ metricas, clientes, empresaNome, T }) {
       {/* Header */}
       <div style={{
         background: T.surface, border: `1px solid ${T.border}`,
-        borderRadius: 16, padding: "20px 22px", marginBottom: 16,
+        borderRadius: 18, padding: "20px 22px", marginBottom: 16,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
           <div style={{
@@ -720,10 +710,10 @@ function ModalHistoricoCRM({ cliente, vendas, T, onClose }) {
       zIndex: 999, padding: "20px", backdropFilter: "blur(8px)",
     }}>
       <div style={{
-        background: "#0f0f12", width: "100%", maxWidth: "550px", borderRadius: 20,
+        background: "#1c1c1e", width: "100%", maxWidth: "550px", borderRadius: 20,
         border: `1px solid rgba(255,255,255,0.09)`,
         display: "flex", flexDirection: "column", maxHeight: "90vh",
-        boxShadow: "0 30px 80px rgba(0,0,0,0.8)", fontFamily: FONT,
+        boxShadow: "0 30px 80px rgba(0,0,0,0.5)", fontFamily: FONT,
         overflow: "hidden",
       }}>
         <div style={{
@@ -778,13 +768,12 @@ function ModalHistoricoCRM({ cliente, vendas, T, onClose }) {
 
         <div style={{ padding: "18px 28px", borderTop: `1px solid rgba(255,255,255,0.07)` }}>
           <button style={{
-            width: "100%", padding: "13px", borderRadius: 10,
-            background: T.goldGradient, color: "#1a1100", border: "none",
-            fontWeight: 600, cursor: "pointer", fontSize: 12,
-            textTransform: "uppercase", letterSpacing: "0.08em", fontFamily: FONT,
-            boxShadow: "0 4px 18px rgba(212,175,55,0.28)",
+            width: "100%", padding: "13px", borderRadius: 9999,
+            background: T.goldGradient, color: "#ffffff", border: "none",
+            fontWeight: 400, cursor: "pointer", fontSize: 15,
+            letterSpacing: "-0.01em", fontFamily: FONT,
           }}>
-            + Registrar Contato Manual
+            Registrar Contato Manual
           </button>
         </div>
       </div>
@@ -852,12 +841,12 @@ function ClientesIgnorados({ ignorados, empresaId, T }) {
                 </div>
               </div>
               <button onClick={() => handleReativar(ig)} disabled={isReativando} style={{
-                fontSize: 11.5, fontWeight: 600, padding: "7px 16px", borderRadius: 9,
+                fontSize: 14, fontWeight: 400, padding: "8px 18px", borderRadius: 9999,
                 background: isReativando ? T.surfaceAlt : "transparent",
                 border: `1px solid ${isReativando ? T.border : T.greenBorder}`,
                 cursor: isReativando ? "not-allowed" : "pointer",
                 color: isReativando ? T.textDim : T.green,
-                letterSpacing: "0.04em", fontFamily: FONT,
+                letterSpacing: "-0.01em", fontFamily: FONT,
               }}>
                 {isReativando ? "Reativando..." : "↩ Reativar"}
               </button>
@@ -898,7 +887,7 @@ function InsightCrescimentoCard({ insight, idx, T }) {
       style={{
         background: T.surface,
         border: `1px solid ${expandido ? `${catCor}40` : T.border}`,
-        borderRadius: 14, overflow: "hidden", cursor: "pointer",
+        borderRadius: 18, overflow: "hidden", cursor: "pointer",
         transition: "border-color 0.2s", fontFamily: FONT,
       }}
     >
@@ -1071,12 +1060,13 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
     }}>
       <style>{`
         @keyframes crm-pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.75)} }
-        .crm-nav-item:hover { background: rgba(212,175,55,0.05) !important; border-color: ${T.goldBorder} !important; }
+        .crm-nav-item:hover { background: rgba(255,255,255,0.05) !important; }
         .crm-nav-item:hover span { color: rgba(255,255,255,0.85) !important; }
         .crm-card:hover { border-color: ${T.goldBorder} !important; }
         .crm-suggestion-btn:hover { background: ${T.goldDim} !important; border-color: ${T.goldBorder} !important; }
         .crm-secondary-btn:hover { border-color: rgba(255,255,255,0.20) !important; color: ${T.text} !important; }
         .crm-table-row:hover { background: ${T.goldDim} !important; }
+        button:active { transform: scale(0.97); }
       `}</style>
 
       {isDark && (
@@ -1113,9 +1103,9 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
         top: 0, left: 0, bottom: 0,
         width: bp.isMobile ? 250 : sidebarWidth,
         zIndex: bp.isMobile ? 50 : 1,
-        background: isDark ? "rgba(5,5,5,0.96)" : "#141414",
-        backdropFilter: isDark ? "blur(20px)" : "none",
-        borderRight: isDark ? `1px solid ${T.border}` : "1px solid rgba(255,255,255,0.06)",
+        background: "rgba(0,0,0,0.97)",
+        backdropFilter: "blur(20px)",
+        borderRight: `1px solid rgba(255,255,255,0.06)`,
         display: "flex", flexDirection: "column",
         transition: "width 0.22s ease, transform 0.22s ease",
         transform: bp.isMobile ? (sidebarAberta ? "translateX(0)" : "translateX(-100%)") : "none",
@@ -1123,21 +1113,17 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
       }}>
         {/* Logo */}
         <div style={{
-          padding: "20px 16px", borderBottom: isDark ? `1px solid ${T.border}` : "1px solid rgba(255,255,255,0.06)",
+          padding: "20px 16px", borderBottom: "1px solid rgba(255,255,255,0.06)",
           display: "flex", alignItems: "center", justifyContent: "space-between", minHeight: 64,
         }}>
           <div style={{ overflow: "hidden", opacity: sidebarAberta || bp.isMobile ? 1 : 0, transition: "opacity 0.15s ease", whiteSpace: "nowrap" }}>
             <div style={{
-              fontSize: 11, fontWeight: 600, letterSpacing: "0.18em", color: T.gold,
-              textTransform: "uppercase", fontFamily: FONT_BRAND,
-              background: isDark ? T.goldGradient : "none",
-              WebkitBackgroundClip: isDark ? "text" : "none",
-              WebkitTextFillColor: isDark ? "transparent" : T.gold,
-              backgroundClip: isDark ? "text" : "none",
+              fontSize: 15, fontWeight: 600, letterSpacing: "-0.01em", color: "#ffffff",
+              fontFamily: FONT_BRAND,
             }}>
               Assent CRM
             </div>
-            <div style={{ fontSize: 9.5, color: isDark ? T.textDim : "rgba(255,255,255,0.35)", marginTop: 3, letterSpacing: "0.06em" }}>via Assent Gestão</div>
+            <div style={{ fontSize: 11, color: "rgba(255,255,255,0.35)", marginTop: 3, letterSpacing: "-0.01em" }}>via Assent Gestão</div>
           </div>
           {!bp.isMobile && (
             <button
@@ -1177,8 +1163,8 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                   background: ativo
                     ? "linear-gradient(140deg, rgba(212,175,55,0.12), rgba(212,175,55,0.03))"
                     : "transparent",
-                  color: ativo ? (isDark ? T.text : "#fff") : (isDark ? T.textMid : "rgba(255,255,255,0.5)"),
-                  fontSize: 12.5, cursor: "pointer", fontFamily: FONT,
+                  color: ativo ? "#ffffff" : "rgba(235,235,245,0.5)",
+                  fontSize: 13, cursor: "pointer", fontFamily: FONT,
                   fontWeight: ativo ? 500 : 400, transition: "all 0.15s ease",
                   position: "relative",
                 }}
@@ -1195,7 +1181,7 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                   display: "flex", alignItems: "center", justifyContent: "center",
                   background: ativo ? T.goldDim : "transparent",
                   border: `1px solid ${ativo ? T.goldBorder : "transparent"}`,
-                  fontSize: 13, color: ativo ? T.goldLight : (isDark ? T.textDim : "rgba(255,255,255,0.35)"),
+                  fontSize: 13, color: ativo ? T.gold : "rgba(235,235,245,0.35)",
                   transition: "all 0.15s",
                 }}>
                   {a.icon}
@@ -1216,7 +1202,7 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
         </nav>
 
         {/* Footer sidebar */}
-        <div style={{ padding: "14px 14px", borderTop: isDark ? `1px solid ${T.border}` : "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ padding: "14px 14px", borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 8 }}>
           {sidebarAberta || bp.isMobile ? (
             <>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -1229,18 +1215,18 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                   {(nomeEmpresa || "E")[0].toUpperCase()}
                 </div>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: isDark ? T.text : "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: "#ffffff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", letterSpacing: "-0.01em" }}>
                     {nomeEmpresa || "Empresa"}
                   </div>
-                  <div style={{ fontSize: 9.5, color: isDark ? T.textDim : "rgba(255,255,255,0.35)" }}>Assent CRM</div>
+                  <div style={{ fontSize: 11, color: "rgba(235,235,245,0.4)", letterSpacing: "-0.01em" }}>Assent CRM</div>
                 </div>
               </div>
               <button
                 onClick={onVoltar}
                 style={{
-                  fontSize: 11, color: isDark ? T.textDim : "rgba(255,255,255,0.4)",
-                  background: "transparent", border: isDark ? `1px solid ${T.border}` : "1px solid rgba(255,255,255,0.1)",
-                  cursor: "pointer", padding: "7px 12px", borderRadius: 8,
+                  fontSize: 13, color: "rgba(235,235,245,0.5)",
+                  background: "transparent", border: "1px solid rgba(255,255,255,0.1)",
+                  cursor: "pointer", padding: "8px 16px", borderRadius: 9999,
                   fontFamily: FONT, alignSelf: "flex-start", letterSpacing: "0.03em",
                   transition: "color 0.15s, border-color 0.15s",
                 }}
@@ -1270,8 +1256,8 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
         <div style={{
           padding: bp.isMobile ? "12px 16px" : "14px 28px",
           borderBottom: `1px solid ${T.border}`,
-          background: isDark ? "rgba(7,7,7,0.88)" : T.surface,
-          backdropFilter: isDark ? "blur(20px)" : "none",
+          background: isDark ? "rgba(0,0,0,0.85)" : T.surface,
+          backdropFilter: "blur(20px) saturate(180%)",
           display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
@@ -1288,8 +1274,8 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
             )}
             <div style={{ minWidth: 0 }}>
               <div style={{
-                fontSize: bp.isMobile ? 14 : 18, fontWeight: 600, color: T.text,
-                letterSpacing: "-0.02em", fontFamily: FONT,
+                fontSize: bp.isMobile ? 17 : 22, fontWeight: 600, color: T.text,
+                letterSpacing: "-0.02em", fontFamily: FONT_BRAND,
                 overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
               }}>
                 {abas.find((a) => a.id === aba)?.labelFull}
@@ -1403,10 +1389,10 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                   onChange={(e) => setBusca(e.target.value)}
                   placeholder="Buscar por nome ou telefone..."
                   style={{
-                    width: "100%", maxWidth: 420, padding: "10px 14px", borderRadius: 10, fontSize: 13,
+                    width: "100%", maxWidth: 420, padding: "10px 18px", borderRadius: 9999, fontSize: 15,
                     border: `1px solid ${T.border}`, outline: "none",
                     fontFamily: FONT, background: T.surface, color: T.text,
-                    boxSizing: "border-box", transition: "border-color 0.15s",
+                    boxSizing: "border-box", transition: "border-color 0.15s", letterSpacing: "-0.01em",
                   }}
                 />
               </div>
@@ -1494,14 +1480,14 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                   onClick={() => setFunilAberto(true)}
                   style={{
                     display: "flex", alignItems: "center", gap: 8,
-                    padding: "9px 20px", borderRadius: 10,
-                    background: T.goldDim, border: `1px solid ${T.goldBorder}`,
-                    color: T.gold, cursor: "pointer",
-                    fontSize: 12, fontWeight: 600, letterSpacing: "0.06em",
-                    fontFamily: FONT, transition: "all 0.16s", boxShadow: "none",
+                    padding: "9px 22px", borderRadius: 9999,
+                    background: T.goldGradient, border: "none",
+                    color: "#ffffff", cursor: "pointer",
+                    fontSize: 14, fontWeight: 400, letterSpacing: "-0.01em",
+                    fontFamily: FONT, transition: "opacity 0.15s",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = T.goldGradient; e.currentTarget.style.color = "#1a1100"; e.currentTarget.style.boxShadow = "0 4px 18px rgba(212,175,55,0.28)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = T.goldDim; e.currentTarget.style.color = T.gold; e.currentTarget.style.boxShadow = "none"; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.88"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
                 >
                   <span style={{ fontSize: 14 }}>◎</span>
                   Funil de leads
@@ -1521,10 +1507,10 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
                   }}
                 >
                   <div style={{
-                    background: "#0f0f12", border: `1px solid rgba(255,255,255,0.09)`,
+                    background: "#1c1c1e", border: `1px solid rgba(255,255,255,0.09)`,
                     borderRadius: 20, width: "100%", maxWidth: 860, maxHeight: "90vh",
                     display: "flex", flexDirection: "column",
-                    boxShadow: "0 30px 80px rgba(0,0,0,0.8)", fontFamily: FONT, overflow: "hidden",
+                    boxShadow: "0 20px 60px rgba(0,0,0,0.5)", fontFamily: FONT, overflow: "hidden",
                   }}>
                     <div style={{
                       padding: "20px 26px", borderBottom: `1px solid rgba(255,255,255,0.07)`,
@@ -1575,9 +1561,9 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
       {bp.isMobile && (
         <div style={{
           position: "fixed", bottom: 0, left: 0, right: 0,
-          background: isDark ? "rgba(5,5,5,0.96)" : T.surface,
-          backdropFilter: "blur(16px)",
-          borderTop: `1px solid ${T.border}`,
+          background: "rgba(0,0,0,0.94)",
+          backdropFilter: "blur(20px) saturate(180%)",
+          borderTop: "1px solid rgba(255,255,255,0.06)",
           display: "flex", zIndex: 30, paddingBottom: "env(safe-area-inset-bottom)",
         }}>
           {abas.map((a) => {
