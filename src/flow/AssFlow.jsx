@@ -1109,7 +1109,11 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
     return f;
   };
 
-  const listaAtual=aplicarFiltros(aba==="ativas"?ativas:canceladas);
+  const FILTROS_INATIVOS=["cancelado","concluido","nao_apareceu"];
+  const listaBase = aba==="ativas"
+    ? (FILTROS_INATIVOS.includes(filtroStatus) ? canceladas : ativas)
+    : canceladas;
+  const listaAtual=aplicarFiltros(listaBase);
 
   const SUB_FILTROS=[
     {key:"todos",      label:"Todos",      count:ativas.length},
