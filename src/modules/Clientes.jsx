@@ -194,73 +194,50 @@ const CSS = `
     background: rgba(200,165,94,0.15); border-color: var(--gold); color: var(--gold);
   }
 
-  /* ── Lista de clientes ── */
+  /* ── Tabela ── */
   .cl-table-wrap {
     background: var(--s1); border: 1px solid var(--border);
-    border-radius: 14px; overflow: hidden; max-width: 860px;
+    border-radius: 12px; overflow: hidden;
   }
   .cl-table-header {
     padding: 13px 18px;
     border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
   }
-  .cl-table-title { font-size: 14px; font-weight: 600; color: var(--text); }
+  .cl-table-title { font-family: 'Sora', sans-serif; font-size: 14px; font-weight: 600; color: var(--text); }
   .cl-count-badge {
-    font-size: 11px; font-weight: 600;
+    font-family: 'Sora', sans-serif; font-size: 12px; font-weight: 600;
     background: var(--s3); border: 1px solid var(--border-h);
     color: var(--text-2); padding: 2px 10px; border-radius: 20px;
   }
 
-  /* Sort bar */
-  .cl-sort-bar {
-    display: flex; align-items: center; gap: 6px;
-    padding: 8px 18px; border-bottom: 1px solid var(--border);
-    background: var(--s2);
-  }
-  .cl-sort-label { font-size: 10px; color: var(--text-3); font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
-  .cl-sort-btn {
-    background: none; border: 1px solid transparent; border-radius: 6px;
-    padding: 3px 8px; font-size: 11px; font-weight: 600; color: var(--text-2);
-    cursor: pointer; display: inline-flex; align-items: center; gap: 3px;
-    transition: all .13s; font-family: inherit;
-  }
-  .cl-sort-btn:hover { color: var(--text); border-color: var(--border); }
-  .cl-sort-btn.active { color: var(--gold); border-color: rgba(200,165,94,0.3); background: rgba(200,165,94,0.07); }
-
-  /* Card row */
+  /* grid: ID | nome | telefone | doc | perfil | instagram | endereço | ações */
   .cl-row {
-    display: flex; align-items: center; gap: 14px;
-    padding: 13px 18px;
+    display: grid;
+    grid-template-columns: 80px 1fr 130px 140px 90px 130px 1fr 78px;
+    padding: 11px 18px; gap: 8px;
     border-bottom: 1px solid var(--border);
-    transition: background .1s; cursor: default;
+    align-items: center; font-size: 12px; color: var(--text-2);
   }
-  .cl-row:last-child { border-bottom: none; }
-  .cl-row:hover { background: rgba(255,255,255,0.025); }
-
-  .cl-avatar {
-    width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
-    background: var(--s3); border: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px; font-weight: 700; color: var(--text-2);
-    text-transform: uppercase; letter-spacing: .03em;
+  .cl-row:hover { background: rgba(255,255,255,0.02); }
+  .cl-row-head {
+    background: var(--s2); font-weight: 600; color: var(--text);
+    border-bottom: 1px solid var(--border-h);
   }
-  .cl-info { flex: 1; min-width: 0; }
-  .cl-nome {
-    font-size: 13px; font-weight: 600; color: var(--text);
-    cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  .cl-sort-btn {
+    background: none; border: none; padding: 0; margin: 0;
+    font: inherit; font-weight: 600; color: var(--text);
+    cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
     transition: color .13s;
   }
-  .cl-nome:hover { color: var(--gold); }
-  .cl-meta {
-    display: flex; align-items: center; gap: 8px; margin-top: 3px; flex-wrap: wrap;
-  }
-  .cl-meta-id {
-    font-size: 10px; font-family: 'Courier New', monospace; color: var(--text-3);
-  }
-  .cl-meta-tel { font-size: 11px; color: var(--text-3); }
-  .cl-meta-insta { font-size: 11px; color: var(--blue); }
-
-  .cl-actions { display: flex; gap: 4px; flex-shrink: 0; }
+  .cl-sort-btn:hover { color: var(--gold); }
+  .cl-sort-btn.active { color: var(--gold); }
+  .cl-id { font-family: 'Courier New', monospace; font-weight: 600; color: var(--text); }
+  .cl-nome { color: var(--text); cursor: pointer; font-weight: 500; }
+  .cl-nome:hover { color: var(--gold); text-decoration: underline; }
+  .cl-insta { color: var(--blue); }
+  .cl-overflow { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cl-actions { display: flex; gap: 4px; justify-content: flex-end; }
 
   .cl-loading {
     padding: 40px 20px; text-align: center;
@@ -1056,58 +1033,59 @@ export default function Clientes() {
             <span className="cl-count-badge">{clientesFiltrados.length}</span>
           </div>
 
-          {/* Sort bar */}
-          <div className="cl-sort-bar">
-            <span className="cl-sort-label">Ordenar:</span>
-            <button className={`cl-sort-btn ${sortField === "id" ? "active" : ""}`} onClick={() => toggleSort("id")}>
-              ID {sortField === "id" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
-            </button>
-            <button className={`cl-sort-btn ${sortField === "nome" ? "active" : ""}`} onClick={() => toggleSort("nome")}>
-              Nome {sortField === "nome" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
-            </button>
+          <div className="cl-row cl-row-head">
+            <span>
+              <button className={`cl-sort-btn ${sortField === "id" ? "active" : ""}`} onClick={() => toggleSort("id")}>
+                ID {sortField === "id" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+              </button>
+            </span>
+            <span>
+              <button className={`cl-sort-btn ${sortField === "nome" ? "active" : ""}`} onClick={() => toggleSort("nome")}>
+                Nome {sortField === "nome" ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
+              </button>
+            </span>
+            <span>Telefone</span>
+            <span>CPF / CNPJ</span>
+            <span>Perfil</span>
+            <span>Instagram</span>
+            <span>Endereço</span>
+            <span style={{ textAlign: "right" }}>Ações</span>
           </div>
 
           {loading ? (
             <div className="cl-loading">Carregando clientes...</div>
           ) : clientesFiltrados.length === 0 ? (
             <div className="cl-empty">
-              <p>{search || perfilFilter !== "todos" ? "Nenhum resultado para os filtros aplicados." : "Nenhum cliente cadastrado ainda."}</p>
+              <p>
+                {search || perfilFilter !== "todos"
+                  ? "Nenhum resultado para os filtros aplicados."
+                  : "Nenhum cliente cadastrado ainda."}
+              </p>
             </div>
           ) : (
-            clientesFiltrados.map((c) => {
-              const iniciais = (c.nome || "?").split(" ").slice(0, 2).map(p => p[0]).join("").toUpperCase();
-              return (
-                <div key={c.id} className="cl-row">
-                  {/* Avatar */}
-                  <div className="cl-avatar">{iniciais}</div>
-
-                  {/* Info principal */}
-                  <div className="cl-info">
-                    <div className="cl-nome" onClick={() => setHistorico(c)}>{c.nome}</div>
-                    <div className="cl-meta">
-                      <span className="cl-meta-id">{c.idSeqFmt || c.id}</span>
-                      {c.telefone && <span className="cl-meta-tel">· {c.telefone}</span>}
-                      {c.instagram && <span className="cl-meta-insta">· @{c.instagram}</span>}
-                      <PerfilBadge perfis={c.perfis} />
-                    </div>
-                  </div>
-
-                  {/* Ações */}
-                  <div className="cl-actions">
-                    {podeEditarV && (
-                      <button className="btn-icon btn-icon-edit" onClick={() => setEditando(c)}>
-                        <Edit2 size={13} />
-                      </button>
-                    )}
-                    {podeExcluirV && (
-                      <button className="btn-icon btn-icon-del" onClick={() => setDeletando(c)}>
-                        <Trash2 size={13} />
-                      </button>
-                    )}
-                  </div>
+            clientesFiltrados.map((c) => (
+              <div key={c.id} className="cl-row">
+                <span className="cl-id">{c.idSeqFmt || c.id}</span>
+                <span className="cl-nome" onClick={() => setHistorico(c)}>{c.nome}</span>
+                <span>{c.telefone || "—"}</span>
+                <span>{c.cpf || c.documento || "—"}</span>
+                <span><PerfilBadge perfis={c.perfis} /></span>
+                <span className="cl-insta">{c.instagram ? `@${c.instagram}` : "—"}</span>
+                <span className="cl-overflow">{c.endereco || "—"}</span>
+                <div className="cl-actions">
+                  {podeEditarV && (
+                    <button className="btn-icon btn-icon-edit" onClick={() => setEditando(c)}>
+                      <Edit2 size={13} />
+                    </button>
+                  )}
+                  {podeExcluirV && (
+                    <button className="btn-icon btn-icon-del" onClick={() => setDeletando(c)}>
+                      <Trash2 size={13} />
+                    </button>
+                  )}
                 </div>
-              );
-            })
+              </div>
+            ))
           )}
         </div>
       </div>
