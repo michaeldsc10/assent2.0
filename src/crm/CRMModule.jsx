@@ -236,128 +236,144 @@ function InsightCard({ insight, empresaNome, empresaId, T }) {
     <div style={{
       background: T.surface,
       border: `1px solid ${T.border}`,
-      borderRadius: 18, marginBottom: 10, overflow: "hidden",
-      transition: "border-color 0.2s",
+      borderRadius: 18, overflow: "hidden",
+      display: "flex", flexDirection: "column",
+      transition: "border-color 0.2s, box-shadow 0.2s",
     }}>
-      <div style={{ display: "flex" }}>
+      {/* Barra de cor no topo */}
+      <div style={{ height: 3, background: cor.borda, flexShrink: 0 }} />
+
+      <div style={{ padding: "20px 20px 0", flex: 1 }}>
+        {/* Header: avatar + nome + badge */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 12, flexShrink: 0,
+            background: cor.badgeBg, color: cor.badgeColor,
+            border: `1px solid ${cor.border}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 13, fontWeight: 600, fontFamily: FONT_MONO,
+          }}>
+            {insight.cliente ? iniciais(insight.cliente) : "!"}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span style={{
+                fontSize: 15, fontWeight: 600, color: T.text,
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                fontFamily: FONT, letterSpacing: "-0.02em",
+              }}>
+                {insight.cliente || "Alerta"}
+              </span>
+              <span style={{
+                fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 9999,
+                background: cor.badgeBg, color: cor.badgeColor, border: `1px solid ${cor.border}`,
+                letterSpacing: "-0.01em", whiteSpace: "nowrap", fontFamily: FONT,
+              }}>{cor.label}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Descrição */}
+        <p style={{ fontSize: 13, color: T.textMid, lineHeight: 1.55, margin: "0 0 14px", fontFamily: FONT, fontWeight: 400 }}>
+          {insight.descricao}
+        </p>
+
+        {/* Stats */}
         <div style={{
-          width: 3, flexShrink: 0, background: cor.borda,
-          boxShadow: tipoKey === "risco_alto" ? `0 0 16px ${T.red}66` : "none",
-        }} />
-        <div style={{ flex: 1, padding: "18px 18px 16px 16px" }}>
-          <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-            {/* Avatar */}
-            <div style={{
-              width: 42, height: 42, borderRadius: 12, flexShrink: 0,
-              background: cor.badgeBg, color: cor.badgeColor,
-              border: `1px solid ${cor.border}`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 12, fontWeight: 700, fontFamily: FONT_MONO,
-              letterSpacing: "0.02em",
-            }}>
-              {insight.cliente ? iniciais(insight.cliente) : "!"}
-            </div>
-
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 5 }}>
-                <span style={{
-                  fontSize: 13.5, fontWeight: 600, color: T.text,
-                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  maxWidth: "60%", fontFamily: FONT, letterSpacing: "-0.01em",
-                }}>
-                  {insight.cliente || "Alerta"}
-                </span>
-                <span style={{
-                  fontSize: 9, fontWeight: 700, padding: "3px 10px", borderRadius: 999,
-                  background: cor.badgeBg, color: cor.badgeColor, border: `1px solid ${cor.border}`,
-                  textTransform: "uppercase", letterSpacing: "0.10em", whiteSpace: "nowrap", fontFamily: FONT,
-                }}>{cor.label}</span>
-              </div>
-              <p style={{ fontSize: 12.5, color: T.textMid, lineHeight: 1.7, margin: 0, fontFamily: FONT, fontWeight: 300 }}>
-                {insight.descricao}
-              </p>
-              <div style={{ display: "flex", gap: 16, marginTop: 10, flexWrap: "wrap" }}>
-                {insight.diasAusente != null && (
-                  <span style={{ fontSize: 11, color: T.textDim, fontFamily: FONT }}>
-                    ausente há <strong style={{ color: insight.prioridade === 1 ? T.red : T.yellow, fontWeight: 600 }}>{insight.diasAusente}d</strong>
-                  </span>
-                )}
-                {insight.ticketMedio != null && (
-                  <span style={{ fontSize: 11, color: T.textDim, fontFamily: FONT }}>
-                    ticket <strong style={{ color: T.gold, fontWeight: 600, fontFamily: FONT_MONO }}>{formatarReal(insight.ticketMedio)}</strong>
-                  </span>
-                )}
-                {insight.preco != null && (
-                  <span style={{ fontSize: 11, color: T.textDim, fontFamily: FONT }}>
-                    potencial <strong style={{ color: T.green, fontWeight: 600, fontFamily: FONT_MONO }}>+{formatarReal(insight.preco)}</strong>
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap", alignItems: "center" }}>
-            <button onClick={gerarMensagem} style={{
-              fontSize: 14, fontWeight: 400, padding: "9px 22px", borderRadius: 9999,
-              background: T.goldGradient, color: "#ffffff", border: "none",
-              cursor: "pointer", letterSpacing: "-0.01em", fontFamily: FONT,
-              transition: "opacity 0.15s",
-            }}>
-              Mensagem rápida
-            </button>
-            {insight.telefone && (
-              <button onClick={() => window.open(`https://wa.me/55${telLimpo}`, "_blank")} style={{
-                fontSize: 14, fontWeight: 400, padding: "9px 18px", borderRadius: 9999,
-                background: "transparent", border: `1px solid ${T.gold}`,
-                cursor: "pointer", color: T.gold, letterSpacing: "-0.01em", fontFamily: FONT,
-                transition: "opacity 0.15s",
-              }}>WhatsApp</button>
-            )}
-            <button onClick={handleIgnorar} disabled={ignorando} title="Ignorar nos alertas futuros" style={{
-              fontSize: 14, fontWeight: 400, padding: "9px 15px", borderRadius: 9999,
-              background: "transparent", border: `1px solid ${T.border}`,
-              cursor: ignorando ? "not-allowed" : "pointer",
-              color: ignorando ? T.textDim : T.textMid,
-              letterSpacing: "-0.01em", fontFamily: FONT, marginLeft: "auto", transition: "opacity 0.15s",
-            }}>
-              {ignorando ? "Ignorando..." : "Ignorar"}
-            </button>
-          </div>
-
-          {/* Mensagem gerada */}
-          {msg && (
-            <div style={{
-              marginTop: 14, background: T.surfaceAlt, borderRadius: 14,
-              padding: "16px 18px", border: `1px solid ${T.borderAlt}`,
-            }}>
-              <p style={{ fontSize: 15, lineHeight: 1.6, margin: 0, color: T.text, whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: FONT, fontWeight: 400, letterSpacing: "-0.01em" }}>{msg}</p>
-              <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-                {telLimpo && (
-                  <button onClick={() => window.open(`https://wa.me/55${telLimpo}?text=${encodeURIComponent(msg)}`, "_blank")} style={{
-                    fontSize: 14, fontWeight: 400, padding: "9px 18px", borderRadius: 9999,
-                    background: T.greenDim, color: T.green,
-                    border: `1px solid ${T.greenBorder}`, cursor: "pointer",
-                    letterSpacing: "-0.01em", fontFamily: FONT,
-                  }}>Enviar no WhatsApp</button>
-                )}
-                <button onClick={copiarMsg} style={{
-                  fontSize: 14, padding: "9px 18px", borderRadius: 9999,
-                  background: copiado ? T.goldDim : "transparent",
-                  border: `1px solid ${copiado ? T.goldBorder : T.border}`,
-                  cursor: "pointer",
-                  color: copiado ? T.gold : T.textMid,
-                  fontFamily: FONT, transition: "all 0.2s", letterSpacing: "-0.01em",
-                }}>{copiado ? "Copiado" : "Copiar"}</button>
-                <button onClick={gerarMensagem} style={{
-                  fontSize: 14, padding: "9px 18px", borderRadius: 9999,
-                  background: "transparent", border: `1px solid ${T.border}`,
-                  cursor: "pointer", color: T.textMid, fontFamily: FONT, letterSpacing: "-0.01em",
-                }}>Nova variação</button>
-              </div>
+          display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16,
+          padding: "12px 14px", borderRadius: 12,
+          background: T.surfaceAlt, border: `1px solid ${T.border}`,
+        }}>
+          {insight.diasAusente != null && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span style={{ fontSize: 10, color: T.textDim, fontFamily: FONT, letterSpacing: "-0.01em" }}>Ausente</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: insight.prioridade === 1 ? T.red : T.yellow, fontFamily: FONT_MONO, letterSpacing: "-0.02em" }}>{insight.diasAusente}d</span>
             </div>
           )}
+          {insight.diasAusente != null && insight.ticketMedio != null && (
+            <div style={{ width: 1, background: T.border, alignSelf: "stretch", margin: "0 4px" }} />
+          )}
+          {insight.ticketMedio != null && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span style={{ fontSize: 10, color: T.textDim, fontFamily: FONT, letterSpacing: "-0.01em" }}>Ticket médio</span>
+              <span style={{ fontSize: 15, fontWeight: 600, color: T.gold, fontFamily: FONT_MONO, letterSpacing: "-0.02em" }}>{formatarReal(insight.ticketMedio)}</span>
+            </div>
+          )}
+          {insight.preco != null && (
+            <>
+              <div style={{ width: 1, background: T.border, alignSelf: "stretch", margin: "0 4px" }} />
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{ fontSize: 10, color: T.textDim, fontFamily: FONT, letterSpacing: "-0.01em" }}>Potencial</span>
+                <span style={{ fontSize: 15, fontWeight: 600, color: T.green, fontFamily: FONT_MONO, letterSpacing: "-0.02em" }}>+{formatarReal(insight.preco)}</span>
+              </div>
+            </>
+          )}
         </div>
+      </div>
+
+      {/* Mensagem gerada */}
+      {msg && (
+        <div style={{
+          margin: "0 20px 16px", background: T.surfaceAlt, borderRadius: 12,
+          padding: "14px 16px", border: `1px solid ${T.borderAlt}`,
+        }}>
+          <p style={{ fontSize: 13, lineHeight: 1.6, margin: "0 0 12px", color: T.text, whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: FONT, fontWeight: 400, letterSpacing: "-0.01em" }}>{msg}</p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {telLimpo && (
+              <button onClick={() => window.open(`https://wa.me/55${telLimpo}?text=${encodeURIComponent(msg)}`, "_blank")} style={{
+                fontSize: 13, fontWeight: 400, padding: "7px 16px", borderRadius: 9999,
+                background: T.greenDim, color: T.green,
+                border: `1px solid ${T.greenBorder}`, cursor: "pointer",
+                letterSpacing: "-0.01em", fontFamily: FONT,
+              }}>WhatsApp</button>
+            )}
+            <button onClick={copiarMsg} style={{
+              fontSize: 13, padding: "7px 16px", borderRadius: 9999,
+              background: copiado ? T.goldDim : "transparent",
+              border: `1px solid ${copiado ? T.goldBorder : T.border}`,
+              cursor: "pointer", color: copiado ? T.gold : T.textMid,
+              fontFamily: FONT, transition: "all 0.2s", letterSpacing: "-0.01em",
+            }}>{copiado ? "Copiado" : "Copiar"}</button>
+            <button onClick={gerarMensagem} style={{
+              fontSize: 13, padding: "7px 14px", borderRadius: 9999,
+              background: "transparent", border: `1px solid ${T.border}`,
+              cursor: "pointer", color: T.textMid, fontFamily: FONT, letterSpacing: "-0.01em",
+            }}>Outra variação</button>
+          </div>
+        </div>
+      )}
+
+      {/* Ações — rodapé do card */}
+      <div style={{
+        display: "flex", gap: 8, padding: "14px 20px",
+        borderTop: `1px solid ${T.border}`, alignItems: "center",
+        flexWrap: "wrap",
+      }}>
+        <button onClick={gerarMensagem} style={{
+          fontSize: 13, fontWeight: 400, padding: "8px 18px", borderRadius: 9999,
+          background: T.goldGradient, color: "#ffffff", border: "none",
+          cursor: "pointer", letterSpacing: "-0.01em", fontFamily: FONT,
+          transition: "opacity 0.15s", flexShrink: 0,
+        }}>
+          Mensagem rápida
+        </button>
+        {insight.telefone && (
+          <button onClick={() => window.open(`https://wa.me/55${telLimpo}`, "_blank")} style={{
+            fontSize: 13, fontWeight: 400, padding: "8px 16px", borderRadius: 9999,
+            background: "transparent", border: `1px solid ${T.gold}`,
+            cursor: "pointer", color: T.gold, letterSpacing: "-0.01em", fontFamily: FONT,
+            transition: "opacity 0.15s", flexShrink: 0,
+          }}>WA</button>
+        )}
+        <button onClick={handleIgnorar} disabled={ignorando} style={{
+          fontSize: 12, fontWeight: 400, padding: "8px 14px", borderRadius: 9999,
+          background: "transparent", border: "none",
+          cursor: ignorando ? "not-allowed" : "pointer",
+          color: T.textDim, letterSpacing: "-0.01em", fontFamily: FONT,
+          marginLeft: "auto", transition: "opacity 0.15s",
+        }}>
+          {ignorando ? "Ignorando..." : "Ignorar"}
+        </button>
       </div>
     </div>
   );
@@ -1323,26 +1339,25 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
         </div>
 
         {/* Conteúdo das abas */}
-        <div style={{ flex: 1, overflowY: "auto", padding: bp.isMobile ? "16px 14px" : "28px 28px", paddingBottom: bp.isMobile ? "80px" : "28px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: bp.isMobile ? "16px 14px" : "32px 32px", paddingBottom: bp.isMobile ? "80px" : "32px" }}>
 
           {/* ── Radar ── */}
           {aba === "radar" && (
             <>
-              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
                 <div style={{
                   display: "inline-flex", alignItems: "center", gap: 6,
-                  padding: "4px 12px", borderRadius: 999,
+                  padding: "5px 14px", borderRadius: 9999,
                   background: T.goldDim, border: `1px solid ${T.goldBorder}`,
                 }}>
                   <span style={{ width: 5, height: 5, borderRadius: "50%", background: T.gold, display: "inline-block", animation: "crm-pulse 2.2s ease-in-out infinite" }} />
-                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.16em", textTransform: "uppercase", color: T.gold }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: "-0.01em", color: T.gold, fontFamily: FONT }}>
                     Alertas ativos
                   </span>
                 </div>
-                <div style={{ flex: 1, height: 1, background: T.border }} />
                 {!bp.isMobile && metricas && (
-                  <span style={{ fontSize: 11, color: T.textDim }}>
-                    {insights.length} {insights.length === 1 ? "cliente" : "clientes"} precisam de atenção
+                  <span style={{ fontSize: 13, color: T.textDim, fontFamily: FONT, letterSpacing: "-0.01em" }}>
+                    {insights.length} {insights.length === 1 ? "cliente precisa" : "clientes precisam"} de atenção
                   </span>
                 )}
               </div>
@@ -1359,17 +1374,24 @@ export default function CRMModule({ tenantUid, nomeEmpresa, onVoltar, theme, onT
               {insights.length === 0 ? (
                 <div style={{
                   textAlign: "center", padding: "60px 0",
-                  color: T.textDim, fontSize: 13, fontFamily: FONT, fontWeight: 300,
-                  border: `1px dashed ${T.border}`, borderRadius: 16,
+                  color: T.textDim, fontSize: 15, fontFamily: FONT, fontWeight: 400,
+                  border: `1px solid ${T.border}`, borderRadius: 18, letterSpacing: "-0.01em",
                 }}>
                   {clientes.length === 0
                     ? "Nenhum cliente importado ainda. Registre vendas no Assent Gestão para ativar o radar."
-                    : "✦ Tudo certo — sem alertas no radar hoje."}
+                    : "Tudo certo — sem alertas no radar hoje."}
                 </div>
               ) : (
-                insights.map((ins, i) => (
-                  <InsightCard key={ins.clienteId || i} insight={ins} empresaNome={nomeEmpresa} empresaId={tenantUid} T={T} />
-                ))
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: bp.isDesktop ? "repeat(2, 1fr)" : "1fr",
+                  gap: 16,
+                  alignItems: "start",
+                }}>
+                  {insights.map((ins, i) => (
+                    <InsightCard key={ins.clienteId || i} insight={ins} empresaNome={nomeEmpresa} empresaId={tenantUid} T={T} />
+                  ))}
+                </div>
               )}
             </>
           )}
