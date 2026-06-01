@@ -2696,6 +2696,10 @@ export default function Dashboard() {
   const [collapsed,     setCollapsed]    = useState(
     () => localStorage.getItem("ag_sidebar_collapsed") === "true"
   );
+  const [secaoAberta, setSecaoAberta] = useState(
+    () => { try { return JSON.parse(localStorage.getItem("ag_sec_aberta") || "{}"); } catch { return {}; } }
+  );
+  const [pwaPrompt, setPwaPrompt] = useState(null);
   const [dropdownOpen,  setDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [notifOpen,     setNotifOpen]    = useState(false);
@@ -3124,10 +3128,34 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     el.textContent = RESPONSIVE_CSS;
   }, []);
 
+  /* ── Captura evento de instalação PWA ── */
+  useEffect(() => {
+    const handler = (e) => { e.preventDefault(); setPwaPrompt(e); };
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
   /* ── Fecha mobile menu ao navegar ── */
   const navigateTo = (label) => {
     setModule(label);
     setMobileMenuOpen(false);
+  };
+
+  /* ── Accordion de seções da sidebar ── */
+  const toggleSecaoFn = (secao) => {
+    setSecaoAberta(prev => {
+      const next = { ...prev, [secao]: !prev[secao] };
+      localStorage.setItem("ag_sec_aberta", JSON.stringify(next));
+      return next;
+    });
+  };
+
+  /* ── Instalar PWA ── */
+  const instalarPWA = async () => {
+    if (!pwaPrompt) return;
+    pwaPrompt.prompt();
+    const { outcome } = await pwaPrompt.userChoice;
+    if (outcome === "accepted") setPwaPrompt(null);
   };
 
   /* ── Busca global no Firestore ── */
@@ -4721,28 +4749,56 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           {/* Sidebar desktop recolhível — oculta no Assent CRM */}
           <aside className={`ag-sidebar ${collapsed ? "collapsed" : ""}`} style={sistemaAtivo === "crm" || sistemaAtivo === "flow" ? { display: "none" } : {}}>
             <nav className="ag-nav">
-              {NAV.map((sec) => (
-                <div key={sec.section}>
-                  <div className="ag-sec-label">{sec.section}</div>
-                  {sec.items.map((item) => {
-                    const dbKey = KEY_MAP[item.label];
-                    if (dbKey && menuVisivel[dbKey] === false) return null;
-                    if (item.modulo && !podeVer(item.modulo)) return null;
-                    return (
+              {NAV.map((sec) => {
+                const aberta = secaoAberta[sec.section] !== false;
+                return (
+                  <div key={sec.section}>
+                    {/* Cabeçalho da seção — clicável */}
+                    <div
+                      className="ag-sec-label"
+                      onClick={() => !collapsed && toggleSecaoFn(sec.section)}
+                      style={{ cursor: collapsed ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", userSelect: "none" }}
+                    >
+                      <span>{sec.section}</span>
+                      {!collapsed && (
+                        <ChevronDown size={11} style={{ transition: "transform 0.2s", transform: aberta ? "rotate(0deg)" : "rotate(-90deg)", opacity: 0.4 }} />
+                      )}
+                    </div>
+
+                    {/* Itens — visíveis só se seção aberta (ou sidebar colapsada) */}
+                    {(aberta || collapsed) && sec.items.map((item) => {
+                      const dbKey = KEY_MAP[item.label];
+                      if (dbKey && menuVisivel[dbKey] === false) return null;
+                      if (item.modulo && !podeVer(item.modulo)) return null;
+                      return (
+                        <div
+                          key={item.label}
+                          className={`ag-nav-item ${module === item.label ? "active" : ""}`}
+                          onClick={() => setModule(item.label)}
+                          data-label={item.label}
+                          title={collapsed ? item.label : undefined}
+                        >
+                          <item.icone size={15} />
+                          <span>{item.label}</span>
+                        </div>
+                      );
+                    })}
+
+                    {/* Botão Instalar App — só na seção SISTEMA */}
+                    {sec.section === "SISTEMA" && (aberta || collapsed) && pwaPrompt && (
                       <div
-                        key={item.label}
-                        className={`ag-nav-item ${module === item.label ? "active" : ""}`}
-                        onClick={() => setModule(item.label)}
-                        data-label={item.label}
-                        title={collapsed ? item.label : undefined}
+                        className="ag-nav-item"
+                        onClick={instalarPWA}
+                        title={collapsed ? "Instalar app" : undefined}
+                        style={{ opacity: 0.75 }}
                       >
-                        <item.icone size={15} />
-                        <span>{item.label}</span>
+                        <ArrowDownToLine size={15} />
+                        <span>Instalar app</span>
                       </div>
-                    );
-                  })}
-                </div>
-              ))}
+                    )}
+                  </div>
+                );
+              })}
             </nav>
           </aside>
 
@@ -4830,27 +4886,49 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               </div>
 
               <nav className="ag-nav" style={{ padding: "10px 0" }}>
-                {NAV.map((sec) => (
-                  <div key={sec.section}>
-                    <div className="ag-sec-label">{sec.section}</div>
-                    {sec.items.map((item) => {
-                      const dbKey = KEY_MAP[item.label];
-                      if (dbKey && menuVisivel[dbKey] === false) return null;
-                      if (item.modulo && !podeVer(item.modulo)) return null;
-                      return (
+                {NAV.map((sec) => {
+                  const aberta = secaoAberta[sec.section] !== false;
+                  return (
+                    <div key={sec.section}>
+                      <div
+                        className="ag-sec-label"
+                        onClick={() => toggleSecaoFn(sec.section)}
+                        style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", userSelect: "none" }}
+                      >
+                        <span>{sec.section}</span>
+                        <ChevronDown size={11} style={{ transition: "transform 0.2s", transform: aberta ? "rotate(0deg)" : "rotate(-90deg)", opacity: 0.4 }} />
+                      </div>
+
+                      {aberta && sec.items.map((item) => {
+                        const dbKey = KEY_MAP[item.label];
+                        if (dbKey && menuVisivel[dbKey] === false) return null;
+                        if (item.modulo && !podeVer(item.modulo)) return null;
+                        return (
+                          <div
+                            key={item.label}
+                            className={`ag-nav-item ${module === item.label ? "active" : ""}`}
+                            onClick={() => navigateTo(item.label)}
+                            data-label={item.label}
+                          >
+                            <item.icone size={15} />
+                            <span>{item.label}</span>
+                          </div>
+                        );
+                      })}
+
+                      {sec.section === "SISTEMA" && aberta && pwaPrompt && (
                         <div
-                          key={item.label}
-                          className={`ag-nav-item ${module === item.label ? "active" : ""}`}
-                          onClick={() => navigateTo(item.label)}
-                          data-label={item.label}
+                          className="ag-nav-item"
+                          onClick={instalarPWA}
+                          style={{ opacity: 0.75 }}
                         >
-                          <item.icone size={15} />
-                          <span>{item.label}</span>
+                          <ArrowDownToLine size={15} />
+                          <span>Instalar app</span>
                         </div>
-                      );
-                    })}
-                  </div>
-                ))}
+                      )}
+                    </div>
+                  );
+                })}
               </nav>
             </aside>
           </>
