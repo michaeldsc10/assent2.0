@@ -30,8 +30,8 @@ self.addEventListener('push', (event) => {
     console.log('[SW] exibindo:', title, body);
     await self.registration.showNotification(title, {
       body,
-      icon: '/favicon.ico',
-      badge: '/favicon.ico',
+      icon:  '/icons/icon-192x192.png',
+      badge: '/icons/badge-72x72.png',
       tag: `notif-assent-${Date.now()}`,
     });
     console.log('[SW] notificação exibida');
