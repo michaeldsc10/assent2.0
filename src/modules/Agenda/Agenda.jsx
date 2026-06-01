@@ -1209,6 +1209,8 @@ export default function Agenda({ isPro = false }) {
             <AgendaCalendario
               eventos={eventos}
               onVerDetalhes={setDetalhes}
+              onNovo={(dataISO) => setFormEvt({ data: dataISO })}
+              categorias={categorias}
             />
           )}
 

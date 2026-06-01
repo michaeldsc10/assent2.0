@@ -1,92 +1,156 @@
 /* ═══════════════════════════════════════════════════
    ASSENT v2.0 — AgendaCalendario.jsx
-   Subcomponente: visualização mensal em calendário
+   Layout: calendário compacto + painel do dia lateral
    ═══════════════════════════════════════════════════ */
 
 import { useState, useMemo, useCallback } from "react";
-import { TIPO_ESTILO, todayISO } from "./Agenda";
+import { Clock, Plus, ChevronLeft, ChevronRight } from "lucide-react";
+import { TIPO_ESTILO, todayISO, resolverEstiloTipo } from "./Agenda";
 
-const DIAS_SEMANA = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
-const MAX_EVENTOS_DIA = 3;
+const DIAS_SEMANA = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
 
-/* ── Gera o grid de células do calendário ── */
+/* ── Gera grid começando no domingo ── */
 function buildCalGrid(year, month) {
-  // month: 0-based (Jan=0)
   const firstDay = new Date(year, month, 1);
   const lastDay  = new Date(year, month + 1, 0);
-
-  // Offset: segunda-feira = 0, domingo = 6
-  const startOffset = (firstDay.getDay() + 6) % 7; // converte de dom-base para seg-base
+  const startOffset = firstDay.getDay(); // 0=dom
   const totalCells  = Math.ceil((startOffset + lastDay.getDate()) / 7) * 7;
 
   const cells = [];
   for (let i = 0; i < totalCells; i++) {
     const dayNum = i - startOffset + 1;
-    if (dayNum < 1) {
-      // Dia do mês anterior
-      const dt = new Date(year, month, dayNum);
-      cells.push({ iso: dt.toISOString().slice(0, 10), day: dt.getDate(), outroMes: true });
-    } else if (dayNum > lastDay.getDate()) {
-      // Dia do próximo mês
-      const dt = new Date(year, month, dayNum);
-      cells.push({ iso: dt.toISOString().slice(0, 10), day: dt.getDate(), outroMes: true });
-    } else {
-      const dt = new Date(year, month, dayNum);
-      cells.push({ iso: dt.toISOString().slice(0, 10), day: dayNum, outroMes: false });
-    }
+    const dt = new Date(year, month, dayNum);
+    cells.push({
+      iso: dt.toISOString().slice(0, 10),
+      day: dt.getDate(),
+      outroMes: dayNum < 1 || dayNum > lastDay.getDate(),
+    });
   }
   return cells;
 }
 
-/* ── Célula de dia ── */
-function CalCell({ cell, eventos, hoje, onVerDetalhes }) {
-  const isHoje    = cell.iso === hoje;
-  const visiveis  = eventos.slice(0, MAX_EVENTOS_DIA);
-  const restantes = eventos.length - visiveis.length;
+const MESES_PT = [
+  "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+  "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"
+];
+
+const DIAS_PT = ["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
+
+/* ── Painel lateral do dia selecionado ── */
+function PainelDia({ iso, eventos, onVerDetalhes, onNovo, categorias }) {
+  if (!iso) return null;
+
+  const [ano, mes, dia] = iso.split("-").map(Number);
+  const dt = new Date(ano, mes - 1, dia);
+  const diaSemana = DIAS_PT[dt.getDay()];
+  const labelData = `${dia} ${MESES_PT[mes - 1].slice(0,3)} ${ano}`;
+
+  const evsDia = [...eventos].sort((a, b) =>
+    (a.horario || "").localeCompare(b.horario || "")
+  );
 
   return (
-    <div className={`ag-cal-cell ${cell.outroMes ? "outro-mes" : ""} ${isHoje ? "hoje" : ""}`}>
-      <div className="ag-cal-day-num">{cell.day}</div>
-
-      {visiveis.map(ev => {
-        const estilo = TIPO_ESTILO[ev.tipo] || TIPO_ESTILO["Outro"];
-        return (
-          <div
-            key={ev.id}
-            className="ag-cal-evento"
-            style={{
-              background: estilo.bg,
-              color: estilo.color,
-              opacity: ev.status === "concluido" ? 0.45 : 1,
-              textDecoration: ev.status === "concluido" ? "line-through" : "none",
-            }}
-            onClick={() => onVerDetalhes(ev)}
-            title={`${ev.horario || ""} — ${ev.titulo}`}
-          >
-            {ev.horario && <span style={{ opacity: 0.7 }}>{ev.horario} </span>}
-            {ev.titulo}
+    <div style={{
+      width: 280, flexShrink: 0,
+      background: "var(--s1)", border: "1px solid var(--border)",
+      borderRadius: 14, display: "flex", flexDirection: "column",
+      overflow: "hidden",
+    }}>
+      {/* Header do painel */}
+      <div style={{
+        padding: "16px 18px", borderBottom: "1px solid var(--border)",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: "var(--text)", lineHeight: 1.2 }}>
+            {labelData}
           </div>
-        );
-      })}
+          <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3 }}>
+            {diaSemana}
+          </div>
+        </div>
+        <button
+          onClick={() => onNovo(iso)}
+          style={{
+            display: "flex", alignItems: "center", gap: 5,
+            padding: "6px 12px", borderRadius: 8,
+            background: "transparent", border: "1px solid var(--border)",
+            cursor: "pointer", color: "var(--text-2)", fontSize: 12,
+            fontFamily: "inherit", transition: "all .13s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--gold)"; e.currentTarget.style.color = "var(--gold)"; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--text-2)"; }}
+        >
+          <Plus size={13} /> Adicionar
+        </button>
+      </div>
 
-      {restantes > 0 && (
-        <div className="ag-cal-mais">+{restantes} mais</div>
-      )}
+      {/* Lista de eventos do dia */}
+      <div style={{ flex: 1, overflowY: "auto", padding: "12px 14px" }}>
+        {evsDia.length === 0 ? (
+          <div style={{
+            display: "flex", flexDirection: "column", alignItems: "center",
+            justifyContent: "center", gap: 8, padding: "32px 0",
+            color: "var(--text-3)",
+          }}>
+            <Clock size={22} strokeWidth={1.5} />
+            <span style={{ fontSize: 12 }}>Nenhum compromisso neste dia.</span>
+          </div>
+        ) : (
+          evsDia.map(ev => {
+            const estilo = resolverEstiloTipo(ev.tipo, categorias);
+            return (
+              <div
+                key={ev.id}
+                onClick={() => onVerDetalhes(ev)}
+                style={{
+                  display: "flex", alignItems: "flex-start", gap: 10,
+                  padding: "10px 12px", borderRadius: 10, marginBottom: 6,
+                  background: "var(--s2)", border: "1px solid var(--border)",
+                  cursor: "pointer", transition: "border-color .13s",
+                  opacity: ev.status === "concluido" ? 0.5 : 1,
+                }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = estilo.color}
+                onMouseLeave={e => e.currentTarget.style.borderColor = "var(--border)"}
+              >
+                {/* Dot colorido */}
+                <div style={{
+                  width: 8, height: 8, borderRadius: "50%",
+                  background: estilo.color, flexShrink: 0, marginTop: 4,
+                }} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 13, fontWeight: 600, color: "var(--text)",
+                    textDecoration: ev.status === "concluido" ? "line-through" : "none",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>
+                    {ev.titulo}
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 2 }}>
+                    {ev.horario ? ev.horario : "Dia inteiro"}
+                    {ev.tipo ? ` · ${ev.tipo}` : ""}
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }
 
 /* ══════════════════════════════════════════════════════
-   COMPONENTE PRINCIPAL — AgendaCalendario
+   COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════ */
-export default function AgendaCalendario({ eventos, onVerDetalhes }) {
+export default function AgendaCalendario({ eventos, onVerDetalhes, onNovo, categorias = [] }) {
   const hoje = todayISO();
   const now  = new Date();
 
-  const [ano, setAno]   = useState(now.getFullYear());
-  const [mes, setMes]   = useState(now.getMonth()); // 0-based
+  const [ano, setAno]         = useState(now.getFullYear());
+  const [mes, setMes]         = useState(now.getMonth());
+  const [diaSel, setDiaSel]   = useState(hoje);
 
-  /* Navegar meses */
   const irMes = useCallback((delta) => {
     setMes(m => {
       const novoMes = m + delta;
@@ -96,10 +160,14 @@ export default function AgendaCalendario({ eventos, onVerDetalhes }) {
     });
   }, []);
 
-  /* Grid de dias */
+  const irHoje = () => {
+    setAno(now.getFullYear());
+    setMes(now.getMonth());
+    setDiaSel(hoje);
+  };
+
   const cells = useMemo(() => buildCalGrid(ano, mes), [ano, mes]);
 
-  /* Mapear eventos por ISO */
   const eventosPorDia = useMemo(() => {
     const mapa = {};
     for (const ev of eventos) {
@@ -107,58 +175,146 @@ export default function AgendaCalendario({ eventos, onVerDetalhes }) {
       if (!mapa[ev.data]) mapa[ev.data] = [];
       mapa[ev.data].push(ev);
     }
-    // Ordenar por horário dentro de cada dia
-    for (const iso in mapa) {
-      mapa[iso].sort((a, b) => (a.horario || "").localeCompare(b.horario || ""));
-    }
     return mapa;
   }, [eventos]);
 
-  /* Label do mês */
-  const labelMes = new Date(ano, mes, 1).toLocaleDateString("pt-BR", {
-    month: "long", year: "numeric",
-  });
+  const evsDiaSel = eventosPorDia[diaSel] || [];
 
   return (
-    <div className="ag-cal-wrap">
-      {/* Header do calendário */}
-      <div className="ag-cal-header">
-        <div className="ag-cal-mes" style={{ textTransform: "capitalize" }}>
-          {labelMes}
-        </div>
-        <div className="ag-cal-nav">
-          <button className="ag-cal-nav-btn" onClick={() => irMes(-1)} title="Mês anterior">‹</button>
+    <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+
+      {/* Calendário */}
+      <div style={{
+        flex: 1, minWidth: 0,
+        background: "var(--s1)", border: "1px solid var(--border)",
+        borderRadius: 14, overflow: "hidden",
+      }}>
+        {/* Header navegação */}
+        <div style={{
+          padding: "14px 18px",
+          display: "flex", alignItems: "center", gap: 10,
+          borderBottom: "1px solid var(--border)",
+        }}>
           <button
-            className="ag-cal-nav-btn"
-            onClick={() => { setAno(now.getFullYear()); setMes(now.getMonth()); }}
-            title="Hoje"
-            style={{ fontSize: 10, width: "auto", padding: "0 8px", fontFamily: "'DM Sans', sans-serif" }}
-          >
-            Hoje
-          </button>
-          <button className="ag-cal-nav-btn" onClick={() => irMes(1)} title="Próximo mês">›</button>
+            onClick={() => irMes(-1)}
+            style={{
+              width: 30, height: 30, borderRadius: 8, border: "1px solid var(--border)",
+              background: "var(--s2)", cursor: "pointer", color: "var(--text-2)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "all .13s",
+            }}
+          ><ChevronLeft size={14} /></button>
+
+          <span style={{
+            flex: 1, textAlign: "center",
+            fontSize: 15, fontWeight: 700, color: "var(--text)",
+          }}>
+            {MESES_PT[mes]} {ano}
+          </span>
+
+          <button
+            onClick={() => irMes(1)}
+            style={{
+              width: 30, height: 30, borderRadius: 8, border: "1px solid var(--border)",
+              background: "var(--s2)", cursor: "pointer", color: "var(--text-2)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "all .13s",
+            }}
+          ><ChevronRight size={14} /></button>
+
+          <button
+            onClick={irHoje}
+            style={{
+              padding: "6px 14px", borderRadius: 8, border: "1px solid var(--border)",
+              background: "var(--s2)", cursor: "pointer", color: "var(--text-2)",
+              fontSize: 12, fontFamily: "inherit", transition: "all .13s",
+            }}
+          >Hoje</button>
+        </div>
+
+        {/* Dias da semana */}
+        <div style={{
+          display: "grid", gridTemplateColumns: "repeat(7, 1fr)",
+          padding: "8px 0", borderBottom: "1px solid var(--border)",
+        }}>
+          {DIAS_SEMANA.map(d => (
+            <div key={d} style={{
+              textAlign: "center", fontSize: 10, fontWeight: 700,
+              letterSpacing: ".06em", color: "var(--text-3)",
+            }}>{d}</div>
+          ))}
+        </div>
+
+        {/* Grid de dias */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)" }}>
+          {cells.map((cell, i) => {
+            const isHoje   = cell.iso === hoje;
+            const isSel    = cell.iso === diaSel;
+            const evs      = eventosPorDia[cell.iso] || [];
+            const temEvs   = evs.length > 0;
+            const isLast   = (i + 1) % 7 === 0;
+            const isLastRow = i >= cells.length - 7;
+
+            return (
+              <div
+                key={cell.iso}
+                onClick={() => setDiaSel(cell.iso)}
+                style={{
+                  borderRight: isLast ? "none" : "1px solid var(--border)",
+                  borderBottom: isLastRow ? "none" : "1px solid var(--border)",
+                  padding: "8px 6px",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 5,
+                  cursor: "pointer", transition: "background .1s",
+                  background: isSel ? "var(--s2)" : "transparent",
+                  minHeight: 64,
+                }}
+              >
+                {/* Número do dia */}
+                <div style={{
+                  width: 28, height: 28, borderRadius: "50%",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 13, fontWeight: isHoje || isSel ? 700 : 500,
+                  background: isHoje ? "var(--gold)" : "transparent",
+                  color: isHoje
+                    ? "#0a0808"
+                    : cell.outroMes
+                      ? "var(--text-3)"
+                      : isSel
+                        ? "var(--text)"
+                        : "var(--text-2)",
+                  border: isSel && !isHoje ? "2px solid var(--gold)" : "2px solid transparent",
+                  transition: "all .13s",
+                }}>
+                  {cell.day}
+                </div>
+
+                {/* Dots de eventos */}
+                {temEvs && !cell.outroMes && (
+                  <div style={{ display: "flex", gap: 3, flexWrap: "wrap", justifyContent: "center" }}>
+                    {evs.slice(0, 3).map((ev, idx) => {
+                      const cor = (resolverEstiloTipo(ev.tipo, categorias)).color;
+                      return (
+                        <div key={idx} style={{
+                          width: 5, height: 5, borderRadius: "50%", background: cor,
+                        }} />
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* Dias da semana */}
-      <div className="ag-cal-weekdays">
-        {DIAS_SEMANA.map(d => (
-          <div key={d} className="ag-cal-weekday">{d}</div>
-        ))}
-      </div>
-
-      {/* Grid de células */}
-      <div className="ag-cal-grid">
-        {cells.map((cell) => (
-          <CalCell
-            key={cell.iso}
-            cell={cell}
-            eventos={eventosPorDia[cell.iso] || []}
-            hoje={hoje}
-            onVerDetalhes={onVerDetalhes}
-          />
-        ))}
-      </div>
+      {/* Painel lateral do dia */}
+      <PainelDia
+        iso={diaSel}
+        eventos={evsDiaSel}
+        onVerDetalhes={onVerDetalhes}
+        onNovo={onNovo}
+        categorias={categorias}
+      />
     </div>
   );
 }
