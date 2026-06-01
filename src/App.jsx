@@ -16,6 +16,7 @@ import LoginForm         from "./components/LoginForm";
 import BrandAnimation    from "./components/BrandAnimation";
 import Dashboard         from "./Dashboard";
 import AnnouncementModal from "./components/AnnouncementModal";
+import { usePWAManifest } from "./hooks/usePWAManifest";
 
 /* ─────────────────────────────────────────
    Shell do app — decide o que renderizar
@@ -28,6 +29,8 @@ function AppShell() {
   // contexts/AuthContext: source of truth para autenticação no nível de aplicação.
   // tenantUid só é preenchido após carregarPerfil validar o usuário no Firestore.
   const { tenantUid, loadingAuth, cargo } = useAuthCargo();
+
+  usePWAManifest(tenantUid);
 
   // Plano do usuário para filtrar destinatários do AnnouncementModal
   const userPlan = cargo === "pro" ? "pro" : "free";
