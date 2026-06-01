@@ -19,12 +19,12 @@ export function usePWAManifest(uid) {
 
         const icons = logo
           ? [
-              { src: logo, sizes: "192x192", type: "image/png", purpose: "any maskable" },
-              { src: logo, sizes: "512x512", type: "image/png", purpose: "any maskable" },
+              { src: logo, sizes: "192x192", type: "image/png", purpose: "any" },
+              { src: logo, sizes: "512x512", type: "image/png", purpose: "any" },
             ]
           : [
-              { src: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
-              { src: "/icons/icon-512x512.png",  sizes: "512x512",  type: "image/png", purpose: "any maskable" },
+              { src: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+              { src: "/icons/icon-512x512.png",  sizes: "512x512",  type: "image/png", purpose: "any" },
             ];
 
         const manifest = {
