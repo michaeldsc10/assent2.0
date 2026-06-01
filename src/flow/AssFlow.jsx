@@ -384,8 +384,8 @@ function formatDateShort(ts) {
   const d = ts.toDate ? ts.toDate() : new Date(ts);
   return d.toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});
 }
-function statusColor(s){ return s==="confirmado"?"green":s==="pendente"?"yellow":s==="cancelado"?"red":s==="pendente_pagamento"?"blue":"gray"; }
-function statusLabel(s){ return s==="confirmado"?"Confirmado":s==="pendente"?"Pendente":s==="cancelado"?"Cancelado":s==="pendente_pagamento"?"Aguard. Pagamento":s; }
+function statusColor(s){ return s==="confirmado"?"green":s==="pendente"?"yellow":s==="cancelado"?"red":s==="pendente_pagamento"?"blue":s==="concluido"?"purple":s==="nao_apareceu"?"orange":"gray"; }
+function statusLabel(s){ return s==="confirmado"?"Confirmado":s==="pendente"?"Pendente":s==="cancelado"?"Cancelado":s==="pendente_pagamento"?"Aguard. Pagamento":s==="concluido"?"Concluído":s==="nao_apareceu"?"Não apareceu":s; }
 function initials(nome){ return (nome||"?").split(" ").slice(0,2).map(w=>w[0]).join("").toUpperCase(); }
 function formatDuracao(min){ if(min<60) return `${min} min`; const h=Math.floor(min/60),m=min%60; return m===0?`${h}h`:`${h}h${m}min`; }
 function cargoLabel(c){ const map={financeiro:"Financeiro",comercial:"Comercial",compras:"Compras",operacional:"Operacional",vendedor:"Vendedor",suporte:"Suporte",admin:"Administrador"}; return map[c]||c; }
@@ -478,10 +478,12 @@ function CheckItem({ok,label}){
 // ─── STATUS_ACCENT Global ──────────────────────────────────────────────────────
 function getStatusAccent(T) {
   return {
-    confirmado:         { color:T.emerald,  glow:T.emeraldA10, label:"Confirmado" },
-    pendente:           { color:T.goldHi,   glow:T.goldA12,    label:"Pendente"   },
+    confirmado:         { color:T.emerald,  glow:T.emeraldA10,              label:"Confirmado"        },
+    pendente:           { color:T.goldHi,   glow:T.goldA12,                 label:"Pendente"          },
     cancelado:          { color:"rgba(239,68,68,0.75)", glow:"rgba(239,68,68,0.10)", label:"Cancelado" },
-    pendente_pagamento: { color:T.blue,     glow:T.blueA10,    label:"Aguard. Pagamento" },
+    pendente_pagamento: { color:T.blue,     glow:T.blueA10,                 label:"Aguard. Pagamento" },
+    concluido:          { color:"rgba(168,85,247,0.85)", glow:"rgba(168,85,247,0.10)", label:"Concluído"      },
+    nao_apareceu:       { color:"rgba(249,115,22,0.85)", glow:"rgba(249,115,22,0.10)", label:"Não apareceu"   },
   };
 }
 
@@ -972,10 +974,14 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
               </>
             )}
             {r.status==="confirmado"&&(
-              <button onClick={()=>onAtualizar(r.id,"cancelado")} disabled={atualizando===r.id} style={{padding:"6px 12px",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,background:"rgba(239,68,68,0.06)",color:"#F87171",fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",opacity:atualizando===r.id?0.5:1}}>✕ Cancelar</button>
+              <>
+                <button onClick={()=>onAtualizar(r.id,"concluido")} disabled={atualizando===r.id} style={{padding:"6px 12px",border:"1px solid rgba(168,85,247,0.30)",borderRadius:8,background:"rgba(168,85,247,0.08)",color:"rgba(168,85,247,0.9)",fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",opacity:atualizando===r.id?0.5:1}}>✓ Concluir</button>
+                <button onClick={()=>onAtualizar(r.id,"nao_apareceu")} disabled={atualizando===r.id} style={{padding:"6px 12px",border:"1px solid rgba(249,115,22,0.30)",borderRadius:8,background:"rgba(249,115,22,0.08)",color:"rgba(249,115,22,0.9)",fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",opacity:atualizando===r.id?0.5:1}}>✕ Não apareceu</button>
+                <button onClick={()=>onAtualizar(r.id,"cancelado")} disabled={atualizando===r.id} style={{padding:"6px 12px",border:"1px solid rgba(239,68,68,0.25)",borderRadius:8,background:"rgba(239,68,68,0.06)",color:"#F87171",fontSize:11,fontWeight:700,cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",opacity:atualizando===r.id?0.5:1}}>✕ Cancelar</button>
+              </>
             )}
-            {r.status==="cancelado"&&(
-              <button onClick={()=>onAtualizar(r.id,"pendente")} disabled={atualizando===r.id} style={{padding:"6px 12px",border:"1px solid ${T.lineHi}",borderRadius:8,background:T.text08,color:T.text65,fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",opacity:atualizando===r.id?0.5:1}}>↺ Reabrir</button>
+            {(r.status==="cancelado"||r.status==="concluido"||r.status==="nao_apareceu")&&(
+              <button onClick={()=>onAtualizar(r.id,"pendente")} disabled={atualizando===r.id} style={{padding:"6px 12px",border:`1px solid ${T.lineHi}`,borderRadius:8,background:T.text08,color:T.text65,fontSize:11,fontWeight:600,cursor:"pointer",display:"flex",alignItems:"center",gap:4,transition:"all 0.2s",opacity:atualizando===r.id?0.5:1}}>↺ Reabrir</button>
             )}
           </div>
         )}
@@ -1039,7 +1045,9 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
       }
 
       await batch.commit();
-      showT(novoStatus==="confirmado"?"Confirmada!":novoStatus==="cancelado"?"Cancelada.":"Reaberta.",novoStatus==="confirmado"?"success":"error");
+      const toastMsg = novoStatus==="confirmado"?"Confirmada!":novoStatus==="concluido"?"Concluído!":novoStatus==="nao_apareceu"?"Marcado como não apareceu.":novoStatus==="cancelado"?"Cancelada.":"Reaberta.";
+      const toastType = novoStatus==="confirmado"||novoStatus==="concluido"?"success":"error";
+      showT(toastMsg, toastType);
     } catch { showT("Erro.","error"); }
     setAtualizando(null);
   };
@@ -1052,13 +1060,14 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
   if(loading) return <Loading/>;
   const prestadoresAtivos=prestadores.filter(p=>p.ativo);
 
-  const ativas    = reservas.filter(r=>r.status!=="cancelado");
-  const canceladas= reservas.filter(r=>r.status==="cancelado");
+  const INATIVOS  = ["cancelado","concluido","nao_apareceu"];
+  const ativas    = reservas.filter(r=>!INATIVOS.includes(r.status));
+  const canceladas= reservas.filter(r=>INATIVOS.includes(r.status));
 
   const aplicarFiltros=(lista)=>{
     let f=lista;
     if(isAdmin&&filtroP!=="todos") f=f.filter(r=>r.prestadorId===filtroP);
-    if(aba==="ativas"&&filtroStatus!=="todos") f=f.filter(r=>r.status===filtroStatus);
+    if(filtroStatus!=="todos") f=f.filter(r=>r.status===filtroStatus);
     // Busca unificada: nome OU serviço
     if(busca.trim()){
       const q=busca.trim().toLowerCase();
@@ -1106,8 +1115,11 @@ function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar})
     {key:"todos",      label:"Todos",      count:ativas.length},
     {key:"pendente",   label:"Pendente",   count:ativas.filter(r=>r.status==="pendente").length},
     {key:"confirmado", label:"Confirmado", count:ativas.filter(r=>r.status==="confirmado").length},
+    {key:"concluido",  label:"Concluído",  count:canceladas.filter(r=>r.status==="concluido").length},
+    {key:"nao_apareceu",label:"Não apareceu",count:canceladas.filter(r=>r.status==="nao_apareceu").length},
+    {key:"cancelado",  label:"Cancelado",  count:canceladas.filter(r=>r.status==="cancelado").length},
   ];
-  const SUB_COLORS={todos:T.gold,pendente:T.goldHi,confirmado:T.emerald};
+  const SUB_COLORS={todos:T.gold,pendente:T.goldHi,confirmado:T.emerald,concluido:"rgba(168,85,247,0.85)",nao_apareceu:"rgba(249,115,22,0.85)",cancelado:"rgba(239,68,68,0.75)"};
 
   const limparBusca=()=>{ setBusca(""); setBuscarData(""); setFiltroHoje(false); };
   const temBusca=busca.trim()||buscarData||filtroHoje;
