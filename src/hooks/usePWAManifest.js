@@ -13,9 +13,11 @@ export function usePWAManifest(uid) {
         const snap = await getDoc(doc(db, "users", uid, "config", "geral"));
         if (!snap.exists()) return;
 
-        const empresa = snap.data()?.empresa || {};
-        const nome    = empresa.nomeEmpresa || "Assent Gestão";
-        const logo    = empresa.logo        || null;
+        const data    = snap.data() || {};
+        // Suporta formato novo (data.empresa) e legado (data.nomeEmpresa / data.logo)
+        const empresa = data.empresa ?? data;
+        const nome    = empresa.nomeEmpresa || data.nomeEmpresa || "Assent Gestão";
+        const logo    = empresa.logo        || data.logo        || null;
 
         const icons = logo
           ? [
