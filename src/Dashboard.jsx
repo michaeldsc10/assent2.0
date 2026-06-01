@@ -1022,8 +1022,8 @@ const CSS = `
   .ag-nav::-webkit-scrollbar-thumb { background: var(--text-3); border-radius: 2px; }
 
   .ag-sec-label {
-    font-size: 9px; font-weight: 600; letter-spacing: .1em;
-    color: var(--text-3); padding: 10px 18px 5px;
+    font-size: 10px; font-weight: 700; letter-spacing: .06em;
+    color: var(--text-2); padding: 14px 12px 6px;
     text-transform: uppercase; white-space: nowrap; overflow: hidden;
     transition: opacity .15s, padding .22s;
   }
@@ -4757,11 +4757,25 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     <div
                       className="ag-sec-label"
                       onClick={() => !collapsed && toggleSecaoFn(sec.section)}
-                      style={{ cursor: collapsed ? "default" : "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", userSelect: "none" }}
+                      style={{
+                        cursor: collapsed ? "default" : "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        userSelect: "none",
+                        borderRadius: 6,
+                        padding: "10px 12px 6px",
+                      }}
                     >
                       <span>{sec.section}</span>
                       {!collapsed && (
-                        <ChevronDown size={11} style={{ transition: "transform 0.2s", transform: aberta ? "rotate(0deg)" : "rotate(-90deg)", opacity: 0.4 }} />
+                        <ChevronDown
+                          size={13}
+                          style={{
+                            transition: "transform 0.2s",
+                            transform: aberta ? "rotate(0deg)" : "rotate(-90deg)",
+                            opacity: 0.7,
+                            flexShrink: 0,
+                          }}
+                        />
                       )}
                     </div>
 
@@ -4785,12 +4799,12 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     })}
 
                     {/* Botão Instalar App — só na seção SISTEMA */}
-                    {sec.section === "SISTEMA" && (aberta || collapsed) && pwaPrompt && (
+                    {sec.section === "SISTEMA" && (aberta || collapsed) && (
                       <div
                         className="ag-nav-item"
                         onClick={instalarPWA}
                         title={collapsed ? "Instalar app" : undefined}
-                        style={{ opacity: 0.75 }}
+                        style={{ opacity: pwaPrompt ? 1 : 0.45 }}
                       >
                         <ArrowDownToLine size={15} />
                         <span>Instalar app</span>
@@ -4893,10 +4907,14 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                       <div
                         className="ag-sec-label"
                         onClick={() => toggleSecaoFn(sec.section)}
-                        style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", userSelect: "none" }}
+                        style={{
+                          cursor: "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          userSelect: "none", borderRadius: 6, padding: "10px 12px 6px",
+                        }}
                       >
                         <span>{sec.section}</span>
-                        <ChevronDown size={11} style={{ transition: "transform 0.2s", transform: aberta ? "rotate(0deg)" : "rotate(-90deg)", opacity: 0.4 }} />
+                        <ChevronDown size={13} style={{ transition: "transform 0.2s", transform: aberta ? "rotate(0deg)" : "rotate(-90deg)", opacity: 0.7, flexShrink: 0 }} />
                       </div>
 
                       {aberta && sec.items.map((item) => {
@@ -4916,11 +4934,11 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                         );
                       })}
 
-                      {sec.section === "SISTEMA" && aberta && pwaPrompt && (
+                      {sec.section === "SISTEMA" && aberta && (
                         <div
                           className="ag-nav-item"
                           onClick={instalarPWA}
-                          style={{ opacity: 0.75 }}
+                          style={{ opacity: pwaPrompt ? 1 : 0.45 }}
                         >
                           <ArrowDownToLine size={15} />
                           <span>Instalar app</span>
