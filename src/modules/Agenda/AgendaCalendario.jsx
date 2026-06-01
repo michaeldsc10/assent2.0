@@ -199,11 +199,11 @@ export default function AgendaCalendario({ eventos, onVerDetalhes, onNovo, categ
             onClick={() => irMes(-1)}
             style={{
               width: 30, height: 30, borderRadius: 8, border: "1px solid var(--border)",
-              background: "var(--s2)", cursor: "pointer", color: "var(--text-2)",
+              background: "var(--s2)", cursor: "pointer", color: "var(--text)",
               display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "all .13s",
+              transition: "all .13s", flexShrink: 0,
             }}
-          ><ChevronLeft size={14} /></button>
+          >‹</button>
 
           <span style={{
             flex: 1, textAlign: "center",
@@ -216,18 +216,18 @@ export default function AgendaCalendario({ eventos, onVerDetalhes, onNovo, categ
             onClick={() => irMes(1)}
             style={{
               width: 30, height: 30, borderRadius: 8, border: "1px solid var(--border)",
-              background: "var(--s2)", cursor: "pointer", color: "var(--text-2)",
+              background: "var(--s2)", cursor: "pointer", color: "var(--text)",
               display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "all .13s",
+              transition: "all .13s", flexShrink: 0, fontSize: 16,
             }}
-          ><ChevronRight size={14} /></button>
+          >›</button>
 
           <button
             onClick={irHoje}
             style={{
               padding: "6px 14px", borderRadius: 8, border: "1px solid var(--border)",
-              background: "var(--s2)", cursor: "pointer", color: "var(--text-2)",
-              fontSize: 12, fontFamily: "inherit", transition: "all .13s",
+              background: "var(--s2)", cursor: "pointer", color: "var(--text)",
+              fontSize: 12, fontFamily: "inherit", transition: "all .13s", flexShrink: 0,
             }}
           >Hoje</button>
         </div>
