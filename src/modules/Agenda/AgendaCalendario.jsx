@@ -47,7 +47,7 @@ const MESES_PT = [
 const DIAS_PT = ["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
 
 /* ── Painel lateral do dia selecionado ── */
-function PainelDia({ iso, eventos, onVerDetalhes, onNovo, categorias }) {
+function PainelDia({ iso, eventos, onVerDetalhes, onNovo, categorias, mobile }) {
   if (!iso) return null;
 
   const [ano, mes, dia] = iso.split("-").map(Number);
@@ -330,6 +330,7 @@ export default function AgendaCalendario({ eventos, onVerDetalhes, onNovo, categ
         onVerDetalhes={onVerDetalhes}
         onNovo={onNovo}
         categorias={categorias}
+        mobile={mobile}
       />
     </div>
   );
