@@ -21,7 +21,8 @@ import { db, functions } from "../lib/firebase";
 import { fsError } from "../utils/firestoreError";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { useAuth } from "../contexts/AuthContext";
-import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, startAfter } from "firebase/firestore";
+import { doc, getDoc, setDoc, collection, query, orderBy, limit, getDocs, startAfter, onSnapshot, deleteDoc } from "firebase/firestore";
+import { PERM_GRUPOS, PERM_LABELS, PERMISSOES_PADRAO_CARGO } from "../contexts/AuthContext";
 import { httpsCallable } from "firebase/functions";
 import {
   reauthenticateWithCredential,
@@ -105,6 +106,7 @@ const TAXAS_DEFAULT = {
 const NAV = [
   { id: "empresa",    label: "Empresa",             icon: Building2      },
   { id: "seguranca",  label: "Segurança",            icon: Shield         },
+  { id: "cargos",     label: "Cargos e Permissões",  icon: Users          },
   { id: "financeiro", label: "Financeiro",           icon: CreditCard     },
   { id: "pagamentos", label: "Pagamentos Online",    icon: Zap            },
   { id: "menu",       label: "Menu do Sistema",      icon: LayoutDashboard},
@@ -2363,6 +2365,235 @@ const SECOES_POR_CARGO = {
   suporte:     ["seguranca", "atalhos"],
 };
 
+// ═══════════════════════════════════════════════════
+// SecaoCargos — Gestão de cargos e permissões
+// ═══════════════════════════════════════════════════
+const CARGOS_PADRAO_IDS = ["vendedor", "financeiro", "comercial", "operacional", "suporte"];
+const CARGO_COR_PADRAO  = { vendedor: "#c8a55e", financeiro: "#5b8ef0", comercial: "#3ecf8e", operacional: "#a78bfa", suporte: "#6b7280" };
+
+function SecaoCargos({ tenantUid }) {
+  const [cargos, setCargos]       = useState([]);
+  const [editando, setEditando]   = useState(null); // cargo obj ou "novo"
+  const [salvando, setSalvando]   = useState(false);
+  const [msg, setMsg]             = useState(null);
+
+  // Carrega cargos do Firestore
+  useEffect(() => {
+    if (!tenantUid) return;
+    const ref = collection(db, "users", tenantUid, "cargos");
+    const unsub = onSnapshot(ref, snap => {
+      setCargos(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+    return unsub;
+  }, [tenantUid]);
+
+  // Seed: cria cargos padrão se ainda não existirem
+  useEffect(() => {
+    if (!tenantUid || cargos.length > 0) return;
+    async function seed() {
+      for (const id of CARGOS_PADRAO_IDS) {
+        const ref = doc(db, "users", tenantUid, "cargos", id);
+        const snap = await getDoc(ref);
+        if (!snap.exists()) {
+          await setDoc(ref, {
+            nome: id.charAt(0).toUpperCase() + id.slice(1),
+            isPadrao: true,
+            isVendedor: id === "vendedor",
+            cor: CARGO_COR_PADRAO[id] || "#888",
+            permissoes: PERMISSOES_PADRAO_CARGO[id] || {},
+          });
+        }
+      }
+    }
+    seed();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantUid]);
+
+  const salvarCargo = async (cargo) => {
+    setSalvando(true);
+    try {
+      const id = cargo.id || cargo.nome.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+      await setDoc(doc(db, "users", tenantUid, "cargos", id), {
+        nome:       cargo.nome,
+        isPadrao:   cargo.isPadrao || false,
+        isVendedor: cargo.isVendedor || false,
+        cor:        cargo.cor || "#888888",
+        permissoes: cargo.permissoes || {},
+      }, { merge: true });
+      setMsg({ tipo: "ok", texto: "Cargo salvo!" });
+      setEditando(null);
+    } catch {
+      setMsg({ tipo: "erro", texto: "Erro ao salvar cargo." });
+    }
+    setSalvando(false);
+    setTimeout(() => setMsg(null), 3000);
+  };
+
+  const excluirCargo = async (id) => {
+    if (CARGOS_PADRAO_IDS.includes(id)) return;
+    if (!window.confirm("Excluir este cargo? Usuários com ele perdem acesso.")) return;
+    await deleteDoc(doc(db, "users", tenantUid, "cargos", id));
+  };
+
+  if (editando) {
+    return <FormCargo
+      cargo={editando === "novo" ? { nome: "", cor: "#888888", isPadrao: false, isVendedor: false, permissoes: {} } : editando}
+      onSave={salvarCargo}
+      onCancel={() => setEditando(null)}
+      salvando={salvando}
+    />;
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <div>
+          <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", margin: 0 }}>Cargos e Permissões</h2>
+          <p style={{ fontSize: 12, color: "var(--text-2)", marginTop: 4 }}>
+            Defina o que cada cargo pode fazer no sistema.
+          </p>
+        </div>
+        <button
+          onClick={() => setEditando("novo")}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: 9, background: "var(--gold)", color: "#0a0808", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 600 }}
+        >
+          <Plus size={14} /> Novo cargo
+        </button>
+      </div>
+
+      {msg && (
+        <div style={{ padding: "10px 14px", borderRadius: 8, marginBottom: 16, fontSize: 13,
+          background: msg.tipo === "ok" ? "rgba(62,207,142,0.1)" : "rgba(239,68,68,0.1)",
+          color: msg.tipo === "ok" ? "#3ecf8e" : "#f87171",
+          border: `1px solid ${msg.tipo === "ok" ? "rgba(62,207,142,0.3)" : "rgba(239,68,68,0.3)"}`,
+        }}>{msg.texto}</div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {cargos.length === 0 && (
+          <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-3)", fontSize: 13 }}>
+            Carregando cargos...
+          </div>
+        )}
+        {cargos.map(c => (
+          <div key={c.id} style={{
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "14px 18px", borderRadius: 12,
+            background: "var(--s1)", border: "1px solid var(--border)",
+          }}>
+            <div style={{ width: 10, height: 10, borderRadius: "50%", background: c.cor || "#888", flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: "var(--text)" }}>
+                {c.nome}
+                {c.isPadrao && <span style={{ fontSize: 10, marginLeft: 8, padding: "2px 7px", borderRadius: 999, background: "var(--s3)", color: "var(--text-3)" }}>Padrão</span>}
+                {c.isVendedor && <span style={{ fontSize: 10, marginLeft: 6, padding: "2px 7px", borderRadius: 999, background: "rgba(200,165,94,0.12)", color: "var(--gold)" }}>Vendedor</span>}
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-3)", marginTop: 3 }}>
+                {Object.values(c.permissoes || {}).filter(Boolean).length} permissões ativas
+              </div>
+            </div>
+            <button onClick={() => setEditando(c)} style={{ padding: "6px 12px", borderRadius: 8, background: "var(--s2)", border: "1px solid var(--border)", cursor: "pointer", color: "var(--text-2)", fontSize: 12 }}>
+              <Edit2 size={13} />
+            </button>
+            {!CARGOS_PADRAO_IDS.includes(c.id) && (
+              <button onClick={() => excluirCargo(c.id)} style={{ padding: "6px 12px", borderRadius: 8, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)", cursor: "pointer", color: "#f87171", fontSize: 12 }}>
+                <Trash2 size={13} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FormCargo({ cargo, onSave, onCancel, salvando }) {
+  const [nome, setNome]           = useState(cargo.nome);
+  const [cor, setCor]             = useState(cargo.cor || "#888888");
+  const [perms, setPerms]         = useState({ ...cargo.permissoes });
+
+  const togglePerm = (chave) => setPerms(prev => ({ ...prev, [chave]: !prev[chave] }));
+
+  const ativarGrupo = (chaves, ativar) => {
+    setPerms(prev => {
+      const next = { ...prev };
+      chaves.forEach(c => { next[c] = ativar; });
+      return next;
+    });
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+        <button onClick={onCancel} style={{ padding: "6px 12px", borderRadius: 8, background: "var(--s2)", border: "1px solid var(--border)", cursor: "pointer", color: "var(--text-2)", fontSize: 13 }}>
+          ← Voltar
+        </button>
+        <h2 style={{ fontSize: 16, fontWeight: 600, color: "var(--text)", margin: 0 }}>
+          {cargo.nome ? `Editando: ${cargo.nome}` : "Novo cargo"}
+        </h2>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, marginBottom: 24 }}>
+        <div>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text-2)", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".05em" }}>Nome do cargo</label>
+          <input
+            value={nome}
+            onChange={e => setNome(e.target.value)}
+            placeholder="Ex: Atendente, Gerente..."
+            style={{ width: "100%", padding: "10px 13px", borderRadius: 9, background: "var(--s2)", border: "1px solid var(--border)", color: "var(--text)", fontSize: 14, boxSizing: "border-box" }}
+          />
+        </div>
+        <div>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: "var(--text-2)", marginBottom: 6, textTransform: "uppercase", letterSpacing: ".05em" }}>Cor</label>
+          <input type="color" value={cor} onChange={e => setCor(e.target.value)}
+            style={{ width: 48, height: 42, borderRadius: 9, border: "1px solid var(--border)", background: "var(--s2)", cursor: "pointer", padding: 4 }} />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)", marginBottom: 16 }}>Permissões</div>
+        {PERM_GRUPOS.map(grupo => {
+          const todasAtivas = grupo.chaves.every(c => perms[c]);
+          return (
+            <div key={grupo.label} style={{ marginBottom: 16, padding: "14px 16px", borderRadius: 10, background: "var(--s1)", border: "1px solid var(--border)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--text-2)", textTransform: "uppercase", letterSpacing: ".06em" }}>{grupo.label}</span>
+                <button
+                  onClick={() => ativarGrupo(grupo.chaves, !todasAtivas)}
+                  style={{ fontSize: 11, padding: "3px 10px", borderRadius: 6, background: todasAtivas ? "rgba(62,207,142,0.1)" : "var(--s2)", border: `1px solid ${todasAtivas ? "rgba(62,207,142,0.3)" : "var(--border)"}`, color: todasAtivas ? "#3ecf8e" : "var(--text-3)", cursor: "pointer" }}
+                >
+                  {todasAtivas ? "Desativar todos" : "Ativar todos"}
+                </button>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {grupo.chaves.map(chave => (
+                  <label key={chave} style={{ display: "flex", alignItems: "center", gap: 7, cursor: "pointer", padding: "6px 12px", borderRadius: 8, background: perms[chave] ? "rgba(62,207,142,0.08)" : "var(--s2)", border: `1px solid ${perms[chave] ? "rgba(62,207,142,0.3)" : "var(--border)"}`, transition: "all .13s" }}>
+                    <input type="checkbox" checked={!!perms[chave]} onChange={() => togglePerm(chave)} style={{ accentColor: "#3ecf8e" }} />
+                    <span style={{ fontSize: 12, color: perms[chave] ? "#3ecf8e" : "var(--text-2)" }}>{PERM_LABELS[chave]}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+        <button onClick={onCancel} style={{ padding: "9px 20px", borderRadius: 9, background: "var(--s2)", border: "1px solid var(--border)", cursor: "pointer", color: "var(--text-2)", fontSize: 13 }}>
+          Cancelar
+        </button>
+        <button
+          onClick={() => onSave({ ...cargo, nome, cor, permissoes: perms })}
+          disabled={salvando || !nome.trim()}
+          style={{ padding: "9px 22px", borderRadius: 9, background: "var(--gold)", border: "none", cursor: salvando || !nome.trim() ? "not-allowed" : "pointer", color: "#0a0808", fontSize: 13, fontWeight: 600, opacity: salvando || !nome.trim() ? 0.6 : 1 }}
+        >
+          {salvando ? "Salvando..." : "Salvar cargo"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
   // ── Multi-tenant ──
   const { tenantUid, cargo, isAdmin } = useAuth();
@@ -2397,6 +2628,7 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
     switch (secao) {
       case "empresa":    return <SecaoEmpresa    config={config} onSave={handleSave} uid={uid} />;
       case "seguranca":  return <SecaoSeguranca config={config} onSave={handleSave} />;
+      case "cargos":     return <SecaoCargos    tenantUid={uid} />;
       case "financeiro": return <SecaoFinanceiro config={config} onSave={handleSave} />;
       case "pagamentos": return <SecaoPagamentos config={config} onSave={handleSave} />;
       case "menu":       return <SecaoMenu       config={config} onSave={handleSave} />;

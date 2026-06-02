@@ -26,9 +26,153 @@ export const CARGOS = {
 };
 
 // ─────────────────────────────────────────────
-// Matriz de permissões por módulo e cargo
-// Níveis: "vcex" | "vce" | "vc" | "ve" | "v" | ""
-// v = ver · c = criar · e = editar · x = excluir
+// Chaves de permissão granulares (novo sistema)
+// ─────────────────────────────────────────────
+export const PERM = {
+  verDashboard:         "verDashboard",
+  verClientes:          "verClientes",          gerenciarClientes:      "gerenciarClientes",
+  verProdutos:          "verProdutos",           gerenciarProdutos:      "gerenciarProdutos",
+  verServicos:          "verServicos",           gerenciarServicos:      "gerenciarServicos",
+  verVendas:            "verVendas",             gerenciarVendas:        "gerenciarVendas",
+  verPDV:               "verPDV",                gerenciarPDV:           "gerenciarPDV",
+  verAgenda:            "verAgenda",             gerenciarAgenda:        "gerenciarAgenda",
+  verEstoque:           "verEstoque",            gerenciarEstoque:       "gerenciarEstoque",
+  verCompras:           "verCompras",            gerenciarCompras:       "gerenciarCompras",
+  verOrcamentos:        "verOrcamentos",         gerenciarOrcamentos:    "gerenciarOrcamentos",
+  verFornecedores:      "verFornecedores",       gerenciarFornecedores:  "gerenciarFornecedores",
+  verAReceber:          "verAReceber",           gerenciarAReceber:      "gerenciarAReceber",
+  verCaixaDiario:       "verCaixaDiario",        gerenciarCaixaDiario:   "gerenciarCaixaDiario",
+  verDespesas:          "verDespesas",           gerenciarDespesas:      "gerenciarDespesas",
+  verMesas:             "verMesas",              gerenciarMesas:         "gerenciarMesas",
+  verMatriculas:        "verMatriculas",         gerenciarMatriculas:    "gerenciarMatriculas",
+  verVendedores:        "verVendedores",
+  verRelatorios:        "verRelatorios",
+  verRelFinanceiro:     "verRelFinanceiro",
+  verRelDespesas:       "verRelDespesas",
+  verRelCompras:        "verRelCompras",
+  verRelEstoque:        "verRelEstoque",
+  verRelVendas:         "verRelVendas",
+  verRelClientes:       "verRelClientes",
+  verRelAgenda:         "verRelAgenda",
+  verRelPDV:            "verRelPDV",
+  verAgendamento:       "verAgendamento",        gerenciarAgendamento:   "gerenciarAgendamento",
+  verCRM:               "verCRM",
+};
+
+// Labels para exibição na UI de gestão de cargos
+export const PERM_LABELS = {
+  verDashboard:        "Ver Dashboard",
+  verClientes:         "Ver Clientes",          gerenciarClientes:     "Gerenciar Clientes",
+  verProdutos:         "Ver Produtos",           gerenciarProdutos:     "Gerenciar Produtos",
+  verServicos:         "Ver Serviços",           gerenciarServicos:     "Gerenciar Serviços",
+  verVendas:           "Ver Vendas",             gerenciarVendas:       "Gerenciar Vendas",
+  verPDV:              "Ver PDV",                gerenciarPDV:          "Usar PDV",
+  verAgenda:           "Ver Agenda",             gerenciarAgenda:       "Gerenciar Agenda",
+  verEstoque:          "Ver Estoque",            gerenciarEstoque:      "Gerenciar Estoque",
+  verCompras:          "Ver Compras",            gerenciarCompras:      "Gerenciar Compras",
+  verOrcamentos:       "Ver Orçamentos",         gerenciarOrcamentos:   "Gerenciar Orçamentos",
+  verFornecedores:     "Ver Fornecedores",       gerenciarFornecedores: "Gerenciar Fornecedores",
+  verAReceber:         "Ver A Receber",          gerenciarAReceber:     "Gerenciar A Receber",
+  verCaixaDiario:      "Ver Caixa Diário",       gerenciarCaixaDiario:  "Gerenciar Caixa Diário",
+  verDespesas:         "Ver Despesas",           gerenciarDespesas:     "Gerenciar Despesas",
+  verMesas:            "Ver Mesas",              gerenciarMesas:        "Gerenciar Mesas",
+  verMatriculas:       "Ver Matrículas",         gerenciarMatriculas:   "Gerenciar Matrículas",
+  verVendedores:       "Ver Vendedores",
+  verRelatorios:       "Ver Relatórios",
+  verRelFinanceiro:    "Rel. Financeiro/DRE",
+  verRelDespesas:      "Rel. Despesas",
+  verRelCompras:       "Rel. Compras",
+  verRelEstoque:       "Rel. Estoque",
+  verRelVendas:        "Rel. Vendas",
+  verRelClientes:      "Rel. Clientes",
+  verRelAgenda:        "Rel. Agenda",
+  verRelPDV:           "Rel. PDV",
+  verAgendamento:      "Ver Agendamento",        gerenciarAgendamento:  "Gerenciar Agendamento",
+  verCRM:              "Ver CRM",
+};
+
+// Grupos para exibição organizada na UI
+export const PERM_GRUPOS = [
+  { label: "Geral",        chaves: ["verDashboard"] },
+  { label: "Clientes",     chaves: ["verClientes","gerenciarClientes"] },
+  { label: "Produtos",     chaves: ["verProdutos","gerenciarProdutos"] },
+  { label: "Serviços",     chaves: ["verServicos","gerenciarServicos"] },
+  { label: "Vendas",       chaves: ["verVendas","gerenciarVendas","verPDV","gerenciarPDV"] },
+  { label: "Orçamentos",   chaves: ["verOrcamentos","gerenciarOrcamentos"] },
+  { label: "Agenda",       chaves: ["verAgenda","gerenciarAgenda"] },
+  { label: "Estoque",      chaves: ["verEstoque","gerenciarEstoque"] },
+  { label: "Financeiro",   chaves: ["verAReceber","gerenciarAReceber","verCaixaDiario","gerenciarCaixaDiario","verDespesas","gerenciarDespesas"] },
+  { label: "Compras",      chaves: ["verCompras","gerenciarCompras","verFornecedores","gerenciarFornecedores"] },
+  { label: "Mesas",        chaves: ["verMesas","gerenciarMesas"] },
+  { label: "Matrículas",   chaves: ["verMatriculas","gerenciarMatriculas"] },
+  { label: "Vendedores",   chaves: ["verVendedores"] },
+  { label: "Relatórios",   chaves: ["verRelatorios","verRelFinanceiro","verRelDespesas","verRelCompras","verRelEstoque","verRelVendas","verRelClientes","verRelAgenda","verRelPDV"] },
+  { label: "Agendamento",  chaves: ["verAgendamento","gerenciarAgendamento"] },
+  { label: "CRM",          chaves: ["verCRM"] },
+];
+
+// ─────────────────────────────────────────────
+// Permissões padrão por cargo (seed inicial)
+// ─────────────────────────────────────────────
+export const PERMISSOES_PADRAO_CARGO = {
+  vendedor: {
+    verClientes:true, gerenciarClientes:true,
+    verProdutos:true, verServicos:true,
+    verVendas:true, gerenciarVendas:true,
+    verPDV:true, gerenciarPDV:true,
+    verOrcamentos:true, gerenciarOrcamentos:true,
+    verAgenda:true,
+    verMesas:true, gerenciarMesas:false,
+    verMatriculas:true,
+    verRelatorios:true, verRelVendas:true, verRelClientes:true, verRelAgenda:true, verRelPDV:true,
+  },
+  financeiro: {
+    verDashboard:true,
+    verClientes:true, verProdutos:true, verServicos:true,
+    verVendas:true, verPDV:true,
+    verAReceber:true, gerenciarAReceber:true,
+    verCaixaDiario:true, gerenciarCaixaDiario:true,
+    verDespesas:true, gerenciarDespesas:true,
+    verCompras:true, verEstoque:true,
+    verAgenda:true,
+    verRelatorios:true, verRelFinanceiro:true, verRelDespesas:true,
+    verRelCompras:true, verRelEstoque:true, verRelVendas:true,
+    verAgendamento:true,
+  },
+  comercial: {
+    verClientes:true, gerenciarClientes:true,
+    verProdutos:true, verServicos:true, gerenciarServicos:true,
+    verVendas:true, gerenciarVendas:true,
+    verPDV:true, gerenciarPDV:true,
+    verOrcamentos:true, gerenciarOrcamentos:true,
+    verAgenda:true, gerenciarAgenda:true,
+    verMesas:true, gerenciarMesas:true,
+    verMatriculas:true, gerenciarMatriculas:true,
+    verVendedores:true,
+    verRelatorios:true, verRelVendas:true, verRelClientes:true, verRelAgenda:true, verRelPDV:true, verRelEstoque:true,
+    verAgendamento:true, gerenciarAgendamento:true,
+  },
+  operacional: {
+    verClientes:true, gerenciarClientes:true,
+    verProdutos:true, gerenciarProdutos:true,
+    verServicos:true, gerenciarServicos:true,
+    verEstoque:true, gerenciarEstoque:true,
+    verCaixaDiario:true,
+    verAgenda:true, gerenciarAgenda:true,
+    verMesas:true, gerenciarMesas:true,
+    verMatriculas:true,
+    verRelatorios:true, verRelEstoque:true,
+    verAgendamento:true, gerenciarAgendamento:true,
+  },
+  suporte: {
+    verClientes:true, verProdutos:true, verServicos:true,
+    verOrcamentos:true, verPDV:true,
+    verRelatorios:true, verRelVendas:true, verRelClientes:true, verRelPDV:true,
+  },
+};
+
+// ─────────────────────────────────────────────
+// Matriz legada — mantida para compatibilidade
 // ─────────────────────────────────────────────
 export const PERMISSOES = {
   dashboard:      { admin: "v",    financeiro: "v",   comercial: "",    compras: "",    operacional: "",    vendedor: "",    suporte: ""   },
@@ -42,25 +186,18 @@ export const PERMISSOES = {
   compras:        { admin: "vcex", financeiro: "ve",  comercial: "",    compras: "vce", operacional: "v",   vendedor: "",    suporte: ""   },
   orcamentos:     { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "v",   vendedor: "vce", suporte: "v"  },
   vendas:         { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "v",   vendedor: "vc",  suporte: ""   },
-  // PDV — admin: completo (incl. excluir); comercial/vendedor: criar+ver; financeiro: só ver
   pdv:            { admin: "vcex", financeiro: "v",   comercial: "vc",  compras: "",    operacional: "",    vendedor: "vc",  suporte: "v"  },
   alunos:         { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "v",   vendedor: "v",   suporte: ""   },
   aReceber:       { admin: "vcex", financeiro: "vce", comercial: "v",   compras: "",    operacional: "",    vendedor: "",    suporte: ""   },
   caixaDiario:    { admin: "vcex", financeiro: "vce", comercial: "",    compras: "",    operacional: "vc",  vendedor: "",    suporte: ""   },
   despesas:       { admin: "vcex", financeiro: "vce", comercial: "",    compras: "vc",  operacional: "",    vendedor: "",    suporte: ""   },
-  // Todos veem o menu Relatórios; sub-relatórios são bloqueados internamente com cadeado
   relatorios:     { admin: "v",    financeiro: "v",   comercial: "v",   compras: "v",   operacional: "v",   vendedor: "v",   suporte: "v"  },
   mesas:          { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "vce", vendedor: "vc",  suporte: ""   },
   usuarios:       { admin: "vcex", financeiro: "",    comercial: "",    compras: "",    operacional: "",    vendedor: "",    suporte: ""   },
   configuracoes:  { admin: "vcex", financeiro: "",    comercial: "",    compras: "",    operacional: "",    vendedor: "",    suporte: ""   },
-  // Assent Flow — módulo de agendamento online
-  // admin/operacional: acesso completo | comercial: ver+criar+editar | vendedor: ver+criar | financeiro/suporte: só ver
   agendamento:    { admin: "vcex", financeiro: "v",   comercial: "vce", compras: "",    operacional: "vcex",vendedor: "vc",  suporte: "v"  },
 };
 
-// ─────────────────────────────────────────────
-// Sub-relatórios — quem pode ver cada um
-// ─────────────────────────────────────────────
 export const PERMISSOES_RELATORIOS = {
   dre:        { admin: true, financeiro: true,  comercial: false, compras: false, operacional: false, vendedor: false, suporte: false },
   financeiro: { admin: true, financeiro: true,  comercial: false, compras: false, operacional: false, vendedor: false, suporte: false },
@@ -74,13 +211,92 @@ export const PERMISSOES_RELATORIOS = {
 };
 
 // ─────────────────────────────────────────────
-// Helpers de permissão (uso standalone fora do hook)
+// Mapeamento módulo → permissão granular
 // ─────────────────────────────────────────────
-export const podeVer          = (cargo, modulo)      => !!(PERMISSOES[modulo]?.[cargo]?.includes("v"));
-export const podeCriar        = (cargo, modulo)      => !!(PERMISSOES[modulo]?.[cargo]?.includes("c"));
-export const podeEditar       = (cargo, modulo)      => !!(PERMISSOES[modulo]?.[cargo]?.includes("e"));
-export const podeExcluir      = (cargo, modulo)      => !!(PERMISSOES[modulo]?.[cargo]?.includes("x"));
-export const podeVerRelatorio = (cargo, subRelatorio) => !!(PERMISSOES_RELATORIOS[subRelatorio]?.[cargo]);
+const MODULO_PERM = {
+  dashboard:      { ver: "verDashboard",    ger: null },
+  clientes:       { ver: "verClientes",     ger: "gerenciarClientes" },
+  produtos:       { ver: "verProdutos",     ger: "gerenciarProdutos" },
+  servicos:       { ver: "verServicos",     ger: "gerenciarServicos" },
+  vendas:         { ver: "verVendas",       ger: "gerenciarVendas" },
+  pdv:            { ver: "verPDV",          ger: "gerenciarPDV" },
+  agenda:         { ver: "verAgenda",       ger: "gerenciarAgenda" },
+  entradaEstoque: { ver: "verEstoque",      ger: "gerenciarEstoque" },
+  compras:        { ver: "verCompras",      ger: "gerenciarCompras" },
+  orcamentos:     { ver: "verOrcamentos",   ger: "gerenciarOrcamentos" },
+  fornecedores:   { ver: "verFornecedores", ger: "gerenciarFornecedores" },
+  aReceber:       { ver: "verAReceber",     ger: "gerenciarAReceber" },
+  caixaDiario:    { ver: "verCaixaDiario",  ger: "gerenciarCaixaDiario" },
+  despesas:       { ver: "verDespesas",     ger: "gerenciarDespesas" },
+  mesas:          { ver: "verMesas",        ger: "gerenciarMesas" },
+  alunos:         { ver: "verMatriculas",   ger: "gerenciarMatriculas" },
+  vendedores:     { ver: "verVendedores",   ger: null },
+  relatorios:     { ver: "verRelatorios",   ger: null },
+  usuarios:       { ver: null,              ger: null }, // admin only
+  configuracoes:  { ver: null,              ger: null }, // admin only
+  agendamento:    { ver: "verAgendamento",  ger: "gerenciarAgendamento" },
+  crm:            { ver: "verCRM",          ger: null },
+};
+
+// ─────────────────────────────────────────────
+// Helpers de permissão — suportam novo e legado
+// ─────────────────────────────────────────────
+export const podeVer = (cargo, modulo, permissoesCustom) => {
+  if (cargo === "admin") return true;
+  if (permissoesCustom) {
+    const map = MODULO_PERM[modulo];
+    if (!map) return false;
+    if (!map.ver) return false;
+    return !!permissoesCustom[map.ver];
+  }
+  return !!(PERMISSOES[modulo]?.[cargo]?.includes("v"));
+};
+
+export const podeCriar = (cargo, modulo, permissoesCustom) => {
+  if (cargo === "admin") return true;
+  if (permissoesCustom) {
+    const map = MODULO_PERM[modulo];
+    if (!map?.ger) return false;
+    return !!permissoesCustom[map.ger];
+  }
+  return !!(PERMISSOES[modulo]?.[cargo]?.includes("c"));
+};
+
+export const podeEditar = (cargo, modulo, permissoesCustom) => {
+  if (cargo === "admin") return true;
+  if (permissoesCustom) {
+    const map = MODULO_PERM[modulo];
+    if (!map?.ger) return false;
+    return !!permissoesCustom[map.ger];
+  }
+  return !!(PERMISSOES[modulo]?.[cargo]?.includes("e"));
+};
+
+export const podeExcluir = (cargo, modulo, permissoesCustom) => {
+  if (cargo === "admin") return true;
+  if (permissoesCustom) {
+    const map = MODULO_PERM[modulo];
+    if (!map?.ger) return false;
+    return !!permissoesCustom[map.ger];
+  }
+  return !!(PERMISSOES[modulo]?.[cargo]?.includes("x"));
+};
+
+export const podeVerRelatorio = (cargo, subRelatorio, permissoesCustom) => {
+  if (cargo === "admin") return true;
+  if (permissoesCustom) {
+    const relMap = {
+      dre: "verRelFinanceiro", financeiro: "verRelFinanceiro",
+      despesas: "verRelDespesas", compras: "verRelCompras",
+      estoque: "verRelEstoque", vendas: "verRelVendas",
+      clientes: "verRelClientes", agenda: "verRelAgenda", pdv: "verRelPDV",
+    };
+    const perm = relMap[subRelatorio];
+    if (!perm) return false;
+    return !!permissoesCustom[perm];
+  }
+  return !!(PERMISSOES_RELATORIOS[subRelatorio]?.[cargo]);
+};
 
 // ─────────────────────────────────────────────
 // Rate Limiting — proteção contra brute force
@@ -142,13 +358,14 @@ function rl_resetar(email) {
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser]                 = useState(null);
-  const [tenantUid, setTenantUid]       = useState(null);
-  const [cargo, setCargo]               = useState(null);
-  const [vendedorId, setVendedorId]     = useState(null);
-  const [vendedorNome, setVendedorNome] = useState(null);
-  const [nomeUsuario, setNomeUsuario]   = useState(null);
-  const [loadingAuth, setLoadingAuth]   = useState(true); // ← nasce true: trava render até Firebase responder
+  const [user, setUser]                         = useState(null);
+  const [tenantUid, setTenantUid]               = useState(null);
+  const [cargo, setCargo]                       = useState(null);
+  const [vendedorId, setVendedorId]             = useState(null);
+  const [vendedorNome, setVendedorNome]         = useState(null);
+  const [nomeUsuario, setNomeUsuario]           = useState(null);
+  const [permissoesCustom, setPermissoesCustom] = useState(null); // null = usa legado
+  const [loadingAuth, setLoadingAuth]           = useState(true); // ← nasce true: trava render até Firebase responder
 
   // ── Limpa todo o estado de sessão ──────────────────────────────────
   const limparSessao = useCallback(() => {
@@ -158,6 +375,7 @@ export function AuthProvider({ children }) {
     setVendedorId(null);
     setVendedorNome(null);
     setNomeUsuario(null);
+    setPermissoesCustom(null);
   }, []);
 
   // ── Helper interno: rejeita acesso e garante estado limpo ──────────
@@ -291,6 +509,7 @@ if (licencaDoc.exists()) {
       setNomeUsuario(perfil.nome || firebaseUser.email);
 
       // ── Passo 4: se cargo === "vendedor", carrega dados do cadastro vinculado ──
+      // CRÍTICO: lógica de vendedorId mantida idêntica para comissões/relatórios
       if (perfil.cargo === CARGOS.VENDEDOR && perfil.vendedorId) {
         const vendedorDoc = await getDoc(
           doc(db, "users", tUid, "vendedores", perfil.vendedorId)
@@ -300,6 +519,24 @@ if (licencaDoc.exists()) {
       } else {
         setVendedorId(null);
         setVendedorNome(null);
+      }
+
+      // ── Passo 5: carrega permissões customizadas do cargo (novo sistema) ──
+      try {
+        const cargoKey = perfil.cargo;
+        if (cargoKey && cargoKey !== "admin") {
+          const cargoDoc = await getDoc(doc(db, "users", tUid, "cargos", cargoKey));
+          if (cargoDoc.exists() && cargoDoc.data().permissoes) {
+            setPermissoesCustom(cargoDoc.data().permissoes);
+          } else {
+            // Fallback: usa permissões padrão do cargo se existirem
+            setPermissoesCustom(PERMISSOES_PADRAO_CARGO[cargoKey] ?? null);
+          }
+        } else {
+          setPermissoesCustom(null);
+        }
+      } catch {
+        setPermissoesCustom(null);
       }
     } catch (err) {
       console.error("[AuthContext] Erro ao carregar perfil:", err);
@@ -379,11 +616,14 @@ if (licencaDoc.exists()) {
 
   // ── Helpers de permissão prontos para uso nos componentes ───────────
   const perm = {
-    podeVer:          (modulo) => podeVer(cargo, modulo),
-    podeCriar:        (modulo) => podeCriar(cargo, modulo),
-    podeEditar:       (modulo) => podeEditar(cargo, modulo),
-    podeExcluir:      (modulo) => podeExcluir(cargo, modulo),
-    podeVerRelatorio: (sub)    => podeVerRelatorio(cargo, sub),
+    podeVer:          (modulo) => podeVer(cargo, modulo, permissoesCustom),
+    podeCriar:        (modulo) => podeCriar(cargo, modulo, permissoesCustom),
+    podeEditar:       (modulo) => podeEditar(cargo, modulo, permissoesCustom),
+    podeExcluir:      (modulo) => podeExcluir(cargo, modulo, permissoesCustom),
+    podeVerRelatorio: (sub)    => podeVerRelatorio(cargo, sub, permissoesCustom),
+    // Permissão granular direta — para uso na UI de cargos
+    temPermissao:     (chave)  => cargo === "admin" || !!(permissoesCustom?.[chave]),
+    permissoesCustom,
     isAdmin:    cargo === CARGOS.ADMIN,
     isVendedor: cargo === CARGOS.VENDEDOR,
   };

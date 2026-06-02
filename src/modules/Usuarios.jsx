@@ -33,20 +33,41 @@ import AuthContext from "../contexts/AuthContext";
 import { useLicenca } from "../hooks/useLicenca";
 
 /* ─────────────────────────────────────────────
-   CONSTANTES
+   CONSTANTES — cargos legados (fallback)
 ───────────────────────────────────────────── */
-// MAX_USUARIOS é dinâmico — vem do plano via useLicenca (veja dentro do componente)
-
-const CARGOS = [
-  { value: "financeiro",  label: "Financeiro",          cor: "#5b8ef0", bg: "rgba(91,142,240,0.12)"  },
-  { value: "comercial",   label: "Comercial",           cor: "#3ecf8e", bg: "rgba(62,207,142,0.12)"  },
-  { value: "compras",     label: "Compras",             cor: "#f59e0b", bg: "rgba(245,158,11,0.12)"  },
-  { value: "operacional", label: "Operacional",         cor: "#a78bfa", bg: "rgba(167,139,250,0.12)" },
-  { value: "vendedor",    label: "Vendedor",            cor: "#c8a55e", bg: "rgba(200,165,94,0.12)"  },
+const CARGOS_LEGADO = [
+  { value: "financeiro",  label: "Financeiro",            cor: "#5b8ef0", bg: "rgba(91,142,240,0.12)"  },
+  { value: "comercial",   label: "Comercial",             cor: "#3ecf8e", bg: "rgba(62,207,142,0.12)"  },
+  { value: "compras",     label: "Compras",               cor: "#f59e0b", bg: "rgba(245,158,11,0.12)"  },
+  { value: "operacional", label: "Operacional",           cor: "#a78bfa", bg: "rgba(167,139,250,0.12)" },
+  { value: "vendedor",    label: "Vendedor",              cor: "#c8a55e", bg: "rgba(200,165,94,0.12)"  },
   { value: "suporte",     label: "Suporte / Atendimento", cor: "#6b7280", bg: "rgba(107,114,128,0.12)" },
 ];
 
-const CARGO_MAP = Object.fromEntries(CARGOS.map((c) => [c.value, c]));
+// Hook para carregar cargos dinâmicos do Firestore
+function useCargos(tenantUid) {
+  const [cargos, setCargos] = useState(CARGOS_LEGADO);
+  useEffect(() => {
+    if (!tenantUid) return;
+    const ref = collection(db, "users", tenantUid, "cargos");
+    const unsub = onSnapshot(ref, snap => {
+      if (snap.empty) { setCargos(CARGOS_LEGADO); return; }
+      const lista = snap.docs.map(d => ({
+        value: d.id,
+        label: d.data().nome || d.id,
+        cor:   d.data().cor || "#888",
+        bg:    `${d.data().cor || "#888"}20`,
+        isVendedor: d.data().isVendedor || false,
+      }));
+      setCargos(lista);
+    });
+    return unsub;
+  }, [tenantUid]);
+  return cargos;
+}
+
+// Mantém CARGO_MAP compatível (fallback)
+const CARGO_MAP = Object.fromEntries(CARGOS_LEGADO.map((c) => [c.value, c]));
 
 /* ─────────────────────────────────────────────
    CSS
@@ -833,13 +854,14 @@ function ImageViewer({ src, nome, onClose, onRemove, onTrocar }) {
 }
 
 
-function ModalUsuario({ usuario, vendedores, onSalvar, onFechar, salvando }) {
+function ModalUsuario({ usuario, vendedores, cargos, onSalvar, onFechar, salvando }) {
   const isEdicao = Boolean(usuario?.uid);
+  const listaCargos = cargos || CARGOS_LEGADO;
 
   const [nome,       setNome]       = useState(usuario?.nome  || "");
   const [email,      setEmail]      = useState(usuario?.email || "");
   const [senha,      setSenha]      = useState("");
-  const [cargo,      setCargo]      = useState(usuario?.cargo || "operacional");
+  const [cargo,      setCargo]      = useState(usuario?.cargo || (listaCargos[0]?.value || "operacional"));
   const [vendedorId, setVendedorId] = useState(usuario?.vendedorId || "");
   const [erro,       setErro]       = useState("");
 
@@ -1021,7 +1043,7 @@ function ModalUsuario({ usuario, vendedores, onSalvar, onFechar, salvando }) {
             <div className="usr-field">
               <label>Cargo</label>
               <select value={cargo} onChange={(e) => setCargo(e.target.value)}>
-                {CARGOS.map((c) => (
+                {listaCargos.map((c) => (
                   <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
               </select>
@@ -1030,12 +1052,12 @@ function ModalUsuario({ usuario, vendedores, onSalvar, onFechar, salvando }) {
             {/* Info do cargo */}
             {cargoInfo[cargo] && (
               <div className="usr-cargo-info">
-                💡 <strong>{CARGO_MAP[cargo]?.label}:</strong> {cargoInfo[cargo]}
+                💡 <strong>{(listaCargos.find(c=>c.value===cargo)?.label || cargo)}:</strong> {cargoInfo[cargo]}
               </div>
             )}
 
-            {/* Vínculo de vendedor — só aparece quando cargo = "vendedor" */}
-            {cargo === "vendedor" && (
+            {/* Vínculo de vendedor — aparece para cargo "vendedor" ou cargos com isVendedor=true */}
+            {(cargo === "vendedor" || listaCargos.find(c=>c.value===cargo)?.isVendedor) && (
               <div className="usr-field">
                 <label>Cadastro de vendedor vinculado</label>
                 {vendedores.length === 0 ? (
@@ -1163,6 +1185,9 @@ export default function Usuarios() {
 
   // tenantUid = uid do Admin dono da conta (raiz do Firestore)
   const raiz = tenantUid || user?.uid;
+
+  // Cargos dinâmicos do Firestore
+  const cargosDisponiveis = useCargos(raiz);
 
   // ── Plano: limite dinâmico de usuários extras ──────────────────────
   // Essencial: 5 | Profissional: 15 | Trial: 15 (acesso total)
@@ -1616,6 +1641,7 @@ export default function Usuarios() {
           <ModalUsuario
             usuario={usuarioEditando}
             vendedores={vendedores}
+            cargos={cargosDisponiveis}
             onSalvar={handleSalvar}
             onFechar={fecharModal}
             salvando={salvando}
