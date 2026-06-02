@@ -4006,10 +4006,22 @@ function openModal(m) {
       <div id="planLoadState" style="display:flex;align-items:center;gap:10px;color:var(--text3);font-family:'DM Mono',monospace;font-size:11px">
         <div class="spinner"></div>&nbsp;Carregando plano...
       </div>
+    </div>
+
+    <!-- Módulos Ativos -->
+    <div class="modal-section">
+      <div class="section-label">Módulos do Sistema</div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:14px">
+        Ative ou desative módulos para esta empresa. Dashboard e Configurações são fixos.
+      </div>
+      <div id="modulosLoadState" style="display:flex;align-items:center;gap:10px;color:var(--text3);font-family:'DM Mono',monospace;font-size:11px">
+        <div class="spinner"></div>&nbsp;Carregando módulos...
+      </div>
     </div>`;
 
   document.getElementById('memberModal').classList.add('open');
   loadMemberPlan(m.uid);
+  loadMemberModulos(m.uid);
 }
 
 document.getElementById('modalClose').addEventListener('click', closeModal);
@@ -4035,6 +4047,99 @@ const PLAN_CONFIGS = {
     details:  ['2 500 vendas/mês', '15 logins extras', '★ Insta Insights'],
   },
 };
+
+// ══════════════════════════════════════════════
+//  MÓDULOS — lista completa com chave Firestore
+// ══════════════════════════════════════════════
+const MODULOS_SISTEMA = [
+  { key: 'clientes',        label: 'Clientes'      },
+  { key: 'produtos',        label: 'Produtos'       },
+  { key: 'servicos',        label: 'Serviços'       },
+  { key: 'entrada_estoque', label: 'Estoque'        },
+  { key: 'vendas',          label: 'Vendas'         },
+  { key: 'pdv',             label: 'PDV'            },
+  { key: 'mesas',           label: 'Mesas'          },
+  { key: 'matriculas',      label: 'Matrículas'     },
+  { key: 'fiado',           label: 'A Receber'      },
+  { key: 'caixa',           label: 'Caixa Diário'   },
+  { key: 'despesas',        label: 'Despesas'       },
+  { key: 'fornecedores',    label: 'Fornecedores'   },
+  { key: 'relatorios',      label: 'Relatórios'     },
+  { key: 'agenda',          label: 'Agenda'         },
+  { key: 'orcamentos',      label: 'Orçamentos'     },
+  { key: 'vendedores',      label: 'Vendedores'     },
+  { key: 'compras',         label: 'Compras'        },
+];
+
+async function loadMemberModulos(uid) {
+  const el = document.getElementById('modulosLoadState');
+  if (!el) return;
+  try {
+    const snap = await db.collection('users').doc(uid)
+      .collection('config').doc('geral').get();
+    const menuVisivel = snap.exists ? (snap.data().menuVisivel || {}) : {};
+    renderModulosSection(uid, menuVisivel);
+  } catch (e) {
+    console.error('[loadMemberModulos]', e);
+    if (el) el.innerHTML = '<span style="color:var(--danger)">Erro ao carregar módulos.</span>';
+  }
+}
+
+function renderModulosSection(uid, menuVisivel) {
+  const el = document.getElementById('modulosLoadState');
+  if (!el) return;
+
+  const toggles = MODULOS_SISTEMA.map(m => {
+    const ativo = menuVisivel[m.key] !== false;
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;
+        padding:10px 14px;border-radius:10px;background:var(--surface2);
+        border:1px solid var(--border2);margin-bottom:8px;">
+        <span style="font-size:13px;font-weight:500;color:var(--text)">${esc(m.label)}</span>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <span style="font-size:11px;color:${ativo?'var(--success)':'var(--text3)'};font-weight:600">
+            ${ativo ? 'Ativo' : 'Inativo'}
+          </span>
+          <div onclick="toggleModulo('${uid}','${m.key}',this)"
+            data-key="${m.key}" data-ativo="${ativo}"
+            style="width:40px;height:22px;border-radius:99px;cursor:pointer;
+              background:${ativo?'var(--success)':'var(--border2)'};
+              position:relative;transition:background .2s;flex-shrink:0">
+            <div style="width:16px;height:16px;border-radius:50%;background:#fff;
+              position:absolute;top:3px;transition:left .2s;
+              left:${ativo?'21px':'3px'}"></div>
+          </div>
+        </label>
+      </div>`;
+  }).join('');
+
+  el.outerHTML = `<div id="modulosGrid">${toggles}</div>`;
+}
+
+async function toggleModulo(uid, key, el) {
+  const ativo = el.dataset.ativo === 'true';
+  const novoAtivo = !ativo;
+  // Atualiza visual imediatamente
+  el.dataset.ativo = String(novoAtivo);
+  el.style.background = novoAtivo ? 'var(--success)' : 'var(--border2)';
+  el.querySelector('div').style.left = novoAtivo ? '21px' : '3px';
+  const label = el.previousElementSibling;
+  label.textContent = novoAtivo ? 'Ativo' : 'Inativo';
+  label.style.color = novoAtivo ? 'var(--success)' : 'var(--text3)';
+  try {
+    await db.collection('users').doc(uid)
+      .collection('config').doc('geral')
+      .set({ menuVisivel: { [key]: novoAtivo } }, { merge: true });
+  } catch(e) {
+    // Reverte se falhar
+    el.dataset.ativo = String(ativo);
+    el.style.background = ativo ? 'var(--success)' : 'var(--border2)';
+    el.querySelector('div').style.left = ativo ? '21px' : '3px';
+    label.textContent = ativo ? 'Ativo' : 'Inativo';
+    label.style.color = ativo ? 'var(--success)' : 'var(--text3)';
+    alert('Erro ao salvar. Tente novamente.');
+  }
+}
 
 async function loadMemberPlan(uid) {
   const section = document.getElementById('planSection');
