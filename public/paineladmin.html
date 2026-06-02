@@ -4188,7 +4188,17 @@ async function toggleModulo(uid, key, el) {
     el.querySelector('div').style.left = ativo ? '21px' : '3px';
     label.textContent = ativo ? 'Ativo' : 'Bloqueado';
     label.style.color = ativo ? 'var(--success)' : 'var(--danger)';
-    alert('Erro ao salvar. Tente novamente.');
+    // Feedback inline — sem alert()
+    let fb = document.getElementById('modulosErroBanner');
+    if (!fb) {
+      fb = document.createElement('div');
+      fb.id = 'modulosErroBanner';
+      fb.style.cssText = 'margin:0 0 12px;padding:10px 14px;border-radius:8px;font-size:12px;font-weight:600;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#f87171;';
+      const body = document.getElementById('modulosModalBody');
+      if (body) body.prepend(fb);
+    }
+    fb.textContent = '⚠ Erro ao salvar. Verifique as permissões do Firestore (licencas → allow update isAdminAG).';
+    setTimeout(() => { if (fb.parentNode) fb.remove(); }, 5000);
   }
 }
 
