@@ -4126,10 +4126,9 @@ const MODULOS_SISTEMA = [
 
 async function loadMemberModulos(uid) {
   try {
-    const snap = await db.collection('users').doc(uid)
-      .collection('config').doc('geral').get();
-    const menuVisivel = snap.exists ? (snap.data().menuVisivel || {}) : {};
-    renderModulosSection(uid, menuVisivel);
+    const snap = await db.collection('licencas').doc(uid).get();
+    const modulosAdmin = snap.exists ? (snap.data().modulosAdmin || {}) : {};
+    renderModulosSection(uid, modulosAdmin);
   } catch (e) {
     console.error('[loadMemberModulos]', e);
     const el = document.getElementById('modulosModalBody');
@@ -4149,8 +4148,8 @@ function renderModulosSection(uid, menuVisivel) {
         border:1px solid var(--border2);margin-bottom:8px;">
         <span style="font-size:13px;font-weight:500;color:var(--text)">${esc(m.label)}</span>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
-          <span style="font-size:11px;color:${ativo?'var(--success)':'var(--text3)'};font-weight:600">
-            ${ativo ? 'Ativo' : 'Inativo'}
+          <span style="font-size:11px;color:${ativo?'var(--success)':'var(--danger)'};font-weight:600">
+            ${ativo ? 'Ativo' : 'Bloqueado'}
           </span>
           <div onclick="toggleModulo('${uid}','${m.key}',this)"
             data-key="${m.key}" data-ativo="${ativo}"
@@ -4176,19 +4175,19 @@ async function toggleModulo(uid, key, el) {
   el.style.background = novoAtivo ? 'var(--success)' : 'var(--border2)';
   el.querySelector('div').style.left = novoAtivo ? '21px' : '3px';
   const label = el.previousElementSibling;
-  label.textContent = novoAtivo ? 'Ativo' : 'Inativo';
-  label.style.color = novoAtivo ? 'var(--success)' : 'var(--text3)';
+  label.textContent = novoAtivo ? 'Ativo' : 'Bloqueado';
+  label.style.color = novoAtivo ? 'var(--success)' : 'var(--danger)';
   try {
-    await db.collection('users').doc(uid)
-      .collection('config').doc('geral')
-      .set({ menuVisivel: { [key]: novoAtivo } }, { merge: true });
+    // Grava em licencas/{uid} — cliente não tem permissão de escrita aqui
+    await db.collection('licencas').doc(uid)
+      .set({ modulosAdmin: { [key]: novoAtivo } }, { merge: true });
   } catch(e) {
     // Reverte se falhar
     el.dataset.ativo = String(ativo);
     el.style.background = ativo ? 'var(--success)' : 'var(--border2)';
     el.querySelector('div').style.left = ativo ? '21px' : '3px';
-    label.textContent = ativo ? 'Ativo' : 'Inativo';
-    label.style.color = ativo ? 'var(--success)' : 'var(--text3)';
+    label.textContent = ativo ? 'Ativo' : 'Bloqueado';
+    label.style.color = ativo ? 'var(--success)' : 'var(--danger)';
     alert('Erro ao salvar. Tente novamente.');
   }
 }

@@ -2693,6 +2693,7 @@ export default function Dashboard() {
     () => sessionStorage.getItem("ag_saudacao_shown") !== "true"
   );
   const [menuVisivel,   setMenuVisivel]  = useState({});
+  const [modulosAdmin,  setModulosAdmin] = useState({});
   const [collapsed,     setCollapsed]    = useState(
     () => localStorage.getItem("ag_sidebar_collapsed") === "true"
   );
@@ -3346,13 +3347,24 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     }
   }, [uid, authUser, tenantUid]);
 
-  /* ── Visibilidade do menu ── */
+  /* ── Visibilidade do menu (cliente) ── */
   useEffect(() => {
     if (!uid) return;
     return onSnapshot(doc(db, "users", uid, "config", "geral"), (snap) => {
       if (snap.exists()) setMenuVisivel(snap.data().menuVisivel || {});
     }, fsSnapshotError("Dashboard:configGeral"));
   }, [uid]);
+
+  /* ── Módulos bloqueados pelo admin (licencas — cliente não pode escrever) ── */
+  useEffect(() => {
+    if (!uid) return;
+    return onSnapshot(doc(db, "licencas", uid), (snap) => {
+      if (snap.exists()) setModulosAdmin(snap.data().modulosAdmin || {});
+    }, () => {});
+  }, [uid]);
+
+  // Helper: módulo visível = cliente ativou E admin não bloqueou
+  const moduloVisivel = (key) => menuVisivel[key] !== false && modulosAdmin[key] !== false;
 
   /* ── Datas de cadastro dos clientes (gráfico de crescimento) ── */
   useEffect(() => {
@@ -3375,7 +3387,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       if (tag === "INPUT" || tag === "TEXTAREA" || document.activeElement?.isContentEditable) return;
       const atalho = ATALHO_LOOKUP[e.code];
       if (!atalho) return;
-      if (!LOCKED_KEYS.has(atalho.dbKey) && menuVisivel[atalho.dbKey] === false) return;
+      if (!LOCKED_KEYS.has(atalho.dbKey) && !moduloVisivel(atalho.dbKey)) return;
       e.preventDefault();
       setModule(atalho.label);
     };
@@ -4783,7 +4795,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     {/* Itens — visíveis só se seção aberta (ou sidebar colapsada) */}
                     {(aberta || collapsed) && sec.items.map((item) => {
                       const dbKey = KEY_MAP[item.label];
-                      if (dbKey && menuVisivel[dbKey] === false) return null;
+                      if (dbKey && !moduloVisivel(dbKey)) return null;
                       if (item.modulo && !podeVer(item.modulo)) return null;
                       return (
                         <div
@@ -4920,7 +4932,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
                       {aberta && sec.items.map((item) => {
                         const dbKey = KEY_MAP[item.label];
-                        if (dbKey && menuVisivel[dbKey] === false) return null;
+                        if (dbKey && !moduloVisivel(dbKey)) return null;
                         if (item.modulo && !podeVer(item.modulo)) return null;
                         return (
                           <div
