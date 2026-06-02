@@ -1603,7 +1603,7 @@ const buildVisivel = (cfg) => {
   return base;
 };
 
-function SecaoMenu({ config, onSave }) {
+function SecaoMenu({ config, onSave, modulosAdmin = {} }) {
   const [visivel, setVisivel]   = useState(() => buildVisivel(config));
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro]         = useState("");
@@ -1633,13 +1633,24 @@ function SecaoMenu({ config, onSave }) {
       </div>
       <div className="cfg-card-body">
         <div className="menu-toggle-list">
-          {MENU_SECTIONS.map(s => (
-            <div key={s.key} className="menu-toggle-item">
-              <div className="menu-toggle-icon"><s.Icon size={15} /></div>
-              <div style={{ flex: 1 }}><div className="menu-toggle-label">{s.label}</div><div className="menu-toggle-sub">{s.sub}</div></div>
-              {s.locked ? <span className="menu-toggle-locked">Sempre visível</span> : <Toggle checked={!!visivel[s.key]} onChange={val => toggle(s.key, val)} />}
-            </div>
-          ))}
+          {MENU_SECTIONS.map(s => {
+            const bloqueadoAdmin = modulosAdmin[s.key] === false;
+            return (
+              <div key={s.key} className="menu-toggle-item">
+                <div className="menu-toggle-icon"><s.Icon size={15} /></div>
+                <div style={{ flex: 1 }}>
+                  <div className="menu-toggle-label">{s.label}</div>
+                  <div className="menu-toggle-sub">{s.sub}</div>
+                </div>
+                {s.locked
+                  ? <span className="menu-toggle-locked">Sempre visível</span>
+                  : bloqueadoAdmin
+                    ? <span className="menu-toggle-locked" style={{ color: "var(--red, #e05252)" }}>Bloqueado pelo admin</span>
+                    : <Toggle checked={!!visivel[s.key]} onChange={val => toggle(s.key, val)} />
+                }
+              </div>
+            );
+          })}
         </div>
       </div>
       <div className="cfg-card-footer"><button className="btn-primary" onClick={handleSalvar} disabled={salvando}>{salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Menu</>}</button></div>
@@ -2599,10 +2610,11 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
   const { tenantUid, cargo, isAdmin } = useAuth();
   const uid = tenantUid;
 
-  const [config, setConfig]   = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [secao, setSecao]     = useState(isAdmin ? "empresa" : "seguranca");
-  const [toast, setToast]     = useState(null);
+  const [config, setConfig]           = useState(null);
+  const [loading, setLoading]         = useState(true);
+  const [secao, setSecao]             = useState(isAdmin ? "empresa" : "seguranca");
+  const [toast, setToast]             = useState(null);
+  const [modulosAdmin, setModulosAdmin] = useState({});
 
   // Seções que este cargo pode ver
   const secoesVisiveis = SECOES_POR_CARGO[cargo] ?? ["seguranca", "atalhos"];
@@ -2612,6 +2624,16 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
     if (!uid) { setLoading(false); return; }
     const ref = doc(db, "users", uid, "config", "geral");
     getDoc(ref).then(snap => setConfig(snap.exists() ? snap.data() : {})).catch(() => setConfig({})).finally(() => setLoading(false));
+  }, [uid]);
+
+  // Carrega módulos bloqueados pelo admin
+  useEffect(() => {
+    if (!uid) return;
+    const ref = doc(db, "licencas", uid);
+    const unsub = onSnapshot(ref, snap => {
+      setModulosAdmin(snap.exists() ? (snap.data().modulosAdmin || {}) : {});
+    }, () => {});
+    return unsub;
   }, [uid]);
 
   const handleSave = useCallback(async (partial) => {
@@ -2631,7 +2653,7 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
       case "cargos":     return <SecaoCargos    tenantUid={uid} />;
       case "financeiro": return <SecaoFinanceiro config={config} onSave={handleSave} />;
       case "pagamentos": return <SecaoPagamentos config={config} onSave={handleSave} />;
-      case "menu":       return <SecaoMenu       config={config} onSave={handleSave} />;
+      case "menu":       return <SecaoMenu       config={config} onSave={handleSave} modulosAdmin={modulosAdmin} />;
       case "estoque":    return <SecaoEstoque    config={config} onSave={handleSave} />;
       case "matriculas": return <SecaoMatriculas tenantUid={uid} />;
       case "atalhos":    return <SecaoAtalhos    menuVisivel={menuVisivelProp ?? config?.menuVisivel ?? {}} />;
