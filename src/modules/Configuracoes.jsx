@@ -2356,7 +2356,7 @@ function SecaoLGPD() {
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════ */
 const SECOES_POR_CARGO = {
-  admin:       ["empresa", "seguranca", "financeiro", "pagamentos", "menu", "estoque", "matriculas", "atalhos", "log", "lgpd"],
+  admin:       ["empresa", "seguranca", "cargos", "financeiro", "pagamentos", "menu", "estoque", "matriculas", "atalhos", "log", "lgpd"],
   financeiro:  ["seguranca", "financeiro", "atalhos"],
   comercial:   ["seguranca", "atalhos"],
   compras:     ["seguranca", "estoque", "atalhos"],
