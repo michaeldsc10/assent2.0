@@ -1091,7 +1091,7 @@ export default function Agenda({ isPro = false }) {
   }, [tenantUid]);
 
   const handleEdit = useCallback(async (dados) => {
-    if (!tenantUid || !formEvt || formEvt === "novo") return;
+    if (!tenantUid || !formEvt || formEvt === "novo" || formEvt?._novo) return;
     await updateDoc(doc(db, "users", tenantUid, "eventos", formEvt.id), dados);
     await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.AGENDA, descricao: montarDescricao("editar", "Agendamento", dados.titulo || dados.descricao || "Evento", formEvt.id) });
     setFormEvt(null);
@@ -1216,7 +1216,7 @@ export default function Agenda({ isPro = false }) {
             <AgendaCalendario
               eventos={eventos}
               onVerDetalhes={setDetalhes}
-              onNovo={(dataISO) => setFormEvt({ data: dataISO })}
+              onNovo={(dataISO) => setFormEvt({ _novo: true, data: dataISO })}
               categorias={categorias}
             />
           )}
@@ -1238,7 +1238,7 @@ export default function Agenda({ isPro = false }) {
       {formEvt && (
         <ModalFormEvento
           evento={formEvt === "novo" ? null : formEvt}
-          onSave={formEvt === "novo" ? handleAdd : handleEdit}
+          onSave={formEvt === "novo" || formEvt?._novo ? handleAdd : handleEdit}
           onClose={() => setFormEvt(null)}
           categorias={categorias}
         />
