@@ -341,6 +341,7 @@ const RESPONSIVE_CSS = `
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch !important;
     display: block !important;
+    padding-bottom: 72px !important;
   }
   /* ag-page cresce com o conteúdo, sem altura fixa */
   .ag-page {
@@ -538,6 +539,7 @@ const RESPONSIVE_CSS = `
 /* ── MOBILE BOTTOM NAV ── */
 @media (max-width: 720px) {
   .ag-app { padding-bottom: 0 !important; }
+  .ag-main { padding-bottom: 72px !important; }
   .ag-content { padding-bottom: 76px !important; }
   .ag-mobile-nav { display: flex !important; }
 }
