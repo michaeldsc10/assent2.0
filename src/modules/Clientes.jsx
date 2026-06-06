@@ -359,6 +359,49 @@ function PerfilBadge({ perfis = [] }) {
   );
 }
 
+/* ── Validação CPF / CNPJ ── */
+function validarCPF(cpf) {
+  cpf = cpf.replace(/\D/g, "");
+  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+  let soma = 0;
+  for (let i = 0; i < 9; i++) soma += parseInt(cpf[i]) * (10 - i);
+  let r = soma % 11; const d1 = r < 2 ? 0 : 11 - r;
+  if (d1 !== parseInt(cpf[9])) return false;
+  soma = 0;
+  for (let i = 0; i < 10; i++) soma += parseInt(cpf[i]) * (11 - i);
+  r = soma % 11; const d2 = r < 2 ? 0 : 11 - r;
+  return d2 === parseInt(cpf[10]);
+}
+
+function validarCNPJ(cnpj) {
+  cnpj = cnpj.replace(/\D/g, "");
+  if (cnpj.length !== 14 || /^(\d)\1+$/.test(cnpj)) return false;
+  let t = 12, s = 0, p = t - 7;
+  const n = cnpj;
+  for (let i = t; i >= 1; i--) { s += parseInt(n[t - i]) * p--; if (p < 2) p = 9; }
+  let r = s % 11 < 2 ? 0 : 11 - (s % 11);
+  if (r !== parseInt(n[12])) return false;
+  t = 13; s = 0; p = t - 7;
+  for (let i = t; i >= 1; i--) { s += parseInt(n[t - i]) * p--; if (p < 2) p = 9; }
+  r = s % 11 < 2 ? 0 : 11 - (s % 11);
+  return r === parseInt(n[13]);
+}
+
+function validarDocumento(val) {
+  const digits = val.replace(/\D/g, "");
+  if (digits.length <= 11) return validarCPF(digits);
+  return validarCNPJ(digits);
+}
+
+function mascaraDocumento(val) {
+  const d = val.replace(/\D/g, "").slice(0, 14);
+  if (d.length <= 11)
+    return d.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/, (_, a, b, c, e) =>
+      [a, b, c].filter(Boolean).join(".") + (e ? "-" + e : ""));
+  return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{0,2})/, (_, a, b, c, e, f) =>
+    `${a}.${b}.${c}/${e}` + (f ? "-" + f : ""));
+}
+
 function ModalNovoCliente({ cliente, clientes, onSave, onClose }) {
   const [form, setForm] = useState(cliente || {});
   const [erros, setErros] = useState({});
@@ -366,8 +409,12 @@ function ModalNovoCliente({ cliente, clientes, onSave, onClose }) {
   const validate = () => {
     const novosErros = {};
     if (!form.nome?.trim()) novosErros.nome = "Obrigatório";
-    if (form.cpf && clientes.some(c => c.id !== cliente?.id && c.cpf === form.cpf)) {
-      novosErros.cpf = "CPF já cadastrado";
+    if (!form.cpf?.trim()) {
+      novosErros.cpf = "Obrigatório";
+    } else if (!validarDocumento(form.cpf)) {
+      novosErros.cpf = "CPF ou CNPJ inválido";
+    } else if (clientes.some(c => c.id !== cliente?.id && c.cpf === form.cpf)) {
+      novosErros.cpf = "Documento já cadastrado";
     }
     setErros(novosErros);
     return Object.keys(novosErros).length === 0;
@@ -403,13 +450,14 @@ function ModalNovoCliente({ cliente, clientes, onSave, onClose }) {
             </div>
             <div className="form-row">
               <div className="form-group">
-                <label className="form-label">CPF</label>
+                <label className="form-label">CPF / CNPJ <span className="form-label-req">*</span></label>
                 <input
                   className={`form-input ${erros.cpf ? "err" : ""}`}
                   type="text"
                   value={form.cpf || ""}
-                  onChange={(e) => setForm({ ...form, cpf: e.target.value })}
-                  placeholder="000.000.000-00"
+                  onChange={(e) => setForm({ ...form, cpf: mascaraDocumento(e.target.value) })}
+                  placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                  maxLength={18}
                 />
                 {erros.cpf && <div className="form-error">{erros.cpf}</div>}
               </div>
