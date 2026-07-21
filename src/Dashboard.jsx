@@ -1195,103 +1195,103 @@ const CSS = `
 
   /* Wrapper interno — centraliza e limita largura */
   .db-page {
-    max-width: 1180px;
+    max-width: 1100px;
     margin: 0 auto;
-    padding: 24px 28px 48px;
+    padding: 36px 32px 72px;
   }
 
-  /* ══ KPI STRIP — 3 grandes + 3 compactos ══ */
+  /* ══ HERO STATS — faixa aberta, sem caixas ══ */
   .db-kpi-strip {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr) repeat(3, 0.72fr);
-    gap: 10px;
-    margin-bottom: 22px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    margin-bottom: 44px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--border);
   }
   .db-kpi-card {
-    padding: 20px 20px 16px;
+    flex: 1 1 150px;
+    min-width: 140px;
+    padding: 0 24px;
     position: relative;
-    transition: background .15s, border-color .15s;
+    transition: opacity .15s;
     cursor: default;
-    min-width: 0;
-    background: var(--s1);
-    border: 1px solid var(--border);
-    border-radius: 12px;
+    background: transparent;
+    border: none;
+    border-right: 1px solid var(--border);
+    border-radius: 0;
   }
-  .db-kpi-card + .db-kpi-card { border-left: none; }
-  .db-kpi-card:nth-child(4) { border-left: none; }
-  .db-kpi-card:hover { background: rgba(255,255,255,0.016); border-color: var(--border-h); }
-  .db-kpi-card-accent {
-    position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
-    opacity: 0; transition: opacity .2s;
-  }
-  .db-kpi-card:hover .db-kpi-card-accent { opacity: 1; }
+  .db-kpi-card:first-child { padding-left: 0; }
+  .db-kpi-card:last-child  { border-right: none; }
+  .db-kpi-card:hover { background: transparent; border-color: var(--border); opacity: .82; }
+  .db-kpi-card-accent { display: none; }
   .db-kpi-label {
-    font-size: 9px; font-weight: 600; letter-spacing: .12em;
-    text-transform: uppercase; color: var(--text-3); margin-bottom: 9px;
+    font-size: 10px; font-weight: 600; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--text-3); margin-bottom: 11px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .db-kpi-val {
-    font-family: var(--font-mono); font-size: 20px; font-weight: 600;
-    line-height: 1; letter-spacing: -0.02em; margin-bottom: 7px;
+    font-family: var(--font-mono); font-size: 24px; font-weight: 600;
+    line-height: 1; letter-spacing: -0.02em; margin-bottom: 8px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  /* KPIs secundários (4-6) — valor menor */
-  .db-kpi-card:nth-child(n+4) .db-kpi-val { font-size: 16px; }
+  .db-kpi-card:nth-child(n+4) .db-kpi-val { font-size: 18px; }
   .db-kpi-meta { display: flex; align-items: center; gap: 4px; }
-  .db-kpi-trend { font-size: 10px; font-weight: 600; display: flex; align-items: center; gap: 2px; }
-  .db-kpi-sub { font-size: 10px; color: var(--text-3); }
+  .db-kpi-trend { font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 2px; }
+  .db-kpi-sub { font-size: 11px; color: var(--text-3); }
 
-  /* ══ LAYOUT BODY ══ */
-  .db-body { display: grid; grid-template-columns: 1fr 240px; gap: 18px; }
-  .db-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-  .db-aside { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  /* ══ LAYOUT BODY — seções com respiro, não colunas de caixas ══ */
+  .db-body { display: grid; grid-template-columns: 1fr 260px; gap: 60px; }
+  .db-main { display: flex; flex-direction: column; gap: 44px; min-width: 0; }
+  .db-aside { display: flex; flex-direction: column; gap: 44px; min-width: 0; }
 
-  /* ══ PANEL ══ */
+  /* ══ SEÇÃO — título + régua, sem caixa fechada ══ */
   .db-panel {
-    background: var(--s1);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    transition: border-color .15s;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    transition: none;
     position: relative;
-    overflow: hidden;
+    overflow: visible;
   }
-  .db-panel:hover { border-color: var(--border-h); }
-  .db-panel-table { overflow: hidden; }
+  .db-panel:hover { border-color: transparent; }
+  .db-panel-table { overflow: visible; }
   .db-panel-header {
-    padding: 14px 18px 12px;
+    padding: 0 0 14px;
+    margin-bottom: 2px;
     border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
   }
   .db-panel-title {
-    font-size: 11px; font-weight: 600; letter-spacing: .06em;
-    text-transform: uppercase; color: var(--text-3);
+    font-size: 13px; font-weight: 600; letter-spacing: -0.005em;
+    text-transform: none; color: var(--text);
   }
-  .db-panel-body { padding: 14px 18px; }
+  .db-panel-body { padding: 14px 0; }
   .db-view-all {
-    font-size: 10px; color: var(--text-3); letter-spacing: .04em;
+    font-size: 11px; color: var(--text-3); letter-spacing: .02em;
     background: transparent; border: none; cursor: pointer;
-    font-family: 'Sora', system-ui, sans-serif; text-transform: uppercase;
+    font-family: 'Sora', system-ui, sans-serif; text-transform: none;
     display: flex; align-items: center; gap: 3px; transition: color .13s;
   }
   .db-view-all:hover { color: var(--gold); }
 
-  /* ══ TABELAS ══ */
+  /* ══ TABELAS — linhas soltas, sem grade fechada ══ */
   .ag-trow {
-    display: grid; padding: 9px 18px;
+    display: grid; padding: 12px 0;
     border-bottom: 1px solid rgba(255,255,255,0.04);
-    font-size: 12px; color: var(--text-2); transition: background .1s;
+    font-size: 13px; color: var(--text-2); transition: background .1s;
     align-items: center;
   }
-  .ag-trow:hover   { background: rgba(255,255,255,0.018); }
+  .ag-trow:hover   { background: rgba(255,255,255,0.014); }
   .ag-trow:last-child { border-bottom: none; }
   .ag-thead { background: transparent; }
-  .ag-th { font-size: 9px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); padding-bottom: 2px; }
-  .ag-empty-row { padding: 20px 18px; text-align: center; font-size: 12px; color: var(--text-3); }
+  .ag-th { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); padding-bottom: 6px; }
+  .ag-empty-row { padding: 24px 0; text-align: center; font-size: 12px; color: var(--text-3); }
 
   /* ══ ASIDE STATS ══ */
   .db-stat-row {
     display: flex; align-items: center; gap: 12px;
-    padding: 11px 18px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
     cursor: pointer; transition: background .1s;
   }
   .db-stat-row:last-child { border-bottom: none; }
@@ -1306,7 +1306,7 @@ const CSS = `
   /* ══ DESPESAS ASIDE ══ */
   .db-desp-row {
     display: flex; align-items: center; gap: 10px;
-    padding: 10px 18px; border-bottom: 1px solid rgba(255,255,255,0.04);
+    padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
     font-size: 12px; transition: background .1s;
   }
   .db-desp-row:last-child { border-bottom: none; }
@@ -2602,7 +2602,7 @@ function AgendaFinanceira({ uid }) {
   const modalAR   = diaSel ? (indexAR[toYMD_AF(diaSel)]   || []) : [];
 
   return (
-    <div className="db-panel" style={{ padding: "16px 18px" }}>
+    <div className="db-panel" style={{ padding: "16px 0" }}>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
         <span style={{ fontSize:13, fontWeight:600, color:"var(--text)" }}>
           Agenda financeira — {MESES_AF[m]} {y}
@@ -3906,7 +3906,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   <span className="db-panel-title">Mix de receita</span>
                   <ChartToggle value={mixModeOverview} onChange={setMixModeOverview} />
                 </div>
-                <div style={{ padding: "14px 18px" }}>
+                <div style={{ padding: "14px 0" }}>
                   {mixModeOverview === "3d" ? (
                     <Chart3DDonut data={dash.mixData || []} height={190} />
                   ) : (
