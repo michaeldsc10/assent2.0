@@ -613,6 +613,98 @@ async function verificarAdmin(callerUid) {
 }
 
 /* ─────────────────────────────────────────────
+   FUNÇÃO: Sincronizar Taxas MP
+   Não existe endpoint MP para "taxa contratada" —
+   só dá pra saber a real via fee_details de pagamentos
+   já aprovados. Busca os últimos aprovados, agrupa por
+   modalidade/parcela e calcula a % média cobrada.
+   Substitui o preenchimento manual em Configurações.
+───────────────────────────────────────────── */
+exports.sincronizarTaxasMP = onCall(CALL_OPTIONS, async (request) => {
+  const tenantUid = await verificarAdmin(request.auth?.uid);
+
+  const configSnap = await db.doc(`users/${tenantUid}/config/geral`).get();
+  const token = configSnap.data()?.pagamentos?.mercadopago?.accessToken;
+  if (!token) {
+    throw new HttpsError("failed-precondition", "Mercado Pago não configurado.");
+  }
+
+  const desde = new Date();
+  desde.setDate(desde.getDate() - 90);
+  const ate = new Date();
+
+  const somas  = {}; // chave -> { soma, count }
+  const limit  = 50;
+  const maxRegistros = 300; // teto de segurança — evita loop longo/custo alto
+  let offset = 0;
+  let total  = Infinity;
+
+  while (offset < total && offset < maxRegistros) {
+    const params = new URLSearchParams({
+      sort: "date_created",
+      criteria: "desc",
+      status: "approved",
+      range: "date_created",
+      begin_date: desde.toISOString(),
+      end_date: ate.toISOString(),
+      offset: String(offset),
+      limit: String(limit),
+    });
+
+    let mpRes;
+    try {
+      mpRes = await fetch(`https://api.mercadopago.com/v1/payments/search?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch (err) {
+      console.error("[sincronizarTaxasMP] fetch:", err);
+      break;
+    }
+    if (!mpRes.ok) break;
+
+    const mpData = await mpRes.json();
+    total = mpData.paging?.total ?? 0;
+
+    for (const p of (mpData.results || [])) {
+      if (typeof p.transaction_amount !== "number" || !p.transaction_amount) continue;
+      const feeDetail = (p.fee_details || []).find(f => f.type === "mercadopago_fee");
+      if (!feeDetail || typeof feeDetail.amount !== "number") continue;
+
+      let chave;
+      if (p.payment_type_id === "pix") chave = "pix";
+      else if (p.payment_type_id === "debit_card") chave = "debito";
+      else if (p.payment_type_id === "credit_card") chave = `credito_${p.installments || 1}`;
+      else continue;
+
+      const pct = (feeDetail.amount / p.transaction_amount) * 100;
+      if (!somas[chave]) somas[chave] = { soma: 0, count: 0 };
+      somas[chave].soma  += pct;
+      somas[chave].count += 1;
+    }
+
+    offset += limit;
+  }
+
+  const taxas     = {};
+  const amostras  = {};
+  Object.keys(somas).forEach(k => {
+    taxas[k]    = parseFloat((somas[k].soma / somas[k].count).toFixed(2));
+    amostras[k] = somas[k].count;
+  });
+
+  if (Object.keys(taxas).length === 0) {
+    throw new HttpsError("not-found", "Nenhum pagamento aprovado com dados de taxa nos últimos 90 dias.");
+  }
+
+  await db.doc(`users/${tenantUid}/config/geral`).set({
+    taxas,
+    taxasSincronizadasEm: FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  return { taxas, amostras };
+});
+
+/* ─────────────────────────────────────────────
    FUNÇÃO 1: Criar Usuário
 ───────────────────────────────────────────── */
 exports.criarUsuario = onCall(CALL_OPTIONS, async (request) => {
