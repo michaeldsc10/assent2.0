@@ -737,7 +737,7 @@ function imprimirRecibo(venda, empresa) {
         </div>` : ""}
       ${temTaxa ? `
         <div style="display:flex;justify-content:space-between;font-size:11px;color:#444;">
-          <span>Taxa cartão (${venda.taxaPercentual}%)</span><span>${fmtR$(venda.valorTaxa)}</span>
+          <span>Taxa ${venda.formaPagamento === "Pix" ? "PIX" : "Cartão"} (${venda.taxaPercentual}%)</span><span>${fmtR$(venda.valorTaxa)}</span>
         </div>` : ""}
       <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:14px;margin-top:4px;">
         <span>TOTAL</span><span>${fmtR$(venda.total)}</span>
