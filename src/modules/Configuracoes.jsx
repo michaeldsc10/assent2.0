@@ -1148,65 +1148,64 @@ function SecaoSeguranca({ config, onSave }) {
   );
 }
 
-const normalizaTaxa = (raw) => {
-  let v = String(raw).replace(",", ".").replace(/[^0-9.]/g, "");
-  const parts = v.split(".");
-  if (parts.length > 2) v = parts[0] + "." + parts.slice(1).join("");
-  if (v.includes(".")) {
-    const [int, dec] = v.split(".");
-    v = int + "." + dec.slice(0, 2);
-  }
-  return v;
-};
+function fmtDataTaxa(ts) {
+  if (!ts) return null;
+  try {
+    const d = ts?.toDate ? ts.toDate() : new Date(ts);
+    return d.toLocaleString("pt-BR", {
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  } catch { return null; }
+}
 
-const taxaValida = (v) => {
-  const n = parseFloat(v);
-  return v !== "" && !isNaN(n) && n >= 0;
-};
-
-function SecaoFinanceiro({ config, onSave }) {
-  const [taxas, setTaxas]       = useState(() => ({ ...TAXAS_DEFAULT, ...(config?.taxas || {}) }));
-  const [erros, setErros]       = useState({});
-  const [salvando, setSalvando] = useState(false);
+function SecaoFinanceiro({ config }) {
+  const [taxas, setTaxas]           = useState(() => ({ ...TAXAS_DEFAULT, ...(config?.taxas || {}) }));
+  const [amostras, setAmostras]     = useState({});
+  const [sincronizadoEm, setSincronizadoEm] = useState(config?.taxasSincronizadasEm ?? null);
+  const [sincronizando, setSincronizando]   = useState(false);
+  const [erro, setErro]             = useState("");
 
   useEffect(() => {
     if (config?.taxas) setTaxas(prev => ({ ...TAXAS_DEFAULT, ...config.taxas }));
+    setSincronizadoEm(config?.taxasSincronizadasEm ?? null);
   }, [config]);
 
-  const setTaxa = (k, raw) => {
-    const v = normalizaTaxa(raw);
-    setTaxas(t => ({ ...t, [k]: v }));
-    if (erros[k]) setErros(e => ({ ...e, [k]: "" }));
+  const handleSincronizar = async () => {
+    setSincronizando(true);
+    setErro("");
+    try {
+      const fn  = httpsCallable(functions, "sincronizarTaxasMP");
+      const res = await fn();
+      setTaxas(prev => ({ ...prev, ...res.data.taxas }));
+      setAmostras(res.data.amostras || {});
+      setSincronizadoEm(new Date().toISOString());
+    } catch (e) {
+      const msg = e?.code === "functions/failed-precondition"
+        ? "Configure o Mercado Pago antes de sincronizar."
+        : e?.code === "functions/not-found"
+        ? "Nenhum pagamento aprovado nos últimos 90 dias para calcular a taxa."
+        : "Falha ao sincronizar com o Mercado Pago.";
+      setErro(msg);
+    }
+    setSincronizando(false);
   };
 
-  const validar = () => {
-    const e = {};
-    Object.keys(taxas).forEach(k => { if (!taxaValida(taxas[k])) e[k] = "Inválido"; });
-    setErros(e);
-    return Object.keys(e).length === 0;
+  const TaxaRow = ({ chave, label, tipo }) => {
+    const n = amostras[chave];
+    return (
+      <tr>
+        <td><span className="taxa-bandeira">{label}</span></td>
+        <td><span className="taxa-tipo-badge">{tipo}</span></td>
+        <td style={{ textAlign: "right" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "flex-end", gap: 6 }}>
+            {taxas[chave] != null ? `${taxas[chave]}%` : "—"}
+            {n ? <span className="taxa-pct">({n} vendas)</span> : null}
+          </span>
+        </td>
+      </tr>
+    );
   };
-
-  const handleSalvar = async () => {
-    if (!validar()) return;
-    const taxasFinais = {};
-    Object.keys(taxas).forEach(k => { taxasFinais[k] = parseFloat(parseFloat(taxas[k]).toFixed(2)); });
-    setSalvando(true);
-    await onSave({ taxas: taxasFinais });
-    setSalvando(false);
-  };
-
-  const TaxaRow = ({ chave, label, tipo }) => (
-    <tr>
-      <td><span className="taxa-bandeira">{label}</span></td>
-      <td><span className="taxa-tipo-badge">{tipo}</span></td>
-      <td style={{ textAlign: "right" }}>
-        <span style={{ display: "inline-flex", alignItems: "center" }}>
-          <input className={`taxa-input ${erros[chave] ? "err" : ""}`} value={taxas[chave] ?? ""} onChange={e => setTaxa(chave, e.target.value)} inputMode="decimal" />
-          <span className="taxa-pct">%</span>
-        </span>
-      </td>
-    </tr>
-  );
 
   return (
     <div className="cfg-card">
@@ -1214,7 +1213,7 @@ function SecaoFinanceiro({ config, onSave }) {
         <div className="cfg-card-header-icon"><CreditCard size={15} /></div>
         <div>
           <div className="cfg-card-title">Taxa de Máquina de Cartão</div>
-          <div className="cfg-card-sub">Usada para calcular lucro líquido nas vendas</div>
+          <div className="cfg-card-sub">Calculada automaticamente a partir dos pagamentos aprovados no Mercado Pago</div>
         </div>
       </div>
       <div className="cfg-card-body" style={{ padding: 0 }}>
@@ -1231,10 +1230,20 @@ function SecaoFinanceiro({ config, onSave }) {
           </tbody>
         </table>
       </div>
-      <div className="cfg-card-footer">
-        <button className="btn-primary" onClick={handleSalvar} disabled={salvando}>
-          {salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Taxas</>}
-        </button>
+      <div className="cfg-card-footer" style={{ flexDirection: "column", alignItems: "flex-start", gap: 8 }}>
+        {erro && <span style={{ color: "var(--danger, #e5484d)", fontSize: 12 }}>{erro}</span>}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
+          <button className="btn-primary" onClick={handleSincronizar} disabled={sincronizando}>
+            {sincronizando
+              ? <><span className="cfg-spinner" />Sincronizando...</>
+              : <><RefreshCw size={13} />Sincronizar com Mercado Pago</>}
+          </button>
+          {fmtDataTaxa(sincronizadoEm) && (
+            <span style={{ fontSize: 12, color: "var(--text-3)" }}>
+              Última sincronização: {fmtDataTaxa(sincronizadoEm)}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -2651,7 +2660,7 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
       case "empresa":    return <SecaoEmpresa    config={config} onSave={handleSave} uid={uid} />;
       case "seguranca":  return <SecaoSeguranca config={config} onSave={handleSave} />;
       case "cargos":     return <SecaoCargos    tenantUid={uid} />;
-      case "financeiro": return <SecaoFinanceiro config={config} onSave={handleSave} />;
+      case "financeiro": return <SecaoFinanceiro config={config} />;
       case "pagamentos": return <SecaoPagamentos config={config} onSave={handleSave} />;
       case "menu":       return <SecaoMenu       config={config} onSave={handleSave} modulosAdmin={modulosAdmin} />;
       case "estoque":    return <SecaoEstoque    config={config} onSave={handleSave} />;
