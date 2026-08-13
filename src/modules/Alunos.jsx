@@ -17,6 +17,7 @@
                                              tipoVenda: "mensalidade"
 
      users/{uid}/config/matriculas         → template mensagem WhatsApp
+                                             + turmas [{nome, idade, dia, horario}]
    ═══════════════════════════════════════════════════ */
 
 import { useState, useEffect, useContext, useMemo, useRef } from "react";
@@ -25,6 +26,7 @@ import {
   MessageCircle, Calendar, CreditCard, Settings,
   ChevronLeft, CheckCircle, AlertCircle, Clock,
   Phone, Mail, MapPin, User, FileText, DollarSign, Camera, AtSign,
+  GraduationCap, Check,
 } from "lucide-react";
 
 import AuthContext from "../contexts/AuthContext";
@@ -55,6 +57,16 @@ const permMat = (cargo, acao) => PERMISSOES_MATRICULAS[cargo]?.[acao] ?? false;
 const MSG_WHATSAPP_DEFAULT =
   "Olá [nome], tudo bem? Passando para lembrar da sua mensalidade de [mes] no valor de [valor]. " +
   "Qualquer dúvida estou à disposição. 💙";
+
+/* Turma: objeto {nome, idade, dia, horario}. Aceita string legada. */
+const normalizeTurma = (t) =>
+  typeof t === "string"
+    ? { nome: t, idade: "", dia: "", horario: "" }
+    : { nome: t?.nome || "", idade: t?.idade || "", dia: t?.dia || "", horario: t?.horario || "" };
+
+const MAX_TURMAS      = 50;
+const MAX_TURMA_NOME  = 60;
+const MAX_TURMA_CAMPO = 30;
 
 const MESES_PT = [
   "janeiro", "fevereiro", "março", "abril", "maio", "junho",
@@ -176,7 +188,40 @@ const CSS = `
   box-shadow:0 28px 72px rgba(0,0,0,.65); animation:slideUp .18s ease; }
 .modal-box-xl { max-width:820px; }
 .modal-box-lg { max-width:680px; }
+.modal-box-lg.modal-box-split { max-width:920px; }
 .modal-box-md { max-width:420px; }
+.cfg-split { display:grid; grid-template-columns:1fr 1fr; gap:26px; }
+.cfg-split-col:first-child { border-right:1px solid var(--border); padding-right:26px; }
+@media (max-width:760px) {
+  .cfg-split { grid-template-columns:1fr; }
+  .cfg-split-col:first-child { border-right:none; padding-right:0; border-bottom:1px solid var(--border); padding-bottom:18px; }
+}
+.turmas-list { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+.turma-item { display:flex; align-items:center; gap:8px; background:var(--s2);
+  border:1px solid var(--border); border-radius:8px; padding:8px 10px; min-height:40px;
+  transition:border-color .13s; }
+.turma-item:hover { border-color:var(--border-h); }
+.turma-item-info { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+.turma-item-nome { font-size:13px; color:var(--text); word-break:break-word; }
+.turma-item-meta { font-size:11px; color:var(--text-3); }
+.turma-item-input { flex:1; min-width:0; background:var(--s3); border:1px solid var(--border);
+  border-radius:6px; outline:none; font-size:12px; color:var(--text);
+  font-family:'DM Sans',sans-serif; padding:6px 8px; }
+.turma-item-input:focus { border-color:var(--gold); }
+.turma-fields-row { flex:1; display:grid; grid-template-columns:1.6fr 1fr 1fr 1fr; gap:6px; min-width:0; }
+.turmas-add-box { background:var(--s2); border:1px solid var(--border); border-radius:9px; padding:10px; }
+.turmas-empty { font-size:12px; color:var(--text-3); padding:14px 0; text-align:center; }
+.turma-btn-base { width:28px; height:28px; border-radius:7px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; cursor:pointer;
+  border:1px solid transparent; background:transparent; transition:all .13s; }
+.turma-btn-ok { color:#48bb78; }
+.turma-btn-ok:hover { background:rgba(72,187,120,.12); border-color:rgba(72,187,120,.25); }
+.turma-btn-cancel { color:var(--text-3); }
+.turma-btn-cancel:hover { background:var(--s3); border-color:var(--border); }
+.turma-btn-edit { color:#5b8ef0; }
+.turma-btn-edit:hover { background:rgba(91,142,240,.1); border-color:rgba(91,142,240,.2); }
+.turma-btn-del { color:#e05252; }
+.turma-btn-del:hover { background:rgba(224,82,82,.1); border-color:rgba(224,82,82,.2); }
 .modal-box::-webkit-scrollbar { width:3px; }
 .modal-box::-webkit-scrollbar-thumb { background:var(--text-3); border-radius:2px; }
 .modal-header { padding:20px 22px 16px; border-bottom:1px solid var(--border);
@@ -755,23 +800,31 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose, turmas = [] 
           <div className="form-group">
             <label className="form-label">Turma / Horário</label>
             {turmas.length > 0 ? (() => {
+              const nomes = turmas.map(t => t.nome);
               /* Se o aluno tem uma turma que não está mais na lista (dado legado),
                  inclui como opção temporária para não perder a informação */
-              const opts = turmas.includes(form.turma) || !form.turma
+              const opts = nomes.includes(form.turma) || !form.turma
                 ? turmas
-                : [...turmas, form.turma];
+                : [...turmas, { nome: form.turma, idade: "", dia: "", horario: "" }];
               return (
                 <select className="form-input" value={form.turma}
                   onChange={(e) => set("turma", e.target.value)}>
                   <option value="">— Selecione uma turma —</option>
-                  {opts.map(t => <option key={t} value={t}>{t}</option>)}
+                  {opts.map(t => {
+                    const meta = [t.dia, t.horario].filter(Boolean).join(" · ");
+                    return (
+                      <option key={t.nome} value={t.nome}>
+                        {t.nome}{meta ? ` — ${meta}` : ""}
+                      </option>
+                    );
+                  })}
                 </select>
               );
             })() : (
               <div style={{ fontSize: 12, color: "var(--text-3)", padding: "10px 13px",
                 background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 9 }}>
-                Nenhuma turma cadastrada. Configure em{" "}
-                <span style={{ color: "var(--gold)" }}>⚙ Configurações</span>.
+                Nenhuma turma cadastrada. Adicione em{" "}
+                <span style={{ color: "var(--gold)" }}>⚙ Configurações do módulo</span>.
               </div>
             )}
           </div>
@@ -1028,35 +1081,80 @@ function ModalDetalheAluno({
 }
 
 /* ══════════════════════════════════════════════════
-   MODAL: Configurações (template WhatsApp)
-   Turmas são gerenciadas em Configurações → Matrículas
+   MODAL: Configurações do módulo
+   Dividido em: Mensagem de cobrança + Turmas
    ══════════════════════════════════════════════════ */
-function ModalConfigMatriculas({ config, onSave, onClose }) {
+function ModalConfigMatriculas({ config, turmas: turmasIniciais, onSave, onClose }) {
   const [mensagem, setMensagem] = useState(config?.mensagemWhatsApp || MSG_WHATSAPP_DEFAULT);
+  const [turmas, setTurmas]     = useState((turmasIniciais || []).map(normalizeTurma));
   const [salvando, setSalvando] = useState(false);
+
+  const [novaTurma, setNovaTurma] = useState({ nome: "", idade: "", dia: "", horario: "" });
+  const [editIdx, setEditIdx]     = useState(null);
+  const [editVal, setEditVal]     = useState({ nome: "", idade: "", dia: "", horario: "" });
 
   const handleSave = async () => {
     setSalvando(true);
     try {
-      await onSave({ mensagemWhatsApp: mensagem });
+      await onSave({ mensagemWhatsApp: mensagem, turmas });
       onClose();
     } finally {
       setSalvando(false);
     }
   };
 
+  const nomeExiste = (nome, ignoreIdx = -1) =>
+    turmas.some((t, i) => i !== ignoreIdx && t.nome.toLowerCase() === nome.toLowerCase());
+
+  const addTurma = () => {
+    const nome = novaTurma.nome.trim().slice(0, MAX_TURMA_NOME);
+    if (!nome) return;
+    if (nomeExiste(nome)) { alert("Já existe uma turma com esse nome."); return; }
+    if (turmas.length >= MAX_TURMAS) { alert(`Limite de ${MAX_TURMAS} turmas atingido.`); return; }
+    setTurmas(l => [...l, {
+      nome,
+      idade:   novaTurma.idade.trim().slice(0, MAX_TURMA_CAMPO),
+      dia:     novaTurma.dia.trim().slice(0, MAX_TURMA_CAMPO),
+      horario: novaTurma.horario.trim().slice(0, MAX_TURMA_CAMPO),
+    }]);
+    setNovaTurma({ nome: "", idade: "", dia: "", horario: "" });
+  };
+
+  const removeTurma = (idx) => {
+    if (!window.confirm("Remover esta turma? Os alunos vinculados não serão afetados.")) return;
+    setTurmas(l => l.filter((_, i) => i !== idx));
+    if (editIdx === idx) setEditIdx(null);
+  };
+
+  const startEdit = (idx) => { setEditIdx(idx); setEditVal(turmas[idx]); };
+
+  const confirmEdit = () => {
+    const nome = editVal.nome.trim().slice(0, MAX_TURMA_NOME);
+    if (!nome) { setEditIdx(null); return; }
+    if (nomeExiste(nome, editIdx)) { alert("Já existe uma turma com esse nome."); return; }
+    setTurmas(l => l.map((t, i) => i === editIdx ? {
+      nome,
+      idade:   editVal.idade.trim().slice(0, MAX_TURMA_CAMPO),
+      dia:     editVal.dia.trim().slice(0, MAX_TURMA_CAMPO),
+      horario: editVal.horario.trim().slice(0, MAX_TURMA_CAMPO),
+    } : t));
+    setEditIdx(null);
+  };
+
   return (
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal-box modal-box-lg">
+      <div className="modal-box modal-box-lg modal-box-split">
         <div className="modal-header">
           <div>
             <div className="modal-title">Configurações do módulo</div>
-            <div className="modal-sub">Template de cobrança via WhatsApp</div>
+            <div className="modal-sub">Cobrança via WhatsApp e turmas de alunos</div>
           </div>
           <button className="modal-close" onClick={onClose}><X size={16} /></button>
         </div>
-        <div className="modal-body">
-          <div className="form-group">
+
+        <div className="modal-body cfg-split">
+          {/* ── Mensagem de cobrança ── */}
+          <div className="cfg-split-col">
             <label className="form-label">Mensagem de cobrança</label>
             <textarea className="form-textarea" style={{ minHeight: 140 }}
               value={mensagem} onChange={(e) => setMensagem(e.target.value)} />
@@ -1067,7 +1165,100 @@ function ModalConfigMatriculas({ config, onSave, onClose }) {
               <code style={{ color: "var(--gold)" }}>[valor]</code> — valor formatado (ex: "R$ 250,00")
             </div>
           </div>
+
+          {/* ── Turmas ── */}
+          <div className="cfg-split-col">
+            <label className="form-label">Turmas / Horários</label>
+            <div style={{ fontSize: 11, color: "var(--text-3)", marginBottom: 10, lineHeight: 1.6 }}>
+              Aparecem como opção na matrícula do aluno.
+            </div>
+
+            <div className="turmas-list">
+              {turmas.length === 0 && (
+                <div className="turmas-empty">Nenhuma turma cadastrada ainda.</div>
+              )}
+              {turmas.map((t, idx) => (
+                <div key={idx} className="turma-item">
+                  {editIdx === idx ? (
+                    <div className="turma-fields-row">
+                      <input className="turma-item-input" placeholder="Nome"
+                        value={editVal.nome} maxLength={MAX_TURMA_NOME} autoFocus
+                        onChange={(e) => setEditVal(v => ({ ...v, nome: e.target.value }))}
+                        onKeyDown={(e) => { if (e.key === "Enter") confirmEdit(); if (e.key === "Escape") setEditIdx(null); }} />
+                      <input className="turma-item-input" placeholder="Idade"
+                        value={editVal.idade} maxLength={MAX_TURMA_CAMPO}
+                        onChange={(e) => setEditVal(v => ({ ...v, idade: e.target.value }))} />
+                      <input className="turma-item-input" placeholder="Dia"
+                        value={editVal.dia} maxLength={MAX_TURMA_CAMPO}
+                        onChange={(e) => setEditVal(v => ({ ...v, dia: e.target.value }))} />
+                      <input className="turma-item-input" placeholder="Horário"
+                        value={editVal.horario} maxLength={MAX_TURMA_CAMPO}
+                        onChange={(e) => setEditVal(v => ({ ...v, horario: e.target.value }))} />
+                    </div>
+                  ) : (
+                    <div className="turma-item-info">
+                      <span className="turma-item-nome">{t.nome}</span>
+                      {(t.idade || t.dia || t.horario) && (
+                        <span className="turma-item-meta">
+                          {[t.idade, t.dia, t.horario].filter(Boolean).join(" · ")}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                    {editIdx === idx ? (
+                      <>
+                        <button className="turma-btn-base turma-btn-ok" onClick={confirmEdit} title="Confirmar (Enter)">
+                          <Check size={13} />
+                        </button>
+                        <button className="turma-btn-base turma-btn-cancel" onClick={() => setEditIdx(null)} title="Cancelar (Esc)">
+                          <X size={13} />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button className="turma-btn-base turma-btn-edit" onClick={() => startEdit(idx)} title="Editar">
+                          <Edit2 size={13} />
+                        </button>
+                        <button className="turma-btn-base turma-btn-del" onClick={() => removeTurma(idx)} title="Remover">
+                          <Trash2 size={13} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {turmas.length < MAX_TURMAS && (
+              <div className="turmas-add-box">
+                <div className="turma-fields-row">
+                  <input className="form-input" placeholder="Nome da turma"
+                    value={novaTurma.nome} maxLength={MAX_TURMA_NOME}
+                    onChange={(e) => setNovaTurma(v => ({ ...v, nome: e.target.value }))}
+                    onKeyDown={(e) => e.key === "Enter" && addTurma()} />
+                  <input className="form-input" placeholder="Idade (ex: 6 a 8 anos)"
+                    value={novaTurma.idade} maxLength={MAX_TURMA_CAMPO}
+                    onChange={(e) => setNovaTurma(v => ({ ...v, idade: e.target.value }))}
+                    onKeyDown={(e) => e.key === "Enter" && addTurma()} />
+                  <input className="form-input" placeholder="Dia (ex: Terça)"
+                    value={novaTurma.dia} maxLength={MAX_TURMA_CAMPO}
+                    onChange={(e) => setNovaTurma(v => ({ ...v, dia: e.target.value }))}
+                    onKeyDown={(e) => e.key === "Enter" && addTurma()} />
+                  <input className="form-input" placeholder="Horário (ex: 19h)"
+                    value={novaTurma.horario} maxLength={MAX_TURMA_CAMPO}
+                    onChange={(e) => setNovaTurma(v => ({ ...v, horario: e.target.value }))}
+                    onKeyDown={(e) => e.key === "Enter" && addTurma()} />
+                </div>
+                <button className="btn-secondary" style={{ marginTop: 8, width: "100%", justifyContent: "center" }}
+                  onClick={addTurma} disabled={!novaTurma.nome.trim()}>
+                  <Plus size={14} /> Adicionar turma
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn-primary" onClick={handleSave} disabled={salvando}>
@@ -1179,7 +1370,7 @@ export default function Alunos() {
       if (s.exists()) {
         const data = s.data();
         setConfig({ mensagemWhatsApp: MSG_WHATSAPP_DEFAULT, ...data });
-        setTurmas(Array.isArray(data.turmas) ? data.turmas : []);
+        setTurmas(Array.isArray(data.turmas) ? data.turmas.map(normalizeTurma) : []);
       }
     }).catch(() => {});
 
@@ -1336,7 +1527,7 @@ export default function Alunos() {
         { merge: true }
       );
       setConfig(c => ({ ...c, ...novaConfig }));
-      if (Array.isArray(novaConfig.turmas)) setTurmas(novaConfig.turmas);
+      if (Array.isArray(novaConfig.turmas)) setTurmas(novaConfig.turmas.map(normalizeTurma));
       await logAction({
         tenantUid, nomeUsuario, cargo,
         acao: LOG_ACAO.EDITAR, modulo: "Matrículas",
@@ -1489,7 +1680,7 @@ export default function Alunos() {
                   <select className="mat-filter-select" value={turmaFilter}
                     onChange={(e) => setTurmaFilter(e.target.value)}>
                     <option value="todas">Todas as turmas</option>
-                    {turmas.map(t => <option key={t} value={t}>{t}</option>)}
+                    {turmas.map(t => <option key={t.nome} value={t.nome}>{t.nome}</option>)}
                     <option value="__sem_turma__">Sem turma</option>
                   </select>
                 )}
@@ -1629,6 +1820,7 @@ export default function Alunos() {
       {modalConfig && (
         <ModalConfigMatriculas
           config={config}
+          turmas={turmas}
           onSave={handleSaveConfig}
           onClose={() => setModalConfig(false)}
         />
