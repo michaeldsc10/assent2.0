@@ -17,7 +17,7 @@
                                              tipoVenda: "mensalidade"
 
      users/{uid}/config/matriculas         → template mensagem WhatsApp
-                                             + turmas [{nome, idade, dia, horario}]
+                                             + turmas [{nome, idade, dias[], horaInicio, horaFim}]
    ═══════════════════════════════════════════════════ */
 
 import { useState, useEffect, useContext, useMemo } from "react";
@@ -58,11 +58,29 @@ const MSG_WHATSAPP_DEFAULT =
   "Olá [nome], tudo bem? Passando para lembrar da sua mensalidade de [mes] no valor de [valor]. " +
   "Qualquer dúvida estou à disposição. 💙";
 
-/* Turma: objeto {nome, idade, dia, horario}. Aceita string legada. */
-const normalizeTurma = (t) =>
-  typeof t === "string"
-    ? { nome: t, idade: "", dia: "", horario: "" }
-    : { nome: t?.nome || "", idade: t?.idade || "", dia: t?.dia || "", horario: t?.horario || "" };
+/* Turma: objeto {nome, idade, dias:[], horaInicio, horaFim}. Aceita string/legado {dia,horario}. */
+const DIAS_SEMANA = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+
+const normalizeTurma = (t) => {
+  if (typeof t === "string") return { nome: t, idade: "", dias: [], horaInicio: "", horaFim: "" };
+  const diasLegado = typeof t?.dia === "string" && t.dia
+    ? t.dia.split(/[,/]+/).map(s => s.trim()).filter(Boolean)
+    : [];
+  return {
+    nome:       t?.nome || "",
+    idade:      t?.idade || "",
+    dias:       Array.isArray(t?.dias) ? t.dias.filter(d => DIAS_SEMANA.includes(d)) : diasLegado.filter(d => DIAS_SEMANA.includes(d)),
+    horaInicio: t?.horaInicio || (typeof t?.horario === "string" ? t.horario : ""),
+    horaFim:    t?.horaFim || "",
+  };
+};
+
+/* Texto de exibição "Seg, Qua, Sex · 17h-19h" a partir de uma turma normalizada */
+const turmaMeta = (t) => {
+  const dias = (t.dias || []).join(", ");
+  const hora = t.horaInicio && t.horaFim ? `${t.horaInicio}-${t.horaFim}` : (t.horaInicio || "");
+  return [dias, hora].filter(Boolean).join(" · ");
+};
 
 const MAX_TURMAS      = 50;
 const MAX_TURMA_NOME  = 60;
@@ -198,6 +216,15 @@ const CSS = `
 .turma-btn-edit:hover { background:rgba(91,142,240,.1); border-color:rgba(91,142,240,.2); }
 .turma-btn-del { color:#e05252; }
 .turma-btn-del:hover { background:rgba(224,82,82,.1); border-color:rgba(224,82,82,.2); }
+.turma-dias-row { display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
+.turma-dia-chip { padding:5px 10px; border-radius:7px; font-size:11px; font-weight:600;
+  background:var(--s3); border:1px solid var(--border); color:var(--text-2);
+  cursor:pointer; transition:all .13s; user-select:none; font-family:'DM Sans',sans-serif; }
+.turma-dia-chip:hover { border-color:var(--border-h); color:var(--text); }
+.turma-dia-chip.active { background:var(--gold); border-color:var(--gold); color:#0a0808; }
+.turma-hora-row { display:flex; align-items:center; gap:8px; margin-top:8px; }
+.turma-hora-row .form-input { width:auto; flex:1; padding:8px 10px; font-size:12px; }
+.turma-hora-sep { color:var(--text-3); font-size:12px; flex-shrink:0; }
 .modal-box::-webkit-scrollbar { width:3px; }
 .modal-box::-webkit-scrollbar-thumb { background:var(--text-3); border-radius:2px; }
 .modal-header { padding:20px 22px 16px; border-bottom:1px solid var(--border);
@@ -664,13 +691,13 @@ function ModalMatricula({ aluno, alunosExistentes, alunosDisponiveis = [], onSav
                  inclui como opção temporária para não perder a informação */
               const opts = nomes.includes(form.turma) || !form.turma
                 ? turmas
-                : [...turmas, { nome: form.turma, idade: "", dia: "", horario: "" }];
+                : [...turmas, { nome: form.turma, idade: "", dias: [], horaInicio: "", horaFim: "" }];
               return (
                 <select className="form-input" value={form.turma}
                   onChange={(e) => set("turma", e.target.value)}>
                   <option value="">— Selecione uma turma —</option>
                   {opts.map(t => {
-                    const meta = [t.dia, t.horario].filter(Boolean).join(" · ");
+                    const meta = turmaMeta(t);
                     return (
                       <option key={t.nome} value={t.nome}>
                         {t.nome}{meta ? ` — ${meta}` : ""}
@@ -948,9 +975,9 @@ function ModalConfigMatriculas({ config, turmas: turmasIniciais, onSave, onClose
   const [turmas, setTurmas]     = useState((turmasIniciais || []).map(normalizeTurma));
   const [salvando, setSalvando] = useState(false);
 
-  const [novaTurma, setNovaTurma] = useState({ nome: "", idade: "", dia: "", horario: "" });
+  const [novaTurma, setNovaTurma] = useState({ nome: "", idade: "", dias: [], horaInicio: "", horaFim: "" });
   const [editIdx, setEditIdx]     = useState(null);
-  const [editVal, setEditVal]     = useState({ nome: "", idade: "", dia: "", horario: "" });
+  const [editVal, setEditVal]     = useState({ nome: "", idade: "", dias: [], horaInicio: "", horaFim: "" });
 
   const handleSave = async () => {
     setSalvando(true);
@@ -965,6 +992,9 @@ function ModalConfigMatriculas({ config, turmas: turmasIniciais, onSave, onClose
   const nomeExiste = (nome, ignoreIdx = -1) =>
     turmas.some((t, i) => i !== ignoreIdx && t.nome.toLowerCase() === nome.toLowerCase());
 
+  const toggleDia = (setState, dia) =>
+    setState(v => ({ ...v, dias: v.dias.includes(dia) ? v.dias.filter(d => d !== dia) : [...v.dias, dia] }));
+
   const addTurma = () => {
     const nome = novaTurma.nome.trim().slice(0, MAX_TURMA_NOME);
     if (!nome) return;
@@ -972,11 +1002,12 @@ function ModalConfigMatriculas({ config, turmas: turmasIniciais, onSave, onClose
     if (turmas.length >= MAX_TURMAS) { alert(`Limite de ${MAX_TURMAS} turmas atingido.`); return; }
     setTurmas(l => [...l, {
       nome,
-      idade:   novaTurma.idade.trim().slice(0, MAX_TURMA_CAMPO),
-      dia:     novaTurma.dia.trim().slice(0, MAX_TURMA_CAMPO),
-      horario: novaTurma.horario.trim().slice(0, MAX_TURMA_CAMPO),
+      idade:      novaTurma.idade.trim().slice(0, MAX_TURMA_CAMPO),
+      dias:       novaTurma.dias,
+      horaInicio: novaTurma.horaInicio,
+      horaFim:    novaTurma.horaFim,
     }]);
-    setNovaTurma({ nome: "", idade: "", dia: "", horario: "" });
+    setNovaTurma({ nome: "", idade: "", dias: [], horaInicio: "", horaFim: "" });
   };
 
   const removeTurma = (idx) => {
@@ -993,9 +1024,10 @@ function ModalConfigMatriculas({ config, turmas: turmasIniciais, onSave, onClose
     if (nomeExiste(nome, editIdx)) { alert("Já existe uma turma com esse nome."); return; }
     setTurmas(l => l.map((t, i) => i === editIdx ? {
       nome,
-      idade:   editVal.idade.trim().slice(0, MAX_TURMA_CAMPO),
-      dia:     editVal.dia.trim().slice(0, MAX_TURMA_CAMPO),
-      horario: editVal.horario.trim().slice(0, MAX_TURMA_CAMPO),
+      idade:      editVal.idade.trim().slice(0, MAX_TURMA_CAMPO),
+      dias:       editVal.dias,
+      horaInicio: editVal.horaInicio,
+      horaFim:    editVal.horaFim,
     } : t));
     setEditIdx(null);
   };
@@ -1039,27 +1071,37 @@ function ModalConfigMatriculas({ config, turmas: turmasIniciais, onSave, onClose
               {turmas.map((t, idx) => (
                 <div key={idx} className="turma-item">
                   {editIdx === idx ? (
-                    <div className="turma-fields-row">
-                      <input className="turma-item-input" placeholder="Nome"
-                        value={editVal.nome} maxLength={MAX_TURMA_NOME} autoFocus
-                        onChange={(e) => setEditVal(v => ({ ...v, nome: e.target.value }))}
-                        onKeyDown={(e) => { if (e.key === "Enter") confirmEdit(); if (e.key === "Escape") setEditIdx(null); }} />
-                      <input className="turma-item-input" placeholder="Idade"
-                        value={editVal.idade} maxLength={MAX_TURMA_CAMPO}
-                        onChange={(e) => setEditVal(v => ({ ...v, idade: e.target.value }))} />
-                      <input className="turma-item-input" placeholder="Dia"
-                        value={editVal.dia} maxLength={MAX_TURMA_CAMPO}
-                        onChange={(e) => setEditVal(v => ({ ...v, dia: e.target.value }))} />
-                      <input className="turma-item-input" placeholder="Horário"
-                        value={editVal.horario} maxLength={MAX_TURMA_CAMPO}
-                        onChange={(e) => setEditVal(v => ({ ...v, horario: e.target.value }))} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="turma-fields-row" style={{ gridTemplateColumns: "1.6fr 1fr" }}>
+                        <input className="turma-item-input" placeholder="Nome"
+                          value={editVal.nome} maxLength={MAX_TURMA_NOME} autoFocus
+                          onChange={(e) => setEditVal(v => ({ ...v, nome: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === "Enter") confirmEdit(); if (e.key === "Escape") setEditIdx(null); }} />
+                        <input className="turma-item-input" placeholder="Idade"
+                          value={editVal.idade} maxLength={MAX_TURMA_CAMPO}
+                          onChange={(e) => setEditVal(v => ({ ...v, idade: e.target.value }))} />
+                      </div>
+                      <div className="turma-dias-row">
+                        {DIAS_SEMANA.map(d => (
+                          <button key={d} type="button"
+                            className={`turma-dia-chip ${editVal.dias.includes(d) ? "active" : ""}`}
+                            onClick={() => toggleDia(setEditVal, d)}>{d}</button>
+                        ))}
+                      </div>
+                      <div className="turma-hora-row">
+                        <input type="time" className="form-input" value={editVal.horaInicio}
+                          onChange={(e) => setEditVal(v => ({ ...v, horaInicio: e.target.value }))} />
+                        <span className="turma-hora-sep">até</span>
+                        <input type="time" className="form-input" value={editVal.horaFim}
+                          onChange={(e) => setEditVal(v => ({ ...v, horaFim: e.target.value }))} />
+                      </div>
                     </div>
                   ) : (
                     <div className="turma-item-info">
                       <span className="turma-item-nome">{t.nome}</span>
-                      {(t.idade || t.dia || t.horario) && (
+                      {(t.idade || turmaMeta(t)) && (
                         <span className="turma-item-meta">
-                          {[t.idade, t.dia, t.horario].filter(Boolean).join(" · ")}
+                          {[t.idade, turmaMeta(t)].filter(Boolean).join(" · ")}
                         </span>
                       )}
                     </div>
@@ -1091,7 +1133,7 @@ function ModalConfigMatriculas({ config, turmas: turmasIniciais, onSave, onClose
 
             {turmas.length < MAX_TURMAS && (
               <div className="turmas-add-box">
-                <div className="turma-fields-row">
+                <div className="turma-fields-row" style={{ gridTemplateColumns: "1.6fr 1fr" }}>
                   <input className="form-input" placeholder="Nome da turma"
                     value={novaTurma.nome} maxLength={MAX_TURMA_NOME}
                     onChange={(e) => setNovaTurma(v => ({ ...v, nome: e.target.value }))}
@@ -1100,14 +1142,20 @@ function ModalConfigMatriculas({ config, turmas: turmasIniciais, onSave, onClose
                     value={novaTurma.idade} maxLength={MAX_TURMA_CAMPO}
                     onChange={(e) => setNovaTurma(v => ({ ...v, idade: e.target.value }))}
                     onKeyDown={(e) => e.key === "Enter" && addTurma()} />
-                  <input className="form-input" placeholder="Dia (ex: Terça)"
-                    value={novaTurma.dia} maxLength={MAX_TURMA_CAMPO}
-                    onChange={(e) => setNovaTurma(v => ({ ...v, dia: e.target.value }))}
-                    onKeyDown={(e) => e.key === "Enter" && addTurma()} />
-                  <input className="form-input" placeholder="Horário (ex: 19h)"
-                    value={novaTurma.horario} maxLength={MAX_TURMA_CAMPO}
-                    onChange={(e) => setNovaTurma(v => ({ ...v, horario: e.target.value }))}
-                    onKeyDown={(e) => e.key === "Enter" && addTurma()} />
+                </div>
+                <div className="turma-dias-row">
+                  {DIAS_SEMANA.map(d => (
+                    <button key={d} type="button"
+                      className={`turma-dia-chip ${novaTurma.dias.includes(d) ? "active" : ""}`}
+                      onClick={() => toggleDia(setNovaTurma, d)}>{d}</button>
+                  ))}
+                </div>
+                <div className="turma-hora-row">
+                  <input type="time" className="form-input" value={novaTurma.horaInicio}
+                    onChange={(e) => setNovaTurma(v => ({ ...v, horaInicio: e.target.value }))} />
+                  <span className="turma-hora-sep">até</span>
+                  <input type="time" className="form-input" value={novaTurma.horaFim}
+                    onChange={(e) => setNovaTurma(v => ({ ...v, horaFim: e.target.value }))} />
                 </div>
                 <button className="btn-secondary" style={{ marginTop: 8, width: "100%", justifyContent: "center" }}
                   onClick={addTurma} disabled={!novaTurma.nome.trim()}>
