@@ -46,6 +46,7 @@ import Usuarios      from "./modules/Usuarios.jsx";
 import Compras       from "./modules/Compras.jsx";
 import Mesas         from "./modules/Mesas.jsx";
 import Alunos        from "./modules/Alunos.jsx";
+import AlunosCadastro from "./modules/AlunosCadastro.jsx";
 import PDV          from "./modules/PDV.jsx";
 import CRMModule    from "./crm/CRMModule.jsx";
 import AssFlow      from "./flow/AssFlow.jsx";
@@ -80,6 +81,7 @@ const KEY_MAP = {
   "Estoque":           "entrada_estoque",
   "Vendas":             "vendas",
   "Matriculas":            "matriculas",
+  "Alunos":              "alunosCadastro",
   "Fiado / A Receber":  "fiado",
   "Caixa Diário":       "caixa",
   "Despesas":           "despesas",
@@ -104,6 +106,7 @@ const ATALHOS_TECLADO = [
   { code: "KeyV", label: "Vendas",              dbKey: "vendas"          },
   { code: "KeyF", label: "A Receber",           dbKey: "fiado"           },
   { code: "KeyH", label: "Matriculas",          dbKey: "matriculas"      },
+  { code: "KeyL", label: "Alunos",               dbKey: "alunosCadastro"  },
   { code: "KeyX", label: "Caixa Diário",        dbKey: "caixa"           },
   { code: "KeyZ", label: "Despesas",            dbKey: "despesas"        },
   { code: "KeyN", label: "Fornecedores",        dbKey: "fornecedores"    },
@@ -134,6 +137,7 @@ const NAV = [
      { label: "Mesas",           modulo: "mesas",            icone: LayoutGrid,       secao: "OPERAÇÕES"  },
     { label: "A Receber",       modulo: "aReceber",         icone: Clock,            secao: "FINANCEIRO"},
     {label: "Matriculas",       modulo: "alunos",       icone: GraduationCap,    secao: "COMERCIAL" }, 
+    { label: "Alunos",          modulo: "alunosCadastro", icone: Users,          secao: "COMERCIAL" },
    { label: "Compras",         modulo: "compras",          icone: ShoppingCart,     secao: "COMERCIAL" },
     { label: "Caixa Diário",    modulo: "caixaDiario",      icone: Wallet,           secao: "FINANCEIRO"},
     { label: "Despesas",        modulo: "despesas",         icone: ArrowDownRight,          secao: "FINANCEIRO"},
@@ -1195,103 +1199,103 @@ const CSS = `
 
   /* Wrapper interno — centraliza e limita largura */
   .db-page {
-    max-width: 1100px;
+    max-width: 1180px;
     margin: 0 auto;
-    padding: 36px 32px 72px;
+    padding: 24px 28px 48px;
   }
 
-  /* ══ HERO STATS — faixa aberta, sem caixas ══ */
+  /* ══ KPI STRIP — 3 grandes + 3 compactos ══ */
   .db-kpi-strip {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0;
-    margin-bottom: 44px;
-    padding-bottom: 28px;
-    border-bottom: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: repeat(3, 1fr) repeat(3, 0.72fr);
+    gap: 10px;
+    margin-bottom: 22px;
   }
   .db-kpi-card {
-    flex: 1 1 150px;
-    min-width: 140px;
-    padding: 0 24px;
+    padding: 20px 20px 16px;
     position: relative;
-    transition: opacity .15s;
+    transition: background .15s, border-color .15s;
     cursor: default;
-    background: transparent;
-    border: none;
-    border-right: 1px solid var(--border);
-    border-radius: 0;
+    min-width: 0;
+    background: var(--s1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
   }
-  .db-kpi-card:first-child { padding-left: 0; }
-  .db-kpi-card:last-child  { border-right: none; }
-  .db-kpi-card:hover { background: transparent; border-color: var(--border); opacity: .82; }
-  .db-kpi-card-accent { display: none; }
+  .db-kpi-card + .db-kpi-card { border-left: none; }
+  .db-kpi-card:nth-child(4) { border-left: none; }
+  .db-kpi-card:hover { background: rgba(255,255,255,0.016); border-color: var(--border-h); }
+  .db-kpi-card-accent {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 2px;
+    opacity: 0; transition: opacity .2s;
+  }
+  .db-kpi-card:hover .db-kpi-card-accent { opacity: 1; }
   .db-kpi-label {
-    font-size: 10px; font-weight: 600; letter-spacing: .1em;
-    text-transform: uppercase; color: var(--text-3); margin-bottom: 11px;
+    font-size: 9px; font-weight: 600; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--text-3); margin-bottom: 9px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .db-kpi-val {
-    font-family: var(--font-mono); font-size: 24px; font-weight: 600;
-    line-height: 1; letter-spacing: -0.02em; margin-bottom: 8px;
+    font-family: var(--font-mono); font-size: 20px; font-weight: 600;
+    line-height: 1; letter-spacing: -0.02em; margin-bottom: 7px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .db-kpi-card:nth-child(n+4) .db-kpi-val { font-size: 18px; }
+  /* KPIs secundários (4-6) — valor menor */
+  .db-kpi-card:nth-child(n+4) .db-kpi-val { font-size: 16px; }
   .db-kpi-meta { display: flex; align-items: center; gap: 4px; }
-  .db-kpi-trend { font-size: 11px; font-weight: 600; display: flex; align-items: center; gap: 2px; }
-  .db-kpi-sub { font-size: 11px; color: var(--text-3); }
+  .db-kpi-trend { font-size: 10px; font-weight: 600; display: flex; align-items: center; gap: 2px; }
+  .db-kpi-sub { font-size: 10px; color: var(--text-3); }
 
-  /* ══ LAYOUT BODY — seções com respiro, não colunas de caixas ══ */
-  .db-body { display: grid; grid-template-columns: 1fr 260px; gap: 60px; }
-  .db-main { display: flex; flex-direction: column; gap: 44px; min-width: 0; }
-  .db-aside { display: flex; flex-direction: column; gap: 44px; min-width: 0; }
+  /* ══ LAYOUT BODY ══ */
+  .db-body { display: grid; grid-template-columns: 1fr 240px; gap: 18px; }
+  .db-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .db-aside { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 
-  /* ══ SEÇÃO — título + régua, sem caixa fechada ══ */
+  /* ══ PANEL ══ */
   .db-panel {
-    background: transparent;
-    border: none;
-    border-radius: 0;
-    transition: none;
+    background: var(--s1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    transition: border-color .15s;
     position: relative;
-    overflow: visible;
+    overflow: hidden;
   }
-  .db-panel:hover { border-color: transparent; }
-  .db-panel-table { overflow: visible; }
+  .db-panel:hover { border-color: var(--border-h); }
+  .db-panel-table { overflow: hidden; }
   .db-panel-header {
-    padding: 0 0 14px;
-    margin-bottom: 2px;
+    padding: 14px 18px 12px;
     border-bottom: 1px solid var(--border);
     display: flex; align-items: center; justify-content: space-between;
   }
   .db-panel-title {
-    font-size: 13px; font-weight: 600; letter-spacing: -0.005em;
-    text-transform: none; color: var(--text);
+    font-size: 11px; font-weight: 600; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-3);
   }
-  .db-panel-body { padding: 14px 0; }
+  .db-panel-body { padding: 14px 18px; }
   .db-view-all {
-    font-size: 11px; color: var(--text-3); letter-spacing: .02em;
+    font-size: 10px; color: var(--text-3); letter-spacing: .04em;
     background: transparent; border: none; cursor: pointer;
-    font-family: 'Sora', system-ui, sans-serif; text-transform: none;
+    font-family: 'Sora', system-ui, sans-serif; text-transform: uppercase;
     display: flex; align-items: center; gap: 3px; transition: color .13s;
   }
   .db-view-all:hover { color: var(--gold); }
 
-  /* ══ TABELAS — linhas soltas, sem grade fechada ══ */
+  /* ══ TABELAS ══ */
   .ag-trow {
-    display: grid; padding: 12px 0;
+    display: grid; padding: 9px 18px;
     border-bottom: 1px solid rgba(255,255,255,0.04);
-    font-size: 13px; color: var(--text-2); transition: background .1s;
+    font-size: 12px; color: var(--text-2); transition: background .1s;
     align-items: center;
   }
-  .ag-trow:hover   { background: rgba(255,255,255,0.014); }
+  .ag-trow:hover   { background: rgba(255,255,255,0.018); }
   .ag-trow:last-child { border-bottom: none; }
   .ag-thead { background: transparent; }
-  .ag-th { font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); padding-bottom: 6px; }
-  .ag-empty-row { padding: 24px 0; text-align: center; font-size: 12px; color: var(--text-3); }
+  .ag-th { font-size: 9px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); padding-bottom: 2px; }
+  .ag-empty-row { padding: 20px 18px; text-align: center; font-size: 12px; color: var(--text-3); }
 
   /* ══ ASIDE STATS ══ */
   .db-stat-row {
     display: flex; align-items: center; gap: 12px;
-    padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+    padding: 11px 18px; border-bottom: 1px solid rgba(255,255,255,0.04);
     cursor: pointer; transition: background .1s;
   }
   .db-stat-row:last-child { border-bottom: none; }
@@ -1306,7 +1310,7 @@ const CSS = `
   /* ══ DESPESAS ASIDE ══ */
   .db-desp-row {
     display: flex; align-items: center; gap: 10px;
-    padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+    padding: 10px 18px; border-bottom: 1px solid rgba(255,255,255,0.04);
     font-size: 12px; transition: background .1s;
   }
   .db-desp-row:last-child { border-bottom: none; }
@@ -2602,7 +2606,7 @@ function AgendaFinanceira({ uid }) {
   const modalAR   = diaSel ? (indexAR[toYMD_AF(diaSel)]   || []) : [];
 
   return (
-    <div className="db-panel" style={{ padding: "16px 0" }}>
+    <div className="db-panel" style={{ padding: "16px 18px" }}>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
         <span style={{ fontSize:13, fontWeight:600, color:"var(--text)" }}>
           Agenda financeira — {MESES_AF[m]} {y}
@@ -3608,6 +3612,12 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             <Alunos />
           </RotaProtegida>
             );
+      case "Alunos":
+        return (
+          <RotaProtegida modulo="clientes" label="Alunos">
+            <AlunosCadastro />
+          </RotaProtegida>
+        );
       case "PDV":
         return (
           <RotaProtegida modulo="vendas" label="PDV">
@@ -3906,7 +3916,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   <span className="db-panel-title">Mix de receita</span>
                   <ChartToggle value={mixModeOverview} onChange={setMixModeOverview} />
                 </div>
-                <div style={{ padding: "14px 0" }}>
+                <div style={{ padding: "14px 18px" }}>
                   {mixModeOverview === "3d" ? (
                     <Chart3DDonut data={dash.mixData || []} height={190} />
                   ) : (
