@@ -1,14 +1,14 @@
 /* ═══════════════════════════════════════════════════
-   ASSENT v2.0 — Clientes.jsx [CORRIGIDO]
+   ASSENT v2.0 — Clientes.jsx
    Estrutura: users/{uid}/clientes/{id}
-   Exibe todos os perfis (cliente e aluno) com badge visual.
-   Filtro por perfil na topbar.
+   Alunos são gerenciados no módulo Alunos (perfis: ["aluno"])
+   e não aparecem mais aqui.
    ═══════════════════════════════════════════════════ */
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Search, UserPlus, Edit2, Trash2, X, ChevronRight, Printer,
-  GraduationCap, Package,
+  Package,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
@@ -181,19 +181,6 @@ const CSS = `
     font-family: 'DM Sans', sans-serif;
   }
 
-  /* ── Filtros de perfil ── */
-  .cl-perfil-filters { display: flex; gap: 5px; }
-  .cl-pfbtn {
-    padding: 5px 11px; border-radius: 6px; font-size: 11px; font-weight: 500;
-    background: var(--s3); border: 1px solid var(--border);
-    color: var(--text-2); cursor: pointer; transition: all .13s;
-    font-family: 'DM Sans', sans-serif; white-space: nowrap;
-  }
-  .cl-pfbtn:hover { background: var(--s2); color: var(--text); }
-  .cl-pfbtn.active {
-    background: rgba(200,165,94,0.15); border-color: var(--gold); color: var(--gold);
-  }
-
   /* ── Tabela ── */
   .cl-table-wrap {
     background: var(--s1); border: 1px solid var(--border);
@@ -214,7 +201,7 @@ const CSS = `
   /* grid: ID | nome | telefone | doc | perfil | instagram | endereço | ações */
   .cl-row {
     display: grid;
-    grid-template-columns: 80px 1fr 130px 140px 90px 130px 1fr 78px;
+    grid-template-columns: 80px 1fr 130px 140px 130px 1fr 78px;
     padding: 11px 18px; gap: 8px;
     border-bottom: 1px solid var(--border);
     align-items: center; font-size: 12px; color: var(--text-2);
@@ -322,43 +309,6 @@ const CSS = `
   .modal-venda-row-value { color: var(--text); font-weight: 500; }
 `;
 
-const PERFIL_OPCOES = [
-  { key: "todos",   label: "Todos" },
-  { key: "cliente", label: "Clientes" },
-  { key: "aluno",   label: "Alunos" },
-  { key: "ambos",   label: "Ambos" },
-];
-
-function PerfilBadge({ perfis = [] }) {
-  const isAluno   = perfis.includes("aluno");
-  const isCliente = perfis.includes("cliente");
-
-  if (!perfis.length) return <span style={{ color: "var(--text-3)" }}>—</span>;
-
-  if (isAluno && isCliente) {
-    return (
-      <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-        <span style={{ padding: "2px 6px", borderRadius: "4px", background: "rgba(91,142,240,0.15)", color: "var(--blue)", fontSize: "10px", fontWeight: "600" }}>Aluno</span>
-        <span style={{ padding: "2px 6px", borderRadius: "4px", background: "rgba(200,165,94,0.15)", color: "var(--gold)", fontSize: "10px", fontWeight: "600" }}>Cliente</span>
-      </span>
-    );
-  }
-
-  if (isAluno) {
-    return (
-      <span style={{ padding: "2px 6px", borderRadius: "4px", background: "rgba(91,142,240,0.15)", color: "var(--blue)", fontSize: "10px", fontWeight: "600", display: "inline-block" }}>
-        Aluno
-      </span>
-    );
-  }
-
-  return (
-    <span style={{ padding: "2px 6px", borderRadius: "4px", background: "rgba(200,165,94,0.15)", color: "var(--gold)", fontSize: "10px", fontWeight: "600", display: "inline-block" }}>
-      Cliente
-    </span>
-  );
-}
-
 /* ── Validação CPF / CNPJ ── */
 function validarCPF(cpf) {
   cpf = cpf.replace(/\D/g, "");
@@ -430,7 +380,7 @@ function ModalNovoCliente({ cliente, clientes, onSave, onClose }) {
         <div className="modal-header">
           <div>
             <div className="modal-title">{cliente ? "Editar Cliente" : "Novo Cliente"}</div>
-            <div className="modal-sub">{cliente ? "Atualize os dados" : "Cadastre um novo cliente ou aluno"}</div>
+            <div className="modal-sub">{cliente ? "Atualize os dados" : "Cadastre um novo cliente"}</div>
           </div>
           <button className="modal-close" onClick={onClose}><X size={16} /></button>
         </div>
@@ -502,41 +452,6 @@ function ModalNovoCliente({ cliente, clientes, onSave, onClose }) {
             </div>
           </div>
 
-          <div className="modal-section">
-            <div className="modal-section-title">Perfil</div>
-            <div className="form-checkbox-group">
-              <label className="form-checkbox-item">
-                <input
-                  type="checkbox"
-                  checked={form.perfis?.includes("cliente") || false}
-                  onChange={(e) => {
-                    const newPerfis = form.perfis || [];
-                    if (e.target.checked) {
-                      if (!newPerfis.includes("cliente")) setForm({ ...form, perfis: [...newPerfis, "cliente"] });
-                    } else {
-                      setForm({ ...form, perfis: newPerfis.filter(p => p !== "cliente") });
-                    }
-                  }}
-                />
-                <span className="form-checkbox-label">Cliente</span>
-              </label>
-              <label className="form-checkbox-item">
-                <input
-                  type="checkbox"
-                  checked={form.perfis?.includes("aluno") || false}
-                  onChange={(e) => {
-                    const newPerfis = form.perfis || [];
-                    if (e.target.checked) {
-                      if (!newPerfis.includes("aluno")) setForm({ ...form, perfis: [...newPerfis, "aluno"] });
-                    } else {
-                      setForm({ ...form, perfis: newPerfis.filter(p => p !== "aluno") });
-                    }
-                  }}
-                />
-                <span className="form-checkbox-label">Aluno</span>
-              </label>
-            </div>
-          </div>
         </div>
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
@@ -898,7 +813,6 @@ export default function Clientes() {
   const [clientes, setClientes] = useState([]);
   const [clienteIdCnt, setClienteIdCnt] = useState(0);
   const [search, setSearch] = useState("");
-  const [perfilFilter, setPerfilFilter] = useState("todos");
   const [modalNovo, setModalNovo] = useState(false);
   const [editando, setEditando] = useState(null);
   const [deletando, setDeletando] = useState(null);
@@ -943,7 +857,8 @@ export default function Clientes() {
     }, fsSnapshotError("Clientes:userRef"));
 
     const unsubClientes = onSnapshot(clientesCol, (snap) => {
-      setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      /* Alunos são gerenciados no módulo Alunos — não aparecem aqui */
+      setClientes(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => !c.perfis?.includes("aluno")));
       setLoading(false);
     }, fsSnapshotError("Clientes:clientes"));
 
@@ -966,7 +881,9 @@ export default function Clientes() {
 
   const handleEdit = async (form) => {
     if (!tenantUid || !editando) return;
-    await setDoc(doc(db, "users", tenantUid, "clientes", editando.id), { ...form, id: editando.id }, { merge: true });
+    /* Não sobrescreve "perfis" — evita apagar o vínculo "aluno" de um cadastro legado dual */
+    const { perfis: _perfisIgnorado, ...formSemPerfil } = form;
+    await setDoc(doc(db, "users", tenantUid, "clientes", editando.id), { ...formSemPerfil, id: editando.id }, { merge: true });
     await logAction({ tenantUid, nomeUsuario, cargo, acao: LOG_ACAO.EDITAR, modulo: LOG_MODULO.CLIENTES, descricao: montarDescricao("editar", "Cliente", form.nome, editando.id) });
     setEditando(null);
   };
@@ -982,18 +899,6 @@ export default function Clientes() {
     const q = search.trim().toLowerCase();
 
     return clientes.filter(c => {
-      /* ── Filtro de perfil ── */
-      if (perfilFilter !== "todos") {
-        const isAluno   = c.perfis?.includes("aluno");
-        const isCliente = c.perfis?.includes("cliente") || !c.perfis?.length;
-        const isAmbos   = isAluno && isCliente;
-
-        if (perfilFilter === "aluno"   && !isAluno)   return false;
-        if (perfilFilter === "cliente" && !isCliente) return false;
-        if (perfilFilter === "ambos"   && !isAmbos)   return false;
-      }
-
-      /* ── Filtro de busca ── */
       if (!q) return true;
       const docNumber = c.cpf || c.documento || "";
       return (
@@ -1014,20 +919,7 @@ export default function Clientes() {
       if (va > vb) return sortDir === "asc" ?  1 : -1;
       return 0;
     });
-  }, [clientes, search, perfilFilter, sortField, sortDir]);
-
-  /* Contadores por perfil para exibir nos botões */
-  const contadores = useMemo(() => {
-    const alunos   = clientes.filter(c => c.perfis?.includes("aluno")).length;
-    const clientes_only = clientes.filter(c => c.perfis?.includes("cliente") && !c.perfis?.includes("aluno")).length;
-    const ambos    = clientes.filter(c => c.perfis?.includes("aluno") && c.perfis?.includes("cliente")).length;
-    const legados  = clientes.filter(c => !c.perfis?.length).length;
-    return { 
-      alunos, 
-      clientes: clientes_only + legados + ambos,
-      ambos 
-    };
-  }, [clientes]);
+  }, [clientes, search, sortField, sortDir]);
 
   return (
     <>
@@ -1036,7 +928,7 @@ export default function Clientes() {
       <header className="cl-topbar">
         <div className="cl-topbar-title">
           <h1>Clientes</h1>
-          <p>Base unificada de clientes e alunos</p>
+          <p>Base de clientes</p>
         </div>
 
         {/* Busca */}
@@ -1047,22 +939,6 @@ export default function Clientes() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-        </div>
-
-        {/* Filtros de perfil */}
-        <div className="cl-perfil-filters">
-          {PERFIL_OPCOES.map(op => (
-            <button
-              key={op.key}
-              className={`cl-pfbtn ${perfilFilter === op.key ? "active" : ""}`}
-              onClick={() => setPerfilFilter(op.key)}
-            >
-              {op.label}
-              {op.key === "aluno"   && contadores.alunos  > 0 && ` (${contadores.alunos})`}
-              {op.key === "cliente" && contadores.clientes > 0 && ` (${contadores.clientes})`}
-              {op.key === "ambos"   && contadores.ambos   > 0 && ` (${contadores.ambos})`}
-            </button>
-          ))}
         </div>
 
         {podeCriarV && (
@@ -1094,7 +970,6 @@ export default function Clientes() {
             </span>
             <span>Telefone</span>
             <span>CPF / CNPJ</span>
-            <span>Perfil</span>
             <span>Instagram</span>
             <span>Endereço</span>
             <span style={{ textAlign: "right" }}>Ações</span>
@@ -1105,8 +980,8 @@ export default function Clientes() {
           ) : clientesFiltrados.length === 0 ? (
             <div className="cl-empty">
               <p>
-                {search || perfilFilter !== "todos"
-                  ? "Nenhum resultado para os filtros aplicados."
+                {search
+                  ? "Nenhum resultado para a busca."
                   : "Nenhum cliente cadastrado ainda."}
               </p>
             </div>
@@ -1117,7 +992,6 @@ export default function Clientes() {
                 <span className="cl-nome" onClick={() => setHistorico(c)}>{c.nome}</span>
                 <span>{c.telefone || "—"}</span>
                 <span>{c.cpf || c.documento || "—"}</span>
-                <span><PerfilBadge perfis={c.perfis} /></span>
                 <span className="cl-insta">{c.instagram ? `@${c.instagram}` : "—"}</span>
                 <span className="cl-overflow">{c.endereco || "—"}</span>
                 <div className="cl-actions">
