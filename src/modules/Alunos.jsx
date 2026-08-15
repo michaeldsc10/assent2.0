@@ -1246,9 +1246,13 @@ export default function Alunos() {
   const [statusFilter, setStatusFilter] = useState("todos");
   const [turmaFilter, setTurmaFilter]   = useState("todas");
   const [sortDir, setSortDir]           = useState("asc");
+  const [sortField, setSortField]       = useState("nome");
   const [fotoVisualizando, setFotoVisualizando] = useState(null);
 
-  const toggleSort = () => setSortDir(d => d === "asc" ? "desc" : "asc");
+  const toggleSort = (field) => {
+    if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortField(field); setSortDir("asc"); }
+  };
 
   /* ═══════════════════════════════════════════════════
      Firestore listeners — lê /clientes filtrando por perfis
@@ -1510,10 +1514,18 @@ export default function Alunos() {
         fmtIdSeq(a.idSeq).toLowerCase().includes(q)
       );
     }).sort((a, b) => {
+      if (sortField === "vencimento") {
+        const av = a._proxVenc, bv = b._proxVenc;
+        if (!av && !bv) return 0;
+        if (!av) return 1;
+        if (!bv) return -1;
+        const cmp = av.localeCompare(bv);
+        return sortDir === "asc" ? cmp : -cmp;
+      }
       const cmp = (a.nome || "").localeCompare(b.nome || "", "pt-BR", { sensitivity: "base" });
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [alunosComStatus, search, statusFilter, turmaFilter, sortDir]);
+  }, [alunosComStatus, search, statusFilter, turmaFilter, sortDir, sortField]);
 
   const kpis = useMemo(() => {
     const total    = matriculados.filter(a => a.status === "ativo").length;
@@ -1636,14 +1648,19 @@ export default function Alunos() {
             <div className="mat-row-head">
               <span>ID</span>
               <span>
-                <span className="mat-col-sort" onClick={toggleSort} title={sortDir === "asc" ? "Ordenar Z→A" : "Ordenar A→Z"}>
+                <span className="mat-col-sort" onClick={() => toggleSort("nome")} title="Ordenar por nome">
                   ALUNO
-                  <span className="mat-sort-icon">{sortDir === "asc" ? "▲" : "▼"}</span>
+                  {sortField === "nome" && <span className="mat-sort-icon">{sortDir === "asc" ? "▲" : "▼"}</span>}
                 </span>
               </span>
               <span>DOCUMENTO</span>
               <span>MENSALIDADE</span>
-              <span>VENCIMENTO</span>
+              <span>
+                <span className="mat-col-sort" onClick={() => toggleSort("vencimento")} title="Ordenar por vencimento">
+                  VENCIMENTO
+                  {sortField === "vencimento" && <span className="mat-sort-icon">{sortDir === "asc" ? "▲" : "▼"}</span>}
+                </span>
+              </span>
               <span>STATUS</span>
               <span style={{ textAlign: "right" }}>AÇÕES</span>
             </div>
