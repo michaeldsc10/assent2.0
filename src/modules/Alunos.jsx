@@ -20,7 +20,7 @@
                                              + turmas [{nome, idade, dia, horario}]
    ═══════════════════════════════════════════════════ */
 
-import { useState, useEffect, useContext, useMemo, useRef } from "react";
+import { useState, useEffect, useContext, useMemo } from "react";
 import {
   Search, Plus, Edit2, Trash2, X, Users,
   MessageCircle, Calendar, CreditCard, Settings,
@@ -89,22 +89,6 @@ const fmtData = (iso) => {
   } catch { return "—"; }
 };
 
-const fmtTelefone = (v) => {
-  const d = onlyDigits(v).slice(0, 11);
-  if (d.length <= 2)  return d;
-  if (d.length <= 6)  return `(${d.slice(0, 2)}) ${d.slice(2)}`;
-  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
-  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
-};
-
-const fmtCPF = (v) => {
-  const d = onlyDigits(v).slice(0, 11);
-  if (d.length <= 3)  return d;
-  if (d.length <= 6)  return `${d.slice(0, 3)}.${d.slice(3)}`;
-  if (d.length <= 9)  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
-  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
-};
-
 const fmtValorInput = (v) => {
   const d = onlyDigits(v);
   if (!d) return "";
@@ -116,15 +100,7 @@ const parseValorInput = (v) => {
   return d ? Number(d) / 100 : 0;
 };
 
-/* Gerador de docId único para alunos na coleção /clientes */
-const gerarDocIdAluno = () =>
-  `aluno_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-
-/* Próximo idSeq visual — puramente display */
-const proximoIdSeq = (alunos) => {
-  const max = alunos.reduce((m, a) => Math.max(m, Number(a.idSeq || 0)), 0);
-  return max + 1;
-};
+/* Formatação visual do ID do aluno (gerado no cadastro, módulo Alunos) */
 const fmtIdSeq     = (n) => `A${String(n).padStart(4, "0")}`;
 const fmtIdSeqMens = (n) => `M${String(n).padStart(4, "0")}`;
 
@@ -515,19 +491,13 @@ const CSS = `
 /* ══════════════════════════════════════════════════
    MODAL: Nova / Editar Matrícula
    ══════════════════════════════════════════════════ */
-function ModalMatricula({ aluno, alunosExistentes, onSave, onClose, turmas = [] }) {
+function ModalMatricula({ aluno, alunosExistentes, alunosDisponiveis = [], onSave, onClose, turmas = [] }) {
   const isEdit = !!aluno;
 
+  const [alunoDocId, setAlunoDocId] = useState(aluno?.docId || "");
+  const [buscaAluno, setBuscaAluno] = useState("");
+
   const [form, setForm] = useState({
-    nome:                aluno?.nome                || "",
-    documento:           aluno?.documento           || "",
-    telefone:            aluno?.telefone            || "",
-    email:               aluno?.email               || "",
-    instagram:           aluno?.instagram           || "",
-    dataNascimento:      aluno?.dataNascimento      || "",
-    endereco:            aluno?.endereco            || "",
-    responsavel:         aluno?.responsavel         || "",
-    telefoneResponsavel: aluno?.telefoneResponsavel || "",
     valorMensalidade: aluno
       ? Number(aluno.valorMensalidade || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
       : "",
@@ -539,57 +509,31 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose, turmas = [] 
   });
   const [erros, setErros] = useState({});
 
-  /* ── Foto (base64) ── */
-  const [fotoBase64, setFotoBase64] = useState(aluno?.foto || null);
-  const [cropSrc, setCropSrc]       = useState(null);
-  const [viewerOpen, setViewerOpen] = useState(false);
-  const fileInputRef = useRef(null);
-
-  const handleFotoChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith("image/")) { alert("Selecione uma imagem válida."); return; }
-    if (file.size > 10 * 1024 * 1024) { alert("Imagem muito grande. Máximo 10 MB."); return; }
-    setCropSrc(URL.createObjectURL(file));
-    e.target.value = "";
-  };
-
-  const handleCropConfirm = (base64) => {
-    setFotoBase64(base64);
-    setCropSrc(null);
-  };
-
   const set = (k, v) => {
     setForm(f => ({ ...f, [k]: v }));
     if (erros[k]) setErros(er => ({ ...er, [k]: null }));
   };
 
+  const candidatos = useMemo(() => {
+    const q = buscaAluno.trim().toLowerCase();
+    if (!q) return alunosDisponiveis;
+    return alunosDisponiveis.filter(a =>
+      a.nome?.toLowerCase().includes(q) ||
+      onlyDigits(a.documento).includes(onlyDigits(q)) ||
+      fmtIdSeq(a.idSeq).toLowerCase().includes(q)
+    );
+  }, [alunosDisponiveis, buscaAluno]);
+
+  const alunoEscolhido = isEdit ? aluno : alunosDisponiveis.find(a => a.docId === alunoDocId);
+
   const validar = () => {
     const e = {};
-    if (!form.nome.trim() || form.nome.trim().length < 3)
-      e.nome = "Nome completo é obrigatório (mínimo 3 caracteres).";
-    const docDigits = onlyDigits(form.documento);
-    if (!docDigits || docDigits.length < 5)
-      e.documento = "Documento (CPF/RG) é obrigatório.";
-    const telDigits = onlyDigits(form.telefone);
-    if (!telDigits || telDigits.length < 10)
-      e.telefone = "Telefone válido é obrigatório (com DDD).";
+    if (!isEdit && !alunoDocId) e.aluno = "Selecione um aluno cadastrado.";
     const valor = parseValorInput(form.valorMensalidade);
-    if (!valor || valor <= 0)
-      e.valorMensalidade = "Valor deve ser maior que zero.";
+    if (!valor || valor <= 0) e.valorMensalidade = "Valor deve ser maior que zero.";
     const dia = Number(form.diaVencimento);
-    if (!dia || dia < 1 || dia > 28)
-      e.diaVencimento = "Dia de vencimento deve ser entre 1 e 28.";
-    if (!form.dataInicio)
-      e.dataInicio = "Data de início é obrigatória.";
-
-    /* Documento duplicado (exceto o próprio aluno em edição) */
-    const duplicado = alunosExistentes.find(a =>
-      a.docId !== aluno?.docId &&
-      onlyDigits(a.documento) === docDigits
-    );
-    if (duplicado) e.documento = `Documento já cadastrado para ${duplicado.nome}.`;
-
+    if (!dia || dia < 1 || dia > 28) e.diaVencimento = "Dia de vencimento deve ser entre 1 e 28.";
+    if (!form.dataInicio) e.dataInicio = "Data de início é obrigatória.";
     setErros(e);
     return Object.keys(e).length === 0;
   };
@@ -597,22 +541,13 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose, turmas = [] 
   const handleSubmit = () => {
     if (!validar()) return;
     onSave({
-      nome:                form.nome.trim(),
-      documento:           form.documento.trim(),
-      telefone:            form.telefone.trim(),
-      email:               form.email.trim(),
-      instagram:           form.instagram.trim().replace(/^@/, ""),
-      dataNascimento:      form.dataNascimento,
-      endereco:            form.endereco.trim(),
-      responsavel:         form.responsavel.trim(),
-      telefoneResponsavel: form.telefoneResponsavel.trim(),
-      valorMensalidade:    parseValorInput(form.valorMensalidade),
-      diaVencimento:       Number(form.diaVencimento),
-      dataInicio:          form.dataInicio,
-      status:              form.status,
-      turma:               form.turma.trim(),
-      observacoes:         form.observacoes.trim(),
-      _fotoFile:           fotoBase64,
+      alunoDocId:       isEdit ? aluno.docId : alunoDocId,
+      valorMensalidade: parseValorInput(form.valorMensalidade),
+      diaVencimento:    Number(form.diaVencimento),
+      dataInicio:       form.dataInicio,
+      status:           form.status,
+      turma:            form.turma.trim(),
+      observacoes:      form.observacoes.trim(),
     });
   };
 
@@ -623,140 +558,64 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose, turmas = [] 
           <div>
             <div className="modal-title">{isEdit ? "Editar matrícula" : "Nova matrícula"}</div>
             <div className="modal-sub">
-              {isEdit ? `Editando ${aluno.nome}` : "Preencha os dados do aluno"}
+              {isEdit ? `Editando ${aluno.nome}` : "Selecione o aluno e defina a mensalidade"}
             </div>
           </div>
           <button className="modal-close" onClick={onClose}><X size={16} /></button>
         </div>
 
         <div className="modal-body">
-          {/* — Foto — */}
-          <div className="foto-picker-wrap">
-            <div
-              className="foto-picker-circle"
-              onClick={() => fotoBase64 ? setViewerOpen(true) : fileInputRef.current?.click()}
-              title={fotoBase64 ? "Ver foto" : "Adicionar foto"}
-            >
-              {fotoBase64
-                ? <img src={fotoBase64} alt="Foto do aluno" />
-                : <Camera size={24} color="var(--text-3)" />}
-              <div className="foto-picker-overlay">
-                {fotoBase64
-                  ? <Search size={16} color="#fff" />
-                  : <Camera size={18} color="#fff" />}
+          {/* — Seleção do aluno — */}
+          <div className="mat-section-title"><User size={14} /> Aluno</div>
+
+          {isEdit ? (
+            <div className="form-group" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {aluno.foto
+                ? <img src={aluno.foto} alt={aluno.nome} className="aluno-avatar" />
+                : <div className="aluno-avatar-placeholder">{(aluno.nome || "?")[0].toUpperCase()}</div>}
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 500, color: "var(--text)" }}>{aluno.nome}</div>
+                <div style={{ fontSize: 11, color: "var(--text-3)" }}>
+                  {fmtIdSeq(aluno.idSeq)} · {aluno.documento || "—"} · {aluno.telefone || "—"}
+                </div>
               </div>
             </div>
-            <div className="foto-picker-info">
-              <strong>Foto do aluno</strong>
-              {fotoBase64
-                ? <>Clique na foto para visualizar.<br />Altere ou remova pelo visualizador.</>
-                : <>Clique para selecionar uma imagem.<br />Arraste para posicionar · máx. 10 MB</>}
+          ) : (
+            <div className="form-group">
+              <label className="form-label">Buscar aluno cadastrado<span className="form-label-req">*</span></label>
+              <input type="text" className="form-input" autoFocus
+                placeholder="Nome, documento ou ID…"
+                value={buscaAluno} onChange={(e) => setBuscaAluno(e.target.value)} />
+              {alunosDisponiveis.length === 0 ? (
+                <div style={{ fontSize: 12, color: "var(--text-3)", padding: "10px 13px", marginTop: 8,
+                  background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 9 }}>
+                  Nenhum aluno disponível para matrícula. Cadastre a pessoa no módulo{" "}
+                  <span style={{ color: "var(--gold)" }}>Alunos</span> primeiro.
+                </div>
+              ) : (
+                <div className="turmas-list" style={{ maxHeight: 220, overflowY: "auto", marginTop: 8 }}>
+                  {candidatos.length === 0 && (
+                    <div className="turmas-empty">Nenhum aluno encontrado para essa busca.</div>
+                  )}
+                  {candidatos.map(a => (
+                    <div key={a.docId} className="turma-item"
+                      style={{ cursor: "pointer", borderColor: alunoDocId === a.docId ? "var(--gold)" : undefined }}
+                      onClick={() => setAlunoDocId(a.docId)}>
+                      <div className="turma-item-info">
+                        <span className="turma-item-nome">{a.nome}</span>
+                        <span className="turma-item-meta">{fmtIdSeq(a.idSeq)} · {a.documento || "—"}</span>
+                      </div>
+                      {alunoDocId === a.docId && <CheckCircle size={16} color="var(--gold)" />}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {erros.aluno && <div className="form-error">{erros.aluno}</div>}
             </div>
-            <input ref={fileInputRef} type="file" accept="image/*"
-              style={{ display: "none" }} onChange={handleFotoChange} />
-          </div>
-
-          {viewerOpen && fotoBase64 && (
-            <FotoLightbox
-              src={fotoBase64}
-              onAlterar={() => { setViewerOpen(false); fileInputRef.current?.click(); }}
-              onRemover={() => { setFotoBase64(null); setViewerOpen(false); }}
-              onClose={() => setViewerOpen(false)}
-            />
           )}
-
-          {cropSrc && (
-            <ModalCropFoto
-              src={cropSrc}
-              onConfirm={handleCropConfirm}
-              onClose={() => setCropSrc(null)}
-            />
-          )}
-
-          {/* — Dados pessoais — */}
-          <div className="mat-section-title"><User size={14} /> Dados pessoais</div>
-
-          <div className="form-group">
-            <label className="form-label">Nome completo<span className="form-label-req">*</span></label>
-            <input type="text" className={`form-input ${erros.nome ? "err" : ""}`}
-              value={form.nome} onChange={(e) => set("nome", e.target.value)}
-              placeholder="Nome completo do aluno" autoFocus />
-            {erros.nome && <div className="form-error">{erros.nome}</div>}
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Documento (CPF/RG)<span className="form-label-req">*</span></label>
-              <input type="text" className={`form-input ${erros.documento ? "err" : ""}`}
-                value={form.documento}
-                onChange={(e) => set("documento", fmtCPF(e.target.value))}
-                placeholder="000.000.000-00" maxLength={14} />
-              {erros.documento && <div className="form-error">{erros.documento}</div>}
-            </div>
-            <div className="form-group">
-              <label className="form-label">Data de nascimento</label>
-              <input type="date" className="form-input"
-                value={form.dataNascimento}
-                onChange={(e) => set("dataNascimento", e.target.value)} />
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Telefone<span className="form-label-req">*</span></label>
-              <input type="text" className={`form-input ${erros.telefone ? "err" : ""}`}
-                value={form.telefone}
-                onChange={(e) => set("telefone", fmtTelefone(e.target.value))}
-                placeholder="(62) 99999-9999" maxLength={15} />
-              {erros.telefone && <div className="form-error">{erros.telefone}</div>}
-            </div>
-            <div className="form-group">
-              <label className="form-label">Email</label>
-              <input type="email" className="form-input"
-                value={form.email} onChange={(e) => set("email", e.target.value)}
-                placeholder="email@exemplo.com" />
-            </div>
-          </div>
-
-          {/* Instagram — campo opcional */}
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label"><AtSign size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />Instagram</label>
-              <input type="text" className="form-input"
-                value={form.instagram}
-                onChange={(e) => set("instagram", e.target.value)}
-                placeholder="@usuario (opcional)" />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Endereço</label>
-              <input type="text" className="form-input"
-                value={form.endereco} onChange={(e) => set("endereco", e.target.value)}
-                placeholder="Rua, número, bairro, cidade" />
-            </div>
-          </div>
-
-          {/* — Responsável — */}
-          <div className="mat-section-title" style={{ marginTop: 8 }}>
-            <User size={14} /> Responsável (opcional, caso menor de idade)
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Nome do responsável</label>
-              <input type="text" className="form-input"
-                value={form.responsavel}
-                onChange={(e) => set("responsavel", e.target.value)} />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Telefone do responsável</label>
-              <input type="text" className="form-input"
-                value={form.telefoneResponsavel}
-                onChange={(e) => set("telefoneResponsavel", fmtTelefone(e.target.value))}
-                placeholder="(62) 99999-9999" maxLength={15} />
-            </div>
-          </div>
 
           {/* — Mensalidade — */}
-          <div className="mat-section-title" style={{ marginTop: 8 }}>
+          <div className="mat-section-title" style={{ marginTop: 18 }}>
             <CreditCard size={14} /> Dados da mensalidade
           </div>
           <div className="form-row-3">
@@ -834,14 +693,14 @@ function ModalMatricula({ aluno, alunosExistentes, onSave, onClose, turmas = [] 
             <textarea className="form-textarea"
               value={form.observacoes}
               onChange={(e) => set("observacoes", e.target.value)}
-              placeholder="Anotações livres sobre o aluno…" />
+              placeholder="Anotações livres sobre a matrícula…" />
           </div>
         </div>
 
         <div className="modal-footer">
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
           <button className="btn-primary" onClick={handleSubmit}>
-            <CheckCircle size={14} /> {isEdit ? "Salvar alterações" : "Cadastrar aluno"}
+            <CheckCircle size={14} /> {isEdit ? "Salvar alterações" : "Matricular aluno"}
           </button>
         </div>
       </div>
@@ -1065,7 +924,7 @@ function ModalDetalheAluno({
         <div className="modal-footer">
           {podeExcluir && (
             <button className="btn-danger" onClick={() => onExcluir(aluno)}>
-              <Trash2 size={14} /> Excluir
+              <Trash2 size={14} /> Cancelar matrícula
             </button>
           )}
           {podeEditar && (
@@ -1273,40 +1132,44 @@ function ModalConfigMatriculas({ config, turmas: turmasIniciais, onSave, onClose
 /* ══════════════════════════════════════════════════
    MODAL: Confirmar exclusão
    ══════════════════════════════════════════════════ */
-function ModalExcluirAluno({ aluno, mensQtd, onConfirm, onClose }) {
+function ModalCancelarMatricula({ aluno, mensQtd, onConfirm, onClose }) {
   const [digitado, setDigitado] = useState("");
   return (
     <div className="modal-overlay modal-overlay-top" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-box modal-box-md">
         <div className="modal-header">
           <div>
-            <div className="modal-title">Excluir aluno</div>
-            <div className="modal-sub">Esta ação é permanente e não pode ser desfeita.</div>
+            <div className="modal-title">Cancelar matrícula</div>
+            <div className="modal-sub">O cadastro do aluno é mantido — só a matrícula é encerrada.</div>
           </div>
           <button className="modal-close" onClick={onClose}><X size={16} /></button>
         </div>
         <div className="modal-body">
           <p style={{ fontSize: 13, color: "var(--text-2)", marginBottom: 12 }}>
-            Ao excluir <strong>{aluno.nome}</strong>, todas as <strong>{mensQtd}</strong> mensalidade(s)
-            pendente(s) vinculadas também serão removidas de <em>A Receber</em>.
-            As mensalidades já pagas (registradas em Vendas/Caixa) <strong>permanecem preservadas</strong>.
+            Ao cancelar a matrícula de <strong>{aluno.nome}</strong>, todas as <strong>{mensQtd}</strong> mensalidade(s)
+            pendente(s) vinculadas serão removidas de <em>A Receber</em>. As mensalidades já pagas
+            (registradas em Vendas/Caixa) <strong>permanecem preservadas</strong>. Os dados pessoais continuam
+            disponíveis no módulo <strong>Alunos</strong> para uma nova matrícula futura.
           </p>
           <p style={{ fontSize: 12, color: "var(--text-3)", marginBottom: 10 }}>
-            Digite <strong>EXCLUIR</strong> para confirmar:
+            Digite <strong>CANCELAR</strong> para confirmar:
           </p>
           <input type="text" className="form-input"
             value={digitado} onChange={(e) => setDigitado(e.target.value.toUpperCase())} />
         </div>
         <div className="modal-footer">
-          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-danger" disabled={digitado !== "EXCLUIR"} onClick={onConfirm}>
-            <Trash2 size={14} /> Excluir definitivamente
+          <button className="btn-secondary" onClick={onClose}>Voltar</button>
+          <button className="btn-danger" disabled={digitado !== "CANCELAR"} onClick={onConfirm}>
+            <Trash2 size={14} /> Cancelar matrícula
           </button>
         </div>
       </div>
     </div>
   );
 }
+
+/* Um aluno cadastrado só entra no módulo de Matrículas quando tem mensalidade ativa */
+const isMatriculado = (a) => a?.matriculaAtiva === true || Number(a?.valorMensalidade || 0) > 0;
 
 /* ══════════════════════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
@@ -1385,12 +1248,18 @@ export default function Alunos() {
 
     try {
       if (editando) {
-        /* EDITAR */
-        const { _fotoFile, ...dadosLimpos } = dados;
-        if (_fotoFile !== undefined) dadosLimpos.foto = _fotoFile;
-
+        /* EDITAR matrícula (apenas campos de mensalidade/turma/situação) */
+        const patch = {
+          valorMensalidade: dados.valorMensalidade,
+          diaVencimento:    dados.diaVencimento,
+          dataInicio:       dados.dataInicio,
+          status:           dados.status,
+          turma:            dados.turma,
+          observacoes:      dados.observacoes,
+          atualizadoEm:     new Date().toISOString(),
+        };
         const ref = doc(db, "users", tenantUid, "clientes", editando.docId);
-        await updateDoc(ref, { ...dadosLimpos, atualizadoEm: new Date().toISOString() });
+        await updateDoc(ref, patch);
 
         /* Propaga mudanças de dia/valor para mensalidades em aberto */
         const mensDoAluno = mensalidades.filter(
@@ -1413,7 +1282,7 @@ export default function Alunos() {
             if (valorChanged && Number(m.valorPago || 0) === 0) {
               updates.valorTotal    = Number(dados.valorMensalidade);
               updates.valorRestante = Number(dados.valorMensalidade);
-              updates.descricao     = `Mensalidade ${m.mesReferencia} — ${dados.nome}`;
+              updates.descricao     = `Mensalidade ${m.mesReferencia} — ${editando.nome}`;
             }
             return updateDoc(doc(db, "users", tenantUid, "a_receber", m.id), updates);
           }));
@@ -1422,38 +1291,36 @@ export default function Alunos() {
         await logAction({
           tenantUid, nomeUsuario, cargo,
           acao: LOG_ACAO.EDITAR, modulo: "Matrículas",
-          descricao: `Editou aluno ${fmtIdSeq(editando.idSeq)} — ${dados.nome}`,
+          descricao: `Editou matrícula ${fmtIdSeq(editando.idSeq)} — ${editando.nome}`,
         });
         setEditando(null);
       } else {
-        /* CRIAR */
-        const docId = gerarDocIdAluno();
-        const idSeq = proximoIdSeq(alunos);
-        const agora = new Date().toISOString();
-        const { _fotoFile: _ff, ...dadosCriar } = dados;
-        if (_ff) dadosCriar.foto = _ff;
+        /* CRIAR matrícula sobre um aluno já cadastrado */
+        const alunoCadastro = alunosDisponiveis.find(a => a.docId === dados.alunoDocId);
+        if (!alunoCadastro) { alert("Selecione um aluno cadastrado."); return; }
 
-        /* Grava em /clientes com perfis: ["aluno"] */
-        await setDoc(doc(db, "users", tenantUid, "clientes", docId), {
-          docId,
-          idSeq,
-          idSeqFmt: fmtIdSeq(idSeq), // "A0001" — usado em Clientes.jsx e Relatórios
-          perfis: ["aluno"],
-          ...dadosCriar,
-          criadoEm: agora,
-          atualizadoEm: agora,
+        const ref = doc(db, "users", tenantUid, "clientes", alunoCadastro.docId);
+        await updateDoc(ref, {
+          valorMensalidade: dados.valorMensalidade,
+          diaVencimento:    dados.diaVencimento,
+          dataInicio:       dados.dataInicio,
+          status:           dados.status,
+          turma:            dados.turma,
+          observacoes:      dados.observacoes,
+          matriculaAtiva:   true,
+          atualizadoEm:     new Date().toISOString(),
         });
 
         await gerarMensalidadeEmAberto({
           tenantUid,
-          aluno: { docId, idSeq, ...dados },
+          aluno: { ...alunoCadastro, ...dados },
           mensalidadesDoAluno: [],
         });
 
         await logAction({
           tenantUid, nomeUsuario, cargo,
           acao: LOG_ACAO.CRIAR, modulo: "Matrículas",
-          descricao: `Matriculou ${fmtIdSeq(idSeq)} — ${dados.nome} — ${fmtR$(dados.valorMensalidade)}/mês`,
+          descricao: `Matriculou ${fmtIdSeq(alunoCadastro.idSeq)} — ${alunoCadastro.nome} — ${fmtR$(dados.valorMensalidade)}/mês`,
         });
         setModalNovo(false);
       }
@@ -1489,7 +1356,9 @@ export default function Alunos() {
   };
 
   /* ═══════════════════════════════════════════════════
-     Excluir aluno — remove doc em /clientes + mensalidades em aberto
+     Cancelar matrícula — remove mensalidades em aberto e
+     encerra a matrícula, mas mantém o cadastro do aluno
+     (gerenciado no módulo Alunos)
      ═══════════════════════════════════════════════════ */
   const handleExcluirAluno = async () => {
     if (!tenantUid || !excluindo) return;
@@ -1499,19 +1368,26 @@ export default function Alunos() {
       await Promise.all(
         abertas.map(m => deleteDoc(doc(db, "users", tenantUid, "a_receber", m.id)))
       );
-      /* 2. Remove o aluno de /clientes */
-      await deleteDoc(doc(db, "users", tenantUid, "clientes", excluindo.docId));
+      /* 2. Encerra a matrícula, preservando o cadastro do aluno */
+      const ref = doc(db, "users", tenantUid, "clientes", excluindo.docId);
+      await updateDoc(ref, {
+        matriculaAtiva:   false,
+        valorMensalidade: 0,
+        turma:            "",
+        status:           "inativo",
+        atualizadoEm:     new Date().toISOString(),
+      });
 
       await logAction({
         tenantUid, nomeUsuario, cargo,
         acao: LOG_ACAO.EXCLUIR, modulo: "Matrículas",
-        descricao: `Excluiu aluno ${fmtIdSeq(excluindo.idSeq)} — ${excluindo.nome} (${abertas.length} mensalidade(s) em aberto removidas)`,
+        descricao: `Cancelou matrícula ${fmtIdSeq(excluindo.idSeq)} — ${excluindo.nome} (${abertas.length} mensalidade(s) em aberto removidas)`,
       });
       setExcluindo(null);
       setDetalhe(null);
     } catch (err) {
       fsError(err, "Alunos:excluir");
-      alert("Erro ao excluir aluno.");
+      alert("Erro ao cancelar matrícula.");
     }
   };
 
@@ -1542,8 +1418,11 @@ export default function Alunos() {
   /* ═══════════════════════════════════════════════════
      Derivados / filtros
      ═══════════════════════════════════════════════════ */
+  const matriculados = useMemo(() => alunos.filter(isMatriculado), [alunos]);
+  const alunosDisponiveis = useMemo(() => alunos.filter(a => !isMatriculado(a)), [alunos]);
+
   const alunosComStatus = useMemo(() => {
-    return alunos.map(a => {
+    return matriculados.map(a => {
       const suas   = mensalidades.filter(m => m.clienteId === a.docId);
       const abertas = suas.filter(m => Number(m.valorRestante || 0) > 0);
       const proxVenc = abertas
@@ -1557,7 +1436,7 @@ export default function Alunos() {
       else if (abertas.length === 0)                                   situacao = "em_dia";
       return { ...a, _situacao: situacao, _proxVenc: proxVenc, _totalAberto: abertas.reduce((s, m) => s + Number(m.valorRestante || 0), 0) };
     });
-  }, [alunos, mensalidades]);
+  }, [matriculados, mensalidades]);
 
   const alunosFiltrados = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -1589,12 +1468,12 @@ export default function Alunos() {
   }, [alunosComStatus, search, statusFilter, turmaFilter, sortDir]);
 
   const kpis = useMemo(() => {
-    const total    = alunos.filter(a => a.status === "ativo").length;
+    const total    = matriculados.filter(a => a.status === "ativo").length;
     const emDia    = alunosComStatus.filter(a => a.status === "ativo" && a._situacao === "em_dia").length;
     const vencendo = alunosComStatus.filter(a => a.status === "ativo" && a._situacao === "vencendo").length;
     const vencidos = alunosComStatus.filter(a => a.status === "ativo" && a._situacao === "vencido").length;
     return { total, emDia, vencendo, vencidos };
-  }, [alunos, alunosComStatus]);
+  }, [matriculados, alunosComStatus]);
 
   if (!tenantUid) {
     return <div className="mat-empty">Carregando autenticação…</div>;
@@ -1766,7 +1645,7 @@ export default function Alunos() {
                     </button>
                   )}
                   {podeExcluir && (
-                    <button className="btn-icon btn-icon-del" onClick={() => setExcluindo(a)} title="Excluir">
+                    <button className="btn-icon btn-icon-del" onClick={() => setExcluindo(a)} title="Cancelar matrícula">
                       <Trash2 size={13} />
                     </button>
                   )}
@@ -1781,6 +1660,7 @@ export default function Alunos() {
       {modalNovo && (
         <ModalMatricula
           alunosExistentes={alunos}
+          alunosDisponiveis={alunosDisponiveis}
           turmas={turmas}
           onSave={handleSaveAluno}
           onClose={() => setModalNovo(false)}
@@ -1810,7 +1690,7 @@ export default function Alunos() {
         />
       )}
       {excluindo && (
-        <ModalExcluirAluno
+        <ModalCancelarMatricula
           aluno={excluindo}
           mensQtd={mensalidades.filter(m => m.clienteId === excluindo.docId).length}
           onConfirm={handleExcluirAluno}
@@ -1864,124 +1744,6 @@ function FotoLightbox({ src, onAlterar, onRemover, onClose, readOnly = false }) 
             </button>
           </>
         )}
-      </div>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════════════
-   MODAL: Posicionar / cortar foto (drag + zoom → canvas → base64)
-   ══════════════════════════════════════════════════════════════════════ */
-function ModalCropFoto({ src, onConfirm, onClose }) {
-  const SIZE     = 260;
-  const OUT_SIZE = 400;
-
-  const imgRef   = useRef(null);
-  const stageRef = useRef(null);
-  const [scale, setScale]   = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [imgNat, setImgNat] = useState({ w: 1, h: 1 });
-  const dragRef  = useRef(null);
-
-  const handleImgLoad = () => {
-    const img = imgRef.current;
-    if (!img) return;
-    const w = img.naturalWidth, h = img.naturalHeight;
-    setImgNat({ w, h });
-    const minScale = Math.max(SIZE / w, SIZE / h);
-    setScale(minScale);
-    setOffset({ x: 0, y: 0 });
-  };
-
-  const onMouseDown = (e) => {
-    e.preventDefault();
-    dragRef.current = { startX: e.clientX, startY: e.clientY, ox: offset.x, oy: offset.y };
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup",   onMouseUp);
-  };
-  const onMouseMove = (e) => {
-    if (!dragRef.current) return;
-    const dx = e.clientX - dragRef.current.startX;
-    const dy = e.clientY - dragRef.current.startY;
-    setOffset({ x: dragRef.current.ox + dx, y: dragRef.current.oy + dy });
-  };
-  const onMouseUp = () => {
-    dragRef.current = null;
-    window.removeEventListener("mousemove", onMouseMove);
-    window.removeEventListener("mouseup",   onMouseUp);
-  };
-
-  const touchRef = useRef(null);
-  const onTouchStart = (e) => {
-    if (e.touches.length === 1) {
-      const t = e.touches[0];
-      touchRef.current = { startX: t.clientX, startY: t.clientY, ox: offset.x, oy: offset.y };
-    }
-  };
-  const onTouchMove = (e) => {
-    if (e.touches.length === 1 && touchRef.current) {
-      e.preventDefault();
-      const t = e.touches[0];
-      const dx = t.clientX - touchRef.current.startX;
-      const dy = t.clientY - touchRef.current.startY;
-      setOffset({ x: touchRef.current.ox + dx, y: touchRef.current.oy + dy });
-    }
-  };
-
-  const onWheel = (e) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.05 : 0.05;
-    const minS  = Math.max(SIZE / imgNat.w, SIZE / imgNat.h);
-    setScale(s => Math.min(6, Math.max(minS, s + delta)));
-  };
-
-  const imgStyle = () => {
-    const w = imgNat.w * scale;
-    const h = imgNat.h * scale;
-    const left = (SIZE - w) / 2 + offset.x;
-    const top  = (SIZE - h) / 2 + offset.y;
-    return { width: w, height: h, left, top, transform: "none" };
-  };
-
-  const confirmar = () => {
-    const img = imgRef.current;
-    if (!img) return;
-    const canvas = document.createElement("canvas");
-    canvas.width  = OUT_SIZE;
-    canvas.height = OUT_SIZE;
-    const ctx = canvas.getContext("2d");
-    const scaledW = imgNat.w * scale;
-    const scaledH = imgNat.h * scale;
-    const left    = (SIZE - scaledW) / 2 + offset.x;
-    const top     = (SIZE - scaledH) / 2 + offset.y;
-    ctx.drawImage(img, -left / scale, -top / scale, SIZE / scale, SIZE / scale, 0, 0, OUT_SIZE, OUT_SIZE);
-    const base64 = canvas.toDataURL("image/jpeg", 0.88);
-    onConfirm(base64);
-  };
-
-  return (
-    <div className="crop-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="crop-box">
-        <div className="crop-title">Posicionar foto</div>
-        <div ref={stageRef} className="crop-stage" style={{ width: SIZE, height: SIZE }}
-          onMouseDown={onMouseDown} onWheel={onWheel}
-          onTouchStart={onTouchStart} onTouchMove={onTouchMove}>
-          <img ref={imgRef} src={src} alt="" style={imgStyle()} onLoad={handleImgLoad} draggable={false} />
-        </div>
-        <div className="crop-hint">Arraste para reposicionar · Scroll para zoom</div>
-        <div className="crop-zoom">
-          <span style={{ fontSize: 10 }}>A</span>
-          <input type="range" min={0.5} max={6} step={0.01}
-            value={scale} onChange={(e) => setScale(Number(e.target.value))} />
-          <span style={{ fontSize: 14 }}>A</span>
-          <span>{Math.round(scale * 100)}%</span>
-        </div>
-        <div className="crop-footer">
-          <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-primary" onClick={confirmar}>
-            <CheckCircle size={14} /> Confirmar
-          </button>
-        </div>
       </div>
     </div>
   );
