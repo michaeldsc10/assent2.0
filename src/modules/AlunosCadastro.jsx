@@ -17,7 +17,7 @@ import { fsError, fsSnapshotError } from "../utils/firestoreError";
 import { logAction, LOG_ACAO, LOG_MODULO, montarDescricao } from "../lib/logAction";
 import { useAuth } from "../contexts/AuthContext";
 import {
-  collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where,
+  collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDoc,
 } from "firebase/firestore";
 
 /* ══════════════════════════════════════════════════
@@ -51,6 +51,25 @@ const proximoIdSeq = (alunos) => {
   return max + 1;
 };
 const fmtIdSeq = (n) => `A${String(n).padStart(4, "0")}`;
+
+/* Idade calculada a partir da data de nascimento (YYYY-MM-DD) */
+const calcularIdade = (dataNasc) => {
+  if (!dataNasc) return null;
+  const nasc = new Date(dataNasc + "T00:00:00");
+  if (Number.isNaN(nasc.getTime())) return null;
+  const hoje = new Date();
+  let idade = hoje.getFullYear() - nasc.getFullYear();
+  const m = hoje.getMonth() - nasc.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+  return idade >= 0 ? idade : null;
+};
+
+const fmtDataHora = (iso) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+};
 
 /* Um aluno tem matrícula ativa quando gerado pelo módulo Matrículas */
 const isMatriculado = (a) => a?.matriculaAtiva === true || Number(a?.valorMensalidade || 0) > 0;
@@ -231,21 +250,37 @@ function FotoLightbox({ src, onAlterar, onRemover, onClose }) {
 /* ══════════════════════════════════════════════════
    MODAL: Cadastro / edição de aluno (dados pessoais)
    ══════════════════════════════════════════════════ */
-function ModalAlunoCadastro({ aluno, alunosExistentes, onSave, onClose }) {
+function ModalAlunoCadastro({ aluno, alunosExistentes, tenantUid, onSave, onClose }) {
   const isEdit = !!aluno;
 
   const [form, setForm] = useState({
-    nome:                aluno?.nome                || "",
-    documento:           aluno?.documento           || "",
-    telefone:            aluno?.telefone            || "",
-    email:               aluno?.email               || "",
-    instagram:           aluno?.instagram           || "",
-    dataNascimento:      aluno?.dataNascimento      || "",
-    endereco:            aluno?.endereco            || "",
-    responsavel:         aluno?.responsavel         || "",
-    telefoneResponsavel: aluno?.telefoneResponsavel || "",
+    nome:                  aluno?.nome                  || "",
+    documento:             aluno?.documento             || "",
+    rg:                    aluno?.rg                    || "",
+    telefone:              aluno?.telefone              || "",
+    email:                 aluno?.email                 || "",
+    instagram:             aluno?.instagram             || "",
+    dataNascimento:        aluno?.dataNascimento        || "",
+    turma:                 aluno?.turma                 || "",
+    endereco:              aluno?.endereco              || "",
+    responsavel:           aluno?.responsavel           || "",
+    telefoneResponsavel:   aluno?.telefoneResponsavel   || "",
+    cpfResponsavel:        aluno?.cpfResponsavel        || "",
+    rgResponsavel:         aluno?.rgResponsavel         || "",
+    emailResponsavel:      aluno?.emailResponsavel      || "",
+    enderecoResponsavel:   aluno?.enderecoResponsavel   || "",
   });
   const [erros, setErros] = useState({});
+
+  const idade = useMemo(() => calcularIdade(form.dataNascimento), [form.dataNascimento]);
+
+  const [turmasDisponiveis, setTurmasDisponiveis] = useState([]);
+  useEffect(() => {
+    if (!tenantUid) return;
+    getDoc(doc(db, "users", tenantUid, "config", "matriculas"))
+      .then(s => setTurmasDisponiveis(Array.isArray(s.data()?.turmas) ? s.data().turmas : []))
+      .catch(() => {});
+  }, [tenantUid]);
 
   const [fotoBase64, setFotoBase64] = useState(aluno?.foto || null);
   const [viewerOpen, setViewerOpen] = useState(false);
@@ -290,16 +325,23 @@ function ModalAlunoCadastro({ aluno, alunosExistentes, onSave, onClose }) {
   const handleSubmit = () => {
     if (!validar()) return;
     onSave({
-      nome:                form.nome.trim(),
-      documento:           form.documento.trim(),
-      telefone:            form.telefone.trim(),
-      email:               form.email.trim(),
-      instagram:           form.instagram.trim().replace(/^@/, ""),
-      dataNascimento:      form.dataNascimento,
-      endereco:            form.endereco.trim(),
-      responsavel:         form.responsavel.trim(),
-      telefoneResponsavel: form.telefoneResponsavel.trim(),
-      foto:                fotoBase64,
+      nome:                  form.nome.trim(),
+      documento:             form.documento.trim(),
+      rg:                    form.rg.trim(),
+      telefone:              form.telefone.trim(),
+      email:                 form.email.trim(),
+      instagram:             form.instagram.trim().replace(/^@/, ""),
+      dataNascimento:        form.dataNascimento,
+      idade:                 idade,
+      turma:                 form.turma,
+      endereco:              form.endereco.trim(),
+      responsavel:           form.responsavel.trim(),
+      telefoneResponsavel:   form.telefoneResponsavel.trim(),
+      cpfResponsavel:        form.cpfResponsavel.trim(),
+      rgResponsavel:         form.rgResponsavel.trim(),
+      emailResponsavel:      form.emailResponsavel.trim(),
+      enderecoResponsavel:   form.enderecoResponsavel.trim(),
+      foto:                  fotoBase64,
     });
   };
 
@@ -357,7 +399,7 @@ function ModalAlunoCadastro({ aluno, alunosExistentes, onSave, onClose }) {
 
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Documento (CPF/RG)<span className="form-label-req">*</span></label>
+              <label className="form-label">Documento (CPF)<span className="form-label-req">*</span></label>
               <input type="text" className={`form-input ${erros.documento ? "err" : ""}`}
                 value={form.documento}
                 onChange={(e) => set("documento", fmtCPF(e.target.value))}
@@ -365,9 +407,23 @@ function ModalAlunoCadastro({ aluno, alunosExistentes, onSave, onClose }) {
               {erros.documento && <div className="form-error">{erros.documento}</div>}
             </div>
             <div className="form-group">
+              <label className="form-label">RG</label>
+              <input type="text" className="form-input"
+                value={form.rg} onChange={(e) => set("rg", e.target.value)}
+                placeholder="Opcional" />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
               <label className="form-label">Data de nascimento</label>
               <input type="date" className="form-input"
                 value={form.dataNascimento} onChange={(e) => set("dataNascimento", e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Idade</label>
+              <input type="text" className="form-input" disabled
+                value={idade !== null ? `${idade} anos` : "—"} />
             </div>
           </div>
 
@@ -396,12 +452,33 @@ function ModalAlunoCadastro({ aluno, alunosExistentes, onSave, onClose }) {
                 placeholder="@usuario (opcional)" />
             </div>
             <div className="form-group">
-              <label className="form-label">Endereço</label>
-              <input type="text" className="form-input"
-                value={form.endereco} onChange={(e) => set("endereco", e.target.value)}
-                placeholder="Rua, número, bairro, cidade" />
+              <label className="form-label">Turma</label>
+              <select className="form-input" value={form.turma}
+                onChange={(e) => set("turma", e.target.value)}>
+                <option value="">— Sem turma —</option>
+                {turmasDisponiveis.map((t, i) => (
+                  <option key={i} value={t.nome}>{t.nome}</option>
+                ))}
+                {form.turma && !turmasDisponiveis.some(t => t.nome === form.turma) && (
+                  <option value={form.turma}>{form.turma}</option>
+                )}
+              </select>
             </div>
           </div>
+
+          <div className="form-group">
+            <label className="form-label">Endereço</label>
+            <input type="text" className="form-input"
+              value={form.endereco} onChange={(e) => set("endereco", e.target.value)}
+              placeholder="Rua, número, bairro, cidade" />
+          </div>
+
+          {isEdit && (
+            <div className="form-group">
+              <label className="form-label">Data de cadastro</label>
+              <input type="text" className="form-input" disabled value={fmtDataHora(aluno?.criadoEm)} />
+            </div>
+          )}
 
           <div className="al-section-title" style={{ marginTop: 8 }}>
             <User size={14} /> Responsável (opcional, caso menor de idade)
@@ -418,6 +495,36 @@ function ModalAlunoCadastro({ aluno, alunosExistentes, onSave, onClose }) {
                 value={form.telefoneResponsavel}
                 onChange={(e) => set("telefoneResponsavel", fmtTelefone(e.target.value))}
                 placeholder="(62) 99999-9999" maxLength={15} />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">CPF do responsável</label>
+              <input type="text" className="form-input"
+                value={form.cpfResponsavel}
+                onChange={(e) => set("cpfResponsavel", fmtCPF(e.target.value))}
+                placeholder="000.000.000-00" maxLength={14} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">RG do responsável</label>
+              <input type="text" className="form-input"
+                value={form.rgResponsavel} onChange={(e) => set("rgResponsavel", e.target.value)} />
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">Email do responsável</label>
+              <input type="email" className="form-input"
+                value={form.emailResponsavel}
+                onChange={(e) => set("emailResponsavel", e.target.value)}
+                placeholder="email@exemplo.com" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Endereço do responsável</label>
+              <input type="text" className="form-input"
+                value={form.enderecoResponsavel}
+                onChange={(e) => set("enderecoResponsavel", e.target.value)}
+                placeholder="Rua, número, bairro, cidade" />
             </div>
           </div>
         </div>
@@ -653,10 +760,10 @@ export default function AlunosCadastro() {
       </div>
 
       {modalNovo && podeCriarV && (
-        <ModalAlunoCadastro alunosExistentes={alunos} onSave={handleAdd} onClose={() => setModalNovo(false)} />
+        <ModalAlunoCadastro tenantUid={tenantUid} alunosExistentes={alunos} onSave={handleAdd} onClose={() => setModalNovo(false)} />
       )}
       {editando && podeEditarV && (
-        <ModalAlunoCadastro aluno={editando} alunosExistentes={alunos} onSave={handleEdit} onClose={() => setEditando(null)} />
+        <ModalAlunoCadastro tenantUid={tenantUid} aluno={editando} alunosExistentes={alunos} onSave={handleEdit} onClose={() => setEditando(null)} />
       )}
       {excluindo && podeExcluirV && (
         <ModalExcluirAluno aluno={excluindo} onConfirm={handleDelete} onClose={() => setExcluindo(null)} />
