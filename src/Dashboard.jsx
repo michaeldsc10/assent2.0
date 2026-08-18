@@ -80,7 +80,7 @@ const KEY_MAP = {
   "Serviços":           "servicos",
   "Estoque":           "entrada_estoque",
   "Vendas":             "vendas",
-  "Matriculas":            "matriculas",
+  "Mensalidades":          "matriculas",
   "Alunos":              "alunosCadastro",
   "Fiado / A Receber":  "fiado",
   "Caixa Diário":       "caixa",
@@ -105,7 +105,7 @@ const ATALHOS_TECLADO = [
   { code: "KeyE", label: "Estoque",             dbKey: "entrada_estoque" },
   { code: "KeyV", label: "Vendas",              dbKey: "vendas"          },
   { code: "KeyF", label: "A Receber",           dbKey: "fiado"           },
-  { code: "KeyH", label: "Matriculas",          dbKey: "matriculas"      },
+  { code: "KeyH", label: "Mensalidades",        dbKey: "matriculas"      },
   { code: "KeyL", label: "Alunos",               dbKey: "alunosCadastro"  },
   { code: "KeyX", label: "Caixa Diário",        dbKey: "caixa"           },
   { code: "KeyZ", label: "Despesas",            dbKey: "despesas"        },
@@ -136,7 +136,7 @@ const NAV = [
     { label: "PDV",            modulo: "pdv",              icone: Barcode,            secao: "COMERCIAL" },
      { label: "Mesas",           modulo: "mesas",            icone: LayoutGrid,       secao: "OPERAÇÕES"  },
     { label: "A Receber",       modulo: "aReceber",         icone: Clock,            secao: "FINANCEIRO"},
-    {label: "Matriculas",       modulo: "alunos",       icone: GraduationCap,    secao: "COMERCIAL" }, 
+    {label: "Mensalidades",     modulo: "alunos",       icone: GraduationCap,    secao: "COMERCIAL" }, 
     { label: "Alunos",          modulo: "alunosCadastro", icone: Users,          secao: "COMERCIAL" },
    { label: "Compras",         modulo: "compras",          icone: ShoppingCart,     secao: "COMERCIAL" },
     { label: "Caixa Diário",    modulo: "caixaDiario",      icone: Wallet,           secao: "FINANCEIRO"},
@@ -3209,7 +3209,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
       if (alunosRes.length) grupos.push({ tipo: "Matrículas", items: alunosRes.slice(0,5).map(a => ({
         label: a.nome, sub: a.turma ? `Turma: ${a.turma}` : (a.telefone || a.email || ""), icone: GraduationCap,
-        onClick: () => { navigateTo("Matriculas"); setSearchQuery(""); setSearchResults([]); }
+        onClick: () => { navigateTo("Mensalidades"); setSearchQuery(""); setSearchResults([]); }
       }))});
 
       // Produtos
@@ -3273,7 +3273,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           label: m.clienteNome || "—",
           sub: `${mesLabel} · ${fmtR$(aberta ? m.valorRestante : m.valorTotal)} · ${aberta ? "em aberto" : "paga"}`,
           icone: CreditCard,
-          onClick: () => { navigateTo("Matriculas"); setSearchQuery(""); setSearchResults([]); }
+          onClick: () => { navigateTo("Mensalidades"); setSearchQuery(""); setSearchResults([]); }
         };
       })});
 
@@ -3606,9 +3606,9 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             <Usuarios />
           </RotaProtegida>
         );
-        case "Matriculas":
+        case "Mensalidades":
         return (
-          <RotaProtegida modulo="alunos" label="Matriculas">
+          <RotaProtegida modulo="alunos" label="Mensalidades">
             <Alunos />
           </RotaProtegida>
             );
