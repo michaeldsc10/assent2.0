@@ -223,6 +223,20 @@ const CSS = `
     color: var(--gold);
   }
 
+  .ar-period-group {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
+  .ar-period-custom {
+    display: flex; align-items: center; gap: 6px; margin-left: 4px;
+  }
+  .ar-period-custom-label { font-size: 11px; color: var(--text-3); }
+  .ar-period-date {
+    background: var(--s3); border: 1px solid var(--border); border-radius: 6px;
+    padding: 5px 8px; font-size: 11px; color: var(--text);
+    font-family: 'DM Sans', sans-serif; color-scheme: dark;
+  }
+  .ar-period-date:focus { border-color: var(--gold); outline: none; }
+
   .ar-kpis {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
     margin-bottom: 20px;
@@ -472,6 +486,28 @@ const fmtDataCompleta = (timestamp) => {
 };
 
 const FILTROS_STATUS = ["Todos", "pago", "pendente", "vencido"];
+
+const PERIODS = ["Tudo", "Hoje", "7 dias", "30 dias", "Este mês", "Personalizado"];
+
+function filtrarPorPeriodo(contas, period, dataInicio = "", dataFim = "") {
+  if (period === "Tudo") return contas;
+  if (period === "Personalizado") {
+    return contas.filter(c => {
+      if (!c.dataVencimento) return false;
+      if (dataInicio && c.dataVencimento < dataInicio) return false;
+      if (dataFim && c.dataVencimento > dataFim) return false;
+      return true;
+    });
+  }
+  const now = new Date();
+  const start = new Date();
+  if (period === "Hoje")           { start.setHours(0, 0, 0, 0); }
+  else if (period === "7 dias")    { start.setDate(now.getDate() - 7); }
+  else if (period === "30 dias")   { start.setDate(now.getDate() - 30); }
+  else if (period === "Este mês")  { start.setDate(1); start.setHours(0, 0, 0, 0); }
+  const startStr = start.toISOString().slice(0, 10);
+  return contas.filter(c => c.dataVencimento && c.dataVencimento >= startStr);
+}
 
 const LABEL_STATUS = {
   Todos: "Todos",
@@ -1144,6 +1180,9 @@ export default function AReceber() {
   const [filtroStatus, setFiltroStatus] = useState("Todos");
   const [sortKey, setSortKey]           = useState(null);
   const [sortDir, setSortDir]           = useState("asc");
+  const [period, setPeriod]             = useState("Tudo");
+  const [dataInicio, setDataInicio]     = useState("");
+  const [dataFim, setDataFim]           = useState("");
 
   const { tenantUid, cargo, nomeUsuario, podeCriar, podeEditar, podeExcluir } = useAuth();
 
@@ -1355,7 +1394,7 @@ export default function AReceber() {
   const contasFiltradas = useMemo(() => {
     const q = search.trim().toLowerCase();
 
-    return contas
+    return filtrarPorPeriodo(contas, period, dataInicio, dataFim)
       .filter(c => {
         const passaStatus = filtroStatus === "Todos" || calcStatus(c.valorRestante, c.dataVencimento) === filtroStatus;
         const passaBusca  = !q || c.clienteNome?.toLowerCase().includes(q) || c.descricao?.toLowerCase().includes(q);
@@ -1378,7 +1417,7 @@ export default function AReceber() {
         const cmp = String(va).localeCompare(String(vb), "pt-BR", { numeric: true });
         return sortDir === "asc" ? cmp : -cmp;
       });
-  }, [contas, search, filtroStatus, sortKey, sortDir]);
+  }, [contas, search, filtroStatus, sortKey, sortDir, period, dataInicio, dataFim]);
 
   /* ── KPIs (memoizado) ── */
   const kpis = useMemo(() => {
@@ -1438,6 +1477,36 @@ export default function AReceber() {
               {LABEL_STATUS[f]}
             </button>
           ))}
+        </div>
+
+        <div className="ar-period-group">
+          {PERIODS.map(p => (
+            <button
+              key={p}
+              className={`ar-filter-btn${period === p ? " active" : ""}`}
+              onClick={() => setPeriod(p)}
+            >{p}</button>
+          ))}
+          {period === "Personalizado" && (
+            <div className="ar-period-custom">
+              <span className="ar-period-custom-label">De</span>
+              <input
+                type="date"
+                className="ar-period-date"
+                value={dataInicio}
+                max={dataFim || undefined}
+                onChange={e => setDataInicio(e.target.value)}
+              />
+              <span className="ar-period-custom-label">até</span>
+              <input
+                type="date"
+                className="ar-period-date"
+                value={dataFim}
+                min={dataInicio || undefined}
+                onChange={e => setDataFim(e.target.value)}
+              />
+            </div>
+          )}
         </div>
 
         {podeCriarV && <button className="btn-novo-ar" onClick={() => setModalNovo(true)}>
