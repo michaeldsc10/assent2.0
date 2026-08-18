@@ -54,7 +54,7 @@ const fmtCPF = (v) => {
 const gerarDocIdAluno = () =>
   `aluno_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-/* Próximo idSeq visual — puramente display, mesma numeração usada em Matrículas */
+/* Próximo idSeq visual — ID único do aluno, usado também em Mensalidades */
 const proximoIdSeq = (alunos) => {
   const max = alunos.reduce((m, a) => Math.max(m, Number(a.idSeq || 0)), 0);
   return max + 1;
@@ -640,7 +640,6 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
               </div>
               <div className="modal-sub">
                 {fmtIdSeq(aluno.idSeq)}
-                {aluno.numeroMatricula && <> · {aluno.numeroMatricula}</>}
                 {" "}·{" "}
                 {isMatriculado(aluno)
                   ? <span className="al-pill ok">Matriculado</span>
