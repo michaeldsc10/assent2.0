@@ -255,31 +255,31 @@ const CSS = `
 .al-pill.warn { background:rgba(245,166,35,.12); color:#f5a623; border:1px solid rgba(245,166,35,.25); }
 .al-pill.danger { background:rgba(224,82,82,.12); color:var(--red); border:1px solid rgba(224,82,82,.2); }
 
-.ad-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:14px; margin-bottom:18px; }
-.ad-full { grid-column:1 / -1; }
-.ad-label { display:flex; align-items:center; gap:4px; font-size:10px; font-weight:600;
+.pd-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:14px; margin-bottom:18px; }
+.pd-full { grid-column:1 / -1; }
+.pd-label { display:flex; align-items:center; gap:4px; font-size:10px; font-weight:600;
   letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); margin-bottom:5px; }
-.ad-value { font-size:13px; color:var(--text); word-break:break-word; }
-.ad-row { display:flex; align-items:center; gap:12px; }
-.ad-header-tel { display:flex; align-items:center; gap:5px; font-size:14px; font-weight:600;
+.pd-value { font-size:13px; color:var(--text); word-break:break-word; }
+.pd-row { display:flex; align-items:center; gap:12px; }
+.pd-header-tel { display:flex; align-items:center; gap:5px; font-size:14px; font-weight:600;
   color:var(--gold); margin-top:3px; }
-.ad-resp-box { background:var(--s2); border:1px solid var(--border-h); border-left:3px solid var(--gold);
+.pd-resp-box { background:var(--s2); border:1px solid var(--border-h); border-left:3px solid var(--gold);
   border-radius:10px; padding:16px 16px 2px; margin-bottom:18px; }
-.ad-resp-title { margin-top:0 !important; }
-.ad-summary { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-bottom:14px; }
-.ad-hist-item { background:var(--s2); border:1px solid var(--border); border-radius:9px;
+.pd-resp-title { margin-top:0 !important; }
+.pd-summary { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-bottom:14px; }
+.pd-hist-item { background:var(--s2); border:1px solid var(--border); border-radius:9px;
   padding:10px 12px; margin-bottom:6px; }
-.ad-hist-nome { font-size:13px; color:var(--text); }
-.ad-hist-meta { font-size:11px; color:var(--text-3); margin-top:2px; }
-.ad-mens-head, .ad-mens-row { display:grid; grid-template-columns:90px 1fr 100px 100px;
+.pd-hist-nome { font-size:13px; color:var(--text); }
+.pd-hist-meta { font-size:11px; color:var(--text-3); margin-top:2px; }
+.pd-mens-head, .pd-mens-row { display:grid; grid-template-columns:90px 1fr 100px 100px;
   gap:10px; padding:9px 12px; align-items:center; border-bottom:1px solid var(--border); font-size:12px; }
-.ad-mens-head { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.06em;
+.pd-mens-head { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.06em;
   color:var(--text-3); background:var(--s2); }
-.ad-mens-wrap { border:1px solid var(--border); border-radius:10px; overflow:hidden; }
-.ad-mens-valor { font-family:'JetBrains Mono','Courier New',monospace; color:var(--text); }
+.pd-mens-wrap { border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.pd-mens-valor { font-family:'JetBrains Mono','Courier New',monospace; color:var(--text); }
 @media (max-width: 900px) {
-  .ad-grid { grid-template-columns:1fr; }
-  .ad-summary { grid-template-columns:repeat(2, 1fr); }
+  .pd-grid { grid-template-columns:1fr; }
+  .pd-summary { grid-template-columns:repeat(2, 1fr); }
 }
 
 @media (max-width: 900px) {
@@ -627,7 +627,7 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
     <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal-box modal-box-xl">
         <div className="modal-header">
-          <div className="ad-row">
+          <div className="pd-row">
             {aluno.foto
               ? <img src={aluno.foto} alt={aluno.nome}
                   style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--border-h)", flexShrink: 0, cursor: "zoom-in" }}
@@ -635,7 +635,7 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
               : <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--s3)", border: "2px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Sora',sans-serif", fontSize: 18, fontWeight: 600, color: "var(--text-2)", flexShrink: 0 }}>{(aluno.nome || "?")[0].toUpperCase()}</div>}
             <div>
               <div className="modal-title">{aluno.nome}</div>
-              <div className="ad-header-tel">
+              <div className="pd-header-tel">
                 <Phone size={12} /> {aluno.telefone || "Sem telefone"}
               </div>
               <div className="modal-sub">
@@ -653,77 +653,77 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
 
         <div className="modal-body">
           <div className="al-section-title"><User size={14} /> Dados pessoais</div>
-          <div className="ad-grid">
+          <div className="pd-grid">
             <div>
-              <div className="ad-label"><IdCard size={10} />Documento (CPF)</div>
-              <div className="ad-value">{aluno.documento || "—"}</div>
+              <div className="pd-label"><IdCard size={10} />Documento (CPF)</div>
+              <div className="pd-value">{aluno.documento || "—"}</div>
             </div>
             <div>
-              <div className="ad-label"><IdCard size={10} />RG</div>
-              <div className="ad-value">{aluno.rg || "—"}</div>
+              <div className="pd-label"><IdCard size={10} />RG</div>
+              <div className="pd-value">{aluno.rg || "—"}</div>
             </div>
             <div>
-              <div className="ad-label"><Mail size={10} />Email</div>
-              <div className="ad-value">{aluno.email || "—"}</div>
+              <div className="pd-label"><Mail size={10} />Email</div>
+              <div className="pd-value">{aluno.email || "—"}</div>
             </div>
             <div>
-              <div className="ad-label"><Calendar size={10} />Data de nascimento</div>
-              <div className="ad-value">{fmtData(aluno.dataNascimento)}</div>
+              <div className="pd-label"><Calendar size={10} />Data de nascimento</div>
+              <div className="pd-value">{fmtData(aluno.dataNascimento)}</div>
             </div>
             <div>
-              <div className="ad-label">Idade</div>
-              <div className="ad-value">{calcularIdade(aluno.dataNascimento) ?? "—"}{calcularIdade(aluno.dataNascimento) !== null ? " anos" : ""}</div>
+              <div className="pd-label">Idade</div>
+              <div className="pd-value">{calcularIdade(aluno.dataNascimento) ?? "—"}{calcularIdade(aluno.dataNascimento) !== null ? " anos" : ""}</div>
             </div>
             {aluno.instagram && (
               <div>
-                <div className="ad-label"><AtSign size={10} />Instagram</div>
-                <div className="ad-value" style={{ color: "var(--blue)" }}>@{aluno.instagram}</div>
+                <div className="pd-label"><AtSign size={10} />Instagram</div>
+                <div className="pd-value" style={{ color: "var(--blue)" }}>@{aluno.instagram}</div>
               </div>
             )}
             <div>
-              <div className="ad-label"><GraduationCap size={10} />Turma</div>
-              <div className="ad-value">{aluno.turma || "—"}</div>
+              <div className="pd-label"><GraduationCap size={10} />Turma</div>
+              <div className="pd-value">{aluno.turma || "—"}</div>
             </div>
             {aluno.endereco && (
-              <div className="ad-full">
-                <div className="ad-label"><MapPin size={10} />Endereço</div>
-                <div className="ad-value">{aluno.endereco}</div>
+              <div className="pd-full">
+                <div className="pd-label"><MapPin size={10} />Endereço</div>
+                <div className="pd-value">{aluno.endereco}</div>
               </div>
             )}
             <div>
-              <div className="ad-label"><Calendar size={10} />Data de cadastro</div>
-              <div className="ad-value">{fmtDataHora(aluno.criadoEm)}</div>
+              <div className="pd-label"><Calendar size={10} />Data de cadastro</div>
+              <div className="pd-value">{fmtDataHora(aluno.criadoEm)}</div>
             </div>
           </div>
 
           {(aluno.responsavel || aluno.telefoneResponsavel || aluno.cpfResponsavel || aluno.emailResponsavel || aluno.enderecoResponsavel) && (
-            <div className="ad-resp-box">
-              <div className="al-section-title ad-resp-title"><Users size={14} /> Dados do responsável</div>
-              <div className="ad-grid">
+            <div className="pd-resp-box">
+              <div className="al-section-title pd-resp-title"><Users size={14} /> Dados do responsável</div>
+              <div className="pd-grid">
                 <div>
-                  <div className="ad-label">Nome</div>
-                  <div className="ad-value">{aluno.responsavel || "—"}</div>
+                  <div className="pd-label">Nome</div>
+                  <div className="pd-value">{aluno.responsavel || "—"}</div>
                 </div>
                 <div>
-                  <div className="ad-label"><Phone size={10} />Telefone</div>
-                  <div className="ad-value">{aluno.telefoneResponsavel || "—"}</div>
+                  <div className="pd-label"><Phone size={10} />Telefone</div>
+                  <div className="pd-value">{aluno.telefoneResponsavel || "—"}</div>
                 </div>
                 <div>
-                  <div className="ad-label"><IdCard size={10} />CPF</div>
-                  <div className="ad-value">{aluno.cpfResponsavel || "—"}</div>
+                  <div className="pd-label"><IdCard size={10} />CPF</div>
+                  <div className="pd-value">{aluno.cpfResponsavel || "—"}</div>
                 </div>
                 <div>
-                  <div className="ad-label"><IdCard size={10} />RG</div>
-                  <div className="ad-value">{aluno.rgResponsavel || "—"}</div>
+                  <div className="pd-label"><IdCard size={10} />RG</div>
+                  <div className="pd-value">{aluno.rgResponsavel || "—"}</div>
                 </div>
                 <div>
-                  <div className="ad-label"><Mail size={10} />Email</div>
-                  <div className="ad-value">{aluno.emailResponsavel || "—"}</div>
+                  <div className="pd-label"><Mail size={10} />Email</div>
+                  <div className="pd-value">{aluno.emailResponsavel || "—"}</div>
                 </div>
                 {aluno.enderecoResponsavel && (
-                  <div className="ad-full">
-                    <div className="ad-label"><MapPin size={10} />Endereço</div>
-                    <div className="ad-value">{aluno.enderecoResponsavel}</div>
+                  <div className="pd-full">
+                    <div className="pd-label"><MapPin size={10} />Endereço</div>
+                    <div className="pd-value">{aluno.enderecoResponsavel}</div>
                   </div>
                 )}
               </div>
@@ -735,11 +735,11 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
               <div className="al-section-title"><FileText size={14} /> Histórico de matrículas</div>
               <div style={{ marginBottom: 18 }}>
                 {[...aluno.historicoMatriculas].reverse().map((h, i) => (
-                  <div key={i} className="ad-hist-item">
-                    <div className="ad-hist-nome">
+                  <div key={i} className="pd-hist-item">
+                    <div className="pd-hist-nome">
                       {h.numero} {h.turma ? `· ${h.turma}` : ""} · {fmtR$(h.valorMensalidade)}/mês
                     </div>
-                    <div className="ad-hist-meta">
+                    <div className="pd-hist-meta">
                       {fmtData(h.dataInicio)} {h.dataFim ? `→ ${fmtData(h.dataFim)}` : "→ em andamento"} ·{" "}
                       {h.status === "cancelada" ? "Cancelada" : h.status === "ativo" ? "Ativa" : h.status}
                     </div>
@@ -750,27 +750,27 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
           )}
 
           <div className="al-section-title"><DollarSign size={14} /> Histórico de mensalidades</div>
-          <div className="ad-summary">
+          <div className="pd-summary">
             <div>
-              <div className="ad-label">Abertas</div>
-              <div className="ad-value">{resumo.abertas}</div>
+              <div className="pd-label">Abertas</div>
+              <div className="pd-value">{resumo.abertas}</div>
             </div>
             <div>
-              <div className="ad-label">Total em aberto</div>
-              <div className="ad-value">{fmtR$(resumo.totalAberto)}</div>
+              <div className="pd-label">Total em aberto</div>
+              <div className="pd-value">{fmtR$(resumo.totalAberto)}</div>
             </div>
             <div>
-              <div className="ad-label">Pagas</div>
-              <div className="ad-value">{resumo.pagas}</div>
+              <div className="pd-label">Pagas</div>
+              <div className="pd-value">{resumo.pagas}</div>
             </div>
             <div>
-              <div className="ad-label">Total recebido</div>
-              <div className="ad-value">{fmtR$(resumo.totalPago)}</div>
+              <div className="pd-label">Total recebido</div>
+              <div className="pd-value">{fmtR$(resumo.totalPago)}</div>
             </div>
           </div>
 
-          <div className="ad-mens-wrap">
-            <div className="ad-mens-head">
+          <div className="pd-mens-wrap">
+            <div className="pd-mens-head">
               <span>MÊS</span><span>VENCIMENTO</span><span>VALOR</span><span>STATUS</span>
             </div>
             {mensDoAluno.length === 0 ? (
@@ -781,10 +781,10 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
                 ? `${MESES_PT[Number(m.mesReferencia.split("-")[1]) - 1]}/${m.mesReferencia.split("-")[0]}`
                 : "—";
               return (
-                <div key={m.id} className="ad-mens-row">
+                <div key={m.id} className="pd-mens-row">
                   <span style={{ textTransform: "capitalize" }}>{mesLabel}</span>
                   <span>{fmtData(m.dataVencimento)}</span>
-                  <span className="ad-mens-valor">
+                  <span className="pd-mens-valor">
                     {fmtR$(st === "paga" ? (m.valorPago || m.valorTotal) : m.valorRestante)}
                   </span>
                   <span>
