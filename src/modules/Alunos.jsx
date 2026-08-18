@@ -122,6 +122,16 @@ const parseValorInput = (v) => {
 const fmtIdSeq     = (n) => `A${String(n).padStart(4, "0")}`;
 const fmtIdSeqMens = (n) => `M${String(n).padStart(4, "0")}`;
 
+/* Número de matrícula — sequencial, persiste no aluno entre re-matrículas */
+const fmtNumMatricula = (n) => `MT${String(n).padStart(4, "0")}`;
+const proximoNumeroMatricula = (alunos) => {
+  const max = alunos.reduce((m, a) => {
+    const n = Number(String(a.numeroMatricula || "").replace(/\D/g, "")) || 0;
+    return Math.max(m, n);
+  }, 0);
+  return max + 1;
+};
+
 /* YYYY-MM do mês/ano */
 const toMesRef = (ano, mes) => `${ano}-${String(mes).padStart(2, "0")}`;
 
@@ -801,7 +811,7 @@ function ModalDetalheAluno({
             <div>
               <div className="modal-title">{aluno.nome}</div>
               <div className="modal-sub">
-                {fmtIdSeq(aluno.idSeq)} · {aluno.documento || "—"} ·{" "}
+                {aluno.numeroMatricula || fmtIdSeq(aluno.idSeq)} · {aluno.documento || "—"} ·{" "}
                 <span className={`mat-pill ${aluno.status === "ativo" ? "ok" : "neutral"}`}>
                   {aluno.status === "ativo" ? "Ativo" : aluno.status === "trancado" ? "Trancado" : "Inativo"}
                 </span>
@@ -813,6 +823,12 @@ function ModalDetalheAluno({
 
         <div className="modal-body">
           <div className="mat-detail-grid">
+            {aluno.numeroMatricula && (
+              <div className="mat-detail-item">
+                <div className="mat-detail-label">Nº Matrícula</div>
+                <div className="mat-detail-value" style={{ fontFamily: "monospace" }}>{aluno.numeroMatricula}</div>
+              </div>
+            )}
             <div className="mat-detail-item">
               <div className="mat-detail-label"><Phone size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />Telefone</div>
               <div className="mat-detail-value">{aluno.telefone || "—"}</div>
@@ -865,6 +881,27 @@ function ModalDetalheAluno({
               </div>
             )}
           </div>
+
+          {Array.isArray(aluno.historicoMatriculas) && aluno.historicoMatriculas.length > 0 && (
+            <>
+              <div className="mat-section-title"><FileText size={14} /> Histórico de matrículas</div>
+              <div className="turmas-list" style={{ marginBottom: 18 }}>
+                {[...aluno.historicoMatriculas].reverse().map((h, i) => (
+                  <div key={i} className="turma-item" style={{ cursor: "default" }}>
+                    <div className="turma-item-info">
+                      <span className="turma-item-nome">
+                        {h.numero} {h.turma ? `· ${h.turma}` : ""} · {fmtR$(h.valorMensalidade)}/mês
+                      </span>
+                      <span className="turma-item-meta">
+                        {fmtData(h.dataInicio)} {h.dataFim ? `→ ${fmtData(h.dataFim)}` : "→ em andamento"} ·{" "}
+                        {h.status === "cancelada" ? "Cancelada" : h.status === "ativo" ? "Ativa" : h.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
 
           {/* — Resumo mensalidades — */}
           <div className="mat-section-title"><FileText size={14} /> Mensalidades</div>
@@ -1310,6 +1347,23 @@ export default function Alunos() {
           observacoes:      dados.observacoes,
           atualizadoEm:     new Date().toISOString(),
         };
+
+        /* Atualiza o registro aberto (dataFim: null) no histórico de matrículas */
+        const historico = Array.isArray(editando.historicoMatriculas) ? [...editando.historicoMatriculas] : [];
+        const idxAberto = historico.map(h => h.dataFim).lastIndexOf(null);
+        if (idxAberto >= 0) {
+          historico[idxAberto] = {
+            ...historico[idxAberto],
+            turma:            dados.turma,
+            valorMensalidade: dados.valorMensalidade,
+            diaVencimento:    dados.diaVencimento,
+            dataInicio:       dados.dataInicio,
+            status:           dados.status,
+            observacoes:      dados.observacoes,
+          };
+          patch.historicoMatriculas = historico;
+        }
+
         const ref = doc(db, "users", tenantUid, "clientes", editando.docId);
         await updateDoc(ref, patch);
 
@@ -1351,16 +1405,36 @@ export default function Alunos() {
         const alunoCadastro = alunosDisponiveis.find(a => a.docId === dados.alunoDocId);
         if (!alunoCadastro) { alert("Selecione um aluno cadastrado."); return; }
 
+        /* Número de matrícula: mantém o já existente ou gera um novo sequencial */
+        const numeroMatricula = alunoCadastro.numeroMatricula
+          || fmtNumMatricula(proximoNumeroMatricula(alunos));
+
+        const historico = Array.isArray(alunoCadastro.historicoMatriculas)
+          ? [...alunoCadastro.historicoMatriculas] : [];
+        historico.push({
+          numero:            numeroMatricula,
+          turma:             dados.turma,
+          valorMensalidade:  dados.valorMensalidade,
+          diaVencimento:     dados.diaVencimento,
+          dataInicio:        dados.dataInicio,
+          status:            dados.status,
+          observacoes:       dados.observacoes,
+          criadoEm:          new Date().toISOString(),
+          dataFim:           null,
+        });
+
         const ref = doc(db, "users", tenantUid, "clientes", alunoCadastro.docId);
         await updateDoc(ref, {
-          valorMensalidade: dados.valorMensalidade,
-          diaVencimento:    dados.diaVencimento,
-          dataInicio:       dados.dataInicio,
-          status:           dados.status,
-          turma:            dados.turma,
-          observacoes:      dados.observacoes,
-          matriculaAtiva:   true,
-          atualizadoEm:     new Date().toISOString(),
+          valorMensalidade:    dados.valorMensalidade,
+          diaVencimento:       dados.diaVencimento,
+          dataInicio:          dados.dataInicio,
+          status:              dados.status,
+          turma:               dados.turma,
+          observacoes:         dados.observacoes,
+          matriculaAtiva:      true,
+          numeroMatricula,
+          historicoMatriculas: historico,
+          atualizadoEm:        new Date().toISOString(),
         });
 
         await gerarMensalidadeEmAberto({
@@ -1372,7 +1446,7 @@ export default function Alunos() {
         await logAction({
           tenantUid, nomeUsuario, cargo,
           acao: LOG_ACAO.CRIAR, modulo: "Matrículas",
-          descricao: `Matriculou ${fmtIdSeq(alunoCadastro.idSeq)} — ${alunoCadastro.nome} — ${fmtR$(dados.valorMensalidade)}/mês`,
+          descricao: `Matriculou ${numeroMatricula} — ${alunoCadastro.nome} — ${fmtR$(dados.valorMensalidade)}/mês`,
         });
         setModalNovo(false);
       }
@@ -1420,20 +1494,28 @@ export default function Alunos() {
       await Promise.all(
         abertas.map(m => deleteDoc(doc(db, "users", tenantUid, "a_receber", m.id)))
       );
-      /* 2. Encerra a matrícula, preservando o cadastro do aluno */
+      /* 2. Encerra o registro aberto no histórico de matrículas */
+      const historico = Array.isArray(excluindo.historicoMatriculas) ? [...excluindo.historicoMatriculas] : [];
+      const idxAberto = historico.map(h => h.dataFim).lastIndexOf(null);
+      if (idxAberto >= 0) {
+        historico[idxAberto] = { ...historico[idxAberto], status: "cancelada", dataFim: new Date().toISOString() };
+      }
+
+      /* 3. Encerra a matrícula, preservando o cadastro e o nº de matrícula do aluno */
       const ref = doc(db, "users", tenantUid, "clientes", excluindo.docId);
       await updateDoc(ref, {
-        matriculaAtiva:   false,
-        valorMensalidade: 0,
-        turma:            "",
-        status:           "inativo",
-        atualizadoEm:     new Date().toISOString(),
+        matriculaAtiva:      false,
+        valorMensalidade:    0,
+        turma:               "",
+        status:               "inativo",
+        historicoMatriculas: historico,
+        atualizadoEm:        new Date().toISOString(),
       });
 
       await logAction({
         tenantUid, nomeUsuario, cargo,
         acao: LOG_ACAO.EXCLUIR, modulo: "Matrículas",
-        descricao: `Cancelou matrícula ${fmtIdSeq(excluindo.idSeq)} — ${excluindo.nome} (${abertas.length} mensalidade(s) em aberto removidas)`,
+        descricao: `Cancelou matrícula ${excluindo.numeroMatricula || fmtIdSeq(excluindo.idSeq)} — ${excluindo.nome} (${abertas.length} mensalidade(s) em aberto removidas)`,
       });
       setExcluindo(null);
       setDetalhe(null);
@@ -1511,7 +1593,8 @@ export default function Alunos() {
       return (
         a.nome?.toLowerCase().includes(q) ||
         onlyDigits(a.documento).includes(onlyDigits(q)) ||
-        fmtIdSeq(a.idSeq).toLowerCase().includes(q)
+        fmtIdSeq(a.idSeq).toLowerCase().includes(q) ||
+        (a.numeroMatricula || "").toLowerCase().includes(q)
       );
     }).sort((a, b) => {
       if (sortField === "vencimento") {
@@ -1646,7 +1729,7 @@ export default function Alunos() {
             </div>
 
             <div className="mat-row-head">
-              <span>ID</span>
+              <span>Nº MATRÍCULA</span>
               <span>
                 <span className="mat-col-sort" onClick={() => toggleSort("nome")} title="Ordenar por nome">
                   ALUNO
@@ -1674,7 +1757,7 @@ export default function Alunos() {
               </div>
             ) : alunosFiltrados.map(a => (
               <div key={a.docId} className="mat-row" onClick={() => setDetalhe(a)}>
-                <span className="mat-id">{fmtIdSeq(a.idSeq)}</span>
+                <span className="mat-id">{a.numeroMatricula || "—"}</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   {a.foto
                     ? <img src={a.foto} alt={a.nome} className="aluno-avatar"
