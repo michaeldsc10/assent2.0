@@ -9,7 +9,8 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Search, UserPlus, Edit2, Trash2, X, Users, Camera,
-  User, AtSign, CheckCircle,
+  User, AtSign, CheckCircle, Phone, Mail, MapPin, Calendar,
+  DollarSign, FileText, GraduationCap, IdCard,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
@@ -19,6 +20,14 @@ import { useAuth } from "../contexts/AuthContext";
 import {
   collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot, query, where, getDoc,
 } from "firebase/firestore";
+
+/* ══════════════════════════════════════════════════
+   CONSTANTES
+   ══════════════════════════════════════════════════ */
+const MESES_PT = [
+  "janeiro", "fevereiro", "março", "abril", "maio", "junho",
+  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+];
 
 /* ══════════════════════════════════════════════════
    UTILITÁRIOS
@@ -71,6 +80,32 @@ const fmtDataHora = (iso) => {
   return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 };
 
+const fmtData = (iso) => {
+  if (!iso) return "—";
+  try {
+    const d = typeof iso === "string" ? new Date(iso + (iso.length === 10 ? "T12:00:00" : "")) : new Date(iso);
+    return d.toLocaleDateString("pt-BR");
+  } catch { return "—"; }
+};
+
+const fmtR$ = (v) =>
+  `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const statusMensalidade = (mens) => {
+  const restante = Number(mens.valorRestante ?? 0);
+  if (restante <= 0) return "paga";
+  const hoje = new Date().toISOString().slice(0, 10);
+  const venc = mens.dataVencimento || "";
+  if (venc && venc < hoje) return "vencida";
+  try {
+    const dVenc = new Date(venc + "T12:00:00");
+    const dHoje = new Date(hoje + "T12:00:00");
+    const diffDias = Math.round((dVenc - dHoje) / 86400000);
+    if (diffDias <= 3) return "vencendo";
+  } catch {}
+  return "pendente";
+};
+
 /* Um aluno tem matrícula ativa quando gerado pelo módulo Matrículas */
 const isMatriculado = (a) => a?.matriculaAtiva === true || Number(a?.valorMensalidade || 0) > 0;
 
@@ -88,6 +123,7 @@ const CSS = `
   width:100%; max-width:520px; max-height:92vh; overflow-y:auto;
   box-shadow:0 28px 72px rgba(0,0,0,.65); animation:slideUp .18s ease; }
 .modal-box-lg { max-width:680px; }
+.modal-box-xl { max-width:820px; }
 .modal-box-md { max-width:420px; }
 .modal-box::-webkit-scrollbar { width:3px; }
 .modal-box::-webkit-scrollbar-thumb { background:var(--text-3); border-radius:2px; }
@@ -216,6 +252,30 @@ const CSS = `
   padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600; white-space:nowrap; }
 .al-pill.ok { background:rgba(74,222,128,.12); color:var(--green); border:1px solid rgba(74,222,128,.2); }
 .al-pill.neutral { background:var(--s3); color:var(--text-3); border:1px solid var(--border); }
+.al-pill.warn { background:rgba(245,166,35,.12); color:#f5a623; border:1px solid rgba(245,166,35,.25); }
+.al-pill.danger { background:rgba(224,82,82,.12); color:var(--red); border:1px solid rgba(224,82,82,.2); }
+
+.ad-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:14px; margin-bottom:18px; }
+.ad-full { grid-column:1 / -1; }
+.ad-label { display:flex; align-items:center; gap:4px; font-size:10px; font-weight:600;
+  letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); margin-bottom:5px; }
+.ad-value { font-size:13px; color:var(--text); word-break:break-word; }
+.ad-row { display:flex; align-items:center; gap:12px; }
+.ad-summary { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-bottom:14px; }
+.ad-hist-item { background:var(--s2); border:1px solid var(--border); border-radius:9px;
+  padding:10px 12px; margin-bottom:6px; }
+.ad-hist-nome { font-size:13px; color:var(--text); }
+.ad-hist-meta { font-size:11px; color:var(--text-3); margin-top:2px; }
+.ad-mens-head, .ad-mens-row { display:grid; grid-template-columns:90px 1fr 100px 100px;
+  gap:10px; padding:9px 12px; align-items:center; border-bottom:1px solid var(--border); font-size:12px; }
+.ad-mens-head { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--text-3); background:var(--s2); }
+.ad-mens-wrap { border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+.ad-mens-valor { font-family:'JetBrains Mono','Courier New',monospace; color:var(--text); }
+@media (max-width: 900px) {
+  .ad-grid { grid-template-columns:1fr; }
+  .ad-summary { grid-template-columns:repeat(2, 1fr); }
+}
 
 @media (max-width: 900px) {
   .form-row { grid-template-columns: 1fr; }
@@ -541,6 +601,214 @@ function ModalAlunoCadastro({ aluno, alunosExistentes, tenantUid, onSave, onClos
 }
 
 /* ══════════════════════════════════════════════════
+   MODAL: Detalhe do aluno (dados completos + histórico)
+   ══════════════════════════════════════════════════ */
+function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, podeEditar }) {
+  const mensDoAluno = useMemo(() =>
+    mensalidades.filter(m => m.clienteId === aluno.docId)
+      .sort((a, b) => (b.mesReferencia || "").localeCompare(a.mesReferencia || "")),
+    [mensalidades, aluno.docId]
+  );
+
+  const resumo = useMemo(() => {
+    const abertas = mensDoAluno.filter(m => Number(m.valorRestante || 0) > 0);
+    const pagas   = mensDoAluno.filter(m => Number(m.valorRestante || 0) <= 0);
+    const totalAberto = abertas.reduce((s, m) => s + Number(m.valorRestante || 0), 0);
+    const totalPago   = pagas.reduce((s, m) => s + Number(m.valorPago || m.valorTotal || 0), 0);
+    return { abertas: abertas.length, pagas: pagas.length, totalAberto, totalPago };
+  }, [mensDoAluno]);
+
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box modal-box-xl">
+        <div className="modal-header">
+          <div className="ad-row">
+            {aluno.foto
+              ? <img src={aluno.foto} alt={aluno.nome}
+                  style={{ width: 48, height: 48, borderRadius: "50%", objectFit: "cover", border: "2px solid var(--border-h)", flexShrink: 0, cursor: "zoom-in" }}
+                  onClick={() => onVerFoto?.(aluno.foto)} title="Ver foto" />
+              : <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--s3)", border: "2px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Sora',sans-serif", fontSize: 18, fontWeight: 600, color: "var(--text-2)", flexShrink: 0 }}>{(aluno.nome || "?")[0].toUpperCase()}</div>}
+            <div>
+              <div className="modal-title">{aluno.nome}</div>
+              <div className="modal-sub">
+                {fmtIdSeq(aluno.idSeq)}
+                {aluno.numeroMatricula && <> · {aluno.numeroMatricula}</>}
+                {" "}·{" "}
+                {isMatriculado(aluno)
+                  ? <span className="al-pill ok">Matriculado</span>
+                  : <span className="al-pill neutral">Sem matrícula</span>}
+              </div>
+            </div>
+          </div>
+          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+        </div>
+
+        <div className="modal-body">
+          <div className="al-section-title"><User size={14} /> Dados pessoais</div>
+          <div className="ad-grid">
+            <div>
+              <div className="ad-label"><IdCard size={10} />Documento (CPF)</div>
+              <div className="ad-value">{aluno.documento || "—"}</div>
+            </div>
+            <div>
+              <div className="ad-label"><IdCard size={10} />RG</div>
+              <div className="ad-value">{aluno.rg || "—"}</div>
+            </div>
+            <div>
+              <div className="ad-label"><Phone size={10} />Telefone</div>
+              <div className="ad-value">{aluno.telefone || "—"}</div>
+            </div>
+            <div>
+              <div className="ad-label"><Mail size={10} />Email</div>
+              <div className="ad-value">{aluno.email || "—"}</div>
+            </div>
+            <div>
+              <div className="ad-label"><Calendar size={10} />Data de nascimento</div>
+              <div className="ad-value">{fmtData(aluno.dataNascimento)}</div>
+            </div>
+            <div>
+              <div className="ad-label">Idade</div>
+              <div className="ad-value">{calcularIdade(aluno.dataNascimento) ?? "—"}{calcularIdade(aluno.dataNascimento) !== null ? " anos" : ""}</div>
+            </div>
+            {aluno.instagram && (
+              <div>
+                <div className="ad-label"><AtSign size={10} />Instagram</div>
+                <div className="ad-value" style={{ color: "var(--blue)" }}>@{aluno.instagram}</div>
+              </div>
+            )}
+            <div>
+              <div className="ad-label"><GraduationCap size={10} />Turma</div>
+              <div className="ad-value">{aluno.turma || "—"}</div>
+            </div>
+            {aluno.endereco && (
+              <div className="ad-full">
+                <div className="ad-label"><MapPin size={10} />Endereço</div>
+                <div className="ad-value">{aluno.endereco}</div>
+              </div>
+            )}
+            <div>
+              <div className="ad-label"><Calendar size={10} />Data de cadastro</div>
+              <div className="ad-value">{fmtDataHora(aluno.criadoEm)}</div>
+            </div>
+          </div>
+
+          {(aluno.responsavel || aluno.telefoneResponsavel || aluno.cpfResponsavel || aluno.emailResponsavel || aluno.enderecoResponsavel) && (
+            <>
+              <div className="al-section-title"><User size={14} /> Responsável</div>
+              <div className="ad-grid">
+                <div>
+                  <div className="ad-label">Nome</div>
+                  <div className="ad-value">{aluno.responsavel || "—"}</div>
+                </div>
+                <div>
+                  <div className="ad-label"><Phone size={10} />Telefone</div>
+                  <div className="ad-value">{aluno.telefoneResponsavel || "—"}</div>
+                </div>
+                <div>
+                  <div className="ad-label"><IdCard size={10} />CPF</div>
+                  <div className="ad-value">{aluno.cpfResponsavel || "—"}</div>
+                </div>
+                <div>
+                  <div className="ad-label"><IdCard size={10} />RG</div>
+                  <div className="ad-value">{aluno.rgResponsavel || "—"}</div>
+                </div>
+                <div>
+                  <div className="ad-label"><Mail size={10} />Email</div>
+                  <div className="ad-value">{aluno.emailResponsavel || "—"}</div>
+                </div>
+                {aluno.enderecoResponsavel && (
+                  <div className="ad-full">
+                    <div className="ad-label"><MapPin size={10} />Endereço</div>
+                    <div className="ad-value">{aluno.enderecoResponsavel}</div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {Array.isArray(aluno.historicoMatriculas) && aluno.historicoMatriculas.length > 0 && (
+            <>
+              <div className="al-section-title"><FileText size={14} /> Histórico de matrículas</div>
+              <div style={{ marginBottom: 18 }}>
+                {[...aluno.historicoMatriculas].reverse().map((h, i) => (
+                  <div key={i} className="ad-hist-item">
+                    <div className="ad-hist-nome">
+                      {h.numero} {h.turma ? `· ${h.turma}` : ""} · {fmtR$(h.valorMensalidade)}/mês
+                    </div>
+                    <div className="ad-hist-meta">
+                      {fmtData(h.dataInicio)} {h.dataFim ? `→ ${fmtData(h.dataFim)}` : "→ em andamento"} ·{" "}
+                      {h.status === "cancelada" ? "Cancelada" : h.status === "ativo" ? "Ativa" : h.status}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+          <div className="al-section-title"><DollarSign size={14} /> Histórico de mensalidades</div>
+          <div className="ad-summary">
+            <div>
+              <div className="ad-label">Abertas</div>
+              <div className="ad-value">{resumo.abertas}</div>
+            </div>
+            <div>
+              <div className="ad-label">Total em aberto</div>
+              <div className="ad-value">{fmtR$(resumo.totalAberto)}</div>
+            </div>
+            <div>
+              <div className="ad-label">Pagas</div>
+              <div className="ad-value">{resumo.pagas}</div>
+            </div>
+            <div>
+              <div className="ad-label">Total recebido</div>
+              <div className="ad-value">{fmtR$(resumo.totalPago)}</div>
+            </div>
+          </div>
+
+          <div className="ad-mens-wrap">
+            <div className="ad-mens-head">
+              <span>MÊS</span><span>VENCIMENTO</span><span>VALOR</span><span>STATUS</span>
+            </div>
+            {mensDoAluno.length === 0 ? (
+              <div className="al-empty">Nenhuma mensalidade gerada ainda.</div>
+            ) : mensDoAluno.map(m => {
+              const st = statusMensalidade(m);
+              const mesLabel = m.mesReferencia
+                ? `${MESES_PT[Number(m.mesReferencia.split("-")[1]) - 1]}/${m.mesReferencia.split("-")[0]}`
+                : "—";
+              return (
+                <div key={m.id} className="ad-mens-row">
+                  <span style={{ textTransform: "capitalize" }}>{mesLabel}</span>
+                  <span>{fmtData(m.dataVencimento)}</span>
+                  <span className="ad-mens-valor">
+                    {fmtR$(st === "paga" ? (m.valorPago || m.valorTotal) : m.valorRestante)}
+                  </span>
+                  <span>
+                    {st === "paga"      && <span className="al-pill ok">Paga</span>}
+                    {st === "pendente"  && <span className="al-pill neutral">Pendente</span>}
+                    {st === "vencendo"  && <span className="al-pill warn">Vence em breve</span>}
+                    {st === "vencida"   && <span className="al-pill danger">Vencida</span>}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="modal-footer">
+          {podeEditar && (
+            <button className="btn-secondary" onClick={() => onEditar(aluno)}>
+              <Edit2 size={14} /> Editar
+            </button>
+          )}
+          <button className="btn-primary" onClick={onClose}>Fechar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════
    MODAL: Excluir aluno (só permitido sem matrícula ativa)
    ══════════════════════════════════════════════════ */
 function ModalExcluirAluno({ aluno, onConfirm, onClose }) {
@@ -587,12 +855,14 @@ export default function AlunosCadastro() {
   const podeExcluirV = podeExcluir("clientes");
 
   const [alunos, setAlunos]   = useState([]);
+  const [mensalidades, setMensalidades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch]   = useState("");
 
   const [modalNovo, setModalNovo] = useState(false);
   const [editando, setEditando]   = useState(null);
   const [excluindo, setExcluindo] = useState(null);
+  const [detalhe, setDetalhe]     = useState(null);
   const [fotoVisualizando, setFotoVisualizando] = useState(null);
 
   useEffect(() => {
@@ -602,7 +872,12 @@ export default function AlunosCadastro() {
       setAlunos(snap.docs.map(d => ({ docId: d.id, ...d.data() })));
       setLoading(false);
     }, fsSnapshotError("AlunosCadastro:alunos"));
-    return () => unsub();
+
+    const unsubMens = onSnapshot(collection(db, "users", tenantUid, "a_receber"), (snap) => {
+      setMensalidades(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(m => m.origem === "mensalidade"));
+    }, fsSnapshotError("AlunosCadastro:mensalidades"));
+
+    return () => { unsub(); unsubMens(); };
   }, [tenantUid]);
 
   const handleAdd = async (dados) => {
@@ -725,12 +1000,12 @@ export default function AlunosCadastro() {
                 <p>{search ? "Nenhum resultado para a busca." : "Nenhum aluno cadastrado ainda."}</p>
               </div>
             ) : alunosFiltrados.map(a => (
-              <div key={a.docId} className="al-row">
+              <div key={a.docId} className="al-row" style={{ cursor: "pointer" }} onClick={() => setDetalhe(a)}>
                 <span className="al-id">{fmtIdSeq(a.idSeq)}</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   {a.foto
                     ? <img src={a.foto} alt={a.nome} className="al-avatar" style={{ cursor: "zoom-in" }}
-                        onClick={() => setFotoVisualizando(a.foto)} title="Ver foto" />
+                        onClick={(e) => { e.stopPropagation(); setFotoVisualizando(a.foto); }} title="Ver foto" />
                     : <div className="al-avatar-placeholder">{(a.nome || "?")[0].toUpperCase()}</div>}
                   <span className="al-nome">{a.nome}</span>
                 </span>
@@ -743,12 +1018,12 @@ export default function AlunosCadastro() {
                 </span>
                 <div className="al-actions">
                   {podeEditarV && (
-                    <button className="btn-icon btn-icon-edit" onClick={() => setEditando(a)} title="Editar">
+                    <button className="btn-icon btn-icon-edit" onClick={(e) => { e.stopPropagation(); setEditando(a); }} title="Editar">
                       <Edit2 size={13} />
                     </button>
                   )}
                   {podeExcluirV && (
-                    <button className="btn-icon btn-icon-del" onClick={() => setExcluindo(a)} title="Excluir">
+                    <button className="btn-icon btn-icon-del" onClick={(e) => { e.stopPropagation(); setExcluindo(a); }} title="Excluir">
                       <Trash2 size={13} />
                     </button>
                   )}
@@ -767,6 +1042,16 @@ export default function AlunosCadastro() {
       )}
       {excluindo && podeExcluirV && (
         <ModalExcluirAluno aluno={excluindo} onConfirm={handleDelete} onClose={() => setExcluindo(null)} />
+      )}
+      {detalhe && (
+        <ModalDetalheAluno
+          aluno={alunos.find(a => a.docId === detalhe.docId) || detalhe}
+          mensalidades={mensalidades}
+          podeEditar={podeEditarV}
+          onClose={() => setDetalhe(null)}
+          onEditar={(a) => { setDetalhe(null); setEditando(a); }}
+          onVerFoto={setFotoVisualizando}
+        />
       )}
       {fotoVisualizando && (
         <div className="foto-lightbox" onClick={(e) => e.target === e.currentTarget && setFotoVisualizando(null)}>
