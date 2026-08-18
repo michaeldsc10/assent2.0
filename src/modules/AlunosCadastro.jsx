@@ -261,6 +261,11 @@ const CSS = `
   letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); margin-bottom:5px; }
 .ad-value { font-size:13px; color:var(--text); word-break:break-word; }
 .ad-row { display:flex; align-items:center; gap:12px; }
+.ad-header-tel { display:flex; align-items:center; gap:5px; font-size:14px; font-weight:600;
+  color:var(--gold); margin-top:3px; }
+.ad-resp-box { background:var(--s2); border:1px solid var(--border-h); border-left:3px solid var(--gold);
+  border-radius:10px; padding:16px 16px 2px; margin-bottom:18px; }
+.ad-resp-title { margin-top:0 !important; }
 .ad-summary { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-bottom:14px; }
 .ad-hist-item { background:var(--s2); border:1px solid var(--border); border-radius:9px;
   padding:10px 12px; margin-bottom:6px; }
@@ -630,6 +635,9 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
               : <div style={{ width: 48, height: 48, borderRadius: "50%", background: "var(--s3)", border: "2px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Sora',sans-serif", fontSize: 18, fontWeight: 600, color: "var(--text-2)", flexShrink: 0 }}>{(aluno.nome || "?")[0].toUpperCase()}</div>}
             <div>
               <div className="modal-title">{aluno.nome}</div>
+              <div className="ad-header-tel">
+                <Phone size={12} /> {aluno.telefone || "Sem telefone"}
+              </div>
               <div className="modal-sub">
                 {fmtIdSeq(aluno.idSeq)}
                 {aluno.numeroMatricula && <> · {aluno.numeroMatricula}</>}
@@ -653,10 +661,6 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
             <div>
               <div className="ad-label"><IdCard size={10} />RG</div>
               <div className="ad-value">{aluno.rg || "—"}</div>
-            </div>
-            <div>
-              <div className="ad-label"><Phone size={10} />Telefone</div>
-              <div className="ad-value">{aluno.telefone || "—"}</div>
             </div>
             <div>
               <div className="ad-label"><Mail size={10} />Email</div>
@@ -693,8 +697,8 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
           </div>
 
           {(aluno.responsavel || aluno.telefoneResponsavel || aluno.cpfResponsavel || aluno.emailResponsavel || aluno.enderecoResponsavel) && (
-            <>
-              <div className="al-section-title"><User size={14} /> Responsável</div>
+            <div className="ad-resp-box">
+              <div className="al-section-title ad-resp-title"><Users size={14} /> Dados do responsável</div>
               <div className="ad-grid">
                 <div>
                   <div className="ad-label">Nome</div>
@@ -723,7 +727,7 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
                   </div>
                 )}
               </div>
-            </>
+            </div>
           )}
 
           {Array.isArray(aluno.historicoMatriculas) && aluno.historicoMatriculas.length > 0 && (
