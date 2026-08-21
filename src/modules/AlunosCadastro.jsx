@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════
-   ASSENT v2.0 — AlunosCadastro.jsx
-   Módulo "Alunos" — cadastro pessoal, separado de Clientes.
+   ASSENT v2.0 - AlunosCadastro.jsx
+   Módulo "Alunos" - cadastro pessoal, separado de Clientes.
    Estrutura: users/{uid}/clientes/{docId}  (perfis: ["aluno"])
    Matrícula (mensalidade/turma) é feita em Alunos.jsx (menu "Matrículas"),
    que consome os alunos cadastrados aqui.
@@ -54,7 +54,7 @@ const fmtCPF = (v) => {
 const gerarDocIdAluno = () =>
   `aluno_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-/* Próximo idSeq visual — ID único do aluno, usado também em Mensalidades */
+/* Próximo idSeq visual - ID único do aluno, usado também em Mensalidades */
 const proximoIdSeq = (alunos) => {
   const max = alunos.reduce((m, a) => Math.max(m, Number(a.idSeq || 0)), 0);
   return max + 1;
@@ -74,18 +74,18 @@ const calcularIdade = (dataNasc) => {
 };
 
 const fmtDataHora = (iso) => {
-  if (!iso) return "—";
+  if (!iso) return "-";
   const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "-";
   return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 };
 
 const fmtData = (iso) => {
-  if (!iso) return "—";
+  if (!iso) return "-";
   try {
     const d = typeof iso === "string" ? new Date(iso + (iso.length === 10 ? "T12:00:00" : "")) : new Date(iso);
     return d.toLocaleDateString("pt-BR");
-  } catch { return "—"; }
+  } catch { return "-"; }
 };
 
 const fmtR$ = (v) =>
@@ -488,7 +488,7 @@ function ModalAlunoCadastro({ aluno, alunosExistentes, tenantUid, onSave, onClos
             <div className="form-group">
               <label className="form-label">Idade</label>
               <input type="text" className="form-input" disabled
-                value={idade !== null ? `${idade} anos` : "—"} />
+                value={idade !== null ? `${idade} anos` : "-"} />
             </div>
           </div>
 
@@ -520,7 +520,7 @@ function ModalAlunoCadastro({ aluno, alunosExistentes, tenantUid, onSave, onClos
               <label className="form-label">Turma</label>
               <select className="form-input" value={form.turma}
                 onChange={(e) => set("turma", e.target.value)}>
-                <option value="">— Sem turma —</option>
+                <option value="">- Sem turma -</option>
                 {turmasDisponiveis.map((t, i) => (
                   <option key={i} value={t.nome}>{t.nome}</option>
                 ))}
@@ -655,15 +655,15 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
           <div className="pd-grid">
             <div>
               <div className="pd-label"><IdCard size={10} />Documento (CPF)</div>
-              <div className="pd-value">{aluno.documento || "—"}</div>
+              <div className="pd-value">{aluno.documento || "-"}</div>
             </div>
             <div>
               <div className="pd-label"><IdCard size={10} />RG</div>
-              <div className="pd-value">{aluno.rg || "—"}</div>
+              <div className="pd-value">{aluno.rg || "-"}</div>
             </div>
             <div>
               <div className="pd-label"><Mail size={10} />Email</div>
-              <div className="pd-value">{aluno.email || "—"}</div>
+              <div className="pd-value">{aluno.email || "-"}</div>
             </div>
             <div>
               <div className="pd-label"><Calendar size={10} />Data de nascimento</div>
@@ -671,7 +671,7 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
             </div>
             <div>
               <div className="pd-label">Idade</div>
-              <div className="pd-value">{calcularIdade(aluno.dataNascimento) ?? "—"}{calcularIdade(aluno.dataNascimento) !== null ? " anos" : ""}</div>
+              <div className="pd-value">{calcularIdade(aluno.dataNascimento) ?? "-"}{calcularIdade(aluno.dataNascimento) !== null ? " anos" : ""}</div>
             </div>
             {aluno.instagram && (
               <div>
@@ -681,7 +681,7 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
             )}
             <div>
               <div className="pd-label"><GraduationCap size={10} />Turma</div>
-              <div className="pd-value">{aluno.turma || "—"}</div>
+              <div className="pd-value">{aluno.turma || "-"}</div>
             </div>
             {aluno.endereco && (
               <div className="pd-full">
@@ -701,23 +701,23 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
               <div className="pd-grid">
                 <div>
                   <div className="pd-label">Nome</div>
-                  <div className="pd-value">{aluno.responsavel || "—"}</div>
+                  <div className="pd-value">{aluno.responsavel || "-"}</div>
                 </div>
                 <div>
                   <div className="pd-label"><Phone size={10} />Telefone</div>
-                  <div className="pd-value">{aluno.telefoneResponsavel || "—"}</div>
+                  <div className="pd-value">{aluno.telefoneResponsavel || "-"}</div>
                 </div>
                 <div>
                   <div className="pd-label"><IdCard size={10} />CPF</div>
-                  <div className="pd-value">{aluno.cpfResponsavel || "—"}</div>
+                  <div className="pd-value">{aluno.cpfResponsavel || "-"}</div>
                 </div>
                 <div>
                   <div className="pd-label"><IdCard size={10} />RG</div>
-                  <div className="pd-value">{aluno.rgResponsavel || "—"}</div>
+                  <div className="pd-value">{aluno.rgResponsavel || "-"}</div>
                 </div>
                 <div>
                   <div className="pd-label"><Mail size={10} />Email</div>
-                  <div className="pd-value">{aluno.emailResponsavel || "—"}</div>
+                  <div className="pd-value">{aluno.emailResponsavel || "-"}</div>
                 </div>
                 {aluno.enderecoResponsavel && (
                   <div className="pd-full">
@@ -778,7 +778,7 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
               const st = statusMensalidade(m);
               const mesLabel = m.mesReferencia
                 ? `${MESES_PT[Number(m.mesReferencia.split("-")[1]) - 1]}/${m.mesReferencia.split("-")[0]}`
-                : "—";
+                : "-";
               return (
                 <div key={m.id} className="pd-mens-row">
                   <span style={{ textTransform: "capitalize" }}>{mesLabel}</span>
@@ -851,7 +851,7 @@ function ModalExcluirAluno({ aluno, onConfirm, onClose }) {
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════════════════════ */
 export default function AlunosCadastro() {
-  /* Permissão compartilhada com o módulo Clientes — ver observação no chat */
+  /* Permissão compartilhada com o módulo Clientes - ver observação no chat */
   const { tenantUid, nomeUsuario, cargo, podeCriar, podeEditar, podeExcluir } = useAuth();
   const podeCriarV   = podeCriar("clientes");
   const podeEditarV  = podeEditar("clientes");
@@ -867,6 +867,13 @@ export default function AlunosCadastro() {
   const [excluindo, setExcluindo] = useState(null);
   const [detalhe, setDetalhe]     = useState(null);
   const [fotoVisualizando, setFotoVisualizando] = useState(null);
+  const [ordem, setOrdem] = useState({ campo: null, dir: "desc" });
+
+  const ordenarPor = (campo) => {
+    setOrdem((o) => o.campo === campo
+      ? { campo, dir: o.dir === "desc" ? "asc" : "desc" }
+      : { campo, dir: "desc" });
+  };
 
   useEffect(() => {
     if (!tenantUid) { setLoading(false); return; }
@@ -911,7 +918,7 @@ export default function AlunosCadastro() {
   const handleEdit = async (dados) => {
     if (!tenantUid || !editando) return;
     try {
-      /* Não toca no campo "perfis" nem nos campos de matrícula — apenas dados pessoais */
+      /* Não toca no campo "perfis" nem nos campos de matrícula - apenas dados pessoais */
       await updateDoc(doc(db, "users", tenantUid, "clientes", editando.docId), {
         ...dados,
         atualizadoEm: new Date().toISOString(),
@@ -949,15 +956,27 @@ export default function AlunosCadastro() {
 
   const alunosFiltrados = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return alunos.filter(a => {
+    const lista = alunos.filter(a => {
       if (!q) return true;
       return (
         a.nome?.toLowerCase().includes(q) ||
         onlyDigits(a.documento).includes(onlyDigits(q)) ||
         fmtIdSeq(a.idSeq).toLowerCase().includes(q)
       );
-    }).sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR", { sensitivity: "base" }));
-  }, [alunos, search]);
+    });
+
+    if (!ordem.campo) {
+      return lista.sort((a, b) => (a.nome || "").localeCompare(b.nome || "", "pt-BR", { sensitivity: "base" }));
+    }
+
+    const mult = ordem.dir === "desc" ? -1 : 1;
+    return lista.sort((a, b) => {
+      if (ordem.campo === "id") return mult * (Number(a.idSeq || 0) - Number(b.idSeq || 0));
+      if (ordem.campo === "nome") return mult * (a.nome || "").localeCompare(b.nome || "", "pt-BR", { sensitivity: "base" });
+      if (ordem.campo === "pf") return mult * onlyDigits(a.documento).localeCompare(onlyDigits(b.documento));
+      return 0;
+    });
+  }, [alunos, search, ordem]);
 
   return (
     <>
@@ -966,7 +985,7 @@ export default function AlunosCadastro() {
         <header className="al-topbar">
           <div>
             <h1>Alunos</h1>
-            <p>Cadastro pessoal dos alunos — separado de Clientes</p>
+            <p>Cadastro pessoal dos alunos - separado de Clientes</p>
           </div>
           <div className="al-search">
             <Search size={13} color="var(--text-3)" />
@@ -988,9 +1007,15 @@ export default function AlunosCadastro() {
             </div>
 
             <div className="al-row-head">
-              <span>ID</span>
-              <span>ALUNO</span>
-              <span>DOCUMENTO</span>
+              <span style={{ cursor: "pointer" }} onClick={() => ordenarPor("id")}>
+                ID {ordem.campo === "id" ? (ordem.dir === "desc" ? "▼" : "▲") : ""}
+              </span>
+              <span style={{ cursor: "pointer" }} onClick={() => ordenarPor("nome")}>
+                ALUNO {ordem.campo === "nome" ? (ordem.dir === "desc" ? "▼" : "▲") : ""}
+              </span>
+              <span style={{ cursor: "pointer" }} onClick={() => ordenarPor("pf")}>
+                DOCUMENTO {ordem.campo === "pf" ? (ordem.dir === "desc" ? "▼" : "▲") : ""}
+              </span>
               <span>TELEFONE</span>
               <span>MATRÍCULA</span>
               <span style={{ textAlign: "right" }}>AÇÕES</span>
@@ -1012,8 +1037,8 @@ export default function AlunosCadastro() {
                     : <div className="al-avatar-placeholder">{(a.nome || "?")[0].toUpperCase()}</div>}
                   <span className="al-nome">{a.nome}</span>
                 </span>
-                <span style={{ fontSize: 12, color: "var(--text-2)" }}>{a.documento || "—"}</span>
-                <span style={{ fontSize: 12, color: "var(--text-2)" }}>{a.telefone || "—"}</span>
+                <span style={{ fontSize: 12, color: "var(--text-2)" }}>{a.documento || "-"}</span>
+                <span style={{ fontSize: 12, color: "var(--text-2)" }}>{a.telefone || "-"}</span>
                 <span>
                   {isMatriculado(a)
                     ? <span className="al-pill ok">Matriculado</span>
