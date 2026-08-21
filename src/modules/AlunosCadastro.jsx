@@ -91,6 +91,14 @@ const fmtData = (iso) => {
 const fmtR$ = (v) =>
   `R$ ${Number(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+/* Link WhatsApp a partir de telefone BR (adiciona DDI 55 se faltar) */
+const linkWpp = (tel) => {
+  const d = onlyDigits(tel);
+  if (!d) return null;
+  const num = d.length <= 11 ? `55${d}` : d;
+  return `https://wa.me/${num}`;
+};
+
 const statusMensalidade = (mens) => {
   const restante = Number(mens.valorRestante ?? 0);
   if (restante <= 0) return "paga";
@@ -636,7 +644,14 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
             <div>
               <div className="modal-title">{aluno.nome}</div>
               <div className="pd-header-tel">
-                <Phone size={12} /> {aluno.telefone || "Sem telefone"}
+                <Phone size={12} />{" "}
+                {aluno.telefone
+                  ? <a href={linkWpp(aluno.telefone)} target="_blank" rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ color: "inherit", textDecoration: "underline" }}>
+                      {aluno.telefone}
+                    </a>
+                  : "Sem telefone"}
               </div>
               <div className="modal-sub">
                 {fmtIdSeq(aluno.idSeq)}
@@ -705,7 +720,14 @@ function ModalDetalheAluno({ aluno, mensalidades, onClose, onEditar, onVerFoto, 
                 </div>
                 <div>
                   <div className="pd-label"><Phone size={10} />Telefone</div>
-                  <div className="pd-value">{aluno.telefoneResponsavel || "-"}</div>
+                  <div className="pd-value">
+                    {aluno.telefoneResponsavel
+                      ? <a href={linkWpp(aluno.telefoneResponsavel)} target="_blank" rel="noopener noreferrer"
+                          style={{ color: "inherit", textDecoration: "underline" }}>
+                          {aluno.telefoneResponsavel}
+                        </a>
+                      : "-"}
+                  </div>
                 </div>
                 <div>
                   <div className="pd-label"><IdCard size={10} />CPF</div>
@@ -1038,7 +1060,15 @@ export default function AlunosCadastro() {
                   <span className="al-nome">{a.nome}</span>
                 </span>
                 <span style={{ fontSize: 12, color: "var(--text-2)" }}>{a.documento || "-"}</span>
-                <span style={{ fontSize: 12, color: "var(--text-2)" }}>{a.telefone || "-"}</span>
+                <span style={{ fontSize: 12, color: "var(--text-2)" }}>
+                  {a.telefone
+                    ? <a href={linkWpp(a.telefone)} target="_blank" rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ color: "inherit", textDecoration: "underline" }}>
+                        {a.telefone}
+                      </a>
+                    : "-"}
+                </span>
                 <span>
                   {isMatriculado(a)
                     ? <span className="al-pill ok">Matriculado</span>
