@@ -5395,6 +5395,25 @@ const PERMISSOES_RELATORIO = {
   pdv:                 ["financeiro", "comercial", "vendedor", "suporte"],
 };
 
+/* Mapeia relatório → módulo(s) do sistema (licencas/{uid}.modulosAdmin).
+   Se todos os módulos listados estiverem desativados, o relatório é bloqueado. */
+const MODULO_RELATORIO = {
+  financeiro:         ["caixa"],
+  lucro_ps:           ["produtos", "servicos"],
+  vendas:             ["vendas"],
+  pdv:                ["pdv"],
+  vendedores:         ["vendedores"],
+  clientes:           ["clientes"],
+  alunos:             ["matriculas"],
+  mensalidades:       ["matriculas"],
+  despesas:           ["despesas"],
+  estoque:            ["entrada_estoque"],
+  agenda:             ["agenda"],
+  rel_compras:        ["fornecedores"],
+  rel_contas_receber: ["fiado"],
+  // dre: sem módulo específico — sempre disponível
+};
+
 const MENU = [
   { key: "dre",        label: "DRE",          icon: <LayoutDashboard size={15} /> },
   { key: "financeiro", label: "Financeiro",   icon: <Wallet size={15} />         },
@@ -6322,6 +6341,9 @@ export default function Relatorios() {
   const [ocultos,       setOcultos]       = useState(new Set());
   const [modoGerenciar, setModoGerenciar] = useState(false);
 
+  /* Módulos desativados pelo admin (licencas/{uid}.modulosAdmin) */
+  const [modulosAdmin, setModulosAdmin] = useState({});
+
   /* Filtro de período */
   const [periodo,     setPeriodo]     = useState("mes");
   const [dataInicio,  setDataInicio]  = useState("");
@@ -6341,8 +6363,16 @@ export default function Relatorios() {
   const [compras,      setCompras]      = useState([]);
   const [fornecedores, setFornecedores] = useState([]);
 
+  // Módulo do relatório ainda ativo?
+  const moduloAtivo = (id) => {
+    const modulos = MODULO_RELATORIO[id];
+    if (!modulos) return true;
+    return modulos.some((m) => modulosAdmin[m] !== false);
+  };
+
   // Permissão por sub-relatório
   const temAcesso = (id) => {
+    if (!moduloAtivo(id)) return false;
     if (isAdmin) return true;
     return (PERMISSOES_RELATORIO[id] ?? []).includes(cargo);
   };
@@ -6389,8 +6419,16 @@ export default function Relatorios() {
         }
       }).catch(() => {});
 
+    /* Módulos desativados pelo admin */
+    const unsubModulos = onSnapshot(
+      doc(db, "licencas", tenantUid),
+      (snap) => setModulosAdmin(snap.exists() ? (snap.data().modulosAdmin || {}) : {}),
+      () => {}
+    );
+
     return () => {
       subs.forEach((fn) => { try { fn(); } catch {} });
+      unsubModulos();
       clearTimeout(timeout);
     };
   }, [tenantUid]);
@@ -6419,6 +6457,11 @@ export default function Relatorios() {
 
   /* Impressão */
   const handlePrint = useCallback(() => window.print(), []);
+
+  /* Se o relatório aberto perder acesso (módulo desativado), volta pro DRE */
+  useEffect(() => {
+    if (!temAcesso(ativo) && ativo !== "dre") setAtivo("dre");
+  }, [modulosAdmin, cargo, isAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Mobile dropdown */
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -6450,6 +6493,14 @@ export default function Relatorios() {
         <div className="rel-loading">
           <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
           Carregando dados...
+        </div>
+      );
+    }
+    if (!temAcesso(ativo)) {
+      return (
+        <div className="rel-loading">
+          <Lock size={18} />
+          Relatório indisponível.
         </div>
       );
     }
