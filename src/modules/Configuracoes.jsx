@@ -110,7 +110,6 @@ const NAV = [
   { id: "cargos",     label: "Cargos e Permissões",  icon: Users          },
   { id: "financeiro", label: "Financeiro",           icon: CreditCard     },
   { id: "pagamentos", label: "Pagamentos Online",    icon: Zap            },
-  { id: "menu",       label: "Menu do Sistema",      icon: LayoutDashboard},
   { id: "estoque",    label: "Estoque",              icon: Package        },
   { id: "atalhos",    label: "Atalhos",              icon: Keyboard       },
   { id: "log",        label: "Log de Atividades",    icon: Activity       },
@@ -1566,69 +1565,6 @@ function SecaoPagamentos({ config, onSave }) {
 }
 
 
-const buildVisivel = (cfg) => {
-  const base = {};
-  MENU_SECTIONS.forEach(s => {
-    base[s.key] = s.locked ? true : (cfg?.menuVisivel?.[s.key] !== undefined ? cfg.menuVisivel[s.key] : true);
-  });
-  return base;
-};
-
-function SecaoMenu({ config, onSave, modulosAdmin = {} }) {
-  const [visivel, setVisivel]   = useState(() => buildVisivel(config));
-  const [salvando, setSalvando] = useState(false);
-  const [erro, setErro]         = useState("");
-
-  useEffect(() => { if (config !== null) setVisivel(buildVisivel(config)); }, [config]);
-
-  const toggle = useCallback((key, val) => {
-    setVisivel(prev => ({ ...prev, [key]: val }));
-    setErro("");
-  }, []);
-
-  const handleSalvar = async () => {
-    setSalvando(true); setErro("");
-    try {
-      const menuVisivel = {};
-      MENU_SECTIONS.forEach(s => { if (!s.locked) menuVisivel[s.key] = visivel[s.key]; });
-      await onSave({ menuVisivel });
-    } catch { setErro("Falha ao salvar. Verifique sua conexão."); }
-    finally { setSalvando(false); }
-  };
-
-  return (
-    <div className="cfg-card">
-      <div className="cfg-card-header">
-        <div className="cfg-card-header-icon"><LayoutDashboard size={15} /></div>
-        <div><div className="cfg-card-title">Visibilidade do Menu</div><div className="cfg-card-sub">Oculte seções que não utiliza</div></div>
-      </div>
-      <div className="cfg-card-body">
-        <div className="menu-toggle-list">
-          {MENU_SECTIONS.map(s => {
-            const bloqueadoAdmin = modulosAdmin[s.key] === false;
-            return (
-              <div key={s.key} className="menu-toggle-item">
-                <div className="menu-toggle-icon"><s.Icon size={15} /></div>
-                <div style={{ flex: 1 }}>
-                  <div className="menu-toggle-label">{s.label}</div>
-                  <div className="menu-toggle-sub">{s.sub}</div>
-                </div>
-                {s.locked
-                  ? <span className="menu-toggle-locked">Sempre visível</span>
-                  : bloqueadoAdmin
-                    ? <span className="menu-toggle-locked" style={{ color: "var(--red, #e05252)" }}>Bloqueado pelo admin</span>
-                    : <Toggle checked={!!visivel[s.key]} onChange={val => toggle(s.key, val)} />
-                }
-              </div>
-            );
-          })}
-        </div>
-      </div>
-      <div className="cfg-card-footer"><button className="btn-primary" onClick={handleSalvar} disabled={salvando}>{salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar Menu</>}</button></div>
-    </div>
-  );
-}
-
 function SecaoEstoque({ config, onSave }) {
   const [minimo, setMinimo]     = useState(config?.estoqueMinimo ?? 5);
   const [salvando, setSalvando] = useState(false);
@@ -2158,7 +2094,7 @@ function SecaoLGPD() {
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════ */
 const SECOES_POR_CARGO = {
-  admin:       ["empresa", "seguranca", "cargos", "financeiro", "pagamentos", "menu", "estoque", "atalhos", "log", "lgpd"],
+  admin:       ["empresa", "seguranca", "cargos", "financeiro", "pagamentos", "estoque", "atalhos", "log", "lgpd"],
   financeiro:  ["seguranca", "financeiro", "atalhos"],
   comercial:   ["seguranca", "atalhos"],
   compras:     ["seguranca", "estoque", "atalhos"],
@@ -2405,7 +2341,6 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
   const [loading, setLoading]         = useState(true);
   const [secao, setSecao]             = useState(isAdmin ? "empresa" : "seguranca");
   const [toast, setToast]             = useState(null);
-  const [modulosAdmin, setModulosAdmin] = useState({});
 
   // Seções que este cargo pode ver
   const secoesVisiveis = SECOES_POR_CARGO[cargo] ?? ["seguranca", "atalhos"];
@@ -2415,16 +2350,6 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
     if (!uid) { setLoading(false); return; }
     const ref = doc(db, "users", uid, "config", "geral");
     getDoc(ref).then(snap => setConfig(snap.exists() ? snap.data() : {})).catch(() => setConfig({})).finally(() => setLoading(false));
-  }, [uid]);
-
-  // Carrega módulos bloqueados pelo admin
-  useEffect(() => {
-    if (!uid) return;
-    const ref = doc(db, "licencas", uid);
-    const unsub = onSnapshot(ref, snap => {
-      setModulosAdmin(snap.exists() ? (snap.data().modulosAdmin || {}) : {});
-    }, () => {});
-    return unsub;
   }, [uid]);
 
   const handleSave = useCallback(async (partial) => {
@@ -2444,7 +2369,6 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
       case "cargos":     return <SecaoCargos    tenantUid={uid} />;
       case "financeiro": return <SecaoFinanceiro config={config} onSave={handleSave} />;
       case "pagamentos": return <SecaoPagamentos config={config} onSave={handleSave} />;
-      case "menu":       return <SecaoMenu       config={config} onSave={handleSave} modulosAdmin={modulosAdmin} />;
       case "estoque":    return <SecaoEstoque    config={config} onSave={handleSave} />;
       case "atalhos":    return <SecaoAtalhos    menuVisivel={menuVisivelProp ?? config?.menuVisivel ?? {}} />;
       case "log":        return <SecaoLog        tenantUid={uid} />;
