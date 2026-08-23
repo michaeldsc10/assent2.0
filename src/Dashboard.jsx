@@ -2760,6 +2760,19 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   const empresa = useEmpresa(uid);
   const { isPro, plano: licencaSlug } = useLicenca(tenantUid);
 
+  /* ── AssentFlow: flag de ativação controlada pelo admin (licencas/{tenantUid}.flowAtivo)
+     Essencial: default OFF, só aparece se flowAtivo === true
+     Profissional/Delux: default ON, só some se flowAtivo === false ── */
+  const [flowAtivo, setFlowAtivo] = useState(undefined);
+  useEffect(() => {
+    if (!tenantUid) return;
+    return onSnapshot(doc(db, "licencas", tenantUid), (snap) => {
+      setFlowAtivo(snap.data()?.flowAtivo);
+    }, fsSnapshotError("Dashboard:flowAtivo"));
+  }, [tenantUid]);
+  const flowVisivel =
+    licencaSlug === "essencial" ? flowAtivo === true : flowAtivo !== false;
+
   /* ── Notificações de reserva — AssFlow (tempo real, por usuário) ── */
   const {
     notificacoes: notifReservas,
@@ -4717,8 +4730,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   )}
                 </button>
 
-                {/* ── Assent Flow — essencial, profissional e delux ── */}
-                {(licencaSlug === "essencial" || licencaSlug === "profissional" || licencaSlug === "delux") && (
+                {/* ── Assent Flow — essencial (opt-in), profissional e delux ── */}
+                {flowVisivel && (
                   <button
                     className="ag-dropdown-item"
                     onClick={() => { setSistemaAtivo("flow"); setDropdownOpen(false); }}
