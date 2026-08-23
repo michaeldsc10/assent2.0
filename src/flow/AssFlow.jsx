@@ -2121,6 +2121,9 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
   const [sidebarOpen,setSidebarOpen] = useState(false);
   // Contagem de reservas do mês corrente (todas, de todos os prestadores)
   const [reservasMes,setReservasMes] = useState(0);
+  // Flag de ativação controlada pelo admin no painel (licencas/{uid}.flowAtivo)
+  const [flowAtivo,setFlowAtivo] = useState(true);
+  const [flowAtivoCarregado,setFlowAtivoCarregado] = useState(false);
 
   // ── Tema reativo ──
   const isDark = theme !== "light";
@@ -2146,6 +2149,16 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
     const u = onSnapshot(q, snap => setReservasMes(snap.size));
     return () => u();
   },[tenantUid, isEssencial]);
+
+  // Escuta flag de ativação do Flow (definida só pelo admin no painel, doc protegido por regra Firestore)
+  useEffect(()=>{
+    if(!tenantUid) return;
+    const u = onSnapshot(doc(db,"licencas",tenantUid), snap=>{
+      setFlowAtivo(snap.exists() ? snap.data()?.flowAtivo !== false : true);
+      setFlowAtivoCarregado(true);
+    }, ()=> setFlowAtivoCarregado(true));
+    return ()=>u();
+  },[tenantUid]);
 
   // Auto-init admin
   useEffect(()=>{
@@ -2213,6 +2226,8 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
 
   // Guards
   if(!tenantUid) return null;
+  if(!flowAtivoCarregado) return null; // evita flash antes de saber o estado real
+  if(!flowAtivo) return null; // desativado pelo admin — não renderiza nada, nem tela de bloqueio
   if(plano !== "profissional" && plano !== "essencial") return (
     <FlowThemeCtx.Provider value={themeCtx}>
       <div style={S.root}><TelaUpgrade onVoltar={onVoltar}/></div>
