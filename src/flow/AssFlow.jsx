@@ -2227,6 +2227,7 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
   // Guards
   if(!tenantUid) return null;
   if(!flowAtivoCarregado) return null; // evita flash antes de saber o estado real
+  if(isEssencial) return null; // Essencial nunca tem acesso, valha o que estiver salvo no doc
   if(!flowAtivo) return null; // desativado pelo admin — não renderiza nada, nem tela de bloqueio
   if(plano !== "profissional" && plano !== "essencial") return (
     <FlowThemeCtx.Provider value={themeCtx}>
