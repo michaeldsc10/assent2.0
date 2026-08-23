@@ -2122,7 +2122,9 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
   // Contagem de reservas do mês corrente (todas, de todos os prestadores)
   const [reservasMes,setReservasMes] = useState(0);
   // Flag de ativação controlada pelo admin no painel (licencas/{uid}.flowAtivo)
-  const [flowAtivo,setFlowAtivo] = useState(true);
+  // Essencial: default OFF, só liga se flowAtivo === true (opt-in manual do admin)
+  // Profissional: default ON, só desliga se flowAtivo === false (opt-out manual do admin)
+  const [flowAtivo,setFlowAtivo] = useState(undefined);
   const [flowAtivoCarregado,setFlowAtivoCarregado] = useState(false);
 
   // ── Tema reativo ──
@@ -2154,7 +2156,7 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
   useEffect(()=>{
     if(!tenantUid) return;
     const u = onSnapshot(doc(db,"licencas",tenantUid), snap=>{
-      setFlowAtivo(snap.exists() ? snap.data()?.flowAtivo !== false : true);
+      setFlowAtivo(snap.exists() ? snap.data()?.flowAtivo : undefined);
       setFlowAtivoCarregado(true);
     }, ()=> setFlowAtivoCarregado(true));
     return ()=>u();
@@ -2227,8 +2229,8 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
   // Guards
   if(!tenantUid) return null;
   if(!flowAtivoCarregado) return null; // evita flash antes de saber o estado real
-  if(isEssencial) return null; // Essencial nunca tem acesso, valha o que estiver salvo no doc
-  if(!flowAtivo) return null; // desativado pelo admin — não renderiza nada, nem tela de bloqueio
+  const acessoFlow = isEssencial ? flowAtivo === true : flowAtivo !== false;
+  if(!acessoFlow) return null; // desativado (ou não liberado) pelo admin — não renderiza nada, nem tela de bloqueio
   if(plano !== "profissional" && plano !== "essencial") return (
     <FlowThemeCtx.Provider value={themeCtx}>
       <div style={S.root}><TelaUpgrade onVoltar={onVoltar}/></div>
