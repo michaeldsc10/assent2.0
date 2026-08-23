@@ -4247,7 +4247,7 @@ async function loadMemberPlan(uid) {
       planoRef.doc('profissional').get(),
       licRef.get(),
     ]);
-    const flowAtivo = licSnap.exists ? (licSnap.data()?.flowAtivo !== false) : true;
+    const flowAtivo = licSnap.exists ? licSnap.data()?.flowAtivo : undefined;
 
     let currentSlug = null;
     let planoData   = null;
@@ -4288,8 +4288,7 @@ function renderPlanSection(uid, slug, data, flowAtivo) {
   const limVendas = data?.limites?.vendasMes   ?? '—';
   const limLogins = data?.limites?.loginsExtras ?? '—';
   const instaOk   = data?.features?.instaInsights;
-  const flowBloqueadoPlano = safeSlug === 'essencial';
-  const flowAtivoEfetivo   = flowBloqueadoPlano ? false : !!flowAtivo;
+  const flowAtivoEfetivo = safeSlug === 'essencial' ? (flowAtivo === true) : (flowAtivo !== false);
 
   const planOptionsHtml = Object.entries(PLAN_CONFIGS).map(([s, cfg]) => `
     <div class="plan-option-card${s === safeSlug ? ' selected' : ''}"
@@ -4336,16 +4335,16 @@ function renderPlanSection(uid, slug, data, flowAtivo) {
       border:1px solid var(--border2);margin-top:10px;">
       <div>
         <span style="font-size:13px;font-weight:500;color:var(--text)">AssentFlow</span>
-        ${flowBloqueadoPlano ? `<div style="font-size:10px;color:var(--warning);margin-top:2px">Bloqueado automaticamente — plano Essencial</div>` : ''}
+        ${safeSlug === 'essencial' ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">Desativado por padrão no Essencial — ative se quiser liberar</div>` : ''}
       </div>
-      <label style="display:flex;align-items:center;gap:8px;cursor:${flowBloqueadoPlano ? 'not-allowed' : 'pointer'};opacity:${flowBloqueadoPlano ? '0.5' : '1'}">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
         <span id="flowStatusLabel_${uid.slice(0,8)}" style="font-size:11px;color:${flowAtivoEfetivo?'var(--success)':'var(--danger)'};font-weight:600">
           ${flowAtivoEfetivo ? 'Ativado' : 'Desativado'}
         </span>
         <div id="flowToggle_${uid.slice(0,8)}"
-          onclick="${flowBloqueadoPlano ? '' : `toggleAssentFlow('${uid}', this)`}"
+          onclick="toggleAssentFlow('${uid}', this)"
           data-ativo="${flowAtivoEfetivo}"
-          style="width:40px;height:22px;border-radius:99px;cursor:${flowBloqueadoPlano ? 'not-allowed' : 'pointer'};
+          style="width:40px;height:22px;border-radius:99px;cursor:pointer;
             background:${flowAtivoEfetivo?'var(--success)':'var(--border2)'};
             position:relative;transition:background .2s;flex-shrink:0">
           <div style="width:16px;height:16px;border-radius:50%;background:#fff;
@@ -4467,11 +4466,6 @@ async function confirmChangePlan(uid, currentSlug) {
   try {
     const atualizarPlano = functions.httpsCallable('atualizarPlano');
     await atualizarPlano({ targetUid: uid, action: 'changePlan', newSlug });
-
-    // Essencial não inclui AssentFlow — desativa automaticamente
-    if (newSlug === 'essencial') {
-      await db.collection('licencas').doc(uid).set({ flowAtivo: false }, { merge: true });
-    }
 
     showPlanFeedback(fb, `✓ Plano alterado para ${PLAN_CONFIGS[newSlug].label}!`, 'var(--success)');
     setTimeout(() => loadMemberPlan(uid), 1600);
