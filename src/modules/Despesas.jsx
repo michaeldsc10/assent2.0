@@ -1847,7 +1847,7 @@ export default function Despesas() {
   };
 
   /* ── Filtros e métricas ── */
-  const despesasFiltradas = useMemo(() => {
+  const despesasBase = useMemo(() => {
     const mesAtual = new Date().getMonth();
     const anoAtual = new Date().getFullYear();
     let lista = [...despesas];
@@ -1884,19 +1884,6 @@ export default function Despesas() {
       });
     }
 
-    // Status
-    if (filtroStatus === "em3dias") {
-      lista = lista.filter(d => {
-        if (d.status !== "pendente") return false;
-        const dt = parseDate(d.vencimento);
-        if (!dt) return false;
-        const diff = (dt - hoje()) / (1000 * 60 * 60 * 24);
-        return diff >= 0 && diff <= 3;
-      });
-    } else if (filtroStatus !== "todas") {
-      lista = lista.filter(d => d.status === filtroStatus);
-    }
-
     // Categoria
     if (filtroCategoria !== "todas") lista = lista.filter(d => d.categoria === filtroCategoria);
 
@@ -1911,10 +1898,31 @@ export default function Despesas() {
     }
 
     return lista;
-  }, [despesas, filtroStatus, filtroCategoria, filtroPeriodo, periodoCustom, search]);
+  }, [despesas, filtroCategoria, filtroPeriodo, periodoCustom, search]);
+
+  const despesasFiltradas = useMemo(() => {
+    let lista = despesasBase;
+
+    // Status
+    if (filtroStatus === "em_aberto") {
+      lista = lista.filter(d => ["pendente", "vencido", "parcial"].includes(d.status));
+    } else if (filtroStatus === "em3dias") {
+      lista = lista.filter(d => {
+        if (d.status !== "pendente") return false;
+        const dt = parseDate(d.vencimento);
+        if (!dt) return false;
+        const diff = (dt - hoje()) / (1000 * 60 * 60 * 24);
+        return diff >= 0 && diff <= 3;
+      });
+    } else if (filtroStatus !== "todas") {
+      lista = lista.filter(d => d.status === filtroStatus);
+    }
+
+    return lista;
+  }, [despesasBase, filtroStatus]);
 
   const metricas = useMemo(() => {
-    const base = filtroPeriodo === "todas" ? despesas : despesasFiltradas;
+    const base = despesasBase;
     const vencidas  = base.filter(d => d.status === "vencido").length;
     const em3dias   = base.filter(d => {
       if (d.status !== "pendente") return false;
@@ -1930,7 +1938,7 @@ export default function Despesas() {
       .filter(d => d.status === "pago" || d.status === "parcial")
       .reduce((s, d) => s + (d.status === "parcial" ? (d.valorPago || 0) : (d.valor || 0)), 0);
     return { vencidas, em3dias, totalPendente, totalPago };
-  }, [despesas, despesasFiltradas, filtroPeriodo]);
+  }, [despesasBase]);
 
   const categoriasFiltro = useMemo(() => {
     const fromCategorias = categorias.map(c => c.nome);
@@ -2009,9 +2017,9 @@ export default function Despesas() {
         </div>
 
         <div
-          className={`metric-card metric-card-purple clickable ${filtroStatus === "pendente" ? "active" : ""}`}
-          onClick={() => setFiltroStatus(filtroStatus === "pendente" ? "todas" : "pendente")}
-          title="Filtrar por despesas pendentes"
+          className={`metric-card metric-card-purple clickable ${filtroStatus === "em_aberto" ? "active" : ""}`}
+          onClick={() => setFiltroStatus(filtroStatus === "em_aberto" ? "todas" : "em_aberto")}
+          title="Filtrar despesas em aberto (pendentes, vencidas e parciais)"
         >
           <div className="metric-icon metric-icon-purple">
             <Clock size={15} color="#8b5cf6" />
