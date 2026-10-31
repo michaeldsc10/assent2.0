@@ -83,6 +83,7 @@ const KEY_MAP = {
   "Mensalidades":          "matriculas",
   "Alunos":              "alunosCadastro",
   "Fiado / A Receber":  "fiado",
+  "A Receber":          "fiado",
   "Caixa Diário":       "caixa",
   "Despesas":           "despesas",
   "Fornecedores":       "fornecedores",
@@ -2774,6 +2775,9 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   }, [tenantUid]);
   const flowVisivel =
     licencaSlug === "essencial" ? flowAtivo === true : flowAtivo !== false;
+  useEffect(() => {
+    if (!flowVisivel && sistemaAtivo === "flow") setSistemaAtivo("gestao");
+  }, [flowVisivel, sistemaAtivo]);
 
   /* ── Notificações de reserva - AssFlow (tempo real, por usuário) ── */
   const {
@@ -3109,7 +3113,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   /* Normaliza notificações de reserva do AssFlow
      - só docs com tipo==nova_reserva E payload válido (defensivo contra
      docs estranhos escritos na mesma subcoleção por outros sistemas) */
-  const notifReservasNorm = notifReservas
+  const notifReservasNorm = (flowVisivel ? notifReservas : [])
     .filter((n) => n.tipo === "nova_reserva" && n.payload && typeof n.payload === "object")
     .map((n) => ({
       ...n,
@@ -4866,7 +4870,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 theme={theme}
                 onToggleTheme={toggleTheme}
               />
-            ) : sistemaAtivo === "flow" ? (
+            ) : sistemaAtivo === "flow" && flowVisivel ? (
               <AssFlow
                 tenantUid={tenantUid}
                 nomeEmpresa={nomeEmpresa}
