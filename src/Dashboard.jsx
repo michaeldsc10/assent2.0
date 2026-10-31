@@ -1,5 +1,5 @@
               /* ═══════════════════════════════════════════════════
-   ASSENT v2.0 — Dashboard.jsx  (responsivo)
+   ASSENT v2.0 - Dashboard.jsx  (responsivo)
    ─────────────────────────────────────────────────
    ✓ Sidebar recolhível (ícones + tooltip no modo colapsado)
    ✓ Header global com usuário, avatar e dropdown
@@ -353,7 +353,7 @@ const RESPONSIVE_CSS = `
     min-height: 100% !important;
     overflow: visible !important;
   }
-  /* ag-content não precisa mais scrollar — o pai scrolla */
+  /* ag-content não precisa mais scrollar - o pai scrolla */
   .ag-content {
     overflow: visible !important;
     flex: none !important;
@@ -378,7 +378,7 @@ const RESPONSIVE_CSS = `
   /* KPIs resumo: 2 cols */
   .ag-resumo { grid-template-columns: 1fr 1fr !important; }
 
-  /* Lista: scroll horizontal desativado no mobile — usa card layout */
+  /* Lista: scroll horizontal desativado no mobile - usa card layout */
   .ag-lista-wrap { overflow-x: visible !important; }
   .ag-row, .ag-row-head { min-width: unset !important; }
 
@@ -523,6 +523,8 @@ const RESPONSIVE_CSS = `
   .ag-period-mobile { display: flex !important; }
   .db-page { padding: 14px 14px 40px !important; }
   .db-kpi-strip { grid-template-columns: repeat(2, 1fr) !important; }
+  /* mobile: oculta Ticket Médio (4º) e Projeção (6º) */
+  .db-kpi-card:nth-child(4), .db-kpi-card:nth-child(6) { display: none !important; }
   .db-kpi-card:nth-child(n+4) { border-left: none !important; border-top: 1px solid var(--border) !important; }
   .db-kpi-card:nth-child(odd) { border-left: none !important; }
   .db-kpi-card:nth-child(even) { border-left: 1px solid var(--border) !important; }
@@ -534,8 +536,8 @@ const RESPONSIVE_CSS = `
 }
 @media (max-width: 480px) {
   .db-kpi-strip { grid-template-columns: 1fr 1fr !important; }
-  .db-kpi-val { font-size: 15px !important; }
-  .db-kpi-card { padding: 14px 14px !important; }
+  .db-kpi-val { font-size: clamp(13px, 4.6vw, 17px) !important; overflow: visible !important; text-overflow: clip !important; }
+  .db-kpi-card { padding: 14px 12px !important; }
   .db-panel { overflow: hidden; }
   .db-aside { min-width: 0; }
 }
@@ -778,7 +780,7 @@ const CSS = `
   animation: holo-scan 6s linear infinite;
 }
 
-/* beam — cone de projeção abaixo do card */
+/* beam - cone de projeção abaixo do card */
 .holo-beam {
   height: 14px;
   margin: 0 20px;
@@ -786,7 +788,7 @@ const CSS = `
   opacity: .9;
 }
 
-/* base — plataforma emissora */
+/* base - plataforma emissora */
 .holo-base {
   height: 2px; border-radius: 2px;
   margin: 0 26px;
@@ -1169,11 +1171,11 @@ const CSS = `
   .ag-content::-webkit-scrollbar { width: 3px; }
   .ag-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
 
-  /* ══ CONSTRAINT GLOBAL — módulos ══ */
+  /* ══ CONSTRAINT GLOBAL - módulos ══ */
   .ag-content > div:not(.modal-overlay) {
     padding: 22px 28px 48px;
   }
-  /* Topbars dos módulos — padding consistente */
+  /* Topbars dos módulos - padding consistente */
   .pd-topbar, .cl-topbar, .vd-topbar, .sv-topbar,
   .fr-topbar, .vdr-topbar, .cp-topbar, .cd-topbar,
   .dp-topbar, .mt-topbar, .mc-topbar, .oc-topbar,
@@ -1182,7 +1184,7 @@ const CSS = `
     padding-right: 28px !important;
   }
 
-  /* ══ AGENDA — restaura layout original ══ */
+  /* ══ AGENDA - restaura layout original ══ */
   /* A Agenda tem seu próprio ag-content com flex column; não herda o constraint global */
   .ag-content.agenda-content,
   header.ag-topbar ~ .ag-content {
@@ -1197,14 +1199,14 @@ const CSS = `
     margin: 0 !important;
   }
 
-  /* Wrapper interno — centraliza e limita largura */
+  /* Wrapper interno - centraliza e limita largura */
   .db-page {
     max-width: 1180px;
     margin: 0 auto;
     padding: 24px 28px 48px;
   }
 
-  /* ══ KPI STRIP — 3 grandes + 3 compactos ══ */
+  /* ══ KPI STRIP - 3 grandes + 3 compactos ══ */
   .db-kpi-strip {
     display: grid;
     grid-template-columns: repeat(3, 1fr) repeat(3, 0.72fr);
@@ -1239,7 +1241,7 @@ const CSS = `
     line-height: 1; letter-spacing: -0.02em; margin-bottom: 7px;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  /* KPIs secundários (4-6) — valor menor */
+  /* KPIs secundários (4-6) - valor menor */
   .db-kpi-card:nth-child(n+4) .db-kpi-val { font-size: 16px; }
   .db-kpi-meta { display: flex; align-items: center; gap: 4px; }
   .db-kpi-trend { font-size: 10px; font-weight: 600; display: flex; align-items: center; gap: 2px; }
@@ -2201,7 +2203,7 @@ function Chart3DDonut({ data, height = 200 }) {
                 {/* outer wall */}
                 <path d={outerWall(CX, CY + dy, R_OUT, s.startAngle, s.sweep, DEPTH)}
                   fill={`url(#wg${i})`} stroke={s.color} strokeWidth="0.5" strokeOpacity="0.6" />
-                {/* inner wall — darker, gives depth illusion */}
+                {/* inner wall - darker, gives depth illusion */}
                 <path d={outerWall(CX, CY + dy, R_IN, s.startAngle, s.sweep, DEPTH)}
                   fill={s.color} fillOpacity="0.08"
                   stroke={s.color} strokeWidth="0.3" strokeOpacity="0.2" />
@@ -2305,7 +2307,7 @@ const FRASES_SAUDACAO = [
   "Vamos transformar dados em resultados hoje?",
   "Sua presença já faz a diferença.",
   "Controle, visão e crescimento. Seja bem-vindo.",
-  "O sucesso do seu negócio está em boas mãos — as suas.",
+  "O sucesso do seu negócio está em boas mãos - as suas.",
   "Que hoje seja mais produtivo que ontem.",
   "Acesso registrado. Vamos fazer acontecer?",
   "Seu negócio evoluiu desde a última vez que você esteve aqui.",
@@ -2389,7 +2391,7 @@ function LoadingCubes() {
 }
 
 /* ══════════════════════════════════════════════════════
-   AGENDA FINANCEIRA — helpers internos
+   AGENDA FINANCEIRA - helpers internos
 ═══════════════════════════════════════════════════════ */
 const MESES_AF = [
   "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
@@ -2417,7 +2419,7 @@ function fmtR$_AF(v) {
   return (v ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 function fmtVenc_AF(dt) {
-  if (!dt) return "—";
+  if (!dt) return "-";
   return `${String(dt.getDate()).padStart(2,"0")}/${String(dt.getMonth()+1).padStart(2,"0")}/${dt.getFullYear()}`;
 }
 function fmtLabel_AF(date) {
@@ -2491,7 +2493,7 @@ function ModalDiaFinanceiro({ data, despesas, aReceber, onClose }) {
                     }}>
                       <div style={{ flex:1, minWidth:0 }}>
                         <div style={{ fontSize:13, color:"var(--text)", fontWeight:500, lineHeight:1.3 }}>
-                          {item.clienteNome || item.descricao || "—"}
+                          {item.clienteNome || item.descricao || "-"}
                         </div>
                         {item.descricao && item.clienteNome && (
                           <div style={{ fontSize:11, color:"var(--text-3)", marginTop:2 }}>{item.descricao}</div>
@@ -2519,7 +2521,7 @@ function ModalDiaFinanceiro({ data, despesas, aReceber, onClose }) {
                       display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:8,
                     }}>
                       <div style={{ flex:1, minWidth:0 }}>
-                        <div style={{ fontSize:13, color:"var(--text)", fontWeight:500, lineHeight:1.3 }}>{item.descricao || "—"}</div>
+                        <div style={{ fontSize:13, color:"var(--text)", fontWeight:500, lineHeight:1.3 }}>{item.descricao || "-"}</div>
                         {item.categoria && <div style={{ fontSize:11, color:"var(--text-3)", marginTop:2 }}>{item.categoria}</div>}
                         {item.fornecedor && <div style={{ fontSize:11, color:"var(--text-3)" }}>{item.fornecedor}</div>}
                         <div style={{ fontSize:11, color:"var(--text-3)", marginTop:4 }}>Vencimento: {fmtVenc_AF(venc)}</div>
@@ -2609,7 +2611,7 @@ function AgendaFinanceira({ uid }) {
     <div className="db-panel" style={{ padding: "16px 18px" }}>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
         <span style={{ fontSize:13, fontWeight:600, color:"var(--text)" }}>
-          Agenda financeira — {MESES_AF[m]} {y}
+          Agenda financeira - {MESES_AF[m]} {y}
         </span>
         <div style={{ display:"flex", gap:4 }}>
           {[["prev", <ChevronLeft size={14} />, () => navMes(-1)],
@@ -2756,7 +2758,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   };
   const dropdownRef = useRef(null);
 
-  /* ── Hooks de dados — declarados aqui para isPro estar disponível nos useEffects abaixo ── */
+  /* ── Hooks de dados - declarados aqui para isPro estar disponível nos useEffects abaixo ── */
   const empresa = useEmpresa(uid);
   const { isPro, plano: licencaSlug } = useLicenca(tenantUid);
 
@@ -2773,7 +2775,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   const flowVisivel =
     licencaSlug === "essencial" ? flowAtivo === true : flowAtivo !== false;
 
-  /* ── Notificações de reserva — AssFlow (tempo real, por usuário) ── */
+  /* ── Notificações de reserva - AssFlow (tempo real, por usuário) ── */
   const {
     notificacoes: notifReservas,
     naoLidas:     notifReservasNaoLidas,
@@ -2822,7 +2824,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     period === "Personalizado" && customRange.from && customRange.to ? customRange : null
   );
 
-  /* ── Notificações AG — listener em tempo real ── */
+  /* ── Notificações AG - listener em tempo real ── */
   useEffect(() => {
     if (!tenantUid) return;
     const q = collection(db, "notificacoesAG");
@@ -2842,7 +2844,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           // Notificação individual: verifica se é para este tenant/usuário
           (n.destinatario === "individual" && (n.destinatarioUid === tenantUid || n.uid === tenantUid));
         if (!planOk) return false;
-        // Filtro de 7 dias — ignora notificações antigas para o usuário
+        // Filtro de 7 dias - ignora notificações antigas para o usuário
         const data = n.criadoEm?.toDate ? n.criadoEm.toDate() : null;
         if (data && data < seteDiasAtras) return false;
         return true;
@@ -2852,7 +2854,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     return unsub;
   }, [tenantUid, isPro, licencaSlug]);
 
-  /* ── Anúncios Modais — busca ao entrar, mostra o mais recente ativo ── */
+  /* ── Anúncios Modais - busca ao entrar, mostra o mais recente ativo ── */
   useEffect(() => {
     if (!tenantUid) return;
 
@@ -2864,7 +2866,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
     async function buscarAnuncio() {
       try {
-        // Busca todos os anúncios ativos — sem orderBy para não precisar de índice composto
+        // Busca todos os anúncios ativos - sem orderBy para não precisar de índice composto
         // Ordenação e filtragem feitas no cliente
         const qTodos = query(
           collection(db, "anunciosAG"),
@@ -2967,16 +2969,16 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
         let titulo, urgencia;
         if (diffDias === 0) {
-          titulo   = `⚠️ Vence hoje — #${idShow}`;
+          titulo   = `⚠️ Vence hoje - #${idShow}`;
           urgencia = "hoje";
         } else if (diffDias === 1) {
-          titulo   = `🔔 Vence amanhã — #${idShow}`;
+          titulo   = `🔔 Vence amanhã - #${idShow}`;
           urgencia = "1dia";
         } else if (diffDias === 2) {
-          titulo   = `📅 Vence em 2 dias — #${idShow}`;
+          titulo   = `📅 Vence em 2 dias - #${idShow}`;
           urgencia = "2dias";
         } else {
-          titulo   = `📅 Vence em 3 dias — #${idShow}`;
+          titulo   = `📅 Vence em 3 dias - #${idShow}`;
           urgencia = "3dias";
         }
 
@@ -2998,7 +3000,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     return unsub;
   }, [uid]);
 
-  /* ── Notificações automáticas de A Receber — vence hoje e amanhã ── */
+  /* ── Notificações automáticas de A Receber - vence hoje e amanhã ── */
   useEffect(() => {
     if (!uid) return;
     const q = query(
@@ -3037,7 +3039,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         const fmtValorAR = (v) =>
           v != null
             ? v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
-            : "—";
+            : "-";
 
         const cliente = d.clienteNome || d.descricao || "Cliente";
         const valor   = fmtValorAR(d.valorRestante);
@@ -3045,7 +3047,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
         alertas.push({
           id:          `ar-${d.id}-${urgencia}`,
-          titulo:      diffDias === 0 ? "💰 A Receber — vence hoje" : "🔔 A Receber — vence amanhã",
+          titulo:      diffDias === 0 ? "💰 A Receber - vence hoje" : "🔔 A Receber - vence amanhã",
           mensagem:    `${cliente} · ${valor}`,
           diffDias,
           urgencia,
@@ -3061,7 +3063,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     return unsub;
   }, [uid]);
 
-  /* ── Insights automáticos de negócio — gerados pela Cloud Function diária ── */
+  /* ── Insights automáticos de negócio - gerados pela Cloud Function diária ── */
   useEffect(() => {
     if (!uid) return;
     const q = query(
@@ -3105,7 +3107,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   }));
 
   /* Normaliza notificações de reserva do AssFlow
-     — só docs com tipo==nova_reserva E payload válido (defensivo contra
+     - só docs com tipo==nova_reserva E payload válido (defensivo contra
      docs estranhos escritos na mesma subcoleção por outros sistemas) */
   const notifReservasNorm = notifReservas
     .filter((n) => n.tipo === "nova_reserva" && n.payload && typeof n.payload === "object")
@@ -3283,7 +3285,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         const mesLabel = mes ? `${MESES[Number(mes)-1]}/${ano}` : m.mesReferencia || "";
         const aberta = Number(m.valorRestante || 0) > 0;
         return {
-          label: m.clienteNome || "—",
+          label: m.clienteNome || "-",
           sub: `${mesLabel} · ${fmtR$(aberta ? m.valorRestante : m.valorTotal)} · ${aberta ? "em aberto" : "paga"}`,
           icone: CreditCard,
           onClick: () => { navigateTo("Mensalidades"); setSearchQuery(""); setSearchResults([]); }
@@ -3329,7 +3331,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       return onSnapshot(doc(db, "users", uid, "usuarios", authUser.uid), async (snap) => {
         const nomeLocal = snap.data()?.nome;
         if (nomeLocal) { setUserName(nomeLocal); return; }
-        // fallback sem acesso à licença do dono — usa dados do Firebase Auth
+        // fallback sem acesso à licença do dono - usa dados do Firebase Auth
         const name =
           nomeUsuario ||
           authUser?.displayName ||
@@ -3374,7 +3376,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     }, fsSnapshotError("Dashboard:configGeral"));
   }, [uid]);
 
-  /* ── Módulos bloqueados pelo admin (licencas — cliente não pode escrever) ── */
+  /* ── Módulos bloqueados pelo admin (licencas - cliente não pode escrever) ── */
   useEffect(() => {
     if (!uid) return;
     return onSnapshot(doc(db, "licencas", uid), (snap) => {
@@ -3449,9 +3451,9 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
   const userInitial = userName.charAt(0).toUpperCase();
 
-  /* ── Badge de plano — renderizado no header e na sidebar mobile ──
+  /* ── Badge de plano - renderizado no header e na sidebar mobile ──
      Fonte única de verdade: usa licencaSlug (slug do Firestore).
-     Nunca usa isPro para exibição — só para lógica de permissão. */
+     Nunca usa isPro para exibição - só para lógica de permissão. */
   const PLAN_TAG_STYLES = {
     base: {
       fontSize: 9, fontWeight: 700, letterSpacing: "0.1em",
@@ -3490,7 +3492,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     },
     {
       label: "Despesa total", value: fmtR$(dash.custoTotal),
-      trend: dash.custoTotal === 0 ? "—" : `-${fmtR$(dash.custoTotal)}`,
+      trend: dash.custoTotal === 0 ? "-" : `-${fmtR$(dash.custoTotal)}`,
       up: false, accent: "var(--red)", sub: "mercadorias e serviços",
     },
     {
@@ -3820,7 +3822,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   ) : dash.ultimasVendas.map((v, i) => (
                     <div key={v.id || i} className="ag-trow" style={{ gridTemplateColumns: "80px 1fr 110px 110px", minWidth: 380 }}>
                       <span style={{ color: "var(--gold)", fontFamily: "var(--font-mono)", fontSize: 11 }}>{v.idVenda || v.id}</span>
-                      <span>{v.cliente || "—"}</span>
+                      <span>{v.cliente || "-"}</span>
                       <span style={{ color: "var(--text-2)" }}>{fmtData(v.data)}</span>
                       <span style={{ color: "var(--green)", textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 11 }}>{fmtR$(v.total)}</span>
                     </div>
@@ -3887,7 +3889,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             {/* ASIDE */}
             <div className="db-aside">
 
-              {/* Cadastros — sem borda redundante, ícones menores */}
+              {/* Cadastros - sem borda redundante, ícones menores */}
               <div className="db-panel db-panel-table">
                 <div className="db-panel-header">
                   <span className="db-panel-title">Cadastros</span>
@@ -3944,7 +3946,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                                 {item.name}
                               </span>
                               <span style={{ color: "var(--text)", fontWeight: 600, fontFamily: "var(--font-mono)", fontSize: 11 }}>
-                                {dash.loading ? "—" : `${item.value}%`}
+                                {dash.loading ? "-" : `${item.value}%`}
                               </span>
                             </div>
                             <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 3, height: 3, overflow: "hidden" }}>
@@ -3977,7 +3979,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     // Usa os mesmos dados reais de faturamentoPorDia do hook
     const faturDia = dash.loading ? [] : (dash.faturamentoPorDia || []);
 
-    // Receita por ponto + despesas proporcionais (sem CMV — contabilizado na compra)
+    // Receita por ponto + despesas proporcionais (sem CMV - contabilizado na compra)
     const receitaData = faturDia.map((pt) => {
       const propDesp = dash.receitaBruta > 0 ? (dash.custoTotal || 0) / dash.receitaBruta : 0;
       const receita  = pt.v || 0;
@@ -4100,7 +4102,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     return (
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, padding: 4 }}>
 
-        {/* 1. Faturamento vs Despesas — BarChart / 3D */}
+        {/* 1. Faturamento vs Despesas - BarChart / 3D */}
         <Card
           title="Faturamento vs Despesas"
           subtitle={`Período: ${period}${period === "Personalizado" && customRange.from && customRange.to ? ` (${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")})` : ""}`}
@@ -4129,7 +4131,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           )}
         </Card>
 
-        {/* 2. Lucro Líquido — AreaChart */}
+        {/* 2. Lucro Líquido - AreaChart */}
         <Card
           title="Evolução do Lucro Líquido"
           subtitle={`Período: ${period} · valores estimados por dia`}
@@ -4157,7 +4159,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           )}
         </Card>
 
-        {/* 3. Faturamento por dia (período selecionado) — LineChart / 3D */}
+        {/* 3. Faturamento por dia (período selecionado) - LineChart / 3D */}
         <Card
           title="Faturamento Diário"
           subtitle={`Período: ${period}`}
@@ -4194,7 +4196,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           )}
         </Card>
 
-        {/* 4. Mix de Receita — PieChart / 3D Donut */}
+        {/* 4. Mix de Receita - PieChart / 3D Donut */}
         <Card title="Mix de Receita" subtitle="Distribuição por categoria" headerRight={<ChartToggle value={mixMode} onChange={setMixMode} />}>
           {mixMode === "3d" ? (
             <Chart3DDonut data={dash.mixData || []} height={180} />
@@ -4220,7 +4222,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                       <span style={{ width: 8, height: 8, borderRadius: 2, background: pieColors[i % pieColors.length], display: "inline-block" }} />
                       {item.name}
                     </span>
-                    <span style={{ color: "var(--text)", fontWeight: 600 }}>{dash.loading ? "—" : `${item.value}%`}</span>
+                    <span style={{ color: "var(--text)", fontWeight: 600 }}>{dash.loading ? "-" : `${item.value}%`}</span>
                   </div>
                   <div style={{ background: "var(--s2)", borderRadius: 4, height: 5, overflow: "hidden" }}>
                     <div style={{ width: `${dash.loading ? 0 : item.value}%`, height: "100%", background: pieColors[i % pieColors.length], borderRadius: 4, transition: "width 0.6s ease" }} />
@@ -4232,8 +4234,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           )}
         </Card>
 
-        {/* 5. Top Produtos — Horizontal Bars */}
-        <Card title="Top Produtos Vendidos" subtitle={`Por receita — ${period}`}>
+        {/* 5. Top Produtos - Horizontal Bars */}
+        <Card title="Top Produtos Vendidos" subtitle={`Por receita - ${period}`}>
           {semProdutos ? (
             <EmptyState msg="Nenhum produto vendido no período selecionado" />
           ) : (
@@ -4272,8 +4274,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           )}
         </Card>
 
-        {/* 6. Desempenho Geral — RadarChart */}
-        <Card title="Radar de Desempenho" subtitle={`Saúde geral — baseado nos dados do período (${period})`} style={{ gridColumn: "1 / 3" }}>
+        {/* 6. Desempenho Geral - RadarChart */}
+        <Card title="Radar de Desempenho" subtitle={`Saúde geral - baseado nos dados do período (${period})`} style={{ gridColumn: "1 / 3" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 32 }}>
             <RadarChart outerRadius={110} width={300} height={260} data={radarData}>
               <PolarGrid stroke="var(--border)" />
@@ -4307,7 +4309,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           </div>
         </Card>
 
-        {/* 7. Crescimento de Cadastros de Clientes — AreaChart */}
+        {/* 7. Crescimento de Cadastros de Clientes - AreaChart */}
         {(() => {
           const now = new Date();
           const meses = [];
@@ -4331,11 +4333,11 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             return { mes: m.mes, novos: m.novos, total: acumulado };
           });
           const totalNovos12m = dadosCadastro.reduce((s, d) => s + d.novos, 0);
-          const mesComMaisNovos = dadosCadastro.reduce((best, d) => d.novos > best.novos ? d : best, dadosCadastro[0] || { mes: "—", novos: 0 });
+          const mesComMaisNovos = dadosCadastro.reduce((best, d) => d.novos > best.novos ? d : best, dadosCadastro[0] || { mes: "-", novos: 0 });
           return (
             <Card
               title="Crescimento de Cadastros"
-              subtitle="Novos clientes e base total — últimos 12 meses"
+              subtitle="Novos clientes e base total - últimos 12 meses"
               style={{ gridColumn: "1 / 3" }}
             >
               <div style={{ display: "flex", gap: 24, marginBottom: 18, flexWrap: "wrap" }}>
@@ -4459,7 +4461,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                       /* helper: tempo relativo */
                       const tempoRel = (ts) => {
                         const d = ts?.toDate ? ts.toDate() : null;
-                        if (!d) return "—";
+                        if (!d) return "-";
                         const diff = Date.now() - d.getTime();
                         const m = Math.floor(diff / 60000);
                         const h = Math.floor(diff / 3600000);
@@ -4507,7 +4509,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                       if (n.tipo === "despesa") {
                         const tone = n.diffDias === 0 ? "mag" : n.diffDias === 1 ? "amber" : "blue";
                         const labelUrg = n.diffDias === 0 ? "Vence hoje" : n.diffDias === 1 ? "Amanhã" : `${n.diffDias} dias`;
-                        const idShow = n.titulo?.split("—")[1]?.trim() || "";
+                        const idShow = n.titulo?.split("-")[1]?.trim() || "";
                         const tsObj = n._ts ? { toDate: () => new Date(n._ts) } : null;
                         return (
                           <div key={n.id} className={`holo ${tone}`} style={{ cursor: "pointer" }}
@@ -4600,7 +4602,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                               </div>
                               <span className="holo-categoria">Sistema</span>
                               <span className="ag-notif-item-meta" style={{ marginLeft: "auto" }}>
-                                {n.criadoEm?.toDate ? n.criadoEm.toDate().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "—"}
+                                {n.criadoEm?.toDate ? n.criadoEm.toDate().toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) : "-"}
                               </span>
                             </div>
                             <div className="holo-title">{n.titulo}</div>
@@ -4730,7 +4732,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   )}
                 </button>
 
-                {/* ── Assent Flow — essencial (opt-in), profissional e delux ── */}
+                {/* ── Assent Flow - essencial (opt-in), profissional e delux ── */}
                 {flowVisivel && (
                   <button
                     className="ag-dropdown-item"
@@ -4784,14 +4786,14 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         {/* ── CORPO: sidebar + main ── */}
         <div className="ag-body">
 
-          {/* Sidebar desktop recolhível — oculta no Assent CRM */}
+          {/* Sidebar desktop recolhível - oculta no Assent CRM */}
           <aside className={`ag-sidebar ${collapsed ? "collapsed" : ""}`} style={sistemaAtivo === "crm" || sistemaAtivo === "flow" ? { display: "none" } : {}}>
             <nav className="ag-nav">
               {NAV.map((sec) => {
                 const aberta = secaoAberta[sec.section] !== false;
                 return (
                   <div key={sec.section}>
-                    {/* Cabeçalho da seção — clicável */}
+                    {/* Cabeçalho da seção - clicável */}
                     <div
                       className="ag-sec-label"
                       onClick={() => !collapsed && toggleSecaoFn(sec.section)}
@@ -4817,7 +4819,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                       )}
                     </div>
 
-                    {/* Itens — visíveis só se seção aberta (ou sidebar colapsada) */}
+                    {/* Itens - visíveis só se seção aberta (ou sidebar colapsada) */}
                     {(aberta || collapsed) && sec.items.map((item) => {
                       const dbKey = KEY_MAP[item.label];
                       if (dbKey && !moduloVisivel(dbKey)) return null;
@@ -4836,7 +4838,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                       );
                     })}
 
-                    {/* Botão Instalar App — só na seção SISTEMA */}
+                    {/* Botão Instalar App - só na seção SISTEMA */}
                     {sec.section === "SISTEMA" && (aberta || collapsed) && (
                       <div
                         className="ag-nav-item"
