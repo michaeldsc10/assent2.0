@@ -4112,7 +4112,8 @@ const MODULOS_SISTEMA = [
   { key: 'vendas',          label: 'Vendas'         },
   { key: 'pdv',             label: 'PDV'            },
   { key: 'mesas',           label: 'Mesas'          },
-  { key: 'matriculas',      label: 'Matrículas'     },
+  { key: 'matriculas',      label: 'Mensalidades'   },
+  { key: 'alunosCadastro',  label: 'Alunos'         },
   { key: 'fiado',           label: 'A Receber'      },
   { key: 'caixa',           label: 'Caixa Diário'   },
   { key: 'despesas',        label: 'Despesas'       },
@@ -4122,6 +4123,7 @@ const MODULOS_SISTEMA = [
   { key: 'orcamentos',      label: 'Orçamentos'     },
   { key: 'vendedores',      label: 'Vendedores'     },
   { key: 'compras',         label: 'Compras'        },
+  { key: 'usuarios',        label: 'Usuários'       },
 ];
 
 async function loadMemberModulos(uid) {
@@ -4222,6 +4224,15 @@ async function toggleAssentFlow(uid, el) {
     await db.collection('licencas').doc(uid).set({ flowAtivo: novoAtivo }, { merge: true });
   } catch (e) {
     console.error('[toggleAssentFlow]', e);
+    const body = document.getElementById('planSection');
+    if (body && !document.getElementById('flowErroBanner')) {
+      const fb = document.createElement('div');
+      fb.id = 'flowErroBanner';
+      fb.style.cssText = 'margin:10px 0;padding:10px 14px;border-radius:8px;font-size:12px;font-weight:600;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#f87171;';
+      fb.textContent = '⚠ Erro ao salvar Flow. Verifique permissões do Firestore (licencas → allow update isAdminAG).';
+      body.prepend(fb);
+      setTimeout(() => fb.remove(), 5000);
+    }
     // Reverte se falhar
     el.dataset.ativo = String(ativo);
     el.style.background = ativo ? 'var(--success)' : 'var(--border2)';
