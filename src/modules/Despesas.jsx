@@ -1865,6 +1865,12 @@ export default function Despesas() {
         const dt = getDataRef(d);
         return dt && dt.getMonth() === mesAtual && dt.getFullYear() === anoAtual;
       });
+    } else if (filtroPeriodo === "mes_passado" || filtroPeriodo === "proximo_mes") {
+      const ref = new Date(anoAtual, mesAtual + (filtroPeriodo === "mes_passado" ? -1 : 1), 1);
+      lista = lista.filter(d => {
+        const dt = getDataRef(d);
+        return dt && dt.getMonth() === ref.getMonth() && dt.getFullYear() === ref.getFullYear();
+      });
     } else if (filtroPeriodo === "semana") {
       const inicio = new Date(); inicio.setDate(inicio.getDate() - inicio.getDay());
       const fim    = new Date(inicio); fim.setDate(inicio.getDate() + 6);
@@ -2066,7 +2072,9 @@ export default function Despesas() {
         <div style={{ width: 1, height: 16, background: "var(--border)", margin: "0 4px" }} />
 
         <select className="filter-select" value={filtroPeriodo} onChange={e => setFiltroPeriodo(e.target.value)}>
+          <option value="mes_passado">Mês passado</option>
           <option value="mes">Este mês</option>
+          <option value="proximo_mes">Próximo mês</option>
           <option value="semana">Esta semana</option>
           <option value="todas">Tudo</option>
           <option value="custom">Período personalizado</option>
