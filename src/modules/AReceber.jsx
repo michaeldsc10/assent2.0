@@ -1500,7 +1500,7 @@ export default function AReceber() {
           <p>Controle de contas e valores pendentes</p>
         </div>
 
-        <div className="ar-search">
+        <div className="ar-search" data-tour="ar-busca">
           <Search size={13} color="var(--text-3)" />
           <input
             placeholder="Buscar por cliente ou descrição..."
@@ -1509,7 +1509,7 @@ export default function AReceber() {
           />
         </div>
 
-        <div className="ar-filter-group">
+        <div className="ar-filter-group" data-tour="ar-filtros">
           <Filter size={12} color="var(--text-3)" />
           {FILTROS_STATUS.map(f => (
             <button
@@ -1522,7 +1522,7 @@ export default function AReceber() {
           ))}
         </div>
 
-        <div className="ar-period-group">
+        <div className="ar-period-group" data-tour="ar-periodo">
           <select
             className="ar-period-select"
             value={period}
@@ -1552,16 +1552,16 @@ export default function AReceber() {
           )}
         </div>
 
-        {podeCriarV && <button className="btn-novo-ar" onClick={() => setModalNovo(true)}>
+        {podeCriarV && <button className="btn-novo-ar" data-tour="ar-nova" onClick={() => setModalNovo(true)}>
           <Plus size={14} /> <span><u>N</u>ova Conta</span>
         </button>}
-        <button className="btn-wpp-msg" onClick={() => setModalWppMsg(true)}>
+        <button className="btn-wpp-msg" data-tour="ar-wpp" onClick={() => setModalWppMsg(true)}>
           <MessageSquare size={14} /> Mensagem WhatsApp
         </button>
       </header>
 
       <div className="ag-content">
-        <div className="ar-kpis">
+        <div className="ar-kpis" data-tour="ar-kpis">
           <div className="ar-kpi">
             <div className="ar-kpi-label">Total a Receber</div>
             <div className={`ar-kpi-val${kpis.totalPendente > 0 ? " gold" : ""}`}>
@@ -1585,7 +1585,7 @@ export default function AReceber() {
           </div>
         </div>
 
-        <div className="ar-table-wrap">
+        <div className="ar-table-wrap" data-tour="ar-tabela">
           <div className="ar-table-header">
             <span className="ar-table-title">Contas a Receber</span>
             <span className="ar-count-badge">{contasFiltradas.length}</span>
