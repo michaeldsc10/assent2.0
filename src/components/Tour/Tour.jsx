@@ -118,11 +118,12 @@ const rectIgual = (a, b) =>
 /* Posição do card em relação ao alvo */
 function calcPos(rect, cw, ch, vw, vh, pref = "bottom") {
   const M = 12, G = 14, P = 6;
+  const B = vw <= 720 ? 64 : 0; // barra inferior do mobile
   if (!rect) {
     return { top: Math.max(M, (vh - ch) / 2), left: Math.max(M, (vw - cw) / 2), side: null, arrow: null };
   }
   const sp = {
-    bottom: vh - (rect.bottom + P) - G - M,
+    bottom: vh - B - (rect.bottom + P) - G - M,
     top: rect.top - P - G - M,
     right: vw - (rect.right + P) - G - M,
     left: rect.left - P - G - M,
@@ -140,7 +141,7 @@ function calcPos(rect, cw, ch, vw, vh, pref = "bottom") {
 
   if (!side) {
     /* Sem espaço ao redor: ancora na base da tela */
-    return { top: Math.max(M, vh - ch - M), left: clamp(cx - cw / 2, M, vw - cw - M), side: null, arrow: null };
+    return { top: Math.max(M, vh - B - ch - M), left: clamp(cx - cw / 2, M, vw - cw - M), side: null, arrow: null };
   }
   let top, left;
   if (side === "bottom") { top = rect.bottom + P + G; left = cx - cw / 2; }
@@ -148,7 +149,7 @@ function calcPos(rect, cw, ch, vw, vh, pref = "bottom") {
   else if (side === "right") { left = rect.right + P + G; top = cy - ch / 2; }
   else { left = rect.left - P - G - cw; top = cy - ch / 2; }
 
-  top = clamp(top, M, vh - ch - M);
+  top = clamp(top, M, vh - B - ch - M);
   left = clamp(left, M, vw - cw - M);
   const arrow = side === "top" || side === "bottom"
     ? { x: clamp(cx - left, 22, cw - 22) }
@@ -180,7 +181,9 @@ function TourOverlay({ steps, ctxRef, onClose }) {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
-  const step = lista[idx];
+  const base = lista[idx];
+  const mobile = vp.w <= 720 && base?.mobile ? base.mobile : null;
+  const step = useMemo(() => (base ? { ...base, ...(mobile || {}) } : base), [base, mobile]);
   const ultimo = idx === lista.length - 1;
 
   /* Foco: guarda e devolve */
@@ -207,8 +210,9 @@ function TourOverlay({ steps, ctxRef, onClose }) {
       const el = acharAlvo(step.target);
       if (el) {
         const r = el.getBoundingClientRect();
-        const fora = r.top < 70 || r.bottom > window.innerHeight - 20;
-        if (fora) {
+        const mob = window.innerWidth <= 720;
+        const fora = r.top < 70 || r.bottom > window.innerHeight - (mob ? 84 : 20);
+        if (fora && !el.closest("header, nav, aside")) {
           const alto = r.height > window.innerHeight * 0.6;
           el.scrollIntoView({
             block: alto ? "start" : "center",
