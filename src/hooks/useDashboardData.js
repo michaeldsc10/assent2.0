@@ -277,7 +277,8 @@ export function useDashboardData(uid, period = "Este mês", customRange = null) 
     /* ── A Receber ── */
     // Não depende do campo status (não gravado no Firestore) — usa valorRestante real
     const totalAReceber = aReceber.reduce((s, a) => {
-      const restante = Number(a.valorRestante) ?? Math.max(0, Number(a.valorTotal || 0) - Number(a.valorPago || 0));
+      const rest = parseFloat(a.valorRestante);
+      const restante = Number.isFinite(rest) ? rest : Math.max(0, (parseFloat(a.valorTotal) || 0) - (parseFloat(a.valorPago) || 0));
       return s + (restante > 0 ? restante : 0);
     }, 0);
 
