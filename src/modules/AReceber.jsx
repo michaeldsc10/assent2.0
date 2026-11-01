@@ -1269,6 +1269,21 @@ export default function AReceber() {
     }).catch(() => {});
   }, [tenantUid]);
 
+  /* ── Atalho: tecla N abre Nova Conta ── */
+  useEffect(() => {
+    if (!podeCriarV) return;
+    const handler = (e) => {
+      if (e.key === "n" || e.key === "N") {
+        const tag = document.activeElement?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        e.preventDefault();
+        setModalNovo(true);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [podeCriarV]);
+
   /* ── Firestore — listener em tempo real ── */
   useEffect(() => {
     if (!tenantUid) {
@@ -1538,7 +1553,7 @@ export default function AReceber() {
         </div>
 
         {podeCriarV && <button className="btn-novo-ar" onClick={() => setModalNovo(true)}>
-          <Plus size={14} /> Nova Conta
+          <Plus size={14} /> <span><u>N</u>ova Conta</span>
         </button>}
         <button className="btn-wpp-msg" onClick={() => setModalWppMsg(true)}>
           <MessageSquare size={14} /> Mensagem WhatsApp
