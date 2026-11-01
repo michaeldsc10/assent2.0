@@ -1967,7 +1967,7 @@ export default function Despesas() {
           <p>Controle de pagamentos e obrigações financeiras</p>
         </div>
 
-        <div className="desp-search">
+        <div className="desp-search" data-tour="desp-busca">
           <Search size={13} color="var(--text-3)" />
           <input
             placeholder="Buscar por descrição, fornecedor..."
@@ -1978,7 +1978,7 @@ export default function Despesas() {
 
         <div style={{ marginLeft: "auto" }}>
           <button
-            className="btn-nova-desp"
+            className="btn-nova-desp" data-tour="desp-nova"
             onClick={() => setModalNovo(true)}
             disabled={!podeCriarV}
             title={undefined}
@@ -1989,7 +1989,7 @@ export default function Despesas() {
       </header>
 
       {/* Cards de métricas */}
-      <div className="desp-metrics">
+      <div className="desp-metrics" data-tour="desp-metricas">
         <div
           className={`metric-card metric-card-red clickable ${filtroStatus === "vencido" ? "active" : ""}`}
           onClick={() => setFiltroStatus(filtroStatus === "vencido" ? "todas" : "vencido")}
@@ -2050,7 +2050,7 @@ export default function Despesas() {
       </div>
 
       {/* Filtros */}
-      <div className="desp-filters">
+      <div className="desp-filters" data-tour="desp-filtros">
         <span className="filter-label">Mostrar:</span>
         {[
           { value: "todas",    label: "Todas" },
@@ -2112,7 +2112,7 @@ export default function Despesas() {
       </div>
 
       {/* Tabela */}
-      <div className="desp-table-wrap">
+      <div className="desp-table-wrap" data-tour="desp-tabela">
         <div className="desp-table-header">
           <span className="desp-table-title">Despesas</span>
           <span className="count-badge">{despesasFiltradas.length}</span>
