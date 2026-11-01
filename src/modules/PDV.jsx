@@ -1577,7 +1577,7 @@ export default function PDV({ onVoltar }) {
           </div>
 
           <div className="pdv-header-center">
-            <div className="pdv-barcode-wrapper">
+            <div className="pdv-barcode-wrapper" data-tour="pdv-codigo">
               <Barcode size={16} className="pdv-barcode-icon" />
               <BarcodeInput
                 onScan={buscarPorCodigo}
@@ -1620,14 +1620,14 @@ export default function PDV({ onVoltar }) {
         <div className="pdv-mobile-tabs">
           <button
             className={"pdv-mobile-tab" + (mobileTab === "produtos" ? " active" : "")}
-            onClick={() => setMobileTab("produtos")}
+            data-tour="pdv-tab-produtos" onClick={() => setMobileTab("produtos")}
           >
             <Search size={16} />
             <span>Produtos</span>
           </button>
           <button
             className={"pdv-mobile-tab" + (mobileTab === "carrinho" ? " active" : "")}
-            onClick={() => setMobileTab("carrinho")}
+            data-tour="pdv-tab-carrinho" onClick={() => setMobileTab("carrinho")}
           >
             <ShoppingCart size={16} />
             <span>Carrinho</span>
@@ -1642,7 +1642,7 @@ export default function PDV({ onVoltar }) {
           {/* ─── COLUNA ESQUERDA: busca + produto ─── */}
           <section className={"pdv-col-left" + (mobileTab === "carrinho" ? " pdv-hidden-mobile" : "")}>
             {/* Busca textual */}
-            <div className="pdv-search-box">
+            <div className="pdv-search-box" data-tour="pdv-busca">
               <Search size={15} className="pdv-search-icon" />
               <input
                 type="text"
@@ -1693,7 +1693,7 @@ export default function PDV({ onVoltar }) {
             )}
 
             {/* ─── Cliente (opcional) ─── */}
-            <div className="pdv-cliente-section">
+            <div className="pdv-cliente-section" data-tour="pdv-cliente">
               <label className="pdv-section-label">
                 <User size={14} /> Cliente <span className="pdv-optional">(opcional)</span>
               </label>
@@ -1738,7 +1738,7 @@ export default function PDV({ onVoltar }) {
             </div>
 
             {/* ─── Pagamento Dividido ─── */}
-            <div className="pdv-pagamento-section">
+            <div className="pdv-pagamento-section" data-tour="pdv-pagamento">
               <label className="pdv-section-label">
                 <CreditCard size={14} /> Pagamento
               </label>
@@ -1885,7 +1885,7 @@ export default function PDV({ onVoltar }) {
             })()}
 
             {/* Tabela de itens */}
-            <div className="pdv-carrinho-body">
+            <div className="pdv-carrinho-body" data-tour="pdv-carrinho">
               {carrinho.length === 0 ? (
                 <div className="pdv-carrinho-vazio">
                   <ShoppingCart size={36} />
@@ -1964,7 +1964,7 @@ export default function PDV({ onVoltar }) {
             </div>
 
             {/* Totalizador */}
-            <div className="pdv-total-section">
+            <div className="pdv-total-section" data-tour="pdv-total">
               <div className="pdv-total-row">
                 <span>Subtotal</span>
                 <span>{fmt(total)}</span>
@@ -1987,7 +1987,7 @@ export default function PDV({ onVoltar }) {
             <span
               role="button"
               tabIndex={!vencido ? -1 : 0}
-              onClick={!finalizando && vencido ? finalizarVenda : undefined}
+              data-tour="pdv-finalizar" onClick={!finalizando && vencido ? finalizarVenda : undefined}
               onKeyDown={e => e.key === "Enter" && !finalizando && vencido && finalizarVenda()}
               style={{
                 margin: "12px 16px 4px",
