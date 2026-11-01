@@ -83,6 +83,7 @@ const KEY_MAP = {
   "Mensalidades":          "matriculas",
   "Alunos":              "alunosCadastro",
   "Fiado / A Receber":  "fiado",
+  "A Receber":          "fiado",
   "Caixa Diário":       "caixa",
   "Despesas":           "despesas",
   "Fornecedores":       "fornecedores",
@@ -2712,8 +2713,7 @@ class DbErrorBoundary extends React.Component {
 export default function Dashboard() {
   const [period,        setPeriod]       = useState("Este mês");
   const [customRange,   setCustomRange]  = useState({ from: "", to: "" });
-  /* Troca de período: volta o scroll ao topo (no mobile .ag-main é o scroller;
-     conteúdo que encolhe com scroll alto deixava a tela preta) */
+  /* Troca de período: volta o scroll ao topo (no mobile .ag-main é o scroller) */
   const changePeriod = (p) => {
     setPeriod(p);
     if (typeof document !== "undefined") {
@@ -2793,7 +2793,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
   /* ── Hooks de dados - declarados aqui para isPro estar disponível nos useEffects abaixo ── */
   const empresa = useEmpresa(uid);
-  const { isPro, plano: licencaSlug } = useLicenca(tenantUid);
+  const { isPro, plano: licencaSlug, dataVencimento: vencimentoPlano } = useLicenca(tenantUid);
 
   /* ── AssentFlow: flag de ativação controlada pelo admin (licencas/{tenantUid}.flowAtivo)
      Essencial: default OFF, só aparece se flowAtivo === true
@@ -2807,6 +2807,25 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   }, [tenantUid]);
   const flowVisivel =
     licencaSlug === "essencial" ? flowAtivo === true : flowAtivo !== false;
+  useEffect(() => {
+    if (!flowVisivel && sistemaAtivo === "flow") setSistemaAtivo("gestao");
+  }, [flowVisivel, sistemaAtivo]);
+
+  /* ── Vencimento do plano (licencas/{tenantUid}/plano/*): carência de 3 dias → bloqueio ── */
+  const GRACA_DIAS = 3;
+  const planoVenc = (() => {
+    if (!vencimentoPlano) return null;
+    const fim = new Date(vencimentoPlano);
+    fim.setHours(23, 59, 59, 999);
+    const diff = Date.now() - fim.getTime();
+    if (diff <= 0) {
+      const hoje = new Date();
+      const venceHoje = fim.toDateString() === hoje.toDateString();
+      return venceHoje ? { hoje: true, restantes: GRACA_DIAS, bloqueado: false } : null;
+    }
+    const restantes = GRACA_DIAS - Math.floor(diff / 86400000);
+    return { hoje: false, restantes, bloqueado: restantes <= 0 };
+  })();
 
   /* ── Notificações de reserva - AssFlow (tempo real, por usuário) ── */
   const {
@@ -3142,7 +3161,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   /* Normaliza notificações de reserva do AssFlow
      - só docs com tipo==nova_reserva E payload válido (defensivo contra
      docs estranhos escritos na mesma subcoleção por outros sistemas) */
-  const notifReservasNorm = notifReservas
+  const notifReservasNorm = (flowVisivel ? notifReservas : [])
     .filter((n) => n.tipo === "nova_reserva" && n.payload && typeof n.payload === "object")
     .map((n) => ({
       ...n,
@@ -3155,8 +3174,19 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     _ts: Date.now() - n.diffDias * 86400000,
   }));
 
+  /* Aviso de vencimento do plano (só front; id muda por dia → volta como não lida) */
+  const notifPlanoNorm = (planoVenc && !planoVenc.bloqueado)
+    ? [{
+        id: `plano-venc-${new Date().toISOString().slice(0, 10)}-${planoVenc.hoje ? "hoje" : planoVenc.restantes}`,
+        tipo: "plano_venc",
+        hoje: planoVenc.hoje,
+        restantes: planoVenc.restantes,
+        _ts: Date.now(),
+      }]
+    : [];
+
   /* Merge cronológico: mais recente/urgente primeiro */
-  const todasNotif = [...notifDespesasNorm, ...notifAReceberNorm, ...notifSistemaNorm, ...notifInsightsNorm, ...notifReservasNorm]
+  const todasNotif = [...notifPlanoNorm, ...notifDespesasNorm, ...notifAReceberNorm, ...notifSistemaNorm, ...notifInsightsNorm, ...notifReservasNorm]
     .sort((a, b) => b._ts - a._ts);
 
   const notifNaoLidas = todasNotif.filter((n) => !notifLidas.includes(n.id)).length;
@@ -4428,6 +4458,40 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     <>
       <style>{CSS}</style>
 
+      {planoVenc?.bloqueado && (
+        <div style={{
+          position:"fixed", inset:0, zIndex:99999, background:"var(--bg, #0b0b0c)",
+          display:"flex", alignItems:"center", justifyContent:"center", padding:24, textAlign:"center",
+        }}>
+          <div style={{ maxWidth:420 }}>
+            <div style={{ fontSize:42, marginBottom:12 }}>🔒</div>
+            <h2 style={{ color:"var(--text, #fff)", fontSize:22, fontWeight:700, margin:"0 0 8px" }}>Acesso bloqueado</h2>
+            <p style={{ color:"var(--text-2, #aaa)", fontSize:14, lineHeight:1.5, margin:"0 0 20px" }}>
+              Seu plano venceu e o prazo de pagamento acabou. Efetue o pagamento para reativar o acesso.
+            </p>
+            <button
+              onClick={() => { logout(); window.location.reload(); }}
+              style={{ padding:"10px 22px", borderRadius:8, border:"1px solid var(--border, #333)", background:"transparent", color:"var(--text, #fff)", cursor:"pointer", fontWeight:600 }}
+            >Sair</button>
+          </div>
+        </div>
+      )}
+
+      {planoVenc && !planoVenc.bloqueado && (
+        <div style={{
+          position:"fixed", left:"50%", top:12, transform:"translateX(-50%)", zIndex:99990,
+          maxWidth:"calc(100vw - 32px)", padding:"10px 16px", borderRadius:10,
+          background: planoVenc.hoje ? "rgba(245,158,11,0.14)" : "rgba(239,68,68,0.14)",
+          border: planoVenc.hoje ? "1px solid rgba(245,158,11,0.5)" : "1px solid rgba(239,68,68,0.5)",
+          color: planoVenc.hoje ? "#fbbf24" : "#f87171",
+          fontSize:13, fontWeight:600, textAlign:"center", backdropFilter:"blur(6px)",
+        }}>
+          {planoVenc.hoje
+            ? "⚠️ Seu plano vence hoje. Faça o pagamento para evitar interrupções."
+            : `⚠️ Plano vencido — efetue o pagamento em ${planoVenc.restantes} ${planoVenc.restantes === 1 ? "dia" : "dias"} ou o acesso será bloqueado.`}
+        </div>
+      )}
+
       {saudacaoVisivel && userName !== "Usuário" && (
         <SaudacaoCard
           nome={userName}
@@ -4591,6 +4655,31 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                               <div className="holo-meta">
                                 <span className="holo-meta-dot" />
                                 <span>{tempoRel(tsObj)}</span>
+                              </div>
+                            </div>
+                            <div className="holo-beam" />
+                            <div className="holo-base" />
+                          </div>
+                        );
+                      }
+
+                      /* ── Vencimento do plano ── */
+                      if (n.tipo === "plano_venc") {
+                        return (
+                          <div key={n.id} className={`holo ${n.hoje ? "amber" : "mag"}`}>
+                            <div className="holo-card">
+                              <div className="holo-row-top">
+                                <div className="holo-icon">
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                                </div>
+                                <span className="holo-categoria">Sistema · Plano</span>
+                                <span className="holo-urgencia">{n.hoje ? "Vence hoje" : `${n.restantes} ${n.restantes === 1 ? "dia" : "dias"}`}</span>
+                              </div>
+                              <div className="holo-title">{n.hoje ? "Seu plano vence hoje" : "Plano vencido"}</div>
+                              <div className="holo-msg">
+                                {n.hoje
+                                  ? "Faça o pagamento para evitar interrupções."
+                                  : `Efetue o pagamento em ${n.restantes} ${n.restantes === 1 ? "dia" : "dias"} ou o acesso será bloqueado.`}
                               </div>
                             </div>
                             <div className="holo-beam" />
@@ -4901,7 +4990,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 theme={theme}
                 onToggleTheme={toggleTheme}
               />
-            ) : sistemaAtivo === "flow" ? (
+            ) : sistemaAtivo === "flow" && flowVisivel ? (
               <AssFlow
                 tenantUid={tenantUid}
                 nomeEmpresa={nomeEmpresa}
