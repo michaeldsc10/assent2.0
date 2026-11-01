@@ -237,25 +237,20 @@ const CSS = `
     font-family: 'DM Sans', sans-serif; color-scheme: dark;
   }
   .ar-period-date:focus { border-color: var(--gold); outline: none; }
-  .ar-period-mobile { display: none; }
+  .ar-period-select {
+    padding: 6px 10px; border-radius: 8px; font-size: 12px;
+    border: 1px solid var(--border); background: var(--s2); color: var(--text-2);
+    cursor: pointer; outline: none; font-family: 'DM Sans', sans-serif;
+    transition: border-color .13s;
+  }
+  .ar-period-select:focus { border-color: var(--gold); }
   @media (max-width: 640px) {
     .ar-topbar-title p { display: none; }
-    .ar-period-group { display: none !important; }
-    .ar-period-mobile {
-      display: flex; flex-direction: column; gap: 8px;
-      width: 100%; order: 4;
-    }
-    .ar-period-select {
-      width: 100%; background: var(--s2); border: 1px solid var(--border);
-      border-radius: 8px; color: var(--text); font-size: 13px;
-      padding: 8px 10px; outline: none;
-      font-family: 'DM Sans', sans-serif;
-    }
-    .ar-period-select:focus { border-color: var(--gold); }
-    .ar-period-mobile .ar-period-custom { display: flex; align-items: center; gap: 6px; }
-    .ar-period-mobile .ar-period-date { flex: 1; min-width: 0; font-size: 12px; }
+    .ar-period-group { width: 100%; flex-wrap: wrap; }
+    .ar-period-select { flex: 1; min-width: 0; font-size: 13px; padding: 8px 10px; }
+    .ar-period-custom { width: 100%; }
+    .ar-period-date { flex: 1; min-width: 0; font-size: 12px; }
   }
-
   .ar-kpis {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
     margin-bottom: 20px;
@@ -506,26 +501,40 @@ const fmtDataCompleta = (timestamp) => {
 
 const FILTROS_STATUS = ["Todos", "pago", "pendente", "vencido"];
 
-const PERIODS = ["Tudo", "Hoje", "7 dias", "30 dias", "Este mês", "Personalizado"];
+const PERIODS = [
+  { value: "mes_passado", label: "Mês passado" },
+  { value: "mes",         label: "Este mês" },
+  { value: "proximo_mes", label: "Próximo mês" },
+  { value: "semana",      label: "Esta semana" },
+  { value: "todas",       label: "Tudo" },
+  { value: "custom",      label: "Período personalizado" },
+];
+
+const isoLocal = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 function filtrarPorPeriodo(contas, period, dataInicio = "", dataFim = "") {
-  if (period === "Tudo") return contas;
-  if (period === "Personalizado") {
-    return contas.filter(c => {
-      if (!c.dataVencimento) return false;
-      if (dataInicio && c.dataVencimento < dataInicio) return false;
-      if (dataFim && c.dataVencimento > dataFim) return false;
-      return true;
-    });
-  }
+  if (period === "todas") return contas;
+  let ini = "", fim = "";
   const now = new Date();
-  const start = new Date();
-  if (period === "Hoje")           { start.setHours(0, 0, 0, 0); }
-  else if (period === "7 dias")    { start.setDate(now.getDate() - 7); }
-  else if (period === "30 dias")   { start.setDate(now.getDate() - 30); }
-  else if (period === "Este mês")  { start.setDate(1); start.setHours(0, 0, 0, 0); }
-  const startStr = start.toISOString().slice(0, 10);
-  return contas.filter(c => c.dataVencimento && c.dataVencimento >= startStr);
+  if (period === "custom") {
+    ini = dataInicio; fim = dataFim;
+  } else if (period === "mes" || period === "mes_passado" || period === "proximo_mes") {
+    const off = period === "mes_passado" ? -1 : period === "proximo_mes" ? 1 : 0;
+    ini = isoLocal(new Date(now.getFullYear(), now.getMonth() + off, 1));
+    fim = isoLocal(new Date(now.getFullYear(), now.getMonth() + off + 1, 0));
+  } else if (period === "semana") {
+    const i = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+    const f = new Date(i.getFullYear(), i.getMonth(), i.getDate() + 6);
+    ini = isoLocal(i); fim = isoLocal(f);
+  }
+  return contas.filter(c => {
+    if (!c.dataVencimento) return false;
+    const v = String(c.dataVencimento).slice(0, 10);
+    if (ini && v < ini) return false;
+    if (fim && v > fim) return false;
+    return true;
+  });
 }
 
 const LABEL_STATUS = {
@@ -1199,7 +1208,7 @@ export default function AReceber() {
   const [filtroStatus, setFiltroStatus] = useState("Todos");
   const [sortKey, setSortKey]           = useState(null);
   const [sortDir, setSortDir]           = useState("asc");
-  const [period, setPeriod]             = useState("Tudo");
+  const [period, setPeriod]             = useState("todas");
   const [dataInicio, setDataInicio]     = useState("");
   const [dataFim, setDataFim]           = useState("");
 
@@ -1499,16 +1508,16 @@ export default function AReceber() {
         </div>
 
         <div className="ar-period-group">
-          {PERIODS.map(p => (
-            <button
-              key={p}
-              className={`ar-filter-btn${period === p ? " active" : ""}`}
-              onClick={() => setPeriod(p)}
-            >{p}</button>
-          ))}
-          {period === "Personalizado" && (
+          <select
+            className="ar-period-select"
+            value={period}
+            onChange={e => setPeriod(e.target.value)}
+            aria-label="Período"
+          >
+            {PERIODS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+          </select>
+          {period === "custom" && (
             <div className="ar-period-custom">
-              <span className="ar-period-custom-label">De</span>
               <input
                 type="date"
                 className="ar-period-date"
@@ -1517,36 +1526,6 @@ export default function AReceber() {
                 onChange={e => setDataInicio(e.target.value)}
               />
               <span className="ar-period-custom-label">até</span>
-              <input
-                type="date"
-                className="ar-period-date"
-                value={dataFim}
-                min={dataInicio || undefined}
-                onChange={e => setDataFim(e.target.value)}
-              />
-            </div>
-          )}
-        </div>
-
-        <div className="ar-period-mobile">
-          <select
-            className="ar-period-select"
-            value={period}
-            onChange={e => setPeriod(e.target.value)}
-            aria-label="Período"
-          >
-            {PERIODS.map(p => <option key={p} value={p}>{p}</option>)}
-          </select>
-          {period === "Personalizado" && (
-            <div className="ar-period-custom">
-              <input
-                type="date"
-                className="ar-period-date"
-                value={dataInicio}
-                max={dataFim || undefined}
-                onChange={e => setDataInicio(e.target.value)}
-              />
-              <span className="ar-period-custom-label">→</span>
               <input
                 type="date"
                 className="ar-period-date"
