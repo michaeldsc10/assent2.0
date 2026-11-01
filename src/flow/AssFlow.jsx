@@ -390,9 +390,16 @@ function initials(nome){ return (nome||"?").split(" ").slice(0,2).map(w=>w[0]).j
 function formatDuracao(min){ if(min<60) return `${min} min`; const h=Math.floor(min/60),m=min%60; return m===0?`${h}h`:`${h}h${m}min`; }
 function cargoLabel(c){ const map={financeiro:"Financeiro",comercial:"Comercial",compras:"Compras",operacional:"Operacional",vendedor:"Vendedor",suporte:"Suporte",admin:"Administrador"}; return map[c]||c; }
 
+// Horário por dia: horariosDia[dia] > fallback global (horaInicio/horaFim)
+function getHorarioDia(cfg,k){
+  const h=cfg?.horariosDia?.[k];
+  return {inicio:h?.inicio||cfg?.horaInicio||"08:00",fim:h?.fim||cfg?.horaFim||"18:00"};
+}
+const HHMM=/^([01]\d|2[0-3]):[0-5]\d$/;
+
 const CONFIG_DEFAULT = {
   serviços:[],diasAtivos:["seg","ter","qua","qui","sex"],
-  horaInicio:"08:00",horaFim:"18:00",granularidadeMinutos:30,
+  horaInicio:"08:00",horaFim:"18:00",horariosDia:{},granularidadeMinutos:30,
   nomeEmpresa:"",descricao:"",
   bloqueiosRecorrentes:[], // [{id, motivo, inicio, fim}] — pausas fixas diárias (ex: almoço)
   whatsappTemplate:"-*[id]*-\nOlá *[nome]*! \nSua reserva de *[serv]* foi confirmada. \nDia *[hora]h*\nTe aguardo aqui!",
@@ -1317,6 +1324,7 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
   const [loading,setLoading]=useState(true);
   const [salvando,setSalvando]=useState(false);
   const [novoS,setNovoS]=useState({nome:"",duracao:60,preco:"",descricao:""});
+  const [editS,setEditS]=useState(null); // serviço em edição
   const [novaP,setNovaP]=useState({motivo:"Almoço",inicio:"12:00",fim:"13:00"});
   const [bloqueiosData,setBloqueiosData]=useState([]);
   const [novoB,setNovoB]=useState({data:"",diaTodo:true,inicio:"08:00",fim:"09:00",motivo:""});
@@ -1365,9 +1373,22 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
 
   const salvar=async()=>{
     if(!prestadorId) return;
+    // Horário por dia: só dias ativos, validado
+    const horariosDia={};
+    for(const k of (config.diasAtivos||[])){
+      const h=getHorarioDia(config,k);
+      if(!HHMM.test(h.inicio)||!HHMM.test(h.fim)||h.inicio>=h.fim){
+        showT(`Horário inválido em ${DIAS_SEMANA.find(d=>d.key===k)?.label||k}: início deve ser antes do fim.`,"error");
+        return;
+      }
+      horariosDia[k]=h;
+    }
+    const hs=Object.values(horariosDia);
+    // horaInicio/horaFim = menor/maior (compatibilidade com leitores antigos)
+    const legado=hs.length?{horaInicio:hs.map(h=>h.inicio).sort()[0],horaFim:hs.map(h=>h.fim).sort().slice(-1)[0]}:{};
     setSalvando(true);
     try {
-      await setDoc(doc(db,"users",tenantUid,"agendamento_configuracoes",prestadorId),{...config,atualizadoEm:serverTimestamp()},{merge:true});
+      await setDoc(doc(db,"users",tenantUid,"agendamento_configuracoes",prestadorId),{...config,...legado,horariosDia,atualizadoEm:serverTimestamp()},{merge:true});
       // Admin: salva percentual de adiantamento em config/geral (lido pela Cloud Function)
       if(isAdmin){
         const pctDecimal=pagarAtivo&&adiantamentoPct>0 ? adiantamentoPct/100 : 0;
@@ -1385,6 +1406,15 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
     const s={id:Date.now().toString(),nome:novoS.nome.trim(),duracao_min:parseInt(novoS.duracao)||60,preco:parseFloat(novoS.preco)||0,descricao:novoS.descricao.trim(),ativo:true};
     setConfig(p=>({...p,serviços:[...(p.serviços||[]),s]}));
     setNovoS({nome:"",duracao:60,preco:"",descricao:""});
+  };
+
+  const iniciarEdicaoS=(s)=>setEditS({id:s.id,nome:s.nome||"",duracao:s.duracao_min||60,preco:s.preco>0?String(s.preco):"",descricao:s.descricao||""});
+  const salvarEdicaoS=()=>{
+    if(!editS||!editS.nome.trim()) return;
+    const preco=Math.max(0,parseFloat(editS.preco)||0);
+    const dur=parseInt(editS.duracao)||60;
+    setConfig(p=>({...p,serviços:(p.serviços||[]).map(x=>x.id===editS.id?{...x,nome:editS.nome.trim(),duracao_min:dur,preco,descricao:editS.descricao.trim()}:x)}));
+    setEditS(null);
   };
 
   // Pausas recorrentes — salvas dentro do doc de config (salvar geral)
@@ -1420,6 +1450,8 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
     catch { showT("Erro ao remover.","error"); }
   };
 
+  const setHorDia=(k,campo,v)=>setConfig(p=>({...p,horariosDia:{...(p.horariosDia||{}),[k]:{...getHorarioDia(p,k),[campo]:v}}}));
+  const aplicarHorarioTodos=k=>setConfig(p=>{const h=getHorarioDia(p,k);const novo={};(p.diasAtivos||[]).forEach(d=>{novo[d]={...h};});return {...p,horariosDia:novo};});
   const toggleDia=k=>setConfig(p=>({...p,diasAtivos:p.diasAtivos.includes(k)?p.diasAtivos.filter(d=>d!==k):[...p.diasAtivos,k]}));
   const prestadoresAtivos=prestadores.filter(p=>p.ativo);
   const prestadorAtual=prestadores.find(p=>p.id===prestadorId);
@@ -1516,15 +1548,27 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
               );
             })}
           </div>
+          <p style={{...S.label,marginBottom:10}}>Horário por Dia</p>
+          {(config.diasAtivos||[]).length===0?(
+            <p style={{fontSize:12,color:T.text35,marginBottom:16}}>Selecione ao menos um dia de atendimento.</p>
+          ):(
+            <div style={{marginBottom:16,borderRadius:10,overflow:"hidden",border:`1px solid ${T.line}`}}>
+              {DIAS_SEMANA.filter(d=>(config.diasAtivos||[]).includes(d.key)).map((d,i,arr)=>{
+                const h=getHorarioDia(config,d.key);
+                const inv=h.inicio>=h.fim;
+                return (
+                  <div key={d.key} style={{display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",padding:"10px 14px",borderBottom:i<arr.length-1?`1px solid ${T.line}`:"none",background:i%2===0?T.rowAlt:"transparent"}}>
+                    <span style={{width:36,fontSize:12.5,fontWeight:700,color:T.gold}}>{d.label}</span>
+                    <input type="time" aria-label={`Início ${d.label}`} style={{...S.input,width:112,borderColor:inv?"#F87171":undefined}} value={h.inicio} onChange={e=>setHorDia(d.key,"inicio",e.target.value)}/>
+                    <span style={{color:T.text35,fontSize:12}}>até</span>
+                    <input type="time" aria-label={`Fim ${d.label}`} style={{...S.input,width:112,borderColor:inv?"#F87171":undefined}} value={h.fim} onChange={e=>setHorDia(d.key,"fim",e.target.value)}/>
+                    {arr.length>1&&<button onClick={()=>aplicarHorarioTodos(d.key)} style={{...S.btnGhost,marginLeft:"auto",fontSize:11}}>Copiar p/ todos</button>}
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <div className="flow-grid3">
-            <div>
-              <label style={S.label}>Início do expediente</label>
-              <input type="time" style={S.input} value={config.horaInicio||"08:00"} onChange={e=>setConfig(p=>({...p,horaInicio:e.target.value}))}/>
-            </div>
-            <div>
-              <label style={S.label}>Fim do expediente</label>
-              <input type="time" style={S.input} value={config.horaFim||"18:00"} onChange={e=>setConfig(p=>({...p,horaFim:e.target.value}))}/>
-            </div>
             <div>
               <label style={S.label}>Intervalo entre horários</label>
               <select style={S.select} value={config.granularidadeMinutos||30} onChange={e=>setConfig(p=>({...p,granularidadeMinutos:parseInt(e.target.value)}))}>
@@ -1629,11 +1673,24 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
           {secaoHeader(IcCfg.tag2,"Serviços Oferecidos","Os clientes escolhem um serviço antes de selecionar o horário.")}
           {(config.serviços||[]).length>0&&(
             <div style={{marginBottom:16,borderRadius:10,overflow:"hidden",border:`1px solid ${T.line}`}}>
-              {config.serviços.map((s,i)=>(
+              {config.serviços.map((s,i)=>editS?.id===s.id?(
+                <div key={s.id} style={{padding:"14px 16px",borderBottom:i<config.serviços.length-1?`1px solid ${T.line}`:"none",background:T.goldA06}}>
+                  <div className="flow-grid3" style={{marginBottom:12}}>
+                    <div><label style={S.label}>Nome *</label><input style={S.input} value={editS.nome} maxLength={80} autoFocus onChange={e=>setEditS(p=>({...p,nome:e.target.value}))}/></div>
+                    <div><label style={S.label}>Duração</label><select style={S.select} value={editS.duracao} onChange={e=>setEditS(p=>({...p,duracao:e.target.value}))}>{[...new Set([15,20,30,45,60,75,90,120,150,180,240,parseInt(editS.duracao)||60])].sort((a,b)=>a-b).map(v=><option key={v} value={v}>{formatDuracao(v)}</option>)}</select></div>
+                    <div><label style={S.label}>Preço (R$)</label><input style={S.input} type="number" min="0" step="0.01" value={editS.preco} onChange={e=>setEditS(p=>({...p,preco:e.target.value}))} placeholder="0,00"/></div>
+                  </div>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr auto auto",gap:10,alignItems:"flex-end"}}>
+                    <div><label style={S.label}>Descrição curta</label><input style={S.input} value={editS.descricao} maxLength={160} onChange={e=>setEditS(p=>({...p,descricao:e.target.value}))}/></div>
+                    <button onClick={()=>setEditS(null)} style={{...S.btnGhost,height:42}}>Cancelar</button>
+                    <button onClick={salvarEdicaoS} disabled={!editS.nome.trim()} style={{...S.btnPrimary,height:42,paddingLeft:18,paddingRight:18,opacity:editS.nome.trim()?1:0.4}}>Salvar</button>
+                  </div>
+                </div>
+              ):(
                 <div key={s.id} style={{
                   display:"grid",
                   gridTemplateColumns:"1fr auto auto auto auto",
-                  gap:"0 20px",
+                  gap:"0 14px",
                   alignItems:"center",
                   padding:"13px 16px",
                   borderBottom:i<config.serviços.length-1?`1px solid ${T.line}`:"none",
@@ -1650,7 +1707,8 @@ function TelaConfiguracoes({tenantUid,prestadores,meuPrestadorId,isAdmin,prestad
                   <span style={{...S.badge(s.preco>0?"yellow":"gray"),whiteSpace:"nowrap"}}>
                     {s.preco>0?`R$ ${Number(s.preco).toLocaleString("pt-BR",{minimumFractionDigits:2})}`:"Gratuito"}
                   </span>
-                  <button style={S.btnDanger} onClick={()=>setConfig(p=>({...p,serviços:p.serviços.filter(x=>x.id!==s.id)}))}>{Ic.trash}</button>
+                  <button style={S.btnGhost} title="Editar" aria-label="Editar serviço" onClick={()=>iniciarEdicaoS(s)}>{IcCfg.pencil}</button>
+                  <button style={S.btnDanger} title="Excluir" aria-label="Excluir serviço" onClick={()=>{ if(editS?.id===s.id) setEditS(null); setConfig(p=>({...p,serviços:p.serviços.filter(x=>x.id!==s.id)})); }}>{Ic.trash}</button>
                 </div>
               ))}
             </div>
@@ -1923,8 +1981,11 @@ function TelaLinkPublico({tenantUid,prestadores,meuPrestadorId,isAdmin}){
                         return <div key={k} style={{padding:"5px 10px",borderRadius:7,fontSize:11,fontWeight:ativo?700:400,background:ativo?T.goldA12:T.rowAlt,border:ativo?`1px solid ${T.goldA22}`:`1px solid ${T.line}`,color:ativo?T.gold:T.text18}}>{label}</div>;
                       })}
                     </div>
-                    {cfg?.horaInicio&&cfg?.horaFim&&(
-                      <p style={{fontSize:11.5,color:T.text35,marginTop:10}}>{cfg.horaInicio} – {cfg.horaFim} · intervalo de {cfg.granularidadeMinutos||30} min</p>
+                    {diasAtivos.length>0&&(
+                      <div style={{marginTop:10}}>
+                        {["dom","seg","ter","qua","qui","sex","sab"].filter(k=>diasAtivos.includes(k)).map(k=>{const h=getHorarioDia(cfg,k);return <p key={k} style={{fontSize:11.5,color:T.text35}}>{DIAS_SEMANA.find(d=>d.key===k)?.label}: {h.inicio} – {h.fim}</p>;})}
+                        <p style={{fontSize:11.5,color:T.text35,marginTop:4}}>Intervalo de {cfg.granularidadeMinutos||30} min</p>
+                      </div>
                     )}
                   </div>
                   <div>
@@ -2197,6 +2258,7 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
             diasAtivos:          ["seg","ter","qua","qui","sex"],
             horaInicio:          "08:00",
             horaFim:             "18:00",
+            horariosDia:         {},
             granularidadeMinutos: 30,
             nomeEmpresa:         "",
             descricao:           "",
