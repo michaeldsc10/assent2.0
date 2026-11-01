@@ -1465,12 +1465,12 @@ export default function Usuarios() {
 
           <div className="usr-topbar-spacer" />
 
-          <div className="usr-counter">
+          <div className="usr-counter" data-tour="usr-contador">
             <span>{totalAtivos}</span>/{MAX_USUARIOS} usuários ativos
           </div>
 
           <button
-            className="usr-btn-convidar"
+            className="usr-btn-convidar" data-tour="usr-convidar"
             onClick={() => { setUsuarioEditando(null); setModalAberto(true); }}
             disabled={limiteAtingido}
             title={limiteAtingido ? `Limite de ${MAX_USUARIOS} usuários atingido` : "Convidar novo usuário"}
@@ -1493,7 +1493,7 @@ export default function Usuarios() {
         )}
 
         {/* ── Tabela ── */}
-        <div className="usr-table-wrap">
+        <div className="usr-table-wrap" data-tour="usr-tabela">
           {usuarios.length === 0 ? (
             <div className="usr-empty">
               <div className="usr-empty-icon">👥</div>
