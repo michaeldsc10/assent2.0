@@ -10,7 +10,7 @@
 //   ?tenant=X              → usa admin ("admin") — compatível com URL antiga
 //   ?tenant=X&prestador=Y  → prestador específico
 
-import { useState, useEffect, useMemo, createContext, useContext } from "react";
+import { useState, useEffect, useMemo, useRef, createContext, useContext } from "react";
 import { CalendarDays, CalendarRange, Clock, Settings, Users, Ban, Inbox, Link, Lightbulb, ClipboardList, Zap } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext.jsx";
 import {
@@ -995,6 +995,60 @@ function ReservaCard({r, pr, isAdmin, prestadoresAtivos, podeEditar, atualizando
       </div>
     </div>
   );
+}
+
+// ─── Sync Flow → Agenda ──────────────────────────────────────────────────────
+// Reserva confirmada → evento em users/{tenant}/eventos/flow_{reservaId}
+// Idempotente: id fixo + flag agendaSync na reserva (evita recriar evento apagado)
+async function sincronizarAgenda(tenantUid, r, prestadores) {
+  const evRef = doc(db, "users", tenantUid, "eventos", `flow_${r.id}`);
+  const rRef  = doc(db, "users", tenantUid, "agendamento_reservas", r.id);
+
+  if (r.status === "confirmado") {
+    if (r.agendaSync || !r.data_hora_inicio) return;
+    const ini = r.data_hora_inicio.toDate ? r.data_hora_inicio.toDate() : new Date(r.data_hora_inicio);
+    if (isNaN(ini)) return;
+    const p2 = n => String(n).padStart(2, "0");
+    const pr = prestadores.find(p => p.id === r.prestadorId);
+    const obs = [
+      r.cliente_telefone && `Tel: ${r.cliente_telefone}`,
+      r.servico_duracao_min && `Duração: ${r.servico_duracao_min} min`,
+    ].filter(Boolean).join(" · ");
+
+    const batch = writeBatch(db);
+    batch.set(evRef, {
+      id: evRef.id,
+      titulo: `${r.servico_nome || "Atendimento"} — ${r.cliente_nome || "Cliente"}`,
+      tipo: "Flow",
+      data: `${ini.getFullYear()}-${p2(ini.getMonth() + 1)}-${p2(ini.getDate())}`,
+      horario: `${p2(ini.getHours())}:${p2(ini.getMinutes())}`,
+      cliente: r.cliente_nome || "",
+      responsavel: pr?.nome || "",
+      vendaId: "",
+      endereco: "",
+      observacao: obs,
+      status: "pendente",
+      origem: "flow",
+      reservaId: r.id,
+      dataCriacao: new Date().toISOString(),
+    });
+    batch.update(rRef, { agendaSync: true });
+    await batch.commit();
+    return;
+  }
+
+  if (!r.agendaSync) return;
+
+  if (r.status === "concluido") {
+    try { await updateDoc(evRef, { status: "concluido" }); } catch { /* evento removido pelo usuário */ }
+    return;
+  }
+
+  // cancelado | nao_apareceu | pendente (reaberta) → remove evento
+  const batch = writeBatch(db);
+  batch.delete(evRef);
+  batch.update(rRef, { agendaSync: false });
+  await batch.commit();
 }
 
 function TelaReservas({tenantUid,prestadores,meuPrestadorId,isAdmin,podeEditar}){
@@ -2212,6 +2266,26 @@ export default function AssFlow({tenantUid,plano,theme,onToggleTheme,onVoltar,in
     const u = onSnapshot(q, snap => setReservasMes(snap.size));
     return () => u();
   },[tenantUid, isEssencial]);
+
+  // Sync automático: reserva confirmada → Agenda (só admin escreve; reservas de hoje em diante)
+  const syncRef = useRef(new Set());
+  const prestadoresRef = useRef(prestadores);
+  prestadoresRef.current = prestadores;
+  useEffect(()=>{
+    if(!tenantUid||!isAdmin) return;
+    const hoje=new Date(); hoje.setHours(0,0,0,0);
+    const q=query(collection(db,"users",tenantUid,"agendamento_reservas"),where("data_hora_inicio",">=",hoje));
+    const u=onSnapshot(q,snap=>{
+      snap.docs.forEach(d=>{
+        const r={id:d.id,...d.data()};
+        const key=`${r.id}:${r.status}:${r.agendaSync?1:0}`;
+        if(syncRef.current.has(key)) return;
+        syncRef.current.add(key);
+        sincronizarAgenda(tenantUid,r,prestadoresRef.current).catch(()=>syncRef.current.delete(key));
+      });
+    });
+    return ()=>u();
+  },[tenantUid,isAdmin]);
 
   // Escuta flag de ativação do Flow (definida só pelo admin no painel, doc protegido por regra Firestore)
   useEffect(()=>{
