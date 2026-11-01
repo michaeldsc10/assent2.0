@@ -1623,11 +1623,11 @@ export default function Alunos() {
             <p>Gestão de alunos, mensalidades e cobrança integrada</p>
           </div>
           <div className="mat-actions">
-            <button className="btn-secondary" onClick={() => setModalConfig(true)}>
+            <button className="btn-secondary" data-tour="mat-config" onClick={() => setModalConfig(true)}>
               <Settings size={14} /> Configurações
             </button>
             {podeCriar && (
-              <button className="btn-primary" onClick={() => setModalNovo(true)}>
+              <button className="btn-primary" data-tour="mat-nova" onClick={() => setModalNovo(true)}>
                 <Plus size={14} /> Nova matrícula
               </button>
             )}
@@ -1636,7 +1636,7 @@ export default function Alunos() {
 
         <div className="mat-content">
           {/* KPIs */}
-          <div className="mat-cards">
+          <div className="mat-cards" data-tour="mat-cards">
             <div className="mat-card">
               <span className="mat-card-label">Total de alunos ativos</span>
               <span className="mat-card-value">{kpis.total}</span>
@@ -1656,7 +1656,7 @@ export default function Alunos() {
           </div>
 
           {/* Tabela */}
-          <div className="mat-table-wrap">
+          <div className="mat-table-wrap" data-tour="mat-tabela">
             <div className="mat-table-header">
               <div className="mat-table-title">
                 <Users size={15} /> Alunos matriculados
@@ -1664,7 +1664,7 @@ export default function Alunos() {
               </div>
             </div>
 
-            <div style={{ padding: "14px 18px", borderBottom: "1px solid var(--border)" }}>
+            <div data-tour="mat-filtros" style={{ padding: "14px 18px", borderBottom: "1px solid var(--border)" }}>
               <div className="mat-filters">
                 <div className="mat-search">
                   <Search size={14} />
