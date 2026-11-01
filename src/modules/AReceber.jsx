@@ -191,9 +191,10 @@ const CSS = `
     display: flex; align-items: center; gap: 14px; flex-shrink: 0;
     flex-wrap: wrap;
   }
+  .ar-topbar-title { flex-shrink: 0; }
   .ar-topbar-title h1 {
     font-family: 'Sora', sans-serif; font-size: 17px; font-weight: 600;
-    color: var(--text);
+    color: var(--text); white-space: nowrap;
   }
   .ar-topbar-title p { font-size: 11px; color: var(--text-2); margin-top: 2px; }
 
@@ -236,6 +237,24 @@ const CSS = `
     font-family: 'DM Sans', sans-serif; color-scheme: dark;
   }
   .ar-period-date:focus { border-color: var(--gold); outline: none; }
+  .ar-period-mobile { display: none; }
+  @media (max-width: 640px) {
+    .ar-topbar-title p { display: none; }
+    .ar-period-group { display: none !important; }
+    .ar-period-mobile {
+      display: flex; flex-direction: column; gap: 8px;
+      width: 100%; order: 4;
+    }
+    .ar-period-select {
+      width: 100%; background: var(--s2); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-size: 13px;
+      padding: 8px 10px; outline: none;
+      font-family: 'DM Sans', sans-serif;
+    }
+    .ar-period-select:focus { border-color: var(--gold); }
+    .ar-period-mobile .ar-period-custom { display: flex; align-items: center; gap: 6px; }
+    .ar-period-mobile .ar-period-date { flex: 1; min-width: 0; font-size: 12px; }
+  }
 
   .ar-kpis {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
@@ -1498,6 +1517,36 @@ export default function AReceber() {
                 onChange={e => setDataInicio(e.target.value)}
               />
               <span className="ar-period-custom-label">até</span>
+              <input
+                type="date"
+                className="ar-period-date"
+                value={dataFim}
+                min={dataInicio || undefined}
+                onChange={e => setDataFim(e.target.value)}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className="ar-period-mobile">
+          <select
+            className="ar-period-select"
+            value={period}
+            onChange={e => setPeriod(e.target.value)}
+            aria-label="Período"
+          >
+            {PERIODS.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          {period === "Personalizado" && (
+            <div className="ar-period-custom">
+              <input
+                type="date"
+                className="ar-period-date"
+                value={dataInicio}
+                max={dataFim || undefined}
+                onChange={e => setDataInicio(e.target.value)}
+              />
+              <span className="ar-period-custom-label">→</span>
               <input
                 type="date"
                 className="ar-period-date"
