@@ -3971,7 +3971,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             <div className="db-aside">
 
               {/* Cadastros - sem borda redundante, ícones menores */}
-              <div className="db-panel db-panel-table">
+              <div className="db-panel db-panel-table" data-tour="cadastros">
                 <div className="db-panel-header">
                   <span className="db-panel-title">Cadastros</span>
                 </div>
@@ -3989,7 +3989,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
               </div>
 
               {/* Despesas */}
-              <div className="db-panel db-panel-table">
+              <div className="db-panel db-panel-table" data-tour="despesas-resumo">
                 <div className="db-panel-header">
                   <span className="db-panel-title">Despesas</span>
                   <button className="db-view-all" onClick={() => setModule("Despesas")}>Ver todas <ChevronRight size={10} /></button>
@@ -4933,7 +4933,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         <div className="ag-body">
 
           {/* Sidebar desktop recolhível - oculta no Assent CRM */}
-          <aside className={`ag-sidebar ${collapsed ? "collapsed" : ""}`} style={sistemaAtivo === "crm" || sistemaAtivo === "flow" ? { display: "none" } : {}}>
+          <aside className={`ag-sidebar ${collapsed ? "collapsed" : ""}`} data-tour="menu" style={sistemaAtivo === "crm" || sistemaAtivo === "flow" ? { display: "none" } : {}}>
             <nav className="ag-nav">
               {NAV.map((sec) => {
                 const aberta = secaoAberta[sec.section] !== false;
@@ -5046,6 +5046,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           <button
             className={`ag-mobile-nav-btn ${mobileMenuOpen ? "active" : ""}`}
             onClick={() => setMobileMenuOpen(true)}
+            data-tour="menu"
             aria-label="Abrir menu"
           >
             <Menu size={20} />
