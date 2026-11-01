@@ -66,6 +66,8 @@ import { useDashboardData, fmtR$, fmtData } from "./hooks/useDashboardData";
 import { useEmpresa }                        from "./hooks/useEmpresa";
 import { useLicenca }                        from "./hooks/useLicenca";
 import { useNotificacoes }                   from "./hooks/useNotificacoes";
+import { useTour, TourInfoButton }          from "./components/Tour/Tour.jsx";
+import { tourDoModulo }                      from "./components/Tour/tours.js";
 
 /* ═══════════════════════════════════════════════
    CONSTANTES
@@ -2609,7 +2611,7 @@ function AgendaFinanceira({ uid }) {
   const modalAR   = diaSel ? (indexAR[toYMD_AF(diaSel)]   || []) : [];
 
   return (
-    <div className="db-panel" style={{ padding: "16px 18px" }}>
+    <div className="db-panel" data-tour="agenda-financeira" style={{ padding: "16px 18px" }}>
       <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
         <span style={{ fontSize:13, fontWeight:600, color:"var(--text)" }}>
           Agenda financeira - {MESES_AF[m]} {y}
@@ -2710,6 +2712,14 @@ class DbErrorBoundary extends React.Component {
 /* ══════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
 ═══════════════════════════════════════════════════════ */
+/* Alvos do tutorial nos KPIs */
+const KPI_TOUR = {
+  "Receita Bruta": "kpi-receita",
+  "Despesa total": "kpi-despesa",
+  "Lucro Líquido": "kpi-lucro",
+  "A Receber":     "kpi-areceber",
+};
+
 export default function Dashboard() {
   const [period,        setPeriod]       = useState("Este mês");
   const [customRange,   setCustomRange]  = useState({ from: "", to: "" });
@@ -2875,6 +2885,13 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     uid, period,
     period === "Personalizado" && customRange.from && customRange.to ? customRange : null
   );
+
+  /* ── Tutorial guiado (1ª vez por dispositivo + botão "i") ── */
+  const tourId = sistemaAtivo === "gestao" ? tourDoModulo(module) : null;
+  const tour = useTour(tourId, {
+    autoStart: !dash.loading && !(saudacaoVisivel && userName !== "Usuário"),
+    ctx: { setDashView, dashView, setModule },
+  });
 
   /* ── Notificações AG - listener em tempo real ── */
   useEffect(() => {
@@ -3719,7 +3736,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           <p style={{ fontSize: 10, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--text-3)" }}><span className="ag-live-dot" />Visão geral do negócio</p>
         </div>
 
-        <div style={{ display: "flex", background: "transparent", border: "1px solid var(--border)", borderRadius: 8, padding: 2, gap: 2, flexShrink: 0 }}>
+        <div data-tour="dash-view" style={{ display: "flex", background: "transparent", border: "1px solid var(--border)", borderRadius: 8, padding: 2, gap: 2, flexShrink: 0 }}>
           <button
             onClick={() => setDashView("overview")}
             style={{
@@ -3790,7 +3807,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             </div>
           )}
         </div>
-        <div className="ag-periods">
+        <div className="ag-periods" data-tour="periodo">
           {PERIODS.map((p) => (
             <button key={p} className={`ag-period-btn ${period === p ? "active" : ""}`} onClick={() => changePeriod(p)}>{p}</button>
           ))}
@@ -3809,7 +3826,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       </header>
 
       {/* Mobile period */}
-      <div className="ag-period-mobile" style={{ alignItems: "center", gap: 8, padding: "10px 16px", borderBottom: "1px solid var(--border)", background: "var(--s1)", flexShrink: 0 }}>
+      <div className="ag-period-mobile" data-tour="periodo" style={{ alignItems: "center", gap: 8, padding: "10px 16px", borderBottom: "1px solid var(--border)", background: "var(--s1)", flexShrink: 0 }}>
         <select value={period} onChange={(e) => changePeriod(e.target.value)}
           style={{ flex: 1, background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13, padding: "7px 10px", fontFamily: "'Sora', system-ui, sans-serif", outline: "none" }}>
           {PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
@@ -3833,7 +3850,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           {/* ── KPI BAR ── */}
           <div className="db-kpi-strip">
             {[...kpiMain, ...kpiSec].map((k) => (
-              <div key={k.label} className="db-kpi-card">
+              <div key={k.label} className="db-kpi-card" data-tour={KPI_TOUR[k.label]}>
                 <div className="db-kpi-card-accent" style={{ background: `linear-gradient(90deg, ${k.accent || "var(--text-3)"}, transparent)` }} />
                 <div className="db-kpi-label">{k.label}</div>
                 <div className="db-kpi-val" style={{ color: k.accent || "var(--text)" }}>
@@ -4504,6 +4521,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
       <div className={`ag-app${theme === "light" ? " light" : ""}`}>
 
+        {tour.layer}
+
         {/* ── HEADER GLOBAL ── */}
         <header className="ag-global-header">
           <button
@@ -4753,6 +4772,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             )}
           </div>
 
+          {tour.available && <TourInfoButton onClick={tour.start} />}
+
           <div
             className="ag-theme-btn"
             onClick={toggleTheme}
@@ -4768,6 +4789,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           <div className="ag-user-area" ref={dropdownRef}>
             <div
               className="ag-user-trigger"
+              data-tour="perfil"
               onClick={() => setDropdownOpen((v) => !v)}
               role="button" aria-haspopup="true" aria-expanded={dropdownOpen}
             >
