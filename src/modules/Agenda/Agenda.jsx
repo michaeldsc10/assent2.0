@@ -18,7 +18,8 @@ import AgendaCalendario from "./AgendaCalendario";
 import EventoModal from "./EventoModal";
 
 /* ── Constantes (fallback) ── */
-export const TIPOS = ["Reunião", "Visita", "Entrega", "Ligação", "Prazo", "Outro"];
+export const TIPO_FLOW = "Flow"; // eventos vindos do ASSENT Flow (padrão do sistema)
+export const TIPOS = ["Reunião", "Visita", "Entrega", "Ligação", "Prazo", "Outro", TIPO_FLOW];
 
 export const TIPO_ESTILO = {
   "Reunião": { bg: "rgba(91,142,240,0.14)",  color: "#5b8ef0" },
@@ -27,6 +28,7 @@ export const TIPO_ESTILO = {
   "Ligação": { bg: "rgba(192,132,252,0.14)", color: "#c084fc" },
   "Prazo":   { bg: "rgba(224,82,82,0.14)",   color: "var(--red)" },
   "Outro":   { bg: "rgba(255,255,255,0.06)", color: "var(--text-2)" },
+  [TIPO_FLOW]: { bg: "rgba(45,212,191,0.14)", color: "#2dd4bf" },
 };
 
 /* ── Helpers de cor ── */
@@ -47,7 +49,9 @@ export function resolverEstiloTipo(tipo, categorias = []) {
 
 /** Lista de nomes de tipos a exibir no select */
 export function listaTipos(categorias = []) {
-  return categorias.length > 0 ? categorias.map(c => c.nome) : TIPOS;
+  if (categorias.length === 0) return TIPOS;
+  const nomes = categorias.map(c => c.nome);
+  return nomes.includes(TIPO_FLOW) ? nomes : [...nomes, TIPO_FLOW];
 }
 
 /* ── Helpers ── */
