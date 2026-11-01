@@ -1018,7 +1018,7 @@ export default function Servicos() {
           <p>Gerencie o catálogo de serviços oferecidos</p>
         </div>
 
-        <div className="sv-search">
+        <div className="sv-search" data-tour="sv-busca">
           <Search size={13} color="var(--text-3)" />
           <input
             placeholder="Buscar por nome ou categoria..."
@@ -1028,11 +1028,11 @@ export default function Servicos() {
         </div>
 
         <div className="sv-topbar-actions">
-          <button className="btn-cat-manage" onClick={() => setModalCats(true)}>
+          <button data-tour="sv-categorias" className="btn-cat-manage" onClick={() => setModalCats(true)}>
             <Tag size={13} /> Categorias
           </button>
           <button
-            className="btn-novo-sv"
+            className="btn-novo-sv" data-tour="sv-novo"
             onClick={() => setModalNovo(true)}
             title="Novo Serviço (N)"
             disabled={!podeCriarV}
@@ -1043,7 +1043,7 @@ export default function Servicos() {
       {/* Conteúdo */}
       <div className="ag-content">
 
-        <div className="sv-table-wrap">
+        <div className="sv-table-wrap" data-tour="sv-tabela">
           <div className="sv-table-header">
             <span className="sv-table-title">Serviços cadastrados</span>
             <span className="sv-count-badge">{servicos.length}</span>
