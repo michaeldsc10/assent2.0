@@ -2786,9 +2786,13 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     const fim = new Date(vencimentoPlano);
     fim.setHours(23, 59, 59, 999);
     const diff = Date.now() - fim.getTime();
-    if (diff <= 0) return null;
+    if (diff <= 0) {
+      const hoje = new Date();
+      const venceHoje = fim.toDateString() === hoje.toDateString();
+      return venceHoje ? { hoje: true, restantes: GRACA_DIAS, bloqueado: false } : null;
+    }
     const restantes = GRACA_DIAS - Math.floor(diff / 86400000);
-    return { restantes, bloqueado: restantes <= 0 };
+    return { hoje: false, restantes, bloqueado: restantes <= 0 };
   })();
 
   /* ── Notificações de reserva - AssFlow (tempo real, por usuário) ── */
@@ -3138,8 +3142,19 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     _ts: Date.now() - n.diffDias * 86400000,
   }));
 
+  /* Aviso de vencimento do plano (só front; id muda por dia → volta como não lida) */
+  const notifPlanoNorm = (planoVenc && !planoVenc.bloqueado)
+    ? [{
+        id: `plano-venc-${new Date().toISOString().slice(0, 10)}-${planoVenc.hoje ? "hoje" : planoVenc.restantes}`,
+        tipo: "plano_venc",
+        hoje: planoVenc.hoje,
+        restantes: planoVenc.restantes,
+        _ts: Date.now(),
+      }]
+    : [];
+
   /* Merge cronológico: mais recente/urgente primeiro */
-  const todasNotif = [...notifDespesasNorm, ...notifAReceberNorm, ...notifSistemaNorm, ...notifInsightsNorm, ...notifReservasNorm]
+  const todasNotif = [...notifPlanoNorm, ...notifDespesasNorm, ...notifAReceberNorm, ...notifSistemaNorm, ...notifInsightsNorm, ...notifReservasNorm]
     .sort((a, b) => b._ts - a._ts);
 
   const notifNaoLidas = todasNotif.filter((n) => !notifLidas.includes(n.id)).length;
@@ -4430,12 +4445,16 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
       {planoVenc && !planoVenc.bloqueado && (
         <div style={{
-          position:"fixed", left:"50%", bottom:16, transform:"translateX(-50%)", zIndex:9000,
+          position:"fixed", left:"50%", top:12, transform:"translateX(-50%)", zIndex:99990,
           maxWidth:"calc(100vw - 32px)", padding:"10px 16px", borderRadius:10,
-          background:"rgba(239,68,68,0.12)", border:"1px solid rgba(239,68,68,0.4)",
-          color:"#f87171", fontSize:13, fontWeight:600, textAlign:"center", backdropFilter:"blur(6px)",
+          background: planoVenc.hoje ? "rgba(245,158,11,0.14)" : "rgba(239,68,68,0.14)",
+          border: planoVenc.hoje ? "1px solid rgba(245,158,11,0.5)" : "1px solid rgba(239,68,68,0.5)",
+          color: planoVenc.hoje ? "#fbbf24" : "#f87171",
+          fontSize:13, fontWeight:600, textAlign:"center", backdropFilter:"blur(6px)",
         }}>
-          ⚠️ Plano vencido — efetue o pagamento em {planoVenc.restantes} {planoVenc.restantes === 1 ? "dia" : "dias"} ou o acesso será bloqueado.
+          {planoVenc.hoje
+            ? "⚠️ Seu plano vence hoje. Faça o pagamento para evitar interrupções."
+            : `⚠️ Plano vencido — efetue o pagamento em ${planoVenc.restantes} ${planoVenc.restantes === 1 ? "dia" : "dias"} ou o acesso será bloqueado.`}
         </div>
       )}
 
@@ -4602,6 +4621,31 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                               <div className="holo-meta">
                                 <span className="holo-meta-dot" />
                                 <span>{tempoRel(tsObj)}</span>
+                              </div>
+                            </div>
+                            <div className="holo-beam" />
+                            <div className="holo-base" />
+                          </div>
+                        );
+                      }
+
+                      /* ── Vencimento do plano ── */
+                      if (n.tipo === "plano_venc") {
+                        return (
+                          <div key={n.id} className={`holo ${n.hoje ? "amber" : "mag"}`}>
+                            <div className="holo-card">
+                              <div className="holo-row-top">
+                                <div className="holo-icon">
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                                </div>
+                                <span className="holo-categoria">Sistema · Plano</span>
+                                <span className="holo-urgencia">{n.hoje ? "Vence hoje" : `${n.restantes} ${n.restantes === 1 ? "dia" : "dias"}`}</span>
+                              </div>
+                              <div className="holo-title">{n.hoje ? "Seu plano vence hoje" : "Plano vencido"}</div>
+                              <div className="holo-msg">
+                                {n.hoje
+                                  ? "Faça o pagamento para evitar interrupções."
+                                  : `Efetue o pagamento em ${n.restantes} ${n.restantes === 1 ? "dia" : "dias"} ou o acesso será bloqueado.`}
                               </div>
                             </div>
                             <div className="holo-beam" />
