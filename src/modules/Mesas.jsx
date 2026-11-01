@@ -2358,7 +2358,7 @@ export default function Mesas() {
               </span>
             )}
             {podeCfg && (
-              <button className="btn-secondary" onClick={() => setConfigModal(true)}>
+              <button className="btn-secondary" data-tour="mesas-config" onClick={() => setConfigModal(true)}>
                 <Settings size={14} /> Configurar Mesas
               </button>
             )}
@@ -2367,17 +2367,17 @@ export default function Mesas() {
 
         {/* ABAS */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-          <div className="mesas-tabs">
+          <div className="mesas-tabs" data-tour="mesas-abas">
             <button
               className={`mesas-tab ${abaAtiva === "mesas" ? "active" : ""}`}
-              onClick={() => setAbaAtiva("mesas")}
+              data-tour="mesas-aba-mesas" onClick={() => setAbaAtiva("mesas")}
             >
               <LayoutGrid size={14} /> Mesas
               {mesasOcupadas > 0 && <span className="count-badge">{mesasOcupadas}</span>}
             </button>
             <button
               className={`mesas-tab ${abaAtiva === "historico" ? "active" : ""}`}
-              onClick={() => setAbaAtiva("historico")}
+              data-tour="mesas-aba-historico" onClick={() => setAbaAtiva("historico")}
             >
               <Clock size={14} /> Histórico
             </button>
@@ -2388,7 +2388,7 @@ export default function Mesas() {
           <>
             {/* LEGENDA */}
             {mesas.length > 0 && (
-              <div className="mesas-legenda">
+              <div className="mesas-legenda" data-tour="mesas-legenda">
                 <div className="legenda-item">
                   <div className="legenda-dot livre" />
                   Livre
@@ -2402,7 +2402,7 @@ export default function Mesas() {
 
             {/* GRID */}
             {mesas.length === 0 ? (
-              <div className="mesa-empty">
+              <div className="mesa-empty" data-tour="mesas-grid">
                 <UtensilsCrossed size={40} strokeWidth={1.2} />
                 <div>
                   <div style={{ fontWeight: 600, color: "var(--text-2)", marginBottom: 4 }}>
@@ -2415,7 +2415,7 @@ export default function Mesas() {
                 </div>
               </div>
             ) : (
-              <div className="mesas-grid">
+              <div className="mesas-grid" data-tour="mesas-grid">
                 {mesas.map(mesa => {
                   const comanda = comandas[mesa.id];
                   const ocupada = !!comanda;
