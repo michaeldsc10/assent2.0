@@ -1009,20 +1009,20 @@ export default function AlunosCadastro() {
             <h1>Alunos</h1>
             <p>Cadastro pessoal dos alunos - separado de Clientes</p>
           </div>
-          <div className="al-search">
+          <div className="al-search" data-tour="al-busca">
             <Search size={13} color="var(--text-3)" />
             <input placeholder="Buscar por nome, documento ou ID…"
               value={search} onChange={(e) => setSearch(e.target.value)} />
           </div>
           {podeCriarV && (
-            <button className="btn-primary" onClick={() => setModalNovo(true)}>
+            <button className="btn-primary" data-tour="al-novo" onClick={() => setModalNovo(true)}>
               <UserPlus size={14} /> Novo aluno
             </button>
           )}
         </header>
 
         <div className="al-content">
-          <div className="al-table-wrap">
+          <div className="al-table-wrap" data-tour="al-tabela">
             <div className="al-table-header">
               <span className="al-table-title"><Users size={15} /> Cadastros</span>
               <span className="al-count-badge">{alunosFiltrados.length}</span>
