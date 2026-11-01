@@ -932,7 +932,7 @@ export default function Clientes() {
         </div>
 
         {/* Busca */}
-        <div className="cl-search">
+        <div className="cl-search" data-tour="cl-busca">
           <Search size={13} color="var(--text-3)" />
           <input
             placeholder="Buscar por nome, CPF ou telefone..."
@@ -943,7 +943,7 @@ export default function Clientes() {
 
         {podeCriarV && (
           <button
-            className="btn-novo-cl"
+            className="btn-novo-cl" data-tour="cl-novo"
             onClick={() => setModalNovo(true)}
             title="Novo Cliente (N)"
           ><UserPlus size={14} /><span><span style={{ borderBottom: "1.5px solid currentColor" }}>N</span>ovo Cliente</span></button>
@@ -951,7 +951,7 @@ export default function Clientes() {
       </header>
 
       <div className="ag-content">
-        <div className="cl-table-wrap">
+        <div className="cl-table-wrap" data-tour="cl-tabela">
           <div className="cl-table-header">
             <span className="cl-table-title">Cadastros</span>
             <span className="cl-count-badge">{clientesFiltrados.length}</span>
