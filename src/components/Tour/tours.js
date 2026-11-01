@@ -12,6 +12,7 @@
    - title   : título curto
    - body    : texto curto
    - side    : lado preferido do card (top | bottom | left | right)
+   - mobile  : { title, body, side } sobrescreve o passo em telas até 720px
    - when    : (ctx) => boolean, passo só entra se verdadeiro
    - onEnter : (ctx) => void, prepara a tela antes de mostrar o passo
    Suba "version" para o tutorial aparecer de novo para todos.
@@ -76,10 +77,34 @@ export const TOURS = {
         onEnter: verVisaoGeral,
       },
       {
+        target: "cadastros",
+        side: "left",
+        title: "Cadastros",
+        body: "Resumo de clientes, produtos e serviços cadastrados, e vendas do período. Clique em uma linha para abrir o módulo.",
+        onEnter: verVisaoGeral,
+      },
+      {
+        target: "despesas-resumo",
+        side: "left",
+        title: "Controle de despesas",
+        body: "Veja de relance o que está vencido, a vencer, pendente e já pago. Use Ver todas para gerenciar.",
+        onEnter: verVisaoGeral,
+      },
+      {
         target: "dash-view",
         side: "bottom",
         title: "Visão geral e gráficos",
         body: "Alterne entre os números do dia a dia e os gráficos de evolução do seu negócio.",
+      },
+      {
+        target: "menu",
+        side: "right",
+        title: "Menu de módulos",
+        body: "Aqui ficam todos os módulos, agrupados em Básico, Operações, Análise e Sistema. Cada módulo terá o seu próprio guia.",
+        mobile: {
+          side: "top",
+          body: "Toque em Menu para ver todos os módulos, agrupados em Básico, Operações, Análise e Sistema.",
+        },
       },
       {
         target: "tour-info",
