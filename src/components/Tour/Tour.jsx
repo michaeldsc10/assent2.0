@@ -108,6 +108,46 @@ function acharAlvo(id) {
   return null;
 }
 
+/* Container que rola (ou a página) */
+function paiRolavel(el) {
+  let p = el.parentElement;
+  while (p && p !== document.body) {
+    const oy = window.getComputedStyle(p).overflowY;
+    if ((oy === "auto" || oy === "scroll" || oy === "overlay") && p.scrollHeight > p.clientHeight + 1) return p;
+    p = p.parentElement;
+  }
+  return null;
+}
+
+/* Faixa realmente visível, descontando headers fixos e barra inferior */
+function faixaVisivel(pai) {
+  const mob = window.innerWidth <= 720;
+  const pr = pai ? pai.getBoundingClientRect() : { top: 0, bottom: window.innerHeight };
+  const top = Math.max(pr.top, 0) + 8;
+  const bottom = Math.min(pr.bottom, window.innerHeight - (mob ? 64 : 0)) - 8;
+  return { top, bottom, mob };
+}
+
+function dentroDaTela(el) {
+  const f = faixaVisivel(paiRolavel(el));
+  const r = el.getBoundingClientRect();
+  const alto = r.height > (f.bottom - f.top) * 0.6;
+  if (alto) return r.top >= f.top - 2 && r.top <= f.top + (f.bottom - f.top) * 0.4;
+  return r.top >= f.top - 2 && r.bottom <= f.bottom + 2;
+}
+
+function rolarPara(el, behavior) {
+  if (el.closest("header, nav, aside")) return; // fora do container rolável
+  const pai = paiRolavel(el);
+  const f = faixaVisivel(pai);
+  const r = el.getBoundingClientRect();
+  const alto = r.height > (f.bottom - f.top) * 0.6;
+  const desejado = f.mob || alto ? f.top : f.top + (f.bottom - f.top - r.height) / 2;
+  const delta = r.top - desejado;
+  if (Math.abs(delta) < 2) return;
+  (pai || window).scrollBy({ top: delta, behavior });
+}
+
 const lerRect = (el) => {
   const r = el.getBoundingClientRect();
   return { top: r.top, left: r.left, width: r.width, height: r.height, right: r.right, bottom: r.bottom };
@@ -197,6 +237,7 @@ function TourOverlay({ steps, ctxRef, onClose }) {
     if (!step) { onCloseRef.current(mostradosRef.current > 0); return undefined; }
     let cancelado = false;
     let timer;
+    const reforcos = [];
     try { step.onEnter?.(ctxRef.current); } catch { /* noop */ }
 
     if (!step.target) {
@@ -209,17 +250,15 @@ function TourOverlay({ steps, ctxRef, onClose }) {
       if (cancelado) return;
       const el = acharAlvo(step.target);
       if (el) {
-        const r = el.getBoundingClientRect();
-        const mob = window.innerWidth <= 720;
-        const fora = r.top < 70 || r.bottom > window.innerHeight - (mob ? 84 : 20);
-        if (fora && !el.closest("header, nav, aside")) {
-          const alto = r.height > window.innerHeight * 0.6;
-          el.scrollIntoView({
-            block: alto ? "start" : "center",
-            inline: "nearest",
-            behavior: reduzMovimento() ? "auto" : "smooth",
-          });
-        }
+        if (!dentroDaTela(el)) rolarPara(el, reduzMovimento() ? "auto" : "smooth");
+        /* Reforço: conteúdo pode remontar ou mudar de altura; confere de novo */
+        [450, 900, 1500].forEach((ms) => {
+          reforcos.push(setTimeout(() => {
+            if (cancelado) return;
+            const atual = acharAlvo(step.target);
+            if (atual && !dentroDaTela(atual)) rolarPara(atual, "auto");
+          }, ms));
+        });
         setAlvo(el); setRect(lerRect(el)); setPronto(true); mostradosRef.current += 1;
         return;
       }
@@ -233,7 +272,7 @@ function TourOverlay({ steps, ctxRef, onClose }) {
       timer = setTimeout(tick, 50);
     };
     tick();
-    return () => { cancelado = true; clearTimeout(timer); };
+    return () => { cancelado = true; clearTimeout(timer); reforcos.forEach(clearTimeout); };
   }, [idx, lista, step, ctxRef]);
 
   /* Acompanha o alvo: scroll, resize, mudança de tamanho, remontagem */
