@@ -3057,7 +3057,7 @@ useEffect(() => {
           <p>{tab === "ativas" ? "Gerencie e acompanhe todas as vendas" : tab === "canceladas" ? "Histórico de vendas canceladas" : tab === "mesas" ? "Vendas finalizadas pelo módulo de Mesas" : "Vendas realizadas pelo Ponto de Venda"}</p>
         </div>
 
-        <div className="vd-search">
+        <div className="vd-search" data-tour="vd-busca">
           <Search size={13} color="var(--text-3)" />
           <input
             placeholder="Buscar por ID ou cliente..."
@@ -3067,7 +3067,7 @@ useEffect(() => {
         </div>
 
         {tab === "ativas" && podeCriar && (
-          <button onClick={() => setModalNova(true)}
+          <button data-tour="vd-nova" onClick={() => setModalNova(true)}
             style={{ display: "flex", alignItems: "center", gap: 7, padding: "8px 16px", borderRadius: 9, background: "var(--gold)", color: "#0a0808", border: "none", cursor: "pointer", fontFamily: "'DM Sans', sans-serif", fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, transition: "opacity .13s" }}
           >
             <Plus size={14} /> <span><u>N</u>ova Venda</span>
@@ -3076,7 +3076,7 @@ useEffect(() => {
       </header>
 
       {/* ── Tabs ── */}
-      <div className="vd-tabs">
+      <div className="vd-tabs" data-tour="vd-abas">
         <button
           className={`vd-tab ${tab === "ativas" ? "active" : ""}`}
           onClick={() => setTab("ativas")}
@@ -3108,7 +3108,7 @@ useEffect(() => {
       </div>
 
       {/* Filtros de período — compartilhado entre abas */}
-      <div className="vd-periods">
+      <div className="vd-periods" data-tour="vd-periodos">
         {PERIODS.map(p => (
           <button
             key={p}
@@ -3142,7 +3142,7 @@ useEffect(() => {
       {/* ── Tabela: Vendas Ativas ── */}
       {tab === "ativas" && (
         <div className="ag-content">
-          <div className="vd-table-wrap">
+          <div className="vd-table-wrap" data-tour="vd-tabela">
             <div className="vd-table-header">
               <div className="vd-table-title">
                 Todas as vendas
@@ -3230,7 +3230,7 @@ useEffect(() => {
       {/* ── Tabela: Vendas de Mesas ── */}
       {tab === "mesas" && (
         <div className="ag-content">
-          <div className="vd-table-wrap">
+          <div className="vd-table-wrap" data-tour="vd-tabela">
             <div className="vd-table-header">
               <div className="vd-table-title">
                 Vendas de Mesas
@@ -3281,7 +3281,7 @@ useEffect(() => {
       {/* ── Tabela: Vendas Canceladas ── */}
       {tab === "canceladas" && (
         <div className="ag-content">
-          <div className="vd-table-wrap">
+          <div className="vd-table-wrap" data-tour="vd-tabela">
             <div className="vd-table-header">
               <div className="vd-table-title" style={{ color: "var(--red)" }}>
                 Vendas Canceladas
@@ -3344,7 +3344,7 @@ useEffect(() => {
       {/* ── Tabela: Vendas PDV ── */}
       {tab === "pdv" && (
         <div className="ag-content">
-          <div className="vd-table-wrap">
+          <div className="vd-table-wrap" data-tour="vd-tabela">
             <div className="vd-table-header">
               <div className="vd-table-title">
                 Vendas PDV
