@@ -11,7 +11,7 @@
    ✓ CSS responsivo global injetado via useEffect
    ═══════════════════════════════════════════════════ */
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, PieChart, Pie, Cell,
@@ -83,7 +83,6 @@ const KEY_MAP = {
   "Mensalidades":          "matriculas",
   "Alunos":              "alunosCadastro",
   "Fiado / A Receber":  "fiado",
-  "A Receber":          "fiado",
   "Caixa Diário":       "caixa",
   "Despesas":           "despesas",
   "Fornecedores":       "fornecedores",
@@ -522,7 +521,7 @@ const RESPONSIVE_CSS = `
   .ag-periods      { display: none !important; }
   .ag-custom-range { display: none !important; }
   .ag-period-mobile { display: flex !important; }
-  .db-page { padding: 14px 14px 40px !important; }
+  .db-page { padding: 14px 14px 40px !important; min-height: 70vh; }
   .db-kpi-strip { grid-template-columns: repeat(2, 1fr) !important; }
   /* mobile: oculta Ticket Médio (4º) e Projeção (6º) */
   .db-kpi-card:nth-child(4), .db-kpi-card:nth-child(6) { display: none !important; }
@@ -2687,12 +2686,45 @@ function AgendaFinanceira({ uid }) {
   );
 }
 
+/* ── Error boundary: evita tela preta e mostra o erro real ── */
+class DbErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { err: null }; }
+  static getDerivedStateFromError(err) { return { err }; }
+  componentDidCatch(err, info) { console.error("[Dashboard] erro de render:", err, info?.componentStack); }
+  render() {
+    if (!this.state.err) return this.props.children;
+    return (
+      <div style={{ padding: 20, margin: 14, border: "1px solid var(--border)", borderRadius: 12, background: "var(--s1)", color: "var(--text)", fontSize: 12 }}>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>Erro ao renderizar o painel</div>
+        <div style={{ color: "var(--text-3)", wordBreak: "break-word", marginBottom: 12 }}>{String(this.state.err?.message || this.state.err)}</div>
+        <button onClick={() => this.setState({ err: null })}
+          style={{ background: "var(--gold)", color: "#0a0808", border: "none", borderRadius: 8, padding: "8px 14px", fontWeight: 600, cursor: "pointer" }}>
+          Tentar de novo
+        </button>
+      </div>
+    );
+  }
+}
+
 /* ══════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
 ═══════════════════════════════════════════════════════ */
 export default function Dashboard() {
   const [period,        setPeriod]       = useState("Este mês");
   const [customRange,   setCustomRange]  = useState({ from: "", to: "" });
+  /* Troca de período: volta o scroll ao topo (no mobile .ag-main é o scroller;
+     conteúdo que encolhe com scroll alto deixava a tela preta) */
+  const changePeriod = (p) => {
+    setPeriod(p);
+    if (typeof document !== "undefined") {
+      document.activeElement?.blur?.();
+      requestAnimationFrame(() => {
+        const m = document.querySelector(".ag-main");
+        if (m) m.scrollTop = 0;
+        window.scrollTo?.(0, 0);
+      });
+    }
+  };
   const [module,        setModule]       = useState("Dashboard");
   const [sistemaAtivo,  setSistemaAtivo] = useState("gestao");
   const [flowInitialTab, setFlowInitialTab] = useState("overview");
@@ -2761,7 +2793,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
   /* ── Hooks de dados - declarados aqui para isPro estar disponível nos useEffects abaixo ── */
   const empresa = useEmpresa(uid);
-  const { isPro, plano: licencaSlug, dataVencimento: vencimentoPlano } = useLicenca(tenantUid);
+  const { isPro, plano: licencaSlug } = useLicenca(tenantUid);
 
   /* ── AssentFlow: flag de ativação controlada pelo admin (licencas/{tenantUid}.flowAtivo)
      Essencial: default OFF, só aparece se flowAtivo === true
@@ -2775,25 +2807,6 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   }, [tenantUid]);
   const flowVisivel =
     licencaSlug === "essencial" ? flowAtivo === true : flowAtivo !== false;
-  useEffect(() => {
-    if (!flowVisivel && sistemaAtivo === "flow") setSistemaAtivo("gestao");
-  }, [flowVisivel, sistemaAtivo]);
-
-  /* ── Vencimento do plano (licencas/{tenantUid}/plano/*): carência de 3 dias → bloqueio ── */
-  const GRACA_DIAS = 3;
-  const planoVenc = (() => {
-    if (!vencimentoPlano) return null;
-    const fim = new Date(vencimentoPlano);
-    fim.setHours(23, 59, 59, 999);
-    const diff = Date.now() - fim.getTime();
-    if (diff <= 0) {
-      const hoje = new Date();
-      const venceHoje = fim.toDateString() === hoje.toDateString();
-      return venceHoje ? { hoje: true, restantes: GRACA_DIAS, bloqueado: false } : null;
-    }
-    const restantes = GRACA_DIAS - Math.floor(diff / 86400000);
-    return { hoje: false, restantes, bloqueado: restantes <= 0 };
-  })();
 
   /* ── Notificações de reserva - AssFlow (tempo real, por usuário) ── */
   const {
@@ -3129,7 +3142,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   /* Normaliza notificações de reserva do AssFlow
      - só docs com tipo==nova_reserva E payload válido (defensivo contra
      docs estranhos escritos na mesma subcoleção por outros sistemas) */
-  const notifReservasNorm = (flowVisivel ? notifReservas : [])
+  const notifReservasNorm = notifReservas
     .filter((n) => n.tipo === "nova_reserva" && n.payload && typeof n.payload === "object")
     .map((n) => ({
       ...n,
@@ -3142,19 +3155,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     _ts: Date.now() - n.diffDias * 86400000,
   }));
 
-  /* Aviso de vencimento do plano (só front; id muda por dia → volta como não lida) */
-  const notifPlanoNorm = (planoVenc && !planoVenc.bloqueado)
-    ? [{
-        id: `plano-venc-${new Date().toISOString().slice(0, 10)}-${planoVenc.hoje ? "hoje" : planoVenc.restantes}`,
-        tipo: "plano_venc",
-        hoje: planoVenc.hoje,
-        restantes: planoVenc.restantes,
-        _ts: Date.now(),
-      }]
-    : [];
-
   /* Merge cronológico: mais recente/urgente primeiro */
-  const todasNotif = [...notifPlanoNorm, ...notifDespesasNorm, ...notifAReceberNorm, ...notifSistemaNorm, ...notifInsightsNorm, ...notifReservasNorm]
+  const todasNotif = [...notifDespesasNorm, ...notifAReceberNorm, ...notifSistemaNorm, ...notifInsightsNorm, ...notifReservasNorm]
     .sort((a, b) => b._ts - a._ts);
 
   const notifNaoLidas = todasNotif.filter((n) => !notifLidas.includes(n.id)).length;
@@ -3760,7 +3762,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         </div>
         <div className="ag-periods">
           {PERIODS.map((p) => (
-            <button key={p} className={`ag-period-btn ${period === p ? "active" : ""}`} onClick={() => setPeriod(p)}>{p}</button>
+            <button key={p} className={`ag-period-btn ${period === p ? "active" : ""}`} onClick={() => changePeriod(p)}>{p}</button>
           ))}
         </div>
         {period === "Personalizado" && (
@@ -3778,7 +3780,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
       {/* Mobile period */}
       <div className="ag-period-mobile" style={{ alignItems: "center", gap: 8, padding: "10px 16px", borderBottom: "1px solid var(--border)", background: "var(--s1)", flexShrink: 0 }}>
-        <select value={period} onChange={(e) => setPeriod(e.target.value)}
+        <select value={period} onChange={(e) => changePeriod(e.target.value)}
           style={{ flex: 1, background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13, padding: "7px 10px", fontFamily: "'Sora', system-ui, sans-serif", outline: "none" }}>
           {PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
@@ -3795,6 +3797,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
       <div className="ag-content">
         <div className="db-page">
+        <DbErrorBoundary key={`${period}-${dashView}`}>
         {dashView === "charts" ? renderChartsView() : (<>
 
           {/* ── KPI BAR ── */}
@@ -3844,13 +3847,13 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   </div>
                   {dash.loading ? (
                     <div className="ag-trow" style={{ gridTemplateColumns: "1fr" }}><span className="ag-skeleton" /></div>
-                  ) : dash.ultimasVendas.length === 0 ? (
+                  ) : (dash.ultimasVendas || []).length === 0 ? (
                     <div className="ag-empty-state">
                       <div className="ag-empty-icon"><TrendingDown size={18} color="var(--text-3)" /></div>
                       <div className="ag-empty-title">Nenhuma venda no período</div>
                       <div className="ag-empty-sub">Registre uma venda para ela aparecer aqui</div>
                     </div>
-                  ) : dash.ultimasVendas.map((v, i) => (
+                  ) : (dash.ultimasVendas || []).map((v, i) => (
                     <div key={v.id || i} className="ag-trow" style={{ gridTemplateColumns: "80px 1fr 110px 110px", minWidth: 380 }}>
                       <span style={{ color: "var(--gold)", fontFamily: "var(--font-mono)", fontSize: 11 }}>{v.idVenda || v.id}</span>
                       <span>{v.cliente || "-"}</span>
@@ -3875,12 +3878,12 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     </div>
                     {dash.loading ? (
                       <div className="ag-trow" style={{ gridTemplateColumns: "1fr" }}><span className="ag-skeleton" /></div>
-                    ) : dash.topProdutos.length === 0 ? (
+                    ) : (dash.topProdutos || []).length === 0 ? (
                       <div className="ag-empty-state">
                         <div className="ag-empty-icon"><Package size={15} color="var(--text-3)" /></div>
                         <div className="ag-empty-title">Sem dados</div>
                       </div>
-                    ) : dash.topProdutos.map((p, i) => (
+                    ) : (dash.topProdutos || []).map((p, i) => (
                       <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 36px 88px", minWidth: 220 }}>
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.nome}</span>
                         <span style={{ textAlign: "center", color: "var(--text-3)" }}>{p.qtd}</span>
@@ -3900,12 +3903,12 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                     </div>
                     {dash.loading ? (
                       <div className="ag-trow" style={{ gridTemplateColumns: "1fr" }}><span className="ag-skeleton" /></div>
-                    ) : dash.topClientes.length === 0 ? (
+                    ) : (dash.topClientes || []).length === 0 ? (
                       <div className="ag-empty-state">
                         <div className="ag-empty-icon"><Users size={15} color="var(--text-3)" /></div>
                         <div className="ag-empty-title">Sem dados</div>
                       </div>
-                    ) : dash.topClientes.map((c, i) => (
+                    ) : (dash.topClientes || []).map((c, i) => (
                       <div key={i} className="ag-trow" style={{ gridTemplateColumns: "1fr 100px", minWidth: 180 }}>
                         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nome}</span>
                         <span style={{ color: "var(--gold)", textAlign: "right", fontFamily: "var(--font-mono)", fontSize: 11 }}>{fmtR$(c.total)}</span>
@@ -3999,6 +4002,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           </div>{/* /db-body */}
 
         </>)}
+        </DbErrorBoundary>
         </div>
       </div>
     </>
@@ -4199,13 +4203,13 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         >
           {faturDiarioMode === "3d" ? (
             <Chart3DBars
-              data={dash.loading ? [] : dash.faturamentoPorDia}
+              data={dash.loading ? [] : (dash.faturamentoPorDia || [])}
               period={period}
               height={220}
             />
           ) : (
           <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={dash.loading ? [] : dash.faturamentoPorDia} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+            <LineChart data={dash.loading ? [] : (dash.faturamentoPorDia || [])} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
               <defs>
                 <linearGradient id="gLine" x1="0" y1="1" x2="1" y2="0">
                   <stop offset="0%"   stopColor="#c8a55e" />
@@ -4235,7 +4239,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
           <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
             <PieChart width={160} height={160}>
               <Pie
-                data={dash.loading ? [{ name: "", value: 1 }] : dash.mixData}
+                data={dash.loading ? [{ name: "", value: 1 }] : (dash.mixData || [])}
                 cx={75} cy={75} innerRadius={48} outerRadius={72} dataKey="value" strokeWidth={0}
                 paddingAngle={3}
               >
@@ -4424,40 +4428,6 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
     <>
       <style>{CSS}</style>
 
-      {planoVenc?.bloqueado && (
-        <div style={{
-          position:"fixed", inset:0, zIndex:99999, background:"var(--bg, #0b0b0c)",
-          display:"flex", alignItems:"center", justifyContent:"center", padding:24, textAlign:"center",
-        }}>
-          <div style={{ maxWidth:420 }}>
-            <div style={{ fontSize:42, marginBottom:12 }}>🔒</div>
-            <h2 style={{ color:"var(--text, #fff)", fontSize:22, fontWeight:700, margin:"0 0 8px" }}>Acesso bloqueado</h2>
-            <p style={{ color:"var(--text-2, #aaa)", fontSize:14, lineHeight:1.5, margin:"0 0 20px" }}>
-              Seu plano venceu e o prazo de pagamento acabou. Efetue o pagamento para reativar o acesso.
-            </p>
-            <button
-              onClick={() => { logout(); window.location.reload(); }}
-              style={{ padding:"10px 22px", borderRadius:8, border:"1px solid var(--border, #333)", background:"transparent", color:"var(--text, #fff)", cursor:"pointer", fontWeight:600 }}
-            >Sair</button>
-          </div>
-        </div>
-      )}
-
-      {planoVenc && !planoVenc.bloqueado && (
-        <div style={{
-          position:"fixed", left:"50%", top:12, transform:"translateX(-50%)", zIndex:99990,
-          maxWidth:"calc(100vw - 32px)", padding:"10px 16px", borderRadius:10,
-          background: planoVenc.hoje ? "rgba(245,158,11,0.14)" : "rgba(239,68,68,0.14)",
-          border: planoVenc.hoje ? "1px solid rgba(245,158,11,0.5)" : "1px solid rgba(239,68,68,0.5)",
-          color: planoVenc.hoje ? "#fbbf24" : "#f87171",
-          fontSize:13, fontWeight:600, textAlign:"center", backdropFilter:"blur(6px)",
-        }}>
-          {planoVenc.hoje
-            ? "⚠️ Seu plano vence hoje. Faça o pagamento para evitar interrupções."
-            : `⚠️ Plano vencido — efetue o pagamento em ${planoVenc.restantes} ${planoVenc.restantes === 1 ? "dia" : "dias"} ou o acesso será bloqueado.`}
-        </div>
-      )}
-
       {saudacaoVisivel && userName !== "Usuário" && (
         <SaudacaoCard
           nome={userName}
@@ -4621,31 +4591,6 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                               <div className="holo-meta">
                                 <span className="holo-meta-dot" />
                                 <span>{tempoRel(tsObj)}</span>
-                              </div>
-                            </div>
-                            <div className="holo-beam" />
-                            <div className="holo-base" />
-                          </div>
-                        );
-                      }
-
-                      /* ── Vencimento do plano ── */
-                      if (n.tipo === "plano_venc") {
-                        return (
-                          <div key={n.id} className={`holo ${n.hoje ? "amber" : "mag"}`}>
-                            <div className="holo-card">
-                              <div className="holo-row-top">
-                                <div className="holo-icon">
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-                                </div>
-                                <span className="holo-categoria">Sistema · Plano</span>
-                                <span className="holo-urgencia">{n.hoje ? "Vence hoje" : `${n.restantes} ${n.restantes === 1 ? "dia" : "dias"}`}</span>
-                              </div>
-                              <div className="holo-title">{n.hoje ? "Seu plano vence hoje" : "Plano vencido"}</div>
-                              <div className="holo-msg">
-                                {n.hoje
-                                  ? "Faça o pagamento para evitar interrupções."
-                                  : `Efetue o pagamento em ${n.restantes} ${n.restantes === 1 ? "dia" : "dias"} ou o acesso será bloqueado.`}
                               </div>
                             </div>
                             <div className="holo-beam" />
@@ -4956,7 +4901,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 theme={theme}
                 onToggleTheme={toggleTheme}
               />
-            ) : sistemaAtivo === "flow" && flowVisivel ? (
+            ) : sistemaAtivo === "flow" ? (
               <AssFlow
                 tenantUid={tenantUid}
                 nomeEmpresa={nomeEmpresa}
