@@ -2761,7 +2761,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
   /* ── Hooks de dados - declarados aqui para isPro estar disponível nos useEffects abaixo ── */
   const empresa = useEmpresa(uid);
-  const { isPro, plano: licencaSlug } = useLicenca(tenantUid);
+  const { isPro, plano: licencaSlug, dataVencimento: vencimentoPlano } = useLicenca(tenantUid);
 
   /* ── AssentFlow: flag de ativação controlada pelo admin (licencas/{tenantUid}.flowAtivo)
      Essencial: default OFF, só aparece se flowAtivo === true
@@ -2778,6 +2778,18 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   useEffect(() => {
     if (!flowVisivel && sistemaAtivo === "flow") setSistemaAtivo("gestao");
   }, [flowVisivel, sistemaAtivo]);
+
+  /* ── Vencimento do plano (licencas/{tenantUid}/plano/*): carência de 3 dias → bloqueio ── */
+  const GRACA_DIAS = 3;
+  const planoVenc = (() => {
+    if (!vencimentoPlano) return null;
+    const fim = new Date(vencimentoPlano);
+    fim.setHours(23, 59, 59, 999);
+    const diff = Date.now() - fim.getTime();
+    if (diff <= 0) return null;
+    const restantes = GRACA_DIAS - Math.floor(diff / 86400000);
+    return { restantes, bloqueado: restantes <= 0 };
+  })();
 
   /* ── Notificações de reserva - AssFlow (tempo real, por usuário) ── */
   const {
@@ -4396,6 +4408,36 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
   return (
     <>
       <style>{CSS}</style>
+
+      {planoVenc?.bloqueado && (
+        <div style={{
+          position:"fixed", inset:0, zIndex:99999, background:"var(--bg, #0b0b0c)",
+          display:"flex", alignItems:"center", justifyContent:"center", padding:24, textAlign:"center",
+        }}>
+          <div style={{ maxWidth:420 }}>
+            <div style={{ fontSize:42, marginBottom:12 }}>🔒</div>
+            <h2 style={{ color:"var(--text, #fff)", fontSize:22, fontWeight:700, margin:"0 0 8px" }}>Acesso bloqueado</h2>
+            <p style={{ color:"var(--text-2, #aaa)", fontSize:14, lineHeight:1.5, margin:"0 0 20px" }}>
+              Seu plano venceu e o prazo de pagamento acabou. Efetue o pagamento para reativar o acesso.
+            </p>
+            <button
+              onClick={() => { logout(); window.location.reload(); }}
+              style={{ padding:"10px 22px", borderRadius:8, border:"1px solid var(--border, #333)", background:"transparent", color:"var(--text, #fff)", cursor:"pointer", fontWeight:600 }}
+            >Sair</button>
+          </div>
+        </div>
+      )}
+
+      {planoVenc && !planoVenc.bloqueado && (
+        <div style={{
+          position:"fixed", left:"50%", bottom:16, transform:"translateX(-50%)", zIndex:9000,
+          maxWidth:"calc(100vw - 32px)", padding:"10px 16px", borderRadius:10,
+          background:"rgba(239,68,68,0.12)", border:"1px solid rgba(239,68,68,0.4)",
+          color:"#f87171", fontSize:13, fontWeight:600, textAlign:"center", backdropFilter:"blur(6px)",
+        }}>
+          ⚠️ Plano vencido — efetue o pagamento em {planoVenc.restantes} {planoVenc.restantes === 1 ? "dia" : "dias"} ou o acesso será bloqueado.
+        </div>
+      )}
 
       {saudacaoVisivel && userName !== "Usuário" && (
         <SaudacaoCard
