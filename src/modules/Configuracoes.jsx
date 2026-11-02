@@ -110,6 +110,7 @@ const NAV = [
   { id: "cargos",     label: "Cargos e Permissões",  icon: Users          },
   { id: "financeiro", label: "Financeiro",           icon: CreditCard     },
   { id: "pagamentos", label: "Pagamentos Online",    icon: Zap            },
+  { id: "bancos",     label: "Contas Bancárias",     icon: Wallet         },
   { id: "estoque",    label: "Estoque",              icon: Package        },
   { id: "atalhos",    label: "Atalhos",              icon: Keyboard       },
   { id: "log",        label: "Log de Atividades",    icon: Activity       },
@@ -804,6 +805,20 @@ const CSS = `
   }
   .tut-footer-note { font-size: 11px; color: #5c5e72; }
   .tut-footer-note span { color: #48bb78; font-weight: 600; }
+
+  /* ── Contas Bancárias ── */
+  .bk-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .bk-empty { font-size: 12px; color: var(--text-3); padding: 14px; text-align: center;
+    border: 1px dashed var(--border); border-radius: 10px; }
+  .bk-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--s1); flex-wrap: wrap; }
+  .bk-info { flex: 1; min-width: 120px; }
+  .bk-nome { font-size: 13px; font-weight: 600; color: var(--text); }
+  .bk-sub  { font-size: 11px; color: var(--text-3); }
+  .bk-tag  { font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 20px; }
+  .bk-tag.ok  { color: #48bb78; background: rgba(72,187,120,0.1); }
+  .bk-tag.off { color: #e05555; background: rgba(224,85,85,0.1); }
+  .bk-btn { font-size: 11px; padding: 5px 10px; display: flex; align-items: center; gap: 5px; }
 `;
 
 /* ══════════════════════════════════════════════════════
@@ -1311,11 +1326,272 @@ function ModalTutorialPagamento({ onClose }) {
 }
 
 /* ══════════════════════════════════════════════════════
+   MODAL TUTORIAL — Como conectar conta bancária
+   ══════════════════════════════════════════════════════ */
+function ModalTutorialBanco({ onClose }) {
+  const PASSOS = [
+    {
+      titulo: "Acesse o Painel do Desenvolvedor",
+      desc: <>Entre em <a className="tut-link" href="https://www.mercadopago.com.br/developers/panel/app" target="_blank" rel="noreferrer">painel de aplicações <ExternalLink size={10} /></a> com a conta Mercado Pago que você quer acompanhar.</>,
+    },
+    {
+      titulo: "Use sua aplicação",
+      desc: <>Já configurou <strong>Pagamentos Online</strong>? Use a mesma aplicação. Se não, clique em <strong>"Criar aplicação"</strong>, dê o nome <em>"ASSENT Gestão"</em> e confirme.</>,
+    },
+    {
+      titulo: "Copie o Access Token de produção",
+      desc: <>Na aplicação, abra <strong>"Credenciais de produção"</strong> e copie o <strong>Access Token</strong> — começa com <code>APP_USR-</code>.<br/><br/>⚠️ <strong>Não use credenciais de teste.</strong> A Public Key não é necessária aqui.</>,
+    },
+    {
+      titulo: "Cole, dê um apelido e conecte",
+      desc: <>Nesta tela, escolha um apelido (ex: <em>"MP Loja"</em>), cole o token e clique em <strong>Conectar</strong>. O ASSENT valida o token no Mercado Pago antes de salvar.</>,
+    },
+    {
+      titulo: "Conecte mais bancos se quiser",
+      desc: <>Repita para outras contas. No Dashboard, um seletor permite alternar entre elas.</>,
+    },
+  ];
+
+  return (
+    <div className="tut-overlay" onClick={onClose}>
+      <div className="tut-modal" onClick={e => e.stopPropagation()}>
+        <div className="tut-header">
+          <div className="tut-header-icon"><BookOpen size={16} /></div>
+          <div className="tut-header-title">
+            <h3>Como conectar sua conta bancária</h3>
+            <p>Passo a passo para ver saldo e movimentações no Dashboard</p>
+          </div>
+          <button className="tut-close" onClick={onClose}><X size={16} /></button>
+        </div>
+
+        <div className="tut-body">
+          <div className="tut-warning">
+            <AlertCircle size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div>
+              <strong>Somente Administradores têm acesso</strong>
+              O Access Token dá acesso à sua conta Mercado Pago. O ASSENT usa apenas para consultar saldo e movimentações. Nunca compartilhe o token.
+            </div>
+          </div>
+
+          {PASSOS.map((p, i) => (
+            <div key={i} className="tut-step">
+              <div className="tut-step-num">{i + 1}</div>
+              <div className="tut-step-content">
+                <div className="tut-step-title">{p.titulo}</div>
+                <div className="tut-step-desc">{p.desc}</div>
+              </div>
+            </div>
+          ))}
+
+          <div className="tut-warning" style={{ background: "rgba(72,187,120,0.07)", borderColor: "rgba(72,187,120,0.25)", color: "#48bb78" }}>
+            <CheckCircle2 size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+            <div>
+              <strong>Token protegido</strong>
+              Salvo criptografado no servidor. Depois de conectar, o token nunca volta ao navegador. Para revogar, desconecte aqui ou gere novas credenciais no Mercado Pago.
+            </div>
+          </div>
+        </div>
+
+        <div className="tut-footer">
+          <span className="tut-footer-note">
+            Dúvidas? Documentação oficial: <span>developers.mercadopago.com</span>
+          </span>
+          <button className="btn-primary" onClick={onClose}>
+            <Check size={13} /> Entendi
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
+   SEÇÃO CONTAS BANCÁRIAS — somente admin
+   Token vai direto para a Cloud Function (cifrado no servidor).
+   Metadados: users/{uid}/contasBancarias (via Cloud Function)
+   ══════════════════════════════════════════════════════ */
+function SecaoBancos({ onToast }) {
+  const [contas,       setContas]       = useState([]);
+  const [carregando,   setCarregando]   = useState(true);
+  const [apelido,      setApelido]      = useState("");
+  const [token,        setToken]        = useState("");
+  const [showToken,    setShowToken]    = useState(false);
+  const [conectando,   setConectando]   = useState(false);
+  const [testandoId,   setTestandoId]   = useState(null);
+  const [showTutorial, setShowTutorial] = useState(false);
+
+  const fnListar     = useMemo(() => httpsCallable(functions, "listarContasBancarias"), []);
+  const fnConectar   = useMemo(() => httpsCallable(functions, "conectarContaBancaria"), []);
+  const fnTestar     = useMemo(() => httpsCallable(functions, "testarContaBancaria"), []);
+  const fnDesconectar = useMemo(() => httpsCallable(functions, "desconectarContaBancaria"), []);
+
+  const carregar = useCallback(async () => {
+    try {
+      const { data } = await fnListar();
+      setContas(data?.contas || []);
+    } catch {
+      onToast?.("Erro ao carregar contas.", "error");
+    } finally {
+      setCarregando(false);
+    }
+  }, [fnListar, onToast]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  const handleConectar = async () => {
+    setConectando(true);
+    try {
+      await fnConectar({ provider: "mercadopago", apelido: apelido.trim(), accessToken: token.trim() });
+      setApelido(""); setToken(""); setShowToken(false);
+      onToast?.("Conta conectada!", "success");
+      await carregar();
+    } catch (e) {
+      onToast?.(e?.message || "Falha ao conectar.", "error");
+    } finally {
+      setConectando(false);
+    }
+  };
+
+  const handleTestar = async (id) => {
+    setTestandoId(id);
+    try {
+      const { data } = await fnTestar({ contaId: id });
+      onToast?.(data?.valido ? "Conexão ok." : "Token inválido ou revogado.", data?.valido ? "success" : "error");
+      await carregar();
+    } catch {
+      onToast?.("Falha ao testar.", "error");
+    } finally {
+      setTestandoId(null);
+    }
+  };
+
+  const handleDesconectar = async (c) => {
+    if (!window.confirm(`Desconectar "${c.apelido}"? O token será apagado do ASSENT.`)) return;
+    try {
+      await fnDesconectar({ contaId: c.id });
+      onToast?.("Conta desconectada.", "success");
+      await carregar();
+    } catch {
+      onToast?.("Erro ao desconectar.", "error");
+    }
+  };
+
+  const podeConectar = apelido.trim().length >= 2 && token.trim().length > 20 && !conectando;
+
+  return (
+    <>
+      {showTutorial && <ModalTutorialBanco onClose={() => setShowTutorial(false)} />}
+
+      <div className="cfg-card">
+        <div className="cfg-card-header">
+          <div className="cfg-card-header-icon"><Wallet size={15} /></div>
+          <div>
+            <div className="cfg-card-title">Contas Bancárias</div>
+            <div className="cfg-card-sub">Saldo e movimentações do seu banco no Dashboard</div>
+          </div>
+        </div>
+
+        <div className="cfg-card-body">
+          <div className="pag-wrap">
+
+            <button className="pag-btn-tutorial" onClick={() => setShowTutorial(true)}>
+              <BookOpen size={13} />
+              <span>Tutorial - como conectar sua conta bancária</span>
+              <ArrowRight size={13} />
+            </button>
+
+            <div className="pag-info-box">
+              <strong>Token protegido no servidor.</strong> Salvo criptografado e nunca devolvido ao navegador. Somente leitura de saldo e movimentações.
+            </div>
+
+            {/* Contas conectadas */}
+            <div className="bk-list">
+              {carregando ? (
+                <div className="bk-empty">Carregando...</div>
+              ) : contas.length === 0 ? (
+                <div className="bk-empty">Nenhuma conta conectada.</div>
+              ) : contas.map(c => (
+                <div key={c.id} className="bk-item">
+                  <div className="pag-mp-icon"><CreditCard size={16} color="#fff" /></div>
+                  <div className="bk-info">
+                    <div className="bk-nome">{c.apelido}</div>
+                    <div className="bk-sub">
+                      {c.banco}{c.titular ? ` · ${c.titular}` : ""}
+                    </div>
+                  </div>
+                  <span className={`bk-tag ${c.ativo ? "ok" : "off"}`}>
+                    {c.ativo ? (c.relatorios ? "Conectada" : "Sem acesso a relatórios") : "Token inválido"}
+                  </span>
+                  <button className="btn-secondary bk-btn" onClick={() => handleTestar(c.id)} disabled={testandoId === c.id}>
+                    {testandoId === c.id ? <span className="cfg-spinner" /> : <Wifi size={11} />} Testar
+                  </button>
+                  <button className="btn-secondary bk-btn" onClick={() => handleDesconectar(c)} title="Desconectar">
+                    <Trash2 size={11} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Nova conta */}
+            <div className="pag-mp-block">
+              <div className="pag-mp-head">
+                <div className="pag-mp-icon"><Plus size={18} color="#fff" /></div>
+                <div className="pag-mp-label">
+                  <div className="pag-mp-nome">Conectar Mercado Pago</div>
+                  <div className="pag-mp-tag inativo">Nova conta</div>
+                </div>
+              </div>
+
+              <div className="pag-token-area">
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label">Apelido <span className="form-label-req">*</span></label>
+                  <input
+                    type="text" className="form-input" maxLength={40}
+                    value={apelido} onChange={e => setApelido(e.target.value)}
+                    placeholder="Ex: MP Loja"
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0, marginTop: 14 }}>
+                  <label className="form-label">Access Token de Produção <span className="form-label-req">*</span></label>
+                  <div className="pag-token-wrap">
+                    <input
+                      type={showToken ? "text" : "password"} className="form-input"
+                      value={token} onChange={e => setToken(e.target.value)}
+                      placeholder="APP_USR-••••••••••••••••••••••••••••••••••••••"
+                      autoComplete="off" spellCheck={false}
+                    />
+                    <button className="pag-token-toggle" onClick={() => setShowToken(s => !s)} type="button">
+                      {showToken ? <EyeOff size={13} /> : <Eye size={13} />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div className="cfg-card-footer">
+          <button className="btn-primary" onClick={handleConectar} disabled={!podeConectar}>
+            {conectando ? <><span className="cfg-spinner" />Conectando...</> : <><Plus size={13} />Conectar</>}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════════════════
    SEÇÃO PAGAMENTOS ONLINE — somente admin
    Salva em: users/{uid}/config/geral → pagamentos.mercadopago
    ══════════════════════════════════════════════════════ */
+const TOKEN_SENTINELA = "__SEGURO__"; // token real fica cifrado no servidor
+
 function SecaoPagamentos({ config, onSave }) {
-  const [token,        setToken]        = useState(config?.pagamentos?.mercadopago?.accessToken || "");
+  const [token,        setToken]        = useState(""); // nunca pré-carregado
+  const [tokenSalvo,   setTokenSalvo]   = useState(!!config?.pagamentos?.mercadopago?.accessToken);
+  const migrouRef = useRef(false);
   const [publicKey,    setPublicKey]    = useState(config?.pagamentos?.mercadopago?.publicKey || "");
   const [ativo,        setAtivo]        = useState(config?.pagamentos?.mercadopago?.ativo ?? false);
   const [showToken,    setShowToken]    = useState(false);
@@ -1323,78 +1599,68 @@ function SecaoPagamentos({ config, onSave }) {
   const [testando,     setTestando]     = useState(false);
   const [testeOk,      setTesteOk]      = useState(null); // null | true | false
   const [showTutorial, setShowTutorial] = useState(false);
-  const [copiado,      setCopiado]      = useState(false);
 
   useEffect(() => {
-    setToken(config?.pagamentos?.mercadopago?.accessToken || "");
+    const v = config?.pagamentos?.mercadopago?.accessToken;
+    setToken("");
+    setTokenSalvo(!!v);
     setPublicKey(config?.pagamentos?.mercadopago?.publicKey || "");
     setAtivo(config?.pagamentos?.mercadopago?.ativo ?? false);
     setTesteOk(null);
+
+    // Token ainda em texto (legado): move para o servidor, cifrado. Uma vez por abertura.
+    if (v && v !== TOKEN_SENTINELA && !migrouRef.current) {
+      migrouRef.current = true;
+      httpsCallable(functions, "migrarTokenPagamentos")().catch(() => { migrouRef.current = false; });
+    }
   }, [config]);
 
   const handleSalvar = async () => {
-    if (!token.trim()) { alert("Informe o Access Token antes de salvar."); return; }
+    if (!token.trim() && !tokenSalvo) { alert("Informe o Access Token antes de salvar."); return; }
     if (ativo && !publicKey.trim()) { alert("Informe a Public Key para ativar os pagamentos."); return; }
     setSalvando(true);
     setTesteOk(null);
     try {
+      // Token vai direto para a Cloud Function (cifrado no servidor)
+      await httpsCallable(functions, "salvarPagamentosMP")({
+        accessToken: token.trim(),
+        publicKey:   publicKey.trim(),
+        ativo,
+      });
+      // Sincroniza o estado local só com dados não secretos
       await onSave({
         pagamentos: {
           mercadopago: {
-            accessToken:  token.trim(),
+            accessToken:  TOKEN_SENTINELA,
             publicKey:    publicKey.trim(),
             ativo,
             atualizadoEm: new Date().toISOString(),
           }
         }
       });
+      setToken("");
+      setShowToken(false);
+      setTokenSalvo(true);
+    } catch (e) {
+      alert(e?.message || "Erro ao salvar.");
     } finally {
       setSalvando(false);
     }
   };
 
-  /* ── Testa o token via Cloud Function ──────────────────────────────
-     O token já está salvo no Firestore; a CF lê de lá e valida no MP.
-     Assim o token nunca sai do servidor para validação.
-  ─────────────────────────────────────────────────────────────────── */
+  /* ── Testa a conexão via Cloud Function (token nunca sai do servidor) ── */
   const handleTestar = async () => {
-    if (!token.trim()) return;
-
-    // Se há alterações não salvas, salva primeiro
-    const tokenSalvo = config?.pagamentos?.mercadopago?.accessToken || "";
-    if (token.trim() !== tokenSalvo) {
-      alert("Salve o token antes de testar a conexão.");
-      return;
-    }
-
+    if (!tokenSalvo) return;
     setTestando(true);
     setTesteOk(null);
     try {
-      const consultarFn = httpsCallable(functions, "consultarPagamento");
-      // Chama com paymentId inválido — se o erro for 404 (not found) o token é válido;
-      // se for 401 (unauthorized) o token é inválido. Qualquer resposta da CF = token ok.
-      await consultarFn({ tenantUid: config?._tenantUid || "", paymentId: 0 });
-      setTesteOk(true);
-    } catch (e) {
-      // Erro "not-found" ou "invalid-argument" = token válido (CF respondeu)
-      // Erro "failed-precondition" = token não configurado/inativo
-      const code = e?.code || "";
-      if (code === "functions/not-found" || code === "functions/invalid-argument") {
-        setTesteOk(true);
-      } else {
-        setTesteOk(false);
-      }
+      const { data } = await httpsCallable(functions, "testarPagamentosMP")();
+      setTesteOk(!!data?.valido);
+    } catch {
+      setTesteOk(false);
     } finally {
       setTestando(false);
     }
-  };
-
-  const handleCopiar = () => {
-    if (!token) return;
-    navigator.clipboard.writeText(token).then(() => {
-      setCopiado(true);
-      setTimeout(() => setCopiado(false), 2000);
-    });
   };
 
   return (
@@ -1423,15 +1689,15 @@ function SecaoPagamentos({ config, onSave }) {
               <strong>Token protegido no servidor.</strong> O Access Token nunca trafega pelo navegador durante transações — todas as chamadas ao Mercado Pago passam pelas Cloud Functions do ASSENT.
             </div>
 
-            <div className={`pag-mp-block ${ativo && token ? "ativo" : ""}`}>
+            <div className={`pag-mp-block ${ativo && tokenSalvo ? "ativo" : ""}`}>
               <div className="pag-mp-head">
                 <div className="pag-mp-icon">
                   <CreditCard size={18} color="#fff" />
                 </div>
                 <div className="pag-mp-label">
                   <div className="pag-mp-nome">Mercado Pago</div>
-                  <div className={`pag-mp-tag ${ativo && token ? "" : "inativo"}`}>
-                    {ativo && token
+                  <div className={`pag-mp-tag ${ativo && tokenSalvo ? "" : "inativo"}`}>
+                    {ativo && tokenSalvo
                       ? <><span style={{ width: 5, height: 5, borderRadius: "50%", background: "#48bb78", display: "inline-block" }} /> Ativo</>
                       : "Não configurado"
                     }
@@ -1458,7 +1724,8 @@ function SecaoPagamentos({ config, onSave }) {
                       className="form-input"
                       value={token}
                       onChange={e => { setToken(e.target.value); setTesteOk(null); }}
-                      placeholder="APP_USR-••••••••••••••••••••••••••••••••••••••"
+                      placeholder={tokenSalvo ? "•••••••• token salvo - preencha só para trocar" : "APP_USR-••••••••••••••••••••••••••••••••••••••"}
+                      autoComplete="off" spellCheck={false}
                     />
                     <button className="pag-token-toggle" onClick={() => setShowToken(s => !s)} type="button">
                       {showToken ? <EyeOff size={13} /> : <Eye size={13} />}
@@ -1488,8 +1755,8 @@ function SecaoPagamentos({ config, onSave }) {
                     className="btn-secondary"
                     style={{ fontSize: 11, padding: "5px 12px", display: "flex", alignItems: "center", gap: 6 }}
                     onClick={handleTestar}
-                    disabled={!token.trim() || testando}
-                    title="Salve o token antes de testar"
+                    disabled={!tokenSalvo || testando}
+                    title="Teste o token salvo"
                   >
                     {testando
                       ? <><span className="cfg-spinner" />Verificando...</>
@@ -1500,14 +1767,6 @@ function SecaoPagamentos({ config, onSave }) {
                           : <><Wifi size={12} />Testar conexão</>
                     }
                   </button>
-                  <button
-                    className="btn-secondary"
-                    style={{ fontSize: 11, padding: "5px 12px", display: "flex", alignItems: "center", gap: 6 }}
-                    onClick={handleCopiar}
-                    disabled={!token}
-                  >
-                    <Copy size={11} />{copiado ? "Copiado!" : "Copiar token"}
-                  </button>
                 </div>
 
                 <div className={`pag-status ${testeOk === true ? "ok" : testeOk === false ? "erro" : ""}`}>
@@ -1516,8 +1775,8 @@ function SecaoPagamentos({ config, onSave }) {
                     ? "Cloud Function conectada ao Mercado Pago com sucesso"
                     : testeOk === false
                       ? "Falha — verifique o token e o webhook"
-                      : token
-                        ? "Salve e clique em Testar conexão para validar"
+                      : tokenSalvo
+                        ? "Token salvo. Clique em Testar conexão para validar"
                         : "Nenhum token configurado"
                   }
                 </div>
@@ -1555,7 +1814,7 @@ function SecaoPagamentos({ config, onSave }) {
         </div>
 
         <div className="cfg-card-footer">
-          <button className="btn-primary" onClick={handleSalvar} disabled={salvando || !token.trim() || (ativo && !publicKey.trim())}>
+          <button className="btn-primary" onClick={handleSalvar} disabled={salvando || (!token.trim() && !tokenSalvo) || (ativo && !publicKey.trim())}>
             {salvando ? <><span className="cfg-spinner" />Salvando...</> : <><Save size={13} />Salvar</>}
           </button>
         </div>
@@ -2094,7 +2353,7 @@ function SecaoLGPD() {
    COMPONENTE PRINCIPAL
    ══════════════════════════════════════════════════════ */
 const SECOES_POR_CARGO = {
-  admin:       ["empresa", "seguranca", "cargos", "financeiro", "pagamentos", "estoque", "atalhos", "log", "lgpd"],
+  admin:       ["empresa", "seguranca", "cargos", "financeiro", "pagamentos", "bancos", "estoque", "atalhos", "log", "lgpd"],
   financeiro:  ["seguranca", "financeiro", "atalhos"],
   comercial:   ["seguranca", "atalhos"],
   compras:     ["seguranca", "estoque", "atalhos"],
@@ -2361,6 +2620,8 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
     } catch (err) { setToast({ msg: "Erro ao salvar.", type: "error" }); throw err; }
   }, [uid]);
 
+  const showToast = useCallback((msg, type) => setToast({ msg, type }), []);
+
   const renderSecao = () => {
     if (loading) return <div className="cfg-loading">Carregando configurações...</div>;
     switch (secao) {
@@ -2369,6 +2630,7 @@ export default function Configuracoes({ menuVisivel: menuVisivelProp }) {
       case "cargos":     return <SecaoCargos    tenantUid={uid} />;
       case "financeiro": return <SecaoFinanceiro config={config} onSave={handleSave} />;
       case "pagamentos": return <SecaoPagamentos config={config} onSave={handleSave} />;
+      case "bancos":     return <SecaoBancos onToast={showToast} />;
       case "estoque":    return <SecaoEstoque    config={config} onSave={handleSave} />;
       case "atalhos":    return <SecaoAtalhos    menuVisivel={menuVisivelProp ?? config?.menuVisivel ?? {}} />;
       case "log":        return <SecaoLog        tenantUid={uid} />;
