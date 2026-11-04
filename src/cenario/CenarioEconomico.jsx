@@ -20,7 +20,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer,
+  AreaChart, Area, BarChart, Bar, Cell, ReferenceDot, ReferenceLine, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer,
 } from "recharts";
 import { TrendingUp, TrendingDown, Minus, RefreshCw, ArrowLeft, ExternalLink, AlertTriangle } from "lucide-react";
 
@@ -103,7 +103,7 @@ const INFO = [
 /* ═══════════════════ UTILS ═══════════════════ */
 const nf = {};
 const fmt = (v, d = 2) => {
-  if (!Number.isFinite(v)) return "—";
+  if (!Number.isFinite(v)) return "n/d";
   nf[d] = nf[d] || new Intl.NumberFormat("pt-BR", { minimumFractionDigits: d, maximumFractionDigits: d });
   return nf[d].format(v);
 };
@@ -208,7 +208,7 @@ function mkDelta(cur, pr, mode, ctx) {
   if (cur == null || pr == null) return null;
   const diff = mode === "pct" ? ((cur / pr) - 1) * 100 : cur - pr;
   const kind = Math.abs(diff) < 0.005 ? "flat" : diff > 0 ? "up" : "down";
-  const sign = diff > 0 ? "+" : diff < 0 ? "−" : "";
+  const sign = diff > 0 ? "+" : diff < 0 ? "-" : "";
   const txt = kind === "flat" ? "Estável" : `${sign}${fmt(Math.abs(diff), 2)} ${mode === "pct" ? "%" : "p.p."}`;
   return { kind, txt, ctx };
 }
@@ -303,35 +303,33 @@ const CSS = `
 .ce-h1{font-size:clamp(22px,3.2vw,30px);font-weight:600;letter-spacing:-.02em;line-height:1.1}
 .ce-sub{font-size:13px;color:var(--text-2);margin-top:6px}
 .ce-head-r{display:flex;align-items:center;gap:10px}
-.ce-status{display:flex;align-items:center;gap:8px;font:500 10.5px var(--ce-mono);color:var(--text-2);padding:7px 11px;border:1px solid var(--border);border-radius:8px;background:var(--s1);letter-spacing:.02em}
+.ce-status{display:flex;align-items:center;gap:8px;font:500 10.5px var(--ce-mono);color:var(--text-2);padding:9px 14px;border:1px solid var(--border);border-radius:999px;background:var(--s1);letter-spacing:.02em}
 .ce-dot{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 0 var(--gold);animation:ce-pulse 2.4s infinite}
 .ce-status.warn .ce-dot{background:var(--amber);animation:none}
 @keyframes ce-pulse{0%{box-shadow:0 0 0 0 rgba(200,165,94,.45)}70%{box-shadow:0 0 0 7px rgba(200,165,94,0)}100%{box-shadow:0 0 0 0 rgba(200,165,94,0)}}
-.ce-ico-btn{width:34px;height:34px;display:grid;place-items:center;border-radius:8px;border:1px solid var(--border);background:var(--s1);color:var(--text-2);cursor:pointer;transition:all .15s}
+.ce-ico-btn{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;border:1px solid var(--border);background:var(--s1);color:var(--text-2);cursor:pointer;transition:all .15s}
 .ce-ico-btn:hover:not(:disabled){color:var(--gold);border-color:var(--gold);background:var(--gold-d)}
 .ce-ico-btn:disabled{opacity:.45;cursor:not-allowed}
 .ce-spin{animation:ce-rot .9s linear infinite}
 @keyframes ce-rot{to{transform:rotate(360deg)}}
-.ce-banner{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-radius:10px;border:1px solid rgba(245,158,11,.28);background:var(--amber-d);color:var(--text-2);font-size:12px;line-height:1.5}
+.ce-banner{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;border-radius:16px;border:1px solid rgba(245,158,11,.28);background:var(--amber-d);color:var(--text-2);font-size:12px;line-height:1.5}
 .ce-banner svg{flex-shrink:0;color:var(--amber);margin-top:1px}
 .ce-label{font:600 9.5px var(--ce-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--text-3)}
-.ce-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
-.ce-card{all:unset;box-sizing:border-box;position:relative;display:flex;flex-direction:column;gap:10px;padding:16px 16px 14px;background:var(--s1);border:1px solid var(--border);border-radius:12px;cursor:pointer;overflow:hidden;transition:border-color .2s,transform .2s,box-shadow .2s;min-height:196px}
+.ce-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.ce-card{all:unset;box-sizing:border-box;position:relative;display:flex;flex-direction:column;gap:10px;padding:18px 18px 14px;background:linear-gradient(160deg,var(--s2),var(--s1) 55%);border:1px solid var(--border);border-radius:22px;cursor:pointer;overflow:hidden;transition:border-color .2s,transform .2s,box-shadow .2s;min-height:196px}
 .ce-card:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
-.ce-card::before,.ce-card::after{content:"";position:absolute;width:10px;height:10px;border:1px solid var(--gold);opacity:.3;transition:opacity .2s}
-.ce-card::before{top:6px;left:6px;border-right:0;border-bottom:0}
-.ce-card::after{bottom:6px;right:6px;border-left:0;border-top:0}
+.ce-card::before{content:"";position:absolute;top:-46px;right:-46px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,var(--gold-d),transparent 70%);opacity:.7;transition:opacity .2s;pointer-events:none}
 .ce-card:hover{border-color:var(--border-h);transform:translateY(-1px);box-shadow:var(--glow-card),var(--glow-gold)}
-.ce-card:hover::before,.ce-card:hover::after,.ce-card.on::before,.ce-card.on::after{opacity:.9}
+.ce-card:hover::before,.ce-card.on::before{opacity:1}
 .ce-card.on{border-color:rgba(200,165,94,.4)}
 .ce-card-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .ce-card-name{font-size:12px;font-weight:500;color:var(--text-2)}
-.ce-chip{font:600 8.5px var(--ce-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);border:1px solid var(--border);border-radius:999px;padding:2px 7px}
+.ce-chip{font:600 8.5px var(--ce-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);background:var(--s3);border-radius:999px;padding:3px 9px}
 .ce-val{font:500 clamp(22px,2.2vw,27px) var(--ce-mono);letter-spacing:-.03em;font-variant-numeric:tabular-nums;color:var(--text);line-height:1.05}
 .ce-val small{font-size:.5em;color:var(--text-3);margin-left:3px;letter-spacing:0}
 .ce-val.na{font-size:15px;color:var(--text-3);font-family:'Sora',sans-serif;letter-spacing:0}
 .ce-delta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font:500 11px var(--ce-mono)}
-.ce-delta b{display:inline-flex;align-items:center;gap:4px;font-weight:600;padding:2px 7px;border-radius:6px}
+.ce-delta b{display:inline-flex;align-items:center;gap:4px;font-weight:600;padding:3px 9px;border-radius:999px}
 .ce-delta.up b{color:var(--gold-l);background:var(--gold-d)}
 .ce-delta.down b{color:var(--blue);background:var(--blue-d)}
 .ce-delta.flat b{color:var(--text-2);background:var(--s3)}
@@ -340,37 +338,41 @@ const CSS = `
 .ce-subrow b{font:500 11px var(--ce-mono);color:var(--text-2)}
 .ce-spark{height:34px;margin:auto -4px 0;opacity:.9}
 .ce-ref{font:400 10px var(--ce-mono);color:var(--text-3);letter-spacing:.02em}
-.ce-skel{background:linear-gradient(90deg,var(--s2),var(--s3),var(--s2));background-size:200% 100%;animation:ce-sh 1.4s infinite;border-radius:6px}
+.ce-skel{background:linear-gradient(90deg,var(--s2),var(--s3),var(--s2));background-size:200% 100%;animation:ce-sh 1.4s infinite;border-radius:12px}
 @keyframes ce-sh{to{background-position:-200% 0}}
-.ce-panel{background:var(--s1);border:1px solid var(--border);border-radius:14px;padding:18px;position:relative;overflow:hidden}
+.ce-panel{background:linear-gradient(180deg,var(--s2),var(--s1) 40%);border:1px solid var(--border);border-radius:26px;padding:22px;position:relative;overflow:hidden}
 .ce-panel-h{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:14px}
-.ce-tabs,.ce-seg{display:inline-flex;gap:2px;padding:3px;background:var(--s2);border:1px solid var(--border);border-radius:9px;max-width:100%;overflow-x:auto}
-.ce-tab,.ce-segb{all:unset;box-sizing:border-box;cursor:pointer;font:500 12px 'Sora',sans-serif;color:var(--text-2);padding:6px 12px;border-radius:6px;white-space:nowrap;transition:all .15s}
+.ce-tabs,.ce-seg{display:inline-flex;gap:2px;padding:3px;background:var(--s3);border-radius:999px;max-width:100%;overflow-x:auto}
+.ce-tab,.ce-segb{all:unset;box-sizing:border-box;cursor:pointer;font:500 12px 'Sora',sans-serif;color:var(--text-2);padding:7px 15px;border-radius:999px;white-space:nowrap;transition:all .15s}
 .ce-tab:hover:not(.on),.ce-segb:hover:not(.on):not(:disabled){color:var(--text)}
 .ce-tab.on,.ce-segb.on{background:var(--gold-d);color:var(--gold);box-shadow:inset 0 0 0 1px rgba(200,165,94,.3)}
-.ce-segb{font:500 11px var(--ce-mono);padding:5px 10px}
+.ce-segb{font:500 11px var(--ce-mono);padding:6px 12px}
 .ce-segb:disabled{opacity:.35;cursor:not-allowed}
 .ce-tab:focus-visible,.ce-segb:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
 .ce-ctrl{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.ce-chart{height:300px;position:relative}
+.ce-chart-box{border-radius:20px;background:radial-gradient(120% 90% at 50% 0%,var(--gold-d),transparent 65%),var(--s2);border:1px solid var(--border);padding:14px 10px 6px 4px}
+.ce-chart{height:320px;position:relative}
+.ce-chart .recharts-area-curve{filter:drop-shadow(0 6px 10px rgba(200,165,94,.35))}
+.ce-halo{animation:ce-halo 2.2s ease-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes ce-halo{0%{transform:scale(.6);opacity:.5}100%{transform:scale(1.9);opacity:0}}
 .ce-chart-msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;font-size:12.5px;color:var(--text-3);gap:10px;align-content:center}
-.ce-retry{all:unset;cursor:pointer;font:500 11px var(--ce-mono);color:var(--gold);border:1px solid rgba(200,165,94,.35);padding:5px 12px;border-radius:7px}
+.ce-retry{all:unset;cursor:pointer;font:500 11px var(--ce-mono);color:var(--gold);border:1px solid rgba(200,165,94,.35);padding:7px 16px;border-radius:999px}
 .ce-retry:hover{background:var(--gold-d)}
 .ce-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--text-2);margin-bottom:8px}
 .ce-legend span{display:inline-flex;align-items:center;gap:6px}
 .ce-legend i{width:10px;height:2px;border-radius:2px}
-.ce-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin-top:14px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden}
-.ce-stat{background:var(--s1);padding:10px 12px;display:flex;flex-direction:column;gap:3px}
+.ce-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+.ce-stat{background:var(--s2);border:1px solid var(--border);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:3px}
 .ce-stat b{font:500 13px var(--ce-mono);font-variant-numeric:tabular-nums;color:var(--text)}
-.ce-tip{background:var(--s2);border:1px solid var(--border-h);border-radius:9px;padding:8px 11px;box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:11px}
+.ce-tip{background:var(--s2);border:1px solid var(--border-h);border-radius:14px;padding:10px 14px;box-shadow:0 12px 32px rgba(0,0,0,.4);font-size:11px}
 .ce-tip-d{font:500 10px var(--ce-mono);color:var(--text-3);margin-bottom:5px;letter-spacing:.04em}
 .ce-tip-r{display:flex;align-items:center;gap:7px;color:var(--text-2);margin-top:2px}
-.ce-tip-r i{width:7px;height:7px;border-radius:2px}
+.ce-tip-r i{width:8px;height:8px;border-radius:50%}
 .ce-tip-r b{margin-left:auto;padding-left:14px;font:600 11.5px var(--ce-mono);color:var(--text)}
-.ce-info{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:12px;overflow:hidden}
-.ce-info-i{background:var(--s1);padding:14px 16px}
+.ce-info{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.ce-info-i{background:var(--s1);border:1px solid var(--border);border-radius:20px;padding:18px 18px}
 .ce-info-i h4{font-size:12.5px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
-.ce-info-i h4::before{content:"";width:5px;height:5px;background:var(--gold);transform:rotate(45deg)}
+.ce-info-i h4::before{content:"";width:6px;height:6px;background:var(--gold);border-radius:50%}
 .ce-info-i p{font-size:12px;line-height:1.6;color:var(--text-2)}
 .ce-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--text-3);line-height:1.6;padding-top:4px}
 .ce-foot a{color:var(--gold);text-decoration:none;display:inline-flex;align-items:center;gap:4px}
@@ -379,9 +381,9 @@ const CSS = `
   .ce-wrap{padding:16px 14px 40px;gap:18px}
   .ce-cards{grid-template-columns:repeat(2,1fr)}
   .ce-card{min-height:184px;padding:14px 13px 12px}
-  .ce-chart{height:240px}
+  .ce-chart{height:250px}
   .ce-stats{grid-template-columns:repeat(2,1fr)}
-  .ce-panel{padding:14px 12px}
+  .ce-panel{padding:16px 12px;border-radius:22px}
   .ce-head-r{width:100%;justify-content:space-between}
 }
 @media(max-width:400px){.ce-cards{grid-template-columns:1fr}}
@@ -389,6 +391,16 @@ const CSS = `
 `;
 
 /* ═══════════════════ SUBCOMPONENTES ═══════════════════ */
+function EndDot({ cx, cy }) {
+  if (cx == null || cy == null) return null;
+  return (
+    <g>
+      <circle className="ce-halo" cx={cx} cy={cy} r={8} fill="var(--gold)" opacity={0.35} />
+      <circle cx={cx} cy={cy} r={4.5} fill="var(--gold-l)" stroke="var(--s2)" strokeWidth={2} />
+    </g>
+  );
+}
+
 function Spark({ data, step, id }) {
   if (!data || data.length < 2) return <div className="ce-spark" />;
   const rows = data.map((v, i) => ({ i, v }));
@@ -448,7 +460,7 @@ function Card({ c, on, loading, failed, onClick }) {
         </>
       )}
       <Spark data={c.spark} step={c.step} id={c.id} />
-      <div className="ce-ref">{c.ref ? `Ref. ${c.ref}` : "—"} · {c.code}</div>
+      <div className="ce-ref">{c.ref ? `Ref. ${c.ref}` : "Sem data"} · {c.code}</div>
     </button>
   );
 }
@@ -570,7 +582,7 @@ export default function CenarioEconomico({ onVoltar }) {
     return {
       min: Math.min(...vals), max: Math.max(...vals),
       avg: vals.reduce((a, b) => a + b, 0) / vals.length,
-      ch, chTxt: `${ch > 0 ? "+" : ch < 0 ? "−" : ""}${fmt(Math.abs(ch), 2)} ${cfg.mode === "pct" ? "%" : "p.p."}`,
+      ch, chTxt: `${ch > 0 ? "+" : ch < 0 ? "-" : ""}${fmt(Math.abs(ch), 2)} ${cfg.mode === "pct" ? "%" : "p.p."}`,
     };
   }, [chart.rows, cfg.mode]);
 
@@ -591,15 +603,16 @@ export default function CenarioEconomico({ onVoltar }) {
   const yTick = (v) => (view.unit === "R$" ? fmt(v, 2) : fmt(v, 1));
   const gridStroke = "var(--border)";
 
+  const lastRow = chart.rows[chart.rows.length - 1];
   const common = {
-    data: chart.rows, margin: { top: 8, right: 6, bottom: 0, left: 0 },
+    data: chart.rows, margin: { top: 14, right: 14, bottom: 0, left: 0 },
   };
   const axes = (
     <>
-      <CartesianGrid stroke={gridStroke} strokeDasharray="2 4" vertical={false} />
+      <CartesianGrid stroke={gridStroke} strokeDasharray="3 6" vertical={false} />
       <XAxis dataKey="d" tickFormatter={xTick} tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} minTickGap={36} />
       <YAxis tickFormatter={yTick} tick={{ fill: "var(--text-3)", fontSize: 10 }} axisLine={false} tickLine={false} width={44} domain={["auto", "auto"]} />
-      <Tooltip content={<Tip unit={view.unit} dec={cfg.dec} freq={cfg.freq} />} cursor={{ stroke: "var(--gold)", strokeOpacity: 0.35, strokeDasharray: "3 3" }} />
+      <Tooltip content={<Tip unit={view.unit} dec={cfg.dec} freq={cfg.freq} />} cursor={view.bar ? { fill: "var(--gold-d)", radius: 10 } : { stroke: "var(--gold)", strokeOpacity: 0.4, strokeDasharray: "3 4" }} />
     </>
   );
 
@@ -691,29 +704,50 @@ export default function CenarioEconomico({ onVoltar }) {
             </span>
           </div>
 
-          <div className="ce-chart">
+          <div className="ce-chart-box"><div className="ce-chart">
             {chart.status === "ok" && (
               <ResponsiveContainer width="100%" height="100%">
                 {view.bar ? (
                   <BarChart {...common}>
                     {axes}
-                    <Bar dataKey="s0" name={view.lines[0].name} fill="var(--gold)" fillOpacity={0.85} radius={[3, 3, 0, 0]} isAnimationActive={false} />
+                    <defs>
+                      <linearGradient id="ce-bar" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" style={{ stopColor: "var(--gold-l)", stopOpacity: 1 }} />
+                        <stop offset="100%" style={{ stopColor: "var(--gold)", stopOpacity: 0.35 }} />
+                      </linearGradient>
+                    </defs>
+                    <Bar dataKey="s0" name={view.lines[0].name} radius={[10, 10, 10, 10]} maxBarSize={34} isAnimationActive={false}>
+                      {chart.rows.map((r, i) => (
+                        <Cell key={r.d} fill="url(#ce-bar)" fillOpacity={i === chart.rows.length - 1 ? 1 : 0.55} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 ) : (
                   <AreaChart {...common}>
                     <defs>
                       <linearGradient id="ce-fill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" style={{ stopColor: "var(--gold)", stopOpacity: 0.26 }} />
+                        <stop offset="0%" style={{ stopColor: "var(--gold)", stopOpacity: 0.38 }} />
+                        <stop offset="70%" style={{ stopColor: "var(--gold)", stopOpacity: 0.06 }} />
                         <stop offset="100%" style={{ stopColor: "var(--gold)", stopOpacity: 0 }} />
+                      </linearGradient>
+                      <linearGradient id="ce-line" x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" style={{ stopColor: "var(--gold)", stopOpacity: 0.55 }} />
+                        <stop offset="100%" style={{ stopColor: "var(--gold-l)", stopOpacity: 1 }} />
                       </linearGradient>
                     </defs>
                     {axes}
                     {view.lines.map((l, i) => (
                       <Area key={l.src} dataKey={`s${i}`} name={l.name} type={l.step ? "stepAfter" : "monotone"}
-                        stroke={l.color} strokeWidth={l.ghost ? 1.3 : 1.8} strokeDasharray={l.ghost ? "4 3" : undefined}
+                        stroke={l.ghost ? l.color : "url(#ce-line)"} strokeWidth={l.ghost ? 1.6 : 2.6} strokeLinecap="round" strokeDasharray={l.ghost ? "2 6" : undefined}
                         fill={l.ghost ? "none" : "url(#ce-fill)"} dot={false} connectNulls isAnimationActive={false}
-                        activeDot={{ r: 3.5, strokeWidth: 0 }} />
+                        activeDot={{ r: 5, strokeWidth: 3, stroke: "var(--s2)", fill: "var(--gold-l)" }} />
                     ))}
+                    {lastRow && Number.isFinite(lastRow.s0) && (
+                      <>
+                        <ReferenceLine y={lastRow.s0} stroke="var(--gold)" strokeOpacity={0.3} strokeDasharray="2 5" />
+                        <ReferenceDot x={lastRow.d} y={lastRow.s0} shape={<EndDot />} ifOverflow="visible" />
+                      </>
+                    )}
                   </AreaChart>
                 )}
               </ResponsiveContainer>
@@ -727,7 +761,7 @@ export default function CenarioEconomico({ onVoltar }) {
                 <button className="ce-retry" onClick={() => setTick((t) => t + 1)}>Tentar novamente</button>
               </div>
             )}
-          </div>
+          </div></div>
 
           {stats && chart.status === "ok" && (
             <div className="ce-stats">
@@ -751,7 +785,7 @@ export default function CenarioEconomico({ onVoltar }) {
         {/* Fonte */}
         <footer className="ce-foot">
           <span>
-            Fonte: Banco Central do Brasil — Sistema Gerenciador de Séries Temporais (SGS). IPCA: IBGE · IGP-M: FGV · Dólar: câmbio livre (venda/compra).
+            Fonte: Banco Central do Brasil, Sistema Gerenciador de Séries Temporais (SGS). IPCA: IBGE · IGP-M: FGV · Dólar: câmbio livre (venda/compra).
             O IGP-M em 12 meses é calculado a partir da variação mensal oficial. Dados informativos; não constituem recomendação financeira.
           </span>
           <a href={SRC_URL} target="_blank" rel="noopener noreferrer">Dados Abertos BCB <ExternalLink size={11} /></a>
