@@ -90,7 +90,23 @@ const CHARTS = {
       ],
     }],
   },
+  cmp: {
+    label: "Comparar", freq: "M", dec: 2, mode: "pp",
+    views: [
+      {
+        id: "c", label: "Selic × IPCA 12m", unit: "% a.a.",
+        lines: [
+          { src: "selicM", name: "Selic meta (fim do mês)", color: "var(--gold)", step: true },
+          { src: "ipca12", name: "IPCA 12 meses",           color: "var(--blue)", ghost: true },
+        ],
+      },
+      { id: "r", label: "Juro real", unit: "%", lines: [{ src: "real", name: "Juro real", color: "var(--gold)" }] },
+    ],
+  },
 };
+
+const LIVE_URL = "https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL";
+const LIVE_EVERY = 2 * MIN;
 
 const INFO = [
   { id: "selic", t: "Selic",  d: "Taxa básica de juros. Quando sobe, crédito e financiamentos ficam mais caros e aplicações rendem mais; quando cai, o contrário. A meta é definida pelo Copom; a efetiva é a taxa média praticada no mercado." },
@@ -98,6 +114,7 @@ const INFO = [
   { id: "cdi",   t: "CDI",    d: "Taxa de referência das aplicações de renda fixa, sempre muito próxima da Selic. Serve de base para comparar rendimentos." },
   { id: "igpm",  t: "IGP-M",  d: "Índice da FGV usado como referência em reajustes de contratos, como aluguéis. Reflete preços no atacado, na construção e no consumo." },
   { id: "usd",   t: "Dólar",  d: "Cotação comercial do dólar americano. Influencia o custo de produtos importados, insumos e fornecedores que dependem de moeda estrangeira." },
+  { id: "real",  t: "Juro real", d: "Quanto a Selic rende acima da inflação: (1 + Selic) ÷ (1 + IPCA 12m) - 1. Juro real alto encarece o crédito e favorece quem investe em renda fixa. É uma medida simplificada, não uma previsão." },
 ];
 
 /* ═══════════════════ UTILS ═══════════════════ */
@@ -139,6 +156,34 @@ function rolling12(m) {
   return out;
 }
 
+function monthlyLast(a) {
+  const m = new Map();
+  for (const [d, v] of a) m.set(d.slice(0, 7), v);
+  return [...m.entries()].map(([ym, v]) => [`${ym}-01`, v]);
+}
+function realSeries(selicM, ipca12) {
+  const sm = new Map(selicM.map(([d, v]) => [d.slice(0, 7), v]));
+  const out = [];
+  for (const [d, ip] of ipca12) {
+    const sv = sm.get(d.slice(0, 7));
+    if (sv != null) out.push([d, ((1 + sv / 100) / (1 + ip / 100) - 1) * 100]);
+  }
+  return out;
+}
+function parseNum(s) {
+  let t = String(s).trim().replace(/[^\d.,]/g, "");
+  if (!t) return NaN;
+  if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");
+  else if (!/^\d+\.\d{1,2}$/.test(t)) t = t.replace(/\./g, "");
+  const n = Number(t);
+  return Number.isFinite(n) ? n : NaN;
+}
+const irRate = (days) => (days <= 180 ? 0.225 : days <= 360 ? 0.2 : days <= 720 ? 0.175 : 0.15);
+function fmtLiveAt(at, t) {
+  const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/.exec(at || "");
+  return m ? `${m[3]}/${m[2]} ${m[4]}:${m[5]}` : fmtTs(t);
+}
+
 /* ═══════════════════ CACHE + FETCH ═══════════════════ */
 function readCache(key) {
   try {
@@ -174,6 +219,26 @@ async function fetchRaw(key, fromIso) {
     if (!out.length) throw new Error("vazio");
     out.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
     return out;
+  } finally { clearTimeout(to); }
+}
+
+async function fetchLive() {
+  const ctrl = new AbortController();
+  const to = setTimeout(() => ctrl.abort(), 10000);
+  try {
+    const r = await fetch(LIVE_URL, { signal: ctrl.signal });
+    if (!r.ok) throw new Error("http " + r.status);
+    const j = await r.json();
+    const out = {};
+    for (const [k, cur] of [["USDBRL", "USD"], ["EURBRL", "EUR"]]) {
+      const x = j?.[k];
+      const bid = Number(x?.bid), ask = Number(x?.ask), pct = Number(x?.pctChange);
+      if (bid > 0 && ask > 0 && bid < 1000 && ask < 1000) {
+        out[cur] = { bid, ask, pct: Number.isFinite(pct) ? pct : null, at: typeof x?.create_date === "string" ? x.create_date.slice(0, 19) : "" };
+      }
+    }
+    if (!out.USD && !out.EUR) throw new Error("vazio");
+    return { ...out, t: Date.now() };
   } finally { clearTimeout(to); }
 }
 
@@ -213,7 +278,7 @@ function mkDelta(cur, pr, mode, ctx) {
   return { kind, txt, ctx };
 }
 
-function buildCards(st) {
+function buildCards(st, live) {
   const g = (k) => st[k]?.data;
   const cards = [];
 
@@ -276,8 +341,29 @@ function buildCards(st) {
       id: "usd", name: "Dólar · venda", freq: "Diário", code: "SGS 1", prefix: "R$ ", dec: 4,
       value: last(a)?.[1] ?? null, ref: last(a) ? fmtDia(last(a)[0]) : null,
       delta: a && prev(a) ? mkDelta(last(a)[1], prev(a)[1], "pct", "vs. dia útil anterior") : null,
-      sub: c ? [{ k: "Compra", v: `R$ ${fmt(c[1], 4)}` }] : [],
+      sub: [
+        ...(c ? [{ k: "Compra", v: `R$ ${fmt(c[1], 4)}` }] : []),
+        ...(live?.USD ? [{ k: "Agora (intradia)", v: `R$ ${fmt(live.USD.ask, 4)}` }] : []),
+      ],
       spark: a ? a.slice(-30).map((r) => r[1]) : [], avail: !!a?.length,
+    });
+  }
+  // Juro real (Fisher): Selic meta atual x IPCA 12m mais recente
+  {
+    const sa = g("selicMeta"), ia = g("ipca12");
+    const sl = last(sa), il = last(ia);
+    let value = null, delta = null, spark = [];
+    if (sl && il) {
+      value = ((1 + sl[1] / 100) / (1 + il[1] / 100) - 1) * 100;
+      const al = realSeries(monthlyLast(sa), ia);
+      spark = al.slice(-12).map((r) => r[1]).concat(value);
+      if (al.length) delta = mkDelta(value, last(al)[1], "pp", `vs. fim de ${fmtMes(last(al)[0])}`);
+    }
+    cards.push({
+      id: "real", name: "Juro real", freq: "Calculado", code: "Selic e IPCA 12m", unit: " % a.a.", dec: 2,
+      value, ref: sl && il ? `Selic ${fmtDia(sl[0])}` : null, delta,
+      sub: sl && il ? [{ k: "Selic meta", v: `${fmt(sl[1], 2)}% a.a.` }, { k: `IPCA 12m (${fmtMes(il[0])})`, v: `${fmt(il[1], 2)}%` }] : [],
+      spark, avail: value != null,
     });
   }
   return cards;
@@ -377,7 +463,20 @@ const CSS = `
 .ce-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--text-3);line-height:1.6;padding-top:4px}
 .ce-foot a{color:var(--gold);text-decoration:none;display:inline-flex;align-items:center;gap:4px}
 .ce-foot a:hover{text-decoration:underline}
+.ce-h2{font-size:17px;font-weight:600;letter-spacing:-.01em;margin-top:4px}
+.ce-tool{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:16px}
+.ce-form{display:flex;flex-direction:column;gap:14px}
+.ce-field{display:flex;flex-direction:column;gap:7px}
+.ce-in{all:unset;box-sizing:border-box;width:100%;background:var(--s3);border:1px solid var(--border);border-radius:14px;padding:12px 16px;font:500 14px var(--ce-mono);color:var(--text);transition:border-color .15s,box-shadow .15s}
+.ce-in:focus{border-color:rgba(200,165,94,.5);box-shadow:0 0 0 3px var(--gold-d)}
+select.ce-in{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--text-3) 50%),linear-gradient(135deg,var(--text-3) 50%,transparent 50%);background-position:calc(100% - 20px) 50%,calc(100% - 15px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:36px}
+.ce-res{background:var(--s2);border:1px solid var(--border);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:10px;justify-content:center;min-height:180px}
+.ce-res-v{font:500 clamp(24px,3vw,32px) var(--ce-mono);color:var(--gold-l);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.ce-row{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--text-2)}
+.ce-row b{font:500 12px var(--ce-mono);color:var(--text);text-align:right}
+.ce-note{font-size:11px;color:var(--text-3);line-height:1.55}
 @media(max-width:720px){
+  .ce-tool{grid-template-columns:1fr}
   .ce-wrap{padding:16px 14px 40px;gap:18px}
   .ce-cards{grid-template-columns:repeat(2,1fr)}
   .ce-card{min-height:184px;padding:14px 13px 12px}
@@ -481,6 +580,170 @@ function Tip({ active, payload, label, unit, dec, freq }) {
   );
 }
 
+/* ═══════════════════ FERRAMENTAS ═══════════════════ */
+function Field({ id, label, children }) {
+  return (<div className="ce-field"><label className="ce-label" htmlFor={id}>{label}</label>{children}</div>);
+}
+const fmtBRL = (v) => `R$ ${fmt(v, 2)}`;
+
+function Corretor() {
+  const [valor, setValor] = useState("1.000,00");
+  const [idx, setIdx] = useState("ipcaM");
+  const [meses, setMeses] = useState(12);
+  const [r, setR] = useState({ status: "loading" });
+
+  useEffect(() => {
+    let alive = true;
+    setR({ status: "loading" });
+    getSeries(idx, daysAgo(meses * 31 + 45)).then((x) => {
+      const sel = x.data.slice(-meses);
+      if (sel.length < meses || ymIdx(sel[sel.length - 1][0]) - ymIdx(sel[0][0]) !== meses - 1) throw new Error("incompleto");
+      const factor = sel.reduce((f, row) => f * (1 + row[1] / 100), 1);
+      if (alive) setR({ status: "ok", factor, from: sel[0][0], to: sel[sel.length - 1][0], stale: x.stale });
+    }).catch(() => alive && setR({ status: "error" }));
+    return () => { alive = false; };
+  }, [idx, meses]);
+
+  const v = parseNum(valor);
+  const okV = Number.isFinite(v) && v > 0 && v < 1e12;
+  return (
+    <div className="ce-tool">
+      <div className="ce-form">
+        <Field id="cv-valor" label="Valor de referência (R$)">
+          <input id="cv-valor" className="ce-in" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="1.000,00" />
+        </Field>
+        <Field id="cv-idx" label="Índice de correção">
+          <select id="cv-idx" className="ce-in" value={idx} onChange={(e) => setIdx(e.target.value)}>
+            <option value="ipcaM">IPCA</option>
+            <option value="igpmM">IGP-M</option>
+          </select>
+        </Field>
+        <Field id="cv-meses" label="Há quanto tempo">
+          <select id="cv-meses" className="ce-in" value={meses} onChange={(e) => setMeses(Number(e.target.value))}>
+            {[6, 12, 24, 36, 60].map((m) => (<option key={m} value={m}>{m} meses</option>))}
+          </select>
+        </Field>
+      </div>
+      <div className="ce-res" aria-live="polite">
+        {r.status === "loading" && <div className="ce-skel" style={{ height: 70 }} />}
+        {r.status === "error" && <span className="ce-note">Não foi possível obter o índice agora. Tente novamente em instantes.</span>}
+        {r.status === "ok" && !okV && <span className="ce-note">Informe um valor válido.</span>}
+        {r.status === "ok" && okV && (
+          <>
+            <span className="ce-label">{fmtBRL(v)} de {fmtMes(r.from)} valem hoje</span>
+            <div className="ce-res-v">{fmtBRL(v * r.factor)}</div>
+            <div className="ce-row"><span>Variação acumulada</span><b>{fmt((r.factor - 1) * 100, 2)}%</b></div>
+            <div className="ce-row"><span>Diferença</span><b>{fmtBRL(v * r.factor - v)}</b></div>
+            <div className="ce-row"><span>Período</span><b>{fmtMes(r.from)} a {fmtMes(r.to)}</b></div>
+            <span className="ce-note">
+              Usa as {meses} últimas variações mensais divulgadas do {idx === "ipcaM" ? "IPCA" : "IGP-M"}{r.stale ? " (dados salvos, fonte indisponível)" : ""}. Útil para estimar reajustes de contratos e aluguéis.
+            </span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SimuladorCDI({ cdi }) {
+  const [valor, setValor] = useState("10.000,00");
+  const [pct, setPct] = useState("100");
+  const [meses, setMeses] = useState(12);
+  const v = parseNum(valor);
+  const p = parseNum(pct);
+  const okV = Number.isFinite(v) && v > 0 && v < 1e12;
+  const okP = Number.isFinite(p) && p > 0 && p <= 500;
+  const rate = cdi ? (cdi[1] * p) / 100 : null;
+  const factor = rate != null && okP ? Math.pow(1 + rate / 100, meses / 12) : null;
+  const bruto = okV && factor ? v * (factor - 1) : null;
+  const ir = irRate(meses * 30);
+  return (
+    <div className="ce-tool">
+      <div className="ce-form">
+        <Field id="sc-valor" label="Valor investido (R$)">
+          <input id="sc-valor" className="ce-in" inputMode="decimal" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="10.000,00" />
+        </Field>
+        <Field id="sc-pct" label="Rentabilidade (% do CDI)">
+          <input id="sc-pct" className="ce-in" inputMode="decimal" value={pct} onChange={(e) => setPct(e.target.value)} placeholder="100" />
+        </Field>
+        <Field id="sc-meses" label="Prazo">
+          <select id="sc-meses" className="ce-in" value={meses} onChange={(e) => setMeses(Number(e.target.value))}>
+            {[1, 3, 6, 12, 24, 36, 60].map((m) => (<option key={m} value={m}>{m} {m === 1 ? "mês" : "meses"}</option>))}
+          </select>
+        </Field>
+      </div>
+      <div className="ce-res" aria-live="polite">
+        {!cdi && <span className="ce-note">CDI indisponível no momento. Atualize os indicadores.</span>}
+        {cdi && (!okV || !okP) && <span className="ce-note">Informe valor e percentual válidos (até 500% do CDI).</span>}
+        {cdi && okV && okP && (
+          <>
+            <span className="ce-label">Valor líquido estimado em {meses} {meses === 1 ? "mês" : "meses"}</span>
+            <div className="ce-res-v">{fmtBRL(v + bruto * (1 - ir))}</div>
+            <div className="ce-row"><span>Valor bruto</span><b>{fmtBRL(v + bruto)}</b></div>
+            <div className="ce-row"><span>Rendimento bruto</span><b>{fmtBRL(bruto)}</b></div>
+            <div className="ce-row"><span>IR estimado ({fmt(ir * 100, 1)}%)</span><b>{fmtBRL(bruto * ir)}</b></div>
+            <div className="ce-row"><span>Taxa usada</span><b>{fmt(rate, 2)}% a.a. ({fmtDia(cdi[0])})</b></div>
+            <span className="ce-note">
+              Projeção com o CDI atual mantido constante. IR pela tabela regressiva da renda fixa; LCI, LCA e outros produtos podem ser isentos. Estimativa, não garantia de rendimento.
+            </span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Conversor({ store, live }) {
+  const [amt, setAmt] = useState("1.000,00");
+  const [dir, setDir] = useState("BRL-USD");
+  const [from, to] = dir.split("-");
+  const buying = from === "BRL";
+  const cur = buying ? to : from;
+  const sym = cur === "USD" ? "US$" : "€";
+  const L = live?.[cur];
+  let rate = null, srcTxt = "", when = "";
+  if (L) {
+    rate = buying ? L.ask : L.bid; srcTxt = "AwesomeAPI (intradia)"; when = fmtLiveAt(L.at, live.t);
+  } else if (cur === "USD") {
+    const sRow = last(buying ? store.usdV?.data : store.usdC?.data);
+    if (sRow) { rate = sRow[1]; srcTxt = "Banco Central (fechamento)"; when = fmtDia(sRow[0]); }
+  }
+  const v = parseNum(amt);
+  const okV = Number.isFinite(v) && v > 0 && v < 1e12;
+  const res = rate && okV ? (buying ? v / rate : v * rate) : null;
+  return (
+    <div className="ce-tool">
+      <div className="ce-form">
+        <Field id="cc-amt" label={`Valor (${buying ? "R$" : sym})`}>
+          <input id="cc-amt" className="ce-in" inputMode="decimal" value={amt} onChange={(e) => setAmt(e.target.value)} placeholder="1.000,00" />
+        </Field>
+        <Field id="cc-dir" label="Conversão">
+          <select id="cc-dir" className="ce-in" value={dir} onChange={(e) => setDir(e.target.value)}>
+            <option value="BRL-USD">Real → Dólar</option>
+            <option value="USD-BRL">Dólar → Real</option>
+            <option value="BRL-EUR">Real → Euro</option>
+            <option value="EUR-BRL">Euro → Real</option>
+          </select>
+        </Field>
+      </div>
+      <div className="ce-res" aria-live="polite">
+        {rate == null && <span className="ce-note">Cotação do {cur === "USD" ? "dólar" : "euro"} indisponível no momento. Tente novamente em instantes.</span>}
+        {rate != null && !okV && <span className="ce-note">Informe um valor válido.</span>}
+        {res != null && (
+          <>
+            <span className="ce-label">{buying ? fmtBRL(v) : `${sym} ${fmt(v, 2)}`} equivalem a</span>
+            <div className="ce-res-v">{buying ? `${sym} ${fmt(res, 2)}` : fmtBRL(res)}</div>
+            <div className="ce-row"><span>Cotação usada ({buying ? "venda" : "compra"})</span><b>1 {cur} = R$ {fmt(rate, 4)}</b></div>
+            <div className="ce-row"><span>Fonte</span><b>{srcTxt}</b></div>
+            <div className="ce-row"><span>Referência</span><b>{when}</b></div>
+            <span className="ce-note">Cotação comercial de referência. O valor cobrado em corretoras, bancos e casas de câmbio inclui spread e tarifas.</span>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ═══════════════════ COMPONENTE PRINCIPAL ═══════════════════ */
 export default function CenarioEconomico({ onVoltar }) {
   const mounted = useRef(true);
@@ -504,6 +767,9 @@ export default function CenarioEconomico({ onVoltar }) {
   const [viewId, setViewId] = useState("d");
   const [period, setPeriod] = useState("12m");
   const [chart, setChart] = useState({ status: "loading", rows: [] });
+  const [tool, setTool] = useState("corretor");
+  const [live, setLive] = useState(null);
+  const liveT = useRef(0);
 
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
@@ -524,16 +790,33 @@ export default function CenarioEconomico({ onVoltar }) {
   }, []);
   useEffect(() => { loadAll(false); }, [loadAll]);
 
+  /* cotação intradia (opcional): só com a aba visível, a cada 2 min; falha em silêncio */
+  const runLive = useCallback(async () => {
+    if (document.visibilityState !== "visible") return;
+    try {
+      const r = await fetchLive();
+      if (mounted.current) { liveT.current = Date.now(); setLive(r); }
+    } catch { /* mantém o último valor; sem aviso para não poluir */ }
+  }, []);
+  useEffect(() => {
+    runLive();
+    const id = setInterval(runLive, LIVE_EVERY);
+    const vis = () => { if (document.visibilityState === "visible" && Date.now() - liveT.current > LIVE_EVERY) runLive(); };
+    document.addEventListener("visibilitychange", vis);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", vis); };
+  }, [runLive]);
+
   const refresh = () => {
     const now = Date.now();
     if (now - lastRefresh.current < COOLDOWN) return;
     lastRefresh.current = now;
     setCool(true);
     setTimeout(() => mounted.current && setCool(false), COOLDOWN);
+    runLive();
     loadAll(true).then(() => mounted.current && setTick((t) => t + 1));
   };
 
-  const cards = useMemo(() => buildCards(store), [store]);
+  const cards = useMemo(() => buildCards(store, live), [store, live]);
 
   /* gráfico: carrega só o período/indicador selecionado */
   const cfg = CHARTS[tab];
@@ -550,10 +833,13 @@ export default function CenarioEconomico({ onVoltar }) {
       const derived = view.lines.some((l) => l.src === "igpm12");
       const from = derived ? daysAgo(periodDays + 400) : cut;
       const res = await Promise.all(view.lines.map(async (l) => {
-        const base = l.src === "igpm12" ? "igpmM" : l.src;
-        const r = await getSeries(base, from);
-        const arr = l.src === "igpm12" ? rolling12(r.data) : r.data;
-        return sliceFrom(arr, cut);
+        if (l.src === "igpm12") return sliceFrom(rolling12((await getSeries("igpmM", from)).data), cut);
+        if (l.src === "selicM") return sliceFrom(monthlyLast((await getSeries("selicMeta", from)).data), cut);
+        if (l.src === "real") {
+          const [a, b] = await Promise.all([getSeries("selicMeta", from), getSeries("ipca12", from)]);
+          return sliceFrom(realSeries(monthlyLast(a.data), b.data), cut);
+        }
+        return sliceFrom((await getSeries(l.src, from)).data, cut);
       }));
       const map = new Map();
       res.forEach((arr, li) => arr.forEach(([d, v]) => {
@@ -568,8 +854,8 @@ export default function CenarioEconomico({ onVoltar }) {
     return () => { alive = false; };
   }, [tab, viewId, effPeriod, tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const selectTab = (id, scroll) => {
-    setTab(id); setViewId(CHARTS[id].views[0].id);
+  const selectTab = (id, scroll, pickView) => {
+    setTab(id); setViewId(pickView || CHARTS[id].views[0].id);
     if (scroll) chartRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
@@ -660,9 +946,9 @@ export default function CenarioEconomico({ onVoltar }) {
           <div className="ce-label" style={{ marginBottom: 10 }}>Indicadores principais</div>
           <div className="ce-cards">
             {cards.map((c) => (
-              <Card key={c.id} c={c} on={tab === c.id} loading={loading}
+              <Card key={c.id} c={c} on={tab === (c.id === "real" ? "cmp" : c.id)} loading={loading}
                 failed={Object.entries(err).some(([k, v]) => v && k.startsWith(c.id))}
-                onClick={() => selectTab(c.id, true)} />
+                onClick={() => (c.id === "real" ? selectTab("cmp", true, "r") : selectTab(c.id, true))} />
             ))}
           </div>
         </section>
@@ -772,6 +1058,24 @@ export default function CenarioEconomico({ onVoltar }) {
           )}
         </section>
 
+        {/* Ferramentas */}
+        <section className="ce-panel">
+          <div className="ce-panel-h">
+            <div>
+              <div className="ce-label">Ferramentas</div>
+              <h2 className="ce-h2">Calculadoras financeiras</h2>
+            </div>
+            <div className="ce-tabs" role="tablist" aria-label="Ferramenta">
+              {[["corretor", "Corretor de valores"], ["cdi", "Simulador CDI"], ["cambio", "Conversor"]].map(([id, label]) => (
+                <button key={id} role="tab" aria-selected={tool === id} className={`ce-tab${tool === id ? " on" : ""}`} onClick={() => setTool(id)}>{label}</button>
+              ))}
+            </div>
+          </div>
+          {tool === "corretor" && <Corretor />}
+          {tool === "cdi" && <SimuladorCDI cdi={last(store.cdi?.data)} />}
+          {tool === "cambio" && <Conversor store={store} live={live} />}
+        </section>
+
         {/* Informações */}
         <section>
           <div className="ce-label" style={{ marginBottom: 10 }}>Entenda os indicadores</div>
@@ -785,7 +1089,7 @@ export default function CenarioEconomico({ onVoltar }) {
         {/* Fonte */}
         <footer className="ce-foot">
           <span>
-            Fonte: Banco Central do Brasil, Sistema Gerenciador de Séries Temporais (SGS). IPCA: IBGE · IGP-M: FGV · Dólar: câmbio livre (venda/compra).
+            Fonte: Banco Central do Brasil, Sistema Gerenciador de Séries Temporais (SGS). IPCA: IBGE · IGP-M: FGV · Dólar: câmbio livre (venda/compra). Cotação intradia de dólar e euro: AwesomeAPI (terceiros, informativa).
             O IGP-M em 12 meses é calculado a partir da variação mensal oficial. Dados informativos; não constituem recomendação financeira.
           </span>
           <a href={SRC_URL} target="_blank" rel="noopener noreferrer">Dados Abertos BCB <ExternalLink size={11} /></a>
