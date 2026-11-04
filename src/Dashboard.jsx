@@ -50,6 +50,7 @@ import AlunosCadastro from "./modules/AlunosCadastro.jsx";
 import PDV          from "./modules/PDV.jsx";
 import CRMModule    from "./crm/CRMModule.jsx";
 import AssFlow      from "./flow/AssFlow.jsx";
+import CenarioEconomico from "./cenario/CenarioEconomico.jsx";
 
 import RotaProtegida from "./contexts/RotaProtegida";
 import { usePermissao } from "./hooks/usePermissao";
@@ -4530,7 +4531,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             onClick={toggleSidebar}
             title={collapsed ? "Expandir menu" : "Recolher menu"}
             aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-            style={sistemaAtivo === "crm" || sistemaAtivo === "flow" ? { display: "none" } : {}}
+            style={sistemaAtivo === "crm" || sistemaAtivo === "cenario" || sistemaAtivo === "flow" ? { display: "none" } : {}}
           >
             {collapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
           </button>
@@ -4878,6 +4879,40 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                   )}
                 </button>
 
+                {/* ── Assent Cenário Econômico ── */}
+                <button
+                  className="ag-dropdown-item"
+                  onClick={() => { setSistemaAtivo("cenario"); setDropdownOpen(false); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    background: sistemaAtivo === "cenario" ? "var(--gold-d)" : "transparent",
+                    color: sistemaAtivo === "cenario" ? "var(--gold)" : "var(--text-2)",
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: 20, height: 20, borderRadius: 5, flexShrink: 0,
+                      display: "grid", placeItems: "center",
+                      background: "var(--gold-d)", border: "1px solid rgba(200,165,94,0.28)",
+                      color: "var(--gold)",
+                    }}
+                  >
+                    <TrendingUp size={12} />
+                  </span>
+                  <span style={{ flex: 1 }}>Assent Cenário Econômico</span>
+                  {sistemaAtivo === "cenario" ? (
+                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--gold)", flexShrink: 0 }} />
+                  ) : (
+                    <span style={{
+                      fontSize: 8, fontWeight: 700, padding: "1px 5px", borderRadius: 999,
+                      background: "rgba(200,165,94,0.15)", color: "var(--gold)",
+                      border: "1px solid rgba(200,165,94,0.28)",
+                      letterSpacing: "0.08em", textTransform: "uppercase", flexShrink: 0,
+                    }}>NOVO</span>
+                  )}
+                </button>
+
                 {/* ── Assent Flow - essencial (opt-in), profissional e delux ── */}
                 {flowVisivel && (
                   <button
@@ -4933,7 +4968,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         <div className="ag-body">
 
           {/* Sidebar desktop recolhível - oculta no Assent CRM */}
-          <aside className={`ag-sidebar ${collapsed ? "collapsed" : ""}`} data-tour="menu" style={sistemaAtivo === "crm" || sistemaAtivo === "flow" ? { display: "none" } : {}}>
+          <aside className={`ag-sidebar ${collapsed ? "collapsed" : ""}`} data-tour="menu" style={sistemaAtivo === "crm" || sistemaAtivo === "cenario" || sistemaAtivo === "flow" ? { display: "none" } : {}}>
             <nav className="ag-nav">
               {NAV.map((sec) => {
                 const aberta = secaoAberta[sec.section] !== false;
@@ -5012,6 +5047,8 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
                 theme={theme}
                 onToggleTheme={toggleTheme}
               />
+            ) : sistemaAtivo === "cenario" ? (
+              <CenarioEconomico onVoltar={() => setSistemaAtivo("gestao")} />
             ) : sistemaAtivo === "flow" && flowVisivel ? (
               <AssFlow
                 tenantUid={tenantUid}
