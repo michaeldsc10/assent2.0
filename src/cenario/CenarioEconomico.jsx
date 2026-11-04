@@ -38,6 +38,8 @@ const SERIES = {
   cdi:       { code: 4389,  freq: "D", ttl: 30 * MIN,      win: 45  },
   usdV:      { code: 1,     freq: "D", ttl: 30 * MIN,      win: 45  },
   usdC:      { code: 10813, freq: "D", ttl: 30 * MIN,      win: 45  },
+  eurV:      { ptax: true, moeda: "EUR", side: "V", freq: "D", ttl: 30 * MIN, win: 45 },
+  eurC:      { ptax: true, moeda: "EUR", side: "C", freq: "D", ttl: 30 * MIN, win: 45 },
   ipcaM:     { code: 433,   freq: "M", ttl: 6 * 60 * MIN,  win: 800 },
   ipca12:    { code: 13522, freq: "M", ttl: 6 * 60 * MIN,  win: 800 },
   igpmM:     { code: 189,   freq: "M", ttl: 6 * 60 * MIN,  win: 800 },
@@ -90,6 +92,16 @@ const CHARTS = {
       ],
     }],
   },
+  eur: {
+    label: "Euro", freq: "D", dec: 4, mode: "pct",
+    views: [{
+      id: "d", label: "Venda × Compra (PTAX)", unit: "R$",
+      lines: [
+        { src: "eurV", name: "Venda",  color: "var(--gold)" },
+        { src: "eurC", name: "Compra", color: "var(--blue)", ghost: true },
+      ],
+    }],
+  },
   cmp: {
     label: "Comparar", freq: "M", dec: 2, mode: "pp",
     views: [
@@ -105,6 +117,7 @@ const CHARTS = {
   },
 };
 
+const OLINDA = "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/";
 const LIVE_URL = "https://economia.awesomeapi.com.br/json/last/USD-BRL,EUR-BRL";
 const LIVE_EVERY = 2 * MIN;
 
@@ -114,6 +127,7 @@ const INFO = [
   { id: "cdi",   t: "CDI",    d: "Taxa de referência das aplicações de renda fixa, sempre muito próxima da Selic. Serve de base para comparar rendimentos." },
   { id: "igpm",  t: "IGP-M",  d: "Índice da FGV usado como referência em reajustes de contratos, como aluguéis. Reflete preços no atacado, na construção e no consumo." },
   { id: "usd",   t: "Dólar",  d: "Cotação comercial do dólar americano. Influencia o custo de produtos importados, insumos e fornecedores que dependem de moeda estrangeira." },
+  { id: "eur",   t: "Euro",   d: "Cotação do euro em reais (PTAX de fechamento do Banco Central). Importante para quem compra da Europa, viaja ou tem fornecedores e contratos em euro." },
   { id: "real",  t: "Juro real", d: "Quanto a Selic rende acima da inflação: (1 + Selic) ÷ (1 + IPCA 12m) - 1. Juro real alto encarece o crédito e favorece quem investe em renda fixa. É uma medida simplificada, não uma previsão." },
 ];
 
@@ -199,9 +213,50 @@ function writeCache(key, obj) {
   try { localStorage.setItem(LS + key, JSON.stringify(obj)); } catch { /* quota/privado: ignora */ }
 }
 
+const usDate = (iso) => `${iso.slice(5, 7)}-${iso.slice(8, 10)}-${iso.slice(0, 4)}`;
+const ptaxInflight = new Map();
+function fetchPtaxRows(moeda, fromIso) {
+  if (moeda !== "EUR") return Promise.reject(new Error("moeda"));
+  const id = `${moeda}|${fromIso}`;
+  let p = ptaxInflight.get(id);
+  if (!p) {
+    p = (async () => {
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 20000);
+      try {
+        const url = `${OLINDA}CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,dataFinal=@dataFinal)` +
+          `?@moeda='${moeda}'&@dataInicial='${usDate(fromIso)}'&@dataFinal='${usDate(daysAgo(0))}'` +
+          `&$top=10000&$format=json&$select=cotacaoCompra,cotacaoVenda,dataHoraCotacao`;
+        const r = await fetch(url, { signal: ctrl.signal });
+        if (!r.ok) throw new Error("http " + r.status);
+        const j = await r.json();
+        if (!Array.isArray(j?.value)) throw new Error("formato");
+        const byDay = new Map(); // fica com o último boletim do dia (PTAX de fechamento)
+        for (const x of j.value) {
+          const dh = typeof x?.dataHoraCotacao === "string" ? x.dataHoraCotacao : "";
+          const d = dh.slice(0, 10);
+          const v = Number(x?.cotacaoVenda), c = Number(x?.cotacaoCompra);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || !(v > 0) || !(c > 0)) continue;
+          const cur = byDay.get(d);
+          if (!cur || dh > cur.dh) byDay.set(d, { dh, v, c });
+        }
+        const out = [...byDay.entries()].map(([d, o]) => [d, o.v, o.c]).sort((a, b) => (a[0] < b[0] ? -1 : 1));
+        if (!out.length) throw new Error("vazio");
+        return out;
+      } finally { clearTimeout(to); }
+    })().finally(() => ptaxInflight.delete(id));
+    ptaxInflight.set(id, p);
+  }
+  return p;
+}
+
 async function fetchRaw(key, fromIso) {
   const s = SERIES[key];
   if (!s) throw new Error("serie");
+  if (s.ptax) {
+    const rows = await fetchPtaxRows(s.moeda, fromIso);
+    return rows.map((r) => [r[0], s.side === "V" ? r[1] : r[2]]);
+  }
   const ctrl = new AbortController();
   const to = setTimeout(() => ctrl.abort(), 15000);
   try {
@@ -348,6 +403,20 @@ function buildCards(st, live) {
       spark: a ? a.slice(-30).map((r) => r[1]) : [], avail: !!a?.length,
     });
   }
+  // Euro (PTAX fechamento)
+  {
+    const a = g("eurV"), c = last(g("eurC"));
+    cards.push({
+      id: "eur", name: "Euro · venda", freq: "Diário", code: "PTAX BCB", prefix: "R$ ", dec: 4,
+      value: last(a)?.[1] ?? null, ref: last(a) ? fmtDia(last(a)[0]) : null,
+      delta: a && prev(a) ? mkDelta(last(a)[1], prev(a)[1], "pct", "vs. dia útil anterior") : null,
+      sub: [
+        ...(c ? [{ k: "Compra", v: `R$ ${fmt(c[1], 4)}` }] : []),
+        ...(live?.EUR ? [{ k: "Agora (intradia)", v: `R$ ${fmt(live.EUR.ask, 4)}` }] : []),
+      ],
+      spark: a ? a.slice(-30).map((r) => r[1]) : [], avail: !!a?.length,
+    });
+  }
   // Juro real (Fisher): Selic meta atual x IPCA 12m mais recente
   {
     const sa = g("selicMeta"), ia = g("ipca12");
@@ -360,7 +429,7 @@ function buildCards(st, live) {
       if (al.length) delta = mkDelta(value, last(al)[1], "pp", `vs. fim de ${fmtMes(last(al)[0])}`);
     }
     cards.push({
-      id: "real", name: "Juro real", freq: "Calculado", code: "Selic e IPCA 12m", unit: " % a.a.", dec: 2,
+      id: "real", wide: true, name: "Juro real", freq: "Calculado", code: "Selic e IPCA 12m", unit: " % a.a.", dec: 2,
       value, ref: sl && il ? `Selic ${fmtDia(sl[0])}` : null, delta,
       sub: sl && il ? [{ k: "Selic meta", v: `${fmt(sl[1], 2)}% a.a.` }, { k: `IPCA 12m (${fmtMes(il[0])})`, v: `${fmt(il[1], 2)}%` }] : [],
       spark, avail: value != null,
@@ -402,6 +471,7 @@ const CSS = `
 .ce-banner svg{flex-shrink:0;color:var(--amber);margin-top:1px}
 .ce-label{font:600 9.5px var(--ce-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--text-3)}
 .ce-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+@media(min-width:1000px){.ce-cards{grid-template-columns:repeat(4,1fr)}.ce-card.wide{grid-column:span 2}}
 .ce-card{all:unset;box-sizing:border-box;position:relative;display:flex;flex-direction:column;gap:10px;padding:18px 18px 14px;background:linear-gradient(160deg,var(--s2),var(--s1) 55%);border:1px solid var(--border);border-radius:22px;cursor:pointer;overflow:hidden;transition:border-color .2s,transform .2s,box-shadow .2s;min-height:196px}
 .ce-card:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .ce-card::before{content:"";position:absolute;top:-46px;right:-46px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,var(--gold-d),transparent 70%);opacity:.7;transition:opacity .2s;pointer-events:none}
@@ -477,6 +547,7 @@ select.ce-in{cursor:pointer;appearance:none;-webkit-appearance:none;background-i
 .ce-note{font-size:11px;color:var(--text-3);line-height:1.55}
 @media(max-width:720px){
   .ce-tool{grid-template-columns:1fr}
+  .ce-in{font-size:16px}
   .ce-wrap{padding:16px 14px 40px;gap:18px}
   .ce-cards{grid-template-columns:repeat(2,1fr)}
   .ce-card{min-height:184px;padding:14px 13px 12px}
@@ -485,7 +556,8 @@ select.ce-in{cursor:pointer;appearance:none;-webkit-appearance:none;background-i
   .ce-panel{padding:16px 12px;border-radius:22px}
   .ce-head-r{width:100%;justify-content:space-between}
 }
-@media(max-width:400px){.ce-cards{grid-template-columns:1fr}}
+@media(max-width:720px){.ce-card.wide{grid-column:span 2}}
+@media(max-width:400px){.ce-cards{grid-template-columns:1fr}.ce-card.wide{grid-column:auto}}
 @media(prefers-reduced-motion:reduce){.ce-dot,.ce-skel,.ce-spin{animation:none}.ce-card{transition:none}}
 `;
 
@@ -527,7 +599,7 @@ function Card({ c, on, loading, failed, onClick }) {
   const Icon = D?.kind === "up" ? TrendingUp : D?.kind === "down" ? TrendingDown : Minus;
   const showSkel = loading && !c.avail;
   return (
-    <button className={`ce-card${on ? " on" : ""}`} onClick={onClick} aria-label={`${c.name}: ver histórico`}>
+    <button className={`ce-card${on ? " on" : ""}${c.wide ? " wide" : ""}`} onClick={onClick} aria-label={`${c.name}: ver histórico`}>
       <div className="ce-card-top">
         <span className="ce-card-name">{c.name}</span>
         <span className="ce-chip">{c.freq}</span>
@@ -704,9 +776,10 @@ function Conversor({ store, live }) {
   let rate = null, srcTxt = "", when = "";
   if (L) {
     rate = buying ? L.ask : L.bid; srcTxt = "AwesomeAPI (intradia)"; when = fmtLiveAt(L.at, live.t);
-  } else if (cur === "USD") {
-    const sRow = last(buying ? store.usdV?.data : store.usdC?.data);
-    if (sRow) { rate = sRow[1]; srcTxt = "Banco Central (fechamento)"; when = fmtDia(sRow[0]); }
+  } else {
+    const kV = cur === "USD" ? "usdV" : "eurV", kC = cur === "USD" ? "usdC" : "eurC";
+    const sRow = last(buying ? store[kV]?.data : store[kC]?.data);
+    if (sRow) { rate = sRow[1]; srcTxt = cur === "USD" ? "Banco Central (fechamento)" : "Banco Central (PTAX)"; when = fmtDia(sRow[0]); }
   }
   const v = parseNum(amt);
   const okV = Number.isFinite(v) && v > 0 && v < 1e12;
@@ -879,7 +952,7 @@ export default function CenarioEconomico({ onVoltar }) {
   }, [store]);
   const failedKeys = Object.keys(err).filter((k) => err[k]);
   const failedNames = [...new Set(failedKeys.map((k) =>
-    k.startsWith("selic") ? "Selic" : k.startsWith("ipca") ? "IPCA" : k === "cdi" ? "CDI" : k.startsWith("igpm") ? "IGP-M" : "Dólar"))];
+    k.startsWith("selic") ? "Selic" : k.startsWith("ipca") ? "IPCA" : k === "cdi" ? "CDI" : k.startsWith("igpm") ? "IGP-M" : k.startsWith("eur") ? "Euro" : "Dólar"))];
   const anyData = cards.some((c) => c.avail);
 
   const xTick = (iso) => {
@@ -1089,7 +1162,7 @@ export default function CenarioEconomico({ onVoltar }) {
         {/* Fonte */}
         <footer className="ce-foot">
           <span>
-            Fonte: Banco Central do Brasil, Sistema Gerenciador de Séries Temporais (SGS). IPCA: IBGE · IGP-M: FGV · Dólar: câmbio livre (venda/compra). Cotação intradia de dólar e euro: AwesomeAPI (terceiros, informativa).
+            Fonte: Banco Central do Brasil, Sistema Gerenciador de Séries Temporais (SGS). IPCA: IBGE · IGP-M: FGV · Dólar: câmbio livre (venda/compra) · Euro: PTAX de fechamento. Cotação intradia de dólar e euro: AwesomeAPI (terceiros, informativa).
             O IGP-M em 12 meses é calculado a partir da variação mensal oficial. Dados informativos; não constituem recomendação financeira.
           </span>
           <a href={SRC_URL} target="_blank" rel="noopener noreferrer">Dados Abertos BCB <ExternalLink size={11} /></a>

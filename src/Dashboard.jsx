@@ -3241,6 +3241,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
 
   /* ── Fecha mobile menu ao navegar ── */
   const navigateTo = (label) => {
+    setSistemaAtivo("gestao");
     setModule(label);
     setMobileMenuOpen(false);
   };
