@@ -39,6 +39,12 @@ function DetalheCard({ icon: Icon, label, value, valueStyle, fullWidth = false, 
   );
 }
 
+/* ── Escapa texto antes de entrar no HTML da janela de impressão (evita XSS:
+      títulos/nomes podem vir de formulários públicos, como o do Flow) ── */
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => (
+  { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+));
+
 /* ── Gera o HTML de impressão em nova janela ── */
 function abrirJanelaPrint(evento) {
   const estilo = TIPO_ESTILO[evento.tipo] || TIPO_ESTILO["Outro"];
@@ -53,7 +59,7 @@ function abrirJanelaPrint(evento) {
     ["file",     "Observações",     evento.observacao],
     ["check",    "Status",          evento.status === "concluido" ? "Concluído ✓" : "Pendente"],
     ["info",     "Criado em",       evento.dataCriacao ? new Date(evento.dataCriacao).toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" }) : null],
-  ].filter(([, , v]) => v);
+  ].filter(([, , v]) => v).map(([i, l, v]) => [i, l, esc(v)]);
 
   const grid = linhas.map(([, l, v]) => `
     <div class="card">
@@ -66,7 +72,7 @@ function abrirJanelaPrint(evento) {
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <title>Evento — ${evento.titulo}</title>
+  <title>Evento — ${esc(evento.titulo)}</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@500&display=swap');
 
@@ -160,9 +166,9 @@ function abrirJanelaPrint(evento) {
   <div class="header">
     <div class="header-left">
       <div class="app-label">ASSENT · Agenda de Eventos</div>
-      <div class="titulo">${evento.titulo}</div>
-      <div class="badge">${evento.tipo || "Outro"}</div>
-      <div class="data-destaque">${fmtDataLonga(evento.data)}${evento.horario ? ` · ${evento.horario}` : ""}</div>
+      <div class="titulo">${esc(evento.titulo)}</div>
+      <div class="badge">${esc(evento.tipo || "Outro")}</div>
+      <div class="data-destaque">${esc(fmtDataLonga(evento.data))}${evento.horario ? ` · ${esc(evento.horario)}` : ""}</div>
     </div>
   </div>
 

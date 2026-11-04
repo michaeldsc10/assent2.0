@@ -6,7 +6,8 @@
    ═══════════════════════════════════════════════════ */
 const { onSchedule }              = require("firebase-functions/v2/scheduler");
 const { onDocumentCreated,
-        onDocumentDeleted }       = require("firebase-functions/v2/firestore");
+        onDocumentDeleted,
+        onDocumentWritten }       = require("firebase-functions/v2/firestore");
 const { onCall, onRequest,
         HttpsError }              = require("firebase-functions/v2/https");
 const { getFirestore,
@@ -145,7 +146,8 @@ exports.gerarPixQr = onRequest(
     if (!mpConfig?.ativo)        { res.status(400).json({ error: "Pagamentos PIX não ativados." }); return; }
     if (!mpConfig?.accessToken)  { res.status(400).json({ error: "Access Token não configurado." }); return; }
 
-    const token          = mpConfig.accessToken;
+    const token          = await obterTokenMP(tenantUid, mpConfig.accessToken);
+    if (!token) { res.status(400).json({ error: "Access Token não configurado." }); return; }
     const idempotencyKey = `assent-${tenantUid}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     let mpData;
@@ -238,7 +240,7 @@ exports.consultarPagamento = onRequest(
     }
 
     const configSnap = await db.doc(`users/${tenantUid}/config/geral`).get();
-    const token      = configSnap.data()?.pagamentos?.mercadopago?.accessToken;
+    const token      = await obterTokenMP(tenantUid, configSnap.data()?.pagamentos?.mercadopago?.accessToken);
     if (!token) { res.status(400).json({ error: "Token não configurado." }); return; }
 
     const mpRes  = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
@@ -333,6 +335,8 @@ exports.pagamentoPix = onRequest(
     if (!mpConfig?.ativo || !mpConfig?.accessToken) {
       res.status(400).json({ error: "Pagamentos não ativados." }); return;
     }
+    const mpToken = await obterTokenMP(tenantUid, mpConfig.accessToken);
+    if (!mpToken) { res.status(400).json({ error: "Pagamentos não ativados." }); return; }
 
     const adiantamentoPct = configSnap.data()?.reservas?.adiantamentoPct || 0.30;
     const valor           = parseFloat((reserva.servico_preco * adiantamentoPct).toFixed(2));
@@ -343,7 +347,7 @@ exports.pagamentoPix = onRequest(
       const mpRes = await fetch("https://api.mercadopago.com/v1/payments", {
         method:  "POST",
         headers: {
-          Authorization:       `Bearer ${mpConfig.accessToken}`,
+          Authorization:       `Bearer ${mpToken}`,
           "Content-Type":      "application/json",
           "X-Idempotency-Key": idempotencyKey,
         },
@@ -432,6 +436,8 @@ exports.pagamentoCartao = onRequest(
     if (!mpConfig?.ativo || !mpConfig?.accessToken) {
       res.status(400).json({ error: "Pagamentos não ativados." }); return;
     }
+    const mpToken = await obterTokenMP(tenantUid, mpConfig.accessToken);
+    if (!mpToken) { res.status(400).json({ error: "Pagamentos não ativados." }); return; }
 
     const adiantamentoPct = configSnap.data()?.reservas?.adiantamentoPct || 0.30;
     const valor           = parseFloat((reserva.servico_preco * adiantamentoPct).toFixed(2));
@@ -442,7 +448,7 @@ exports.pagamentoCartao = onRequest(
       const mpRes = await fetch("https://api.mercadopago.com/v1/payments", {
         method:  "POST",
         headers: {
-          Authorization:       `Bearer ${mpConfig.accessToken}`,
+          Authorization:       `Bearer ${mpToken}`,
           "Content-Type":      "application/json",
           "X-Idempotency-Key": idempotencyKey,
         },
@@ -548,7 +554,7 @@ exports.mpWebhook = onRequest(
 
     // Lê token do tenant para verificar com MP
     const configSnap = await db.doc(`users/${tenantUid}/config/geral`).get();
-    const token      = configSnap.data()?.pagamentos?.mercadopago?.accessToken;
+    const token      = await obterTokenMP(tenantUid, configSnap.data()?.pagamentos?.mercadopago?.accessToken);
     if (!token) { res.status(200).send("OK"); return; }
 
     // Verifica status real com MP
@@ -624,7 +630,7 @@ exports.sincronizarTaxasMP = onCall(CALL_OPTIONS, async (request) => {
   const tenantUid = await verificarAdmin(request.auth?.uid);
 
   const configSnap = await db.doc(`users/${tenantUid}/config/geral`).get();
-  const token = configSnap.data()?.pagamentos?.mercadopago?.accessToken;
+  const token = await obterTokenMP(tenantUid, configSnap.data()?.pagamentos?.mercadopago?.accessToken);
   if (!token) {
     throw new HttpsError("failed-precondition", "Mercado Pago não configurado.");
   }
@@ -1601,6 +1607,103 @@ exports.onReservaDeleted = onDocumentDeleted(
 );
 
 /* ─────────────────────────────────────────────
+   FUNÇÃO: onReservaAgendaSync
+   Flow → Agenda no servidor (não depende de ninguém abrir o Flow).
+   Reserva "confirmado" (aceite manual, colaborador, Pix, cartão ou
+   webhook MP) vira evento em users/{tenant}/eventos/flow_{reservaId}.
+   Mesmas regras do front (sincronizarAgenda), idempotente via agendaSync:
+     confirmado            → cria evento
+     concluido             → marca evento como concluído
+     cancelado/nao_apareceu/pendente (reaberta) → remove evento
+     reserva excluída      → remove evento
+   A própria escrita de agendaSync dispara a função de novo, mas cai em
+   "nada a fazer" (sem loop).
+───────────────────────────────────────────── */
+const TZ_AGENDA = "America/Sao_Paulo";
+const cortar = (v, n) => String(v ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, n);
+
+exports.onReservaAgendaSync = onDocumentWritten(
+  "users/{tenantUid}/agendamento_reservas/{reservaId}",
+  async (event) => {
+    const { tenantUid, reservaId } = event.params;
+    const evRef = db.doc(`users/${tenantUid}/eventos/flow_${reservaId}`);
+    const rRef  = db.doc(`users/${tenantUid}/agendamento_reservas/${reservaId}`);
+
+    const antes  = event.data?.before;
+    const depois = event.data?.after;
+
+    /* Reserva excluída → remove o evento vinculado */
+    if (!depois?.exists) {
+      if (antes?.exists && antes.data()?.agendaSync) await evRef.delete().catch(() => {});
+      return;
+    }
+
+    const r = depois.data();
+
+    /* ── Confirmada → cria o evento ── */
+    if (r.status === "confirmado") {
+      if (r.agendaSync || !r.data_hora_inicio) return;
+
+      const ini = r.data_hora_inicio.toDate ? r.data_hora_inicio.toDate() : new Date(r.data_hora_inicio);
+      if (isNaN(ini)) return;
+
+      const partes = {};
+      for (const p of new Intl.DateTimeFormat("pt-BR", {
+        timeZone: TZ_AGENDA, year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+      }).formatToParts(ini)) partes[p.type] = p.value;
+
+      let responsavel = "";
+      if (r.prestadorId) {
+        const pSnap = await db.doc(`users/${tenantUid}/agendamento_prestadores/${cortar(r.prestadorId, 128)}`).get().catch(() => null);
+        responsavel = cortar(pSnap?.data()?.nome, 80);
+      }
+
+      const obs = [
+        r.cliente_telefone && `Tel: ${cortar(r.cliente_telefone, 30)}`,
+        r.servico_duracao_min && `Duração: ${cortar(r.servico_duracao_min, 10)} min`,
+      ].filter(Boolean).join(" · ");
+
+      const batch = db.batch();
+      batch.set(evRef, {
+        id:          evRef.id,
+        titulo:      `${cortar(r.servico_nome, 60) || "Atendimento"} — ${cortar(r.cliente_nome, 60) || "Cliente"}`,
+        tipo:        "Flow",
+        data:        `${partes.year}-${partes.month}-${partes.day}`,
+        horario:     `${partes.hour}:${partes.minute}`,
+        cliente:     cortar(r.cliente_nome, 80),
+        responsavel,
+        vendaId:     "",
+        endereco:    "",
+        observacao:  obs,
+        status:      "pendente",
+        origem:      "flow",
+        reservaId,
+        dataCriacao: new Date().toISOString(),
+      });
+      batch.update(rRef, { agendaSync: true });
+      await batch.commit();
+      return;
+    }
+
+    /* Sem vínculo com a Agenda → nada a fazer */
+    if (!r.agendaSync) return;
+
+    /* ── Concluída → marca evento como concluído ── */
+    if (r.status === "concluido") {
+      await evRef.update({ status: "concluido" }).catch(() => {}); /* evento removido pelo usuário */
+      return;
+    }
+
+    /* ── cancelado | nao_apareceu | pendente (reaberta) → remove evento ── */
+    const batch = db.batch();
+    batch.delete(evRef);
+    batch.update(rRef, { agendaSync: false });
+    await batch.commit();
+  }
+);
+
+/* ─────────────────────────────────────────────
    FUNÇÃO: resetContagemMensal
    Roda todo dia 1 às 00:00 (horário de Brasília).
    Zera contagem.vendasMes em todos os planos ativos.
@@ -2199,6 +2302,265 @@ exports.gerarMensagemIA = onCall(
 
     const texto = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
     return { texto };
+  }
+);
+
+/* ═══════════════════════════════════════════════════════════════
+   CONTAS BANCÁRIAS — conexão de bancos para saldo e movimentações
+   Provedor atual: Mercado Pago (adaptador por `provider`).
+
+   SEGURANÇA
+   • O token só existe no servidor: coleção de topo `bancoSegredos`
+     (fora de users/), negada a qualquer cliente pelas regras.
+   • O navegador só recebe metadados, nunca o token.
+═══════════════════════════════════════════════════════════════ */
+const BANCO_PROVIDERS = { mercadopago: "Mercado Pago" };
+const MAX_CONTAS_BANCO = 5;
+
+/** Uso interno (sync futuro): devolve o token em texto. Nunca expor ao cliente. */
+async function lerTokenBanco(tenantUid, contaId) {
+  const snap = await db.doc(`bancoSegredos/${tenantUid}_${contaId}`).get();
+  if (!snap.exists || snap.data()?.tenantUid !== tenantUid) {
+    throw new HttpsError("not-found", "Conta não encontrada.");
+  }
+  return snap.data().token;
+}
+
+/** Valida token no MP e verifica acesso aos relatórios financeiros. */
+async function sondarMercadoPago(token) {
+  const h = { Authorization: `Bearer ${token}` };
+  const me = await fetch("https://api.mercadopago.com/users/me", { headers: h });
+  if (!me.ok) return { valido: false };
+  const u = await me.json();
+  let relatorios = false;
+  try {
+    const r = await fetch("https://api.mercadopago.com/v1/account/release_report/config", { headers: h });
+    relatorios = r.ok || r.status === 404;
+  } catch { /* mantém false */ }
+  return { valido: true, mpUserId: String(u.id), titular: String(u.nickname || u.first_name || "").slice(0, 60), relatorios };
+}
+
+const metaConta = (id, d) => ({
+  id,
+  provider:  d.provider,
+  banco:     BANCO_PROVIDERS[d.provider] || d.provider,
+  apelido:   d.apelido,
+  titular:   d.titular || "",
+  relatorios: !!d.relatorios,
+  ativo:     d.ativo !== false,
+});
+
+exports.listarContasBancarias = onCall(CALL_OPTIONS, async (request) => {
+  const tenantUid = await verificarAdmin(request.auth?.uid);
+  const snap = await db.collection(`users/${tenantUid}/contasBancarias`).get();
+  return { contas: snap.docs.map(d => metaConta(d.id, d.data())) };
+});
+
+exports.conectarContaBancaria = onCall(
+  CALL_OPTIONS,
+  async (request) => {
+    const tenantUid = await verificarAdmin(request.auth?.uid);
+    const { provider, apelido, accessToken } = request.data || {};
+
+    if (!BANCO_PROVIDERS[provider]) throw new HttpsError("invalid-argument", "Banco não suportado.");
+    const nome  = String(apelido || "").trim();
+    const token = String(accessToken || "").trim();
+    if (nome.length < 2 || nome.length > 40) {
+      throw new HttpsError("invalid-argument", "Apelido deve ter de 2 a 40 caracteres.");
+    }
+    if (!/^APP_USR-[A-Za-z0-9_-]{20,200}$/.test(token)) {
+      throw new HttpsError("invalid-argument", "Use o Access Token de produção (começa com APP_USR-).");
+    }
+
+    const colRef = db.collection(`users/${tenantUid}/contasBancarias`);
+    const atuais = await colRef.get();
+    if (atuais.size >= MAX_CONTAS_BANCO) {
+      throw new HttpsError("resource-exhausted", `Limite de ${MAX_CONTAS_BANCO} contas conectadas.`);
+    }
+
+    const sonda = await sondarMercadoPago(token);
+    if (!sonda.valido) throw new HttpsError("invalid-argument", "Token recusado pelo Mercado Pago.");
+    if (atuais.docs.some(d => d.data().mpUserId === sonda.mpUserId)) {
+      throw new HttpsError("already-exists", "Esta conta já está conectada.");
+    }
+
+    const contaRef = colRef.doc();
+    const batch = db.batch();
+    batch.set(db.doc(`bancoSegredos/${tenantUid}_${contaRef.id}`), {
+      tenantUid,
+      provider,
+      token,
+      criadoEm: FieldValue.serverTimestamp(),
+    });
+    batch.set(contaRef, {
+      provider,
+      apelido:    nome,
+      mpUserId:   sonda.mpUserId,
+      titular:    sonda.titular,
+      relatorios: sonda.relatorios,
+      ativo:      true,
+      criadoEm:   FieldValue.serverTimestamp(),
+    });
+    await batch.commit();
+
+    console.log(`[conectarContaBancaria] tenant ${tenantUid} conta ${contaRef.id}`);
+    return { conta: metaConta(contaRef.id, { provider, apelido: nome, titular: sonda.titular, relatorios: sonda.relatorios }) };
+  }
+);
+
+exports.testarContaBancaria = onCall(
+  CALL_OPTIONS,
+  async (request) => {
+    const tenantUid = await verificarAdmin(request.auth?.uid);
+    const contaId = String(request.data?.contaId || "");
+    if (!contaId) throw new HttpsError("invalid-argument", "contaId obrigatório.");
+
+    const contaRef = db.doc(`users/${tenantUid}/contasBancarias/${contaId}`);
+    if (!(await contaRef.get()).exists) throw new HttpsError("not-found", "Conta não encontrada.");
+
+    const sonda = await sondarMercadoPago(await lerTokenBanco(tenantUid, contaId));
+    await contaRef.update({
+      relatorios:  sonda.valido && sonda.relatorios,
+      ativo:       sonda.valido,
+      verificadoEm: FieldValue.serverTimestamp(),
+    });
+    return { valido: sonda.valido, relatorios: sonda.valido && sonda.relatorios };
+  }
+);
+
+exports.desconectarContaBancaria = onCall(CALL_OPTIONS, async (request) => {
+  const tenantUid = await verificarAdmin(request.auth?.uid);
+  const contaId = String(request.data?.contaId || "");
+  if (!contaId) throw new HttpsError("invalid-argument", "contaId obrigatório.");
+
+  const batch = db.batch();
+  batch.delete(db.doc(`users/${tenantUid}/contasBancarias/${contaId}`));
+  batch.delete(db.doc(`bancoSegredos/${tenantUid}_${contaId}`));
+  await batch.commit();
+  return { ok: true };
+});
+
+
+/* ═══════════════════════════════════════════════════════════════
+   PAGAMENTOS ONLINE (Mercado Pago) — token só no servidor
+   • Token fica em bancoSegredos/{tenant}_mp-pagamentos (só Admin SDK).
+   • config/geral guarda apenas a sentinela "__SEGURO__".
+   • Legado (token em texto) continua funcionando e é migrado sozinho
+     na primeira chamada de pagamento, ou ao abrir Configurações.
+═══════════════════════════════════════════════════════════════ */
+const MP_SENTINELA = "__SEGURO__";
+const mpSegredoPath = (tenantUid) => `bancoSegredos/${tenantUid}_mp-pagamentos`;
+
+/** Move o token legado (texto em config/geral) para o cofre do servidor
+ *  e deixa só a sentinela em config/geral. */
+async function migrarTokenMP(tenantUid, legado) {
+  await db.doc(mpSegredoPath(tenantUid)).set({
+    tenantUid,
+    provider: "mercadopago",
+    token:    legado,
+    atualizadoEm: FieldValue.serverTimestamp(),
+  });
+  const cfgRef = db.doc(`users/${tenantUid}/config/geral`);
+  await db.runTransaction(async (tx) => {
+    const s = await tx.get(cfgRef);
+    // só troca se ninguém editou o token no meio do caminho
+    if (s.data()?.pagamentos?.mercadopago?.accessToken === legado) {
+      tx.update(cfgRef, { "pagamentos.mercadopago.accessToken": MP_SENTINELA });
+    }
+  });
+}
+
+/** Token real do tenant. `valorConfig` = config.pagamentos.mercadopago.accessToken.
+ *  1) Cofre do servidor (sempre vence: texto em config/geral é ignorado).
+ *  2) Legado: token em texto ainda em config/geral → migra para o cofre e usa. */
+async function obterTokenMP(tenantUid, valorConfig) {
+  try {
+    const snap = await db.doc(mpSegredoPath(tenantUid)).get();
+    if (snap.exists && snap.data()?.tenantUid === tenantUid && snap.data().token) {
+      return snap.data().token;
+    }
+  } catch (err) {
+    console.error("[obterTokenMP]", tenantUid, err.message);
+  }
+  if (typeof valorConfig === "string" && valorConfig && valorConfig !== MP_SENTINELA) {
+    try { await migrarTokenMP(tenantUid, valorConfig); }
+    catch (err) { console.error("[migrarTokenMP]", tenantUid, err.message); }
+    return valorConfig;
+  }
+  return null;
+}
+
+exports.migrarTokenPagamentos = onCall(
+  CALL_OPTIONS,
+  async (request) => {
+    const tenantUid = await verificarAdmin(request.auth?.uid);
+    const snap = await db.doc(`users/${tenantUid}/config/geral`).get();
+    const v = snap.data()?.pagamentos?.mercadopago?.accessToken;
+    if (typeof v !== "string" || !v || v === MP_SENTINELA) return { migrado: false };
+    await migrarTokenMP(tenantUid, v);
+    console.log(`[migrarTokenPagamentos] tenant ${tenantUid} migrado`);
+    return { migrado: true };
+  }
+);
+
+exports.salvarPagamentosMP = onCall(
+  CALL_OPTIONS,
+  async (request) => {
+    const tenantUid = await verificarAdmin(request.auth?.uid);
+    const token = String(request.data?.accessToken || "").trim();
+    const pk    = String(request.data?.publicKey || "").trim().slice(0, 200);
+    const ativo = !!request.data?.ativo;
+
+    const cfgRef = db.doc(`users/${tenantUid}/config/geral`);
+    const atual  = (await cfgRef.get()).data()?.pagamentos?.mercadopago?.accessToken;
+    const legado = typeof atual === "string" && atual && atual !== MP_SENTINELA ? atual : null;
+    const jaTem  = !!atual;
+
+    if (!token && !jaTem) throw new HttpsError("invalid-argument", "Informe o Access Token.");
+    if (ativo && !pk)     throw new HttpsError("invalid-argument", "Informe a Public Key para ativar.");
+
+    if (token) {
+      if (!/^APP_USR-[A-Za-z0-9_-]{20,200}$/.test(token)) {
+        throw new HttpsError("invalid-argument", "Use o Access Token de produção (começa com APP_USR-).");
+      }
+      const me = await fetch("https://api.mercadopago.com/users/me", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!me.ok) throw new HttpsError("invalid-argument", "Token recusado pelo Mercado Pago.");
+      await db.doc(mpSegredoPath(tenantUid)).set({
+        tenantUid,
+        provider: "mercadopago",
+        token,
+        atualizadoEm: FieldValue.serverTimestamp(),
+      });
+    } else if (legado) {
+      await migrarTokenMP(tenantUid, legado); // sem token novo: preserva o legado
+    }
+
+    await cfgRef.set({
+      pagamentos: { mercadopago: {
+        accessToken:  MP_SENTINELA,
+        publicKey:    pk,
+        ativo,
+        atualizadoEm: new Date().toISOString(),
+      } },
+    }, { merge: true });
+
+    return { ok: true };
+  }
+);
+
+exports.testarPagamentosMP = onCall(
+  CALL_OPTIONS,
+  async (request) => {
+    const tenantUid = await verificarAdmin(request.auth?.uid);
+    const snap  = await db.doc(`users/${tenantUid}/config/geral`).get();
+    const token = await obterTokenMP(tenantUid, snap.data()?.pagamentos?.mercadopago?.accessToken);
+    if (!token) return { valido: false };
+    const me = await fetch("https://api.mercadopago.com/users/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return { valido: me.ok };
   }
 );
 
