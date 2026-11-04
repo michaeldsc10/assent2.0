@@ -22,12 +22,12 @@ export const TIPO_FLOW = "Flow"; // eventos vindos do ASSENT Flow (padrão do si
 export const TIPOS = ["Reunião", "Visita", "Entrega", "Ligação", "Prazo", "Outro", TIPO_FLOW];
 
 export const TIPO_ESTILO = {
-  "Reunião": { bg: "rgba(91,142,240,0.14)",  color: "#5b8ef0" },
-  "Visita":  { bg: "rgba(72,199,142,0.14)",  color: "#48c78e" },
+  "Reunião": { bg: "rgba(91,142,240,0.14)",  color: "var(--blue)" },
+  "Visita":  { bg: "rgba(72,199,142,0.14)",  color: "var(--green)" },
   "Entrega": { bg: "rgba(200,165,94,0.15)",  color: "var(--gold)" },
-  "Ligação": { bg: "rgba(192,132,252,0.14)", color: "#c084fc" },
+  "Ligação": { bg: "rgba(192,132,252,0.14)", color: "var(--purple)" },
   "Prazo":   { bg: "rgba(224,82,82,0.14)",   color: "var(--red)" },
-  "Outro":   { bg: "rgba(255,255,255,0.06)", color: "var(--text-2)" },
+  "Outro":   { bg: "var(--s3)", color: "var(--text-2)" },
   [TIPO_FLOW]: { bg: "rgba(45,212,191,0.14)", color: "#2dd4bf" },
 };
 
@@ -409,7 +409,7 @@ const CSS = `
 
   .btn-success {
     padding: 9px 20px; border-radius: 9px;
-    background: rgba(72,199,142,.12); color: #48c78e;
+    background: rgba(72,199,142,.12); color: var(--green);
     border: 1px solid rgba(72,199,142,.25); cursor: pointer;
     font-family: 'DM Sans', sans-serif; font-size: 13px;
     transition: background .13s;

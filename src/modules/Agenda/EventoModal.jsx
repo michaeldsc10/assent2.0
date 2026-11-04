@@ -12,8 +12,8 @@ function DetalheCard({ icon: Icon, label, value, valueStyle, fullWidth = false, 
   return (
     <div style={{
       gridColumn: fullWidth ? "1 / -1" : "span 1",
-      background: accent ? "rgba(91,142,240,0.06)" : "var(--bg-2, rgba(255,255,255,0.04))",
-      border: `1px solid ${accent ? "rgba(91,142,240,0.2)" : "var(--border, rgba(255,255,255,0.08))"}`,
+      background: accent ? "var(--blue-d)" : "var(--s2)",
+      border: `1px solid ${accent ? "var(--border-h)" : "var(--border)"}`,
       borderRadius: 10,
       padding: "12px 14px",
       display: "flex",
@@ -23,13 +23,13 @@ function DetalheCard({ icon: Icon, label, value, valueStyle, fullWidth = false, 
       <div style={{
         display: "flex", alignItems: "center", gap: 6,
         fontSize: 10, fontWeight: 700, textTransform: "uppercase",
-        letterSpacing: ".08em", color: "var(--text-3, #aaa)",
+        letterSpacing: ".08em", color: "var(--text-2)",
       }}>
         {Icon && <Icon size={11} strokeWidth={2.5} />}
         {label}
       </div>
       <div style={{
-        fontSize: 13.5, color: "var(--text-1, #f0f0f0)",
+        fontSize: 13.5, color: "var(--text)",
         fontWeight: 500, lineHeight: 1.5,
         ...valueStyle,
       }}>
@@ -233,7 +233,7 @@ export default function EventoModal({ evento, onClose, onConcluir, onEditar, onE
               {concluido && (
                 <span
                   className="ag-badge"
-                  style={{ background: "rgba(72,199,142,0.12)", color: "#48c78e" }}
+                  style={{ background: "var(--green-d)", color: "var(--green)" }}
                 >
                   ✓ Concluído
                 </span>
@@ -256,7 +256,7 @@ export default function EventoModal({ evento, onClose, onConcluir, onEditar, onE
             {/* Sub — data + hora */}
             <div style={{
               display: "flex", alignItems: "center", gap: 6,
-              fontSize: 12.5, color: "var(--text-3, #aaa)",
+              fontSize: 12.5, color: "var(--text-2)",
             }}>
               <Calendar size={11} strokeWidth={2} />
               <span>{fmtDataLonga(evento.data)}</span>
@@ -292,7 +292,7 @@ export default function EventoModal({ evento, onClose, onConcluir, onEditar, onE
             <DetalheCard
               icon={Tag} label="Venda vinculada" value={evento.vendaId}
               accent
-              valueStyle={{ color: "#5b8ef0", fontFamily: "'Sora', monospace", fontWeight: 600, letterSpacing: ".02em" }}
+              valueStyle={{ color: "var(--blue)", fontFamily: "'Sora', monospace", fontWeight: 600, letterSpacing: ".02em" }}
             />
           )}
 
@@ -315,7 +315,7 @@ export default function EventoModal({ evento, onClose, onConcluir, onEditar, onE
                 day: "2-digit", month: "long", year: "numeric",
               })}
               fullWidth
-              valueStyle={{ color: "var(--text-3, #aaa)", fontSize: 12, fontWeight: 400 }}
+              valueStyle={{ color: "var(--text-2)", fontSize: 12, fontWeight: 400 }}
             />
           )}
         </div>
@@ -327,7 +327,7 @@ export default function EventoModal({ evento, onClose, onConcluir, onEditar, onE
             justifyContent: "space-between",
             borderTop: "1px solid var(--border)",
             padding: "14px 22px",
-            background: "var(--bg-2, rgba(255,255,255,0.02))",
+            background: "var(--s2)",
           }}
         >
           {/* Esquerda: Imprimir */}
