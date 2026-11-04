@@ -224,8 +224,8 @@ function fetchPtaxRows(moeda, fromIso) {
       const ctrl = new AbortController();
       const to = setTimeout(() => ctrl.abort(), 20000);
       try {
-        const url = `${OLINDA}CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,dataFinal=@dataFinal)` +
-          `?@moeda='${moeda}'&@dataInicial='${usDate(fromIso)}'&@dataFinal='${usDate(daysAgo(0))}'` +
+        const url = `${OLINDA}CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)` +
+          `?@moeda='${moeda}'&@dataInicial='${usDate(fromIso)}'&@dataFinalCotacao='${usDate(daysAgo(0))}'` +
           `&$top=10000&$format=json&$select=cotacaoCompra,cotacaoVenda,dataHoraCotacao`;
         const r = await fetch(url, { signal: ctrl.signal });
         if (!r.ok) throw new Error("http " + r.status);
@@ -577,7 +577,7 @@ function Spark({ data, step, id }) {
   const rows = data.map((v, i) => ({ i, v }));
   return (
     <div className="ce-spark" aria-hidden="true">
-      <ResponsiveContainer width="100%" height="100%">
+      <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 200, height: 34 }}>
         <AreaChart data={rows} margin={{ top: 3, right: 0, bottom: 0, left: 0 }}>
           <defs>
             <linearGradient id={`sp-${id}`} x1="0" y1="0" x2="0" y2="1">
@@ -1065,7 +1065,7 @@ export default function CenarioEconomico({ onVoltar }) {
 
           <div className="ce-chart-box"><div className="ce-chart">
             {chart.status === "ok" && (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} initialDimension={{ width: 600, height: 320 }}>
                 {view.bar ? (
                   <BarChart {...common}>
                     {axes}
