@@ -441,14 +441,16 @@ function buildCards(st, live) {
 /* ═══════════════════ CSS ═══════════════════ */
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+.ce-root{color-scheme:dark;--ce-g30:rgba(200,165,94,.3);--ce-g40:rgba(200,165,94,.4);--ce-g50:rgba(200,165,94,.5);--ce-pulse:rgba(200,165,94,.45);--ce-pulse0:rgba(200,165,94,0);--ce-drop:rgba(200,165,94,.35);--ce-grid:rgba(200,165,94,.05);--ce-amber-line:rgba(245,158,11,.28);--ce-up:var(--gold-l);--ce-tip-sh:0 12px 32px rgba(0,0,0,.4);--ce-card-bg:linear-gradient(160deg,var(--s2),var(--s1) 55%);--ce-panel-bg:linear-gradient(180deg,var(--s2),var(--s1) 40%);--ce-card-sh:none;--ce-card-sh-h:var(--glow-card),var(--glow-gold)}
+.ag-app.light .ce-root{color-scheme:light;--ce-g30:rgba(154,117,24,.3);--ce-g40:rgba(154,117,24,.4);--ce-g50:rgba(154,117,24,.5);--ce-pulse:rgba(154,117,24,.4);--ce-pulse0:rgba(154,117,24,0);--ce-drop:rgba(154,117,24,.28);--ce-grid:rgba(154,117,24,.08);--ce-amber-line:rgba(217,119,6,.3);--ce-up:var(--gold);--ce-tip-sh:0 10px 28px rgba(0,0,0,.14);--ce-card-bg:linear-gradient(160deg,#fcfbf9,var(--s1) 60%);--ce-panel-bg:linear-gradient(180deg,#fcfbf9,var(--s1) 45%);--ce-card-sh:0 1px 2px rgba(0,0,0,.06),0 1px 4px rgba(0,0,0,.04);--ce-card-sh-h:0 3px 10px rgba(0,0,0,.09)}
 .ce-root{--ce-mono:'JetBrains Mono','Montserrat',ui-monospace,monospace;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;position:relative;color:var(--text);font-family:'Sora',system-ui,sans-serif;-webkit-font-smoothing:antialiased;background:var(--bg)}
 .ce-root::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
   background:
    radial-gradient(900px 380px at 12% -8%,var(--gold-d),transparent 70%),
    radial-gradient(700px 320px at 100% 0%,var(--blue-d),transparent 70%),
-   linear-gradient(var(--gold-d) 1px,transparent 1px) 0 0/48px 48px,
-   linear-gradient(90deg,var(--gold-d) 1px,transparent 1px) 0 0/48px 48px;
-  -webkit-mask-image:linear-gradient(180deg,#000 0,transparent 520px);mask-image:linear-gradient(180deg,#000 0,transparent 520px);opacity:.55}
+   linear-gradient(var(--ce-grid) 1px,transparent 1px) 0 0/48px 48px,
+   linear-gradient(90deg,var(--ce-grid) 1px,transparent 1px) 0 0/48px 48px;
+  -webkit-mask-image:linear-gradient(180deg,#000 0,transparent 520px);mask-image:linear-gradient(180deg,#000 0,transparent 520px);opacity:.9}
 .ce-wrap{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:22px 24px 48px;display:flex;flex-direction:column;gap:22px}
 .ce-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
 .ce-back{display:inline-flex;align-items:center;gap:6px;font:500 12px 'Sora',sans-serif;color:var(--text-2);background:none;border:0;cursor:pointer;padding:4px 0;margin-bottom:10px;transition:color .15s}
@@ -461,23 +463,23 @@ const CSS = `
 .ce-status{display:flex;align-items:center;gap:8px;font:500 10.5px var(--ce-mono);color:var(--text-2);padding:9px 14px;border:1px solid var(--border);border-radius:999px;background:var(--s1);letter-spacing:.02em}
 .ce-dot{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 0 var(--gold);animation:ce-pulse 2.4s infinite}
 .ce-status.warn .ce-dot{background:var(--amber);animation:none}
-@keyframes ce-pulse{0%{box-shadow:0 0 0 0 rgba(200,165,94,.45)}70%{box-shadow:0 0 0 7px rgba(200,165,94,0)}100%{box-shadow:0 0 0 0 rgba(200,165,94,0)}}
+@keyframes ce-pulse{0%{box-shadow:0 0 0 0 var(--ce-pulse)}70%{box-shadow:0 0 0 7px var(--ce-pulse0)}100%{box-shadow:0 0 0 0 var(--ce-pulse0)}}
 .ce-ico-btn{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;border:1px solid var(--border);background:var(--s1);color:var(--text-2);cursor:pointer;transition:all .15s}
 .ce-ico-btn:hover:not(:disabled){color:var(--gold);border-color:var(--gold);background:var(--gold-d)}
 .ce-ico-btn:disabled{opacity:.45;cursor:not-allowed}
 .ce-spin{animation:ce-rot .9s linear infinite}
 @keyframes ce-rot{to{transform:rotate(360deg)}}
-.ce-banner{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;border-radius:16px;border:1px solid rgba(245,158,11,.28);background:var(--amber-d);color:var(--text-2);font-size:12px;line-height:1.5}
+.ce-banner{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;border-radius:16px;border:1px solid var(--ce-amber-line);background:var(--amber-d);color:var(--text-2);font-size:12px;line-height:1.5}
 .ce-banner svg{flex-shrink:0;color:var(--amber);margin-top:1px}
 .ce-label{font:600 9.5px var(--ce-mono);letter-spacing:.16em;text-transform:uppercase;color:var(--text-3)}
 .ce-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
 @media(min-width:1000px){.ce-cards{grid-template-columns:repeat(4,1fr)}.ce-card.wide{grid-column:span 2}}
-.ce-card{all:unset;box-sizing:border-box;position:relative;display:flex;flex-direction:column;gap:10px;padding:18px 18px 14px;background:linear-gradient(160deg,var(--s2),var(--s1) 55%);border:1px solid var(--border);border-radius:22px;cursor:pointer;overflow:hidden;transition:border-color .2s,transform .2s,box-shadow .2s;min-height:196px}
+.ce-card{all:unset;box-sizing:border-box;position:relative;display:flex;flex-direction:column;gap:10px;padding:18px 18px 14px;background:var(--ce-card-bg);box-shadow:var(--ce-card-sh);border:1px solid var(--border);border-radius:22px;cursor:pointer;overflow:hidden;transition:border-color .2s,transform .2s,box-shadow .2s;min-height:196px}
 .ce-card:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .ce-card::before{content:"";position:absolute;top:-46px;right:-46px;width:140px;height:140px;border-radius:50%;background:radial-gradient(circle,var(--gold-d),transparent 70%);opacity:.7;transition:opacity .2s;pointer-events:none}
-.ce-card:hover{border-color:var(--border-h);transform:translateY(-1px);box-shadow:var(--glow-card),var(--glow-gold)}
+.ce-card:hover{border-color:var(--border-h);transform:translateY(-1px);box-shadow:var(--ce-card-sh-h)}
 .ce-card:hover::before,.ce-card.on::before{opacity:1}
-.ce-card.on{border-color:rgba(200,165,94,.4)}
+.ce-card.on{border-color:var(--ce-g40)}
 .ce-card-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .ce-card-name{font-size:12px;font-weight:500;color:var(--text-2)}
 .ce-chip{font:600 8.5px var(--ce-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);background:var(--s3);border-radius:999px;padding:3px 9px}
@@ -486,7 +488,7 @@ const CSS = `
 .ce-val.na{font-size:15px;color:var(--text-3);font-family:'Sora',sans-serif;letter-spacing:0}
 .ce-delta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font:500 11px var(--ce-mono)}
 .ce-delta b{display:inline-flex;align-items:center;gap:4px;font-weight:600;padding:3px 9px;border-radius:999px}
-.ce-delta.up b{color:var(--gold-l);background:var(--gold-d)}
+.ce-delta.up b{color:var(--ce-up);background:var(--gold-d)}
 .ce-delta.down b{color:var(--blue);background:var(--blue-d)}
 .ce-delta.flat b{color:var(--text-2);background:var(--s3)}
 .ce-delta span{color:var(--text-3);font:400 10.5px 'Sora',sans-serif}
@@ -496,23 +498,23 @@ const CSS = `
 .ce-ref{font:400 10px var(--ce-mono);color:var(--text-3);letter-spacing:.02em}
 .ce-skel{background:linear-gradient(90deg,var(--s2),var(--s3),var(--s2));background-size:200% 100%;animation:ce-sh 1.4s infinite;border-radius:12px}
 @keyframes ce-sh{to{background-position:-200% 0}}
-.ce-panel{background:linear-gradient(180deg,var(--s2),var(--s1) 40%);border:1px solid var(--border);border-radius:26px;padding:22px;position:relative;overflow:hidden}
+.ce-panel{background:var(--ce-panel-bg);box-shadow:var(--ce-card-sh);border:1px solid var(--border);border-radius:26px;padding:22px;position:relative;overflow:hidden}
 .ce-panel-h{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:14px}
 .ce-tabs,.ce-seg{display:inline-flex;gap:2px;padding:3px;background:var(--s3);border-radius:999px;max-width:100%;overflow-x:auto}
 .ce-tab,.ce-segb{all:unset;box-sizing:border-box;cursor:pointer;font:500 12px 'Sora',sans-serif;color:var(--text-2);padding:7px 15px;border-radius:999px;white-space:nowrap;transition:all .15s}
 .ce-tab:hover:not(.on),.ce-segb:hover:not(.on):not(:disabled){color:var(--text)}
-.ce-tab.on,.ce-segb.on{background:var(--gold-d);color:var(--gold);box-shadow:inset 0 0 0 1px rgba(200,165,94,.3)}
+.ce-tab.on,.ce-segb.on{background:var(--gold-d);color:var(--gold);box-shadow:inset 0 0 0 1px var(--ce-g30)}
 .ce-segb{font:500 11px var(--ce-mono);padding:6px 12px}
 .ce-segb:disabled{opacity:.35;cursor:not-allowed}
 .ce-tab:focus-visible,.ce-segb:focus-visible{outline:2px solid var(--gold);outline-offset:1px}
 .ce-ctrl{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .ce-chart-box{border-radius:20px;background:radial-gradient(120% 90% at 50% 0%,var(--gold-d),transparent 65%),var(--s2);border:1px solid var(--border);padding:14px 10px 6px 4px}
 .ce-chart{height:320px;position:relative}
-.ce-chart .recharts-area-curve{filter:drop-shadow(0 6px 10px rgba(200,165,94,.35))}
+.ce-chart .recharts-area-curve{filter:drop-shadow(0 6px 10px var(--ce-drop))}
 .ce-halo{animation:ce-halo 2.2s ease-out infinite;transform-box:fill-box;transform-origin:center}
 @keyframes ce-halo{0%{transform:scale(.6);opacity:.5}100%{transform:scale(1.9);opacity:0}}
 .ce-chart-msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;font-size:12.5px;color:var(--text-3);gap:10px;align-content:center}
-.ce-retry{all:unset;cursor:pointer;font:500 11px var(--ce-mono);color:var(--gold);border:1px solid rgba(200,165,94,.35);padding:7px 16px;border-radius:999px}
+.ce-retry{all:unset;cursor:pointer;font:500 11px var(--ce-mono);color:var(--gold);border:1px solid var(--ce-g30);padding:7px 16px;border-radius:999px}
 .ce-retry:hover{background:var(--gold-d)}
 .ce-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--text-2);margin-bottom:8px}
 .ce-legend span{display:inline-flex;align-items:center;gap:6px}
@@ -520,13 +522,13 @@ const CSS = `
 .ce-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
 .ce-stat{background:var(--s2);border:1px solid var(--border);border-radius:16px;padding:12px 14px;display:flex;flex-direction:column;gap:3px}
 .ce-stat b{font:500 13px var(--ce-mono);font-variant-numeric:tabular-nums;color:var(--text)}
-.ce-tip{background:var(--s2);border:1px solid var(--border-h);border-radius:14px;padding:10px 14px;box-shadow:0 12px 32px rgba(0,0,0,.4);font-size:11px}
+.ce-tip{background:var(--s2);border:1px solid var(--border-h);border-radius:14px;padding:10px 14px;box-shadow:var(--ce-tip-sh);font-size:11px}
 .ce-tip-d{font:500 10px var(--ce-mono);color:var(--text-3);margin-bottom:5px;letter-spacing:.04em}
 .ce-tip-r{display:flex;align-items:center;gap:7px;color:var(--text-2);margin-top:2px}
 .ce-tip-r i{width:8px;height:8px;border-radius:50%}
 .ce-tip-r b{margin-left:auto;padding-left:14px;font:600 11.5px var(--ce-mono);color:var(--text)}
 .ce-info{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
-.ce-info-i{background:var(--s1);border:1px solid var(--border);border-radius:20px;padding:18px 18px}
+.ce-info-i{background:var(--ce-card-bg);box-shadow:var(--ce-card-sh);border:1px solid var(--border);border-radius:20px;padding:18px 18px}
 .ce-info-i h4{font-size:12.5px;font-weight:600;margin-bottom:5px;display:flex;align-items:center;gap:7px}
 .ce-info-i h4::before{content:"";width:6px;height:6px;background:var(--gold);border-radius:50%}
 .ce-info-i p{font-size:12px;line-height:1.6;color:var(--text-2)}
@@ -538,10 +540,10 @@ const CSS = `
 .ce-form{display:flex;flex-direction:column;gap:14px}
 .ce-field{display:flex;flex-direction:column;gap:7px}
 .ce-in{all:unset;box-sizing:border-box;width:100%;background:var(--s3);border:1px solid var(--border);border-radius:14px;padding:12px 16px;font:500 14px var(--ce-mono);color:var(--text);transition:border-color .15s,box-shadow .15s}
-.ce-in:focus{border-color:rgba(200,165,94,.5);box-shadow:0 0 0 3px var(--gold-d)}
+.ce-in:focus{border-color:var(--ce-g50);box-shadow:0 0 0 3px var(--gold-d)}
 select.ce-in{cursor:pointer;appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--text-3) 50%),linear-gradient(135deg,var(--text-3) 50%,transparent 50%);background-position:calc(100% - 20px) 50%,calc(100% - 15px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:36px}
 .ce-res{background:var(--s2);border:1px solid var(--border);border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:10px;justify-content:center;min-height:180px}
-.ce-res-v{font:500 clamp(24px,3vw,32px) var(--ce-mono);color:var(--gold-l);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.ce-res-v{font:500 clamp(24px,3vw,32px) var(--ce-mono);color:var(--ce-up);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .ce-row{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--text-2)}
 .ce-row b{font:500 12px var(--ce-mono);color:var(--text);text-align:right}
 .ce-note{font-size:11px;color:var(--text-3);line-height:1.55}
@@ -567,7 +569,7 @@ function EndDot({ cx, cy }) {
   return (
     <g>
       <circle className="ce-halo" cx={cx} cy={cy} r={8} fill="var(--gold)" opacity={0.35} />
-      <circle cx={cx} cy={cy} r={4.5} fill="var(--gold-l)" stroke="var(--s2)" strokeWidth={2} />
+      <circle cx={cx} cy={cy} r={4.5} fill="var(--ce-up)" stroke="var(--s2)" strokeWidth={2} />
     </g>
   );
 }
@@ -1099,7 +1101,7 @@ export default function CenarioEconomico({ onVoltar }) {
                       <Area key={l.src} dataKey={`s${i}`} name={l.name} type={l.step ? "stepAfter" : "monotone"}
                         stroke={l.ghost ? l.color : "url(#ce-line)"} strokeWidth={l.ghost ? 1.6 : 2.6} strokeLinecap="round" strokeDasharray={l.ghost ? "2 6" : undefined}
                         fill={l.ghost ? "none" : "url(#ce-fill)"} dot={false} connectNulls isAnimationActive={false}
-                        activeDot={{ r: 5, strokeWidth: 3, stroke: "var(--s2)", fill: "var(--gold-l)" }} />
+                        activeDot={{ r: 5, strokeWidth: 3, stroke: "var(--s2)", fill: "var(--ce-up)" }} />
                     ))}
                     {lastRow && Number.isFinite(lastRow.s0) && (
                       <>
