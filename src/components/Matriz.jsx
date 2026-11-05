@@ -349,14 +349,60 @@ function App({ user, tema, setTema }) {
     setDel(null);
     if (t) deleteDoc(doc(colRef, t.id)).catch(() => push("Erro ao excluir."));
   };
-  const soltar = (q) => {
-    const id = dragId.current; setOver(null); dragId.current = null;
+  /* ── Arrastar no toque (long-press): HTML5 drag não funciona em touch ── */
+  const [ghost, setGhost] = useState(null);
+  const semClique = useRef(0);
+  const soltarRef = useRef(null);
+  const iniciarToque = (e, t) => {
+    if (prefs.auto || e.touches.length !== 1) return;
+    const x0 = e.touches[0].clientX, y0 = e.touches[0].clientY;
+    let ativo = false, alvo = null;
+    const timer = setTimeout(() => {
+      ativo = true;
+      dragId.current = t.id;
+      if (navigator.vibrate) navigator.vibrate(15);
+      setGhost({ x: x0, y: y0, titulo: t.titulo });
+    }, 350);
+    const limpar = () => {
+      clearTimeout(timer);
+      document.removeEventListener("touchmove", mover);
+      document.removeEventListener("touchend", fim);
+      document.removeEventListener("touchcancel", cancelar);
+    };
+    const mover = (ev) => {
+      const p = ev.touches[0];
+      if (!ativo) { if (Math.abs(p.clientX - x0) > 8 || Math.abs(p.clientY - y0) > 8) limpar(); return; }
+      ev.preventDefault();
+      setGhost({ x: p.clientX, y: p.clientY, titulo: t.titulo });
+      alvo = document.elementFromPoint(p.clientX, p.clientY)?.closest?.("[data-q]")?.dataset.q ?? null;
+      setOver(alvo);
+    };
+    const fim = (ev) => {
+      const era = ativo, q = alvo;
+      limpar(); setGhost(null); setOver(null);
+      if (!era) return;
+      ev.preventDefault();
+      semClique.current = Date.now();
+      if (q) soltarRef.current(q); else dragId.current = null;
+    };
+    const cancelar = () => { limpar(); setGhost(null); setOver(null); dragId.current = null; };
+    document.addEventListener("touchmove", mover, { passive: false });
+    document.addEventListener("touchend", fim);
+    document.addEventListener("touchcancel", cancelar);
+  };
+
+  const moverPara = (id, q) => {
     if (!id || prefs.auto) return;
     const t = tarefas.find((x) => x.id === id);
     if (!t || qOf(t) === q) return;
     updateDoc(doc(colRef, id), { importante: q === "q1" || q === "q2", urgente: q === "q1" || q === "q3", movidoMotivo: null })
       .catch(() => push("Erro ao mover."));
   };
+  const soltar = (q) => {
+    const id = dragId.current; setOver(null); dragId.current = null;
+    moverPara(id, q);
+  };
+  soltarRef.current = soltar;
 
   /* ── Derivados ── */
   const [ini, fim] = periodo(view, base);
@@ -383,12 +429,13 @@ function App({ user, tema, setTema }) {
     const compacto = mob && !emFoco;
     const lista = grupos[q];
     return (
-      <section key={q} className={`q ${q}${emFoco ? " full" : ""}${!emFoco && over === q ? " over" : ""}`}
+      <section key={q} data-q={q} className={`q ${q}${emFoco ? " full" : ""}${!emFoco && over === q ? " over" : ""}`}
         tabIndex={emFoco ? undefined : 0}
         aria-label={emFoco ? undefined : `Ampliar ${Q[q].s}`}
         onKeyDown={emFoco ? undefined : (e) => { if (e.key === "Enter" && e.target === e.currentTarget) setFoco(q); }}
         onClick={emFoco ? undefined : (e) => {
           if (e.target.closest("button")) return;
+          if (Date.now() - semClique.current < 500) return;
           if (!compacto && e.target.closest(".tk")) return;
           setFoco(q);
         }}
@@ -414,8 +461,10 @@ function App({ user, tema, setTema }) {
             const atras = !t.concluida && parse(t.prazo) < h0;
             return (
               <div key={t.id} className={"tk" + (t.concluida ? " done" : "") + (why ? " moved" : "")}
-                draggable={!prefs.auto && !emFoco}
-                onDragStart={() => { dragId.current = t.id; }}>
+                draggable={!prefs.auto && !emFoco && !window.matchMedia("(pointer: coarse)").matches}
+                onDragStart={() => { dragId.current = t.id; }}
+                onTouchStart={emFoco ? undefined : (e) => iniciarToque(e, t)}
+                onContextMenu={prefs.auto ? undefined : (e) => e.preventDefault()}>
                 <button className={"ck" + (t.concluida ? " on" : "")} aria-label="Concluir" onClick={() => alternar(t)}>
                   {t.concluida && <Check size={12} />}
                 </button>
@@ -423,6 +472,15 @@ function App({ user, tema, setTema }) {
                   <div className="tkt">{t.titulo}</div>
                   <div className={"tkm" + (atras ? " late" : "")}><Clock size={11} /> {prazoTxt(t)}</div>
                   {why && <div className="why"><Zap size={11} /> {t.movidoMotivo}</div>}
+                  {emFoco && !prefs.auto && (
+                    <div className="mv" onClick={(e) => e.stopPropagation()}>
+                      {Object.keys(Q).filter((k) => k !== q).map((k) => (
+                        <button key={k} type="button" className={"mvb " + k} onClick={() => { moverPara(t.id, k); push(`Movida para ${Q[k].s}.`); }}>
+                          {Q[k].s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <button className="ic" aria-label="Excluir" onClick={() => excluir(t)}><Trash2 size={14} /></button>
               </div>
@@ -480,6 +538,8 @@ function App({ user, tema, setTema }) {
           {Object.keys(Q).map((q) => renderQuadro(q, false))}
         </div>
       </main>
+
+      {ghost && <div className="gst" style={{ left: ghost.x, top: ghost.y }}>{ghost.titulo}</div>}
 
       {foco && (
         <div className="ov" onMouseDown={() => setFoco(null)}>
@@ -638,6 +698,10 @@ background:radial-gradient(900px 500px at 8% -10%,var(--bg2),transparent 70%),va
 .q.over{box-shadow:0 0 0 2px var(--c),var(--sh);transform:scale(1.01)}
 .grid .q{cursor:pointer}
 .qa{display:flex;gap:6px;align-items:flex-start}
+.mv{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;cursor:default}
+.mv::before{content:"Mover para:";font-size:11.5px;color:var(--t2)}
+.mvb{padding:4px 10px;border-radius:99px;font-size:11.5px;font-weight:600;background:var(--bg-q)!important;color:var(--c)!important;border:1px solid color-mix(in srgb,var(--c) 40%,transparent)!important}
+.mvb:hover{filter:brightness(.96)}
 .mais{font-size:11px;font-weight:700;color:var(--c);text-align:center;padding:2px 0}
 .qx{width:100%;max-width:640px;max-height:90vh;overflow:auto;border-radius:20px;animation:in .2s ease-out}
 .q.full{min-height:0}
@@ -651,6 +715,8 @@ background:radial-gradient(900px 500px at 8% -10%,var(--bg2),transparent 70%),va
 .emp{font-size:13px;color:var(--t2);padding:18px 0;text-align:center;border:1px dashed var(--bd);border-radius:12px}
 .tk{display:flex;gap:10px;align-items:flex-start;background:var(--sf);border:1px solid var(--bd);border-left:3px solid var(--c);border-radius:12px;padding:10px 10px 10px 12px;transition:transform .15s,box-shadow .15s,opacity .2s}
 .tk[draggable=true]{cursor:grab}
+.grid .tk{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.gst{position:fixed;z-index:70;pointer-events:none;transform:translate(-50%,-130%);max-width:70vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:var(--sf);color:var(--tx);border:1px solid var(--bd);border-left:3px solid var(--ac);padding:8px 12px;border-radius:12px;font-size:13px;font-weight:600;box-shadow:var(--sh)}
 .tk:hover{transform:translateY(-1px);box-shadow:var(--sh)}
 .tk.done{opacity:.5}.tk.done .tkt{text-decoration:line-through}
 .tk.moved{animation:pulse 1.4s ease-out 1}
@@ -697,6 +763,7 @@ background:radial-gradient(900px 500px at 8% -10%,var(--bg2),transparent 70%),va
 .sw.on i{transform:translateX(18px);background:var(--acx)}
 .mx[data-t=claro] .sw.on i{background:#fff}
 .bell{position:relative}
+.bell .ib{position:relative}
 .bdg{position:absolute;top:2px;right:2px;min-width:16px;height:16px;padding:0 4px;border-radius:99px;background:#dc2626;color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;pointer-events:none}
 .pn{position:absolute;right:0;top:calc(100% + 8px);width:min(340px,90vw);max-height:60vh;overflow:auto;background:var(--sf);border:1px solid var(--bd);border-radius:14px;box-shadow:var(--sh);z-index:30;padding:6px}
 .pnh{padding:8px 10px;font-size:13px;font-weight:700;color:var(--t2)}
