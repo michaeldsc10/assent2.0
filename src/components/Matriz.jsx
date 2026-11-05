@@ -310,6 +310,15 @@ function App({ user, tema, setTema }) {
       if (f.id) await updateDoc(doc(colRef, f.id), { ...dados, movidoMotivo: null });
       else await addDoc(colRef, { ...dados, concluida: false, criadaEm: serverTimestamp() });
       setModal(null);
+      // tarefa fora do período em tela: leva a visão até ela
+      const pz = parse(f.prazo);
+      const [pi, pf] = periodo(view, base);
+      const h = hoje();
+      const aparece = (pz >= pi && pz <= pf) || (pz < h && pi <= h && h <= pf);
+      if (!aparece) {
+        setBase(pz);
+        push(`Salva para ${fmt(pz, { day: "2-digit", month: "short" })}. Visão ajustada.`);
+      }
     } catch { push("Erro ao salvar tarefa."); }
   };
   const alternar = (t) => updateDoc(doc(colRef, t.id), { concluida: !t.concluida }).catch(() => push("Erro ao atualizar."));
