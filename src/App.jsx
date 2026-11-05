@@ -15,7 +15,11 @@ import { useAuth as useAuthCargo }           from "./contexts/AuthContext";
 import LoginForm         from "./components/LoginForm";
 import BrandAnimation    from "./components/BrandAnimation";
 import Dashboard         from "./Dashboard";
+import { lazy, Suspense } from "react";
 import { usePWAManifest } from "./hooks/usePWAManifest";
+
+const Matriz = lazy(() => import("./components/Matriz"));
+const isMatriz = () => /^\/matriz(\/|$)/.test(window.location.pathname);
 
 /* ─────────────────────────────────────────
    Shell do app — decide o que renderizar
@@ -49,6 +53,15 @@ function AppShell() {
       >
         Carregando...
       </div>
+    );
+  }
+
+  // ── Rota /matriz: Matriz faz seu próprio gate (AuthContext) ──────────
+  if (isMatriz()) {
+    return (
+      <Suspense fallback={<div style={{ minHeight: "100vh", background: "#09090c" }} />}>
+        <Matriz />
+      </Suspense>
     );
   }
 

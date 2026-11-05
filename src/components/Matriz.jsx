@@ -1,9 +1,9 @@
 /* ═══════════════════════════════════════════════════
    Matriz de Eisenhower — Matriz.jsx (protótipo)
-   Mesmo Firebase/Auth do ASSENT, dados isolados em:
+   Mesmo AuthContext do Gestão (sessão única), dados isolados em:
      matriz_users/{uid}/tarefas/{id}
      matriz_users/{uid}/config/prefs
-   Requer <AuthProvider> acima.
+   Requer <AuthProvider> (contexts/AuthContext) acima.
    ═══════════════════════════════════════════════════ */
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
@@ -15,7 +15,7 @@ import {
   Plus, Sun, Moon, Settings, LogOut, Check, Trash2,
   ChevronLeft, ChevronRight, Zap, Clock, X, Lock,
 } from "lucide-react";
-import { useAuth } from "./Auth";
+import { useAuth } from "../contexts/AuthContext";
 import { db } from "../lib/firebase";
 
 /* ── Constantes ─────────────────────────────────── */
@@ -77,7 +77,7 @@ function prazoTxt(t) {
    Raiz: gate de autenticação + tema
    ═══════════════════════════════════════════════════ */
 export default function Matriz() {
-  const { user, loading } = useAuth();
+  const { user, tenantUid, loadingAuth } = useAuth();
   const [tema, setTemaState] = useState(() => {
     try { return localStorage.getItem("mx-tema") || "claro"; } catch { return "claro"; }
   });
@@ -88,8 +88,8 @@ export default function Matriz() {
   return (
     <div className="mx" data-t={tema}>
       <style>{CSS}</style>
-      {loading ? <div className="ls"><div className="spin" /></div>
-        : user ? <App user={user} tema={tema} setTema={setTema} />
+      {loadingAuth ? <div className="ls"><div className="spin" /></div>
+        : user && tenantUid ? <App user={user} tema={tema} setTema={setTema} />
         : <Login />}
     </div>
   );
@@ -97,14 +97,14 @@ export default function Matriz() {
 
 /* ── Login (mesmo auth do ASSENT) ───────────────── */
 function Login() {
-  const { login } = useAuth();
+  const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
   const go = async (e) => {
     e.preventDefault(); setErr(""); setBusy(true);
-    try { await login(email, senha); }
+    try { await signIn(email, senha); }
     catch (x) { setErr(x.message || "Erro ao entrar."); setBusy(false); }
   };
   return (
@@ -127,7 +127,7 @@ function Login() {
    App
    ═══════════════════════════════════════════════════ */
 function App({ user, tema, setTema }) {
-  const { logout } = useAuth();
+  const { signOut } = useAuth();
   const uid = user.uid;
   const colRef = useMemo(() => collection(db, "matriz_users", uid, "tarefas"), [uid]);
   const prefRef = useMemo(() => doc(db, "matriz_users", uid, "config", "prefs"), [uid]);
@@ -268,7 +268,7 @@ function App({ user, tema, setTema }) {
               {tema === "claro" ? <Moon size={18} /> : <Sun size={18} />}
             </button>
             <button className="ib" aria-label="Configurações" onClick={() => setCfg(true)}><Settings size={18} /></button>
-            <button className="ib" aria-label="Sair" onClick={logout}><LogOut size={18} /></button>
+            <button className="ib" aria-label="Sair" onClick={signOut}><LogOut size={18} /></button>
           </div>
         </div>
       </header>
