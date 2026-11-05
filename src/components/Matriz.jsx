@@ -236,6 +236,21 @@ function App({ user, tema, setTema }) {
   const [base, setBase] = useState(() => new Date());
   const [modal, setModal] = useState(null);
   const [cfg, setCfg] = useState(false);
+  const [del, setDel] = useState(null);
+  const [foco, setFoco] = useState(null);
+  const [mob, setMob] = useState(() => window.matchMedia("(max-width:820px)").matches);
+  useEffect(() => {
+    const m = window.matchMedia("(max-width:820px)");
+    const f = () => setMob(m.matches);
+    m.addEventListener("change", f);
+    return () => m.removeEventListener("change", f);
+  }, []);
+  useEffect(() => {
+    if (!foco) return undefined;
+    const k = (e) => { if (e.key === "Escape" && !modal && !del && !cfg) setFoco(null); };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [foco, modal, del, cfg]);
   const [toasts, setToasts] = useState([]);
   const [over, setOver] = useState(null);
   const dragId = useRef(null);
@@ -322,8 +337,17 @@ function App({ user, tema, setTema }) {
     } catch { push("Erro ao salvar tarefa."); }
   };
   const alternar = (t) => updateDoc(doc(colRef, t.id), { concluida: !t.concluida }).catch(() => push("Erro ao atualizar."));
-  const excluir = (t) => {
-    if (window.confirm(`Excluir “${t.titulo}”?`)) deleteDoc(doc(colRef, t.id)).catch(() => push("Erro ao excluir."));
+  useEffect(() => {
+    if (!del) return undefined;
+    const k = (e) => { if (e.key === "Escape") setDel(null); };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [del]);
+  const excluir = (t) => setDel(t);
+  const confirmarExcluir = () => {
+    const t = del;
+    setDel(null);
+    if (t) deleteDoc(doc(colRef, t.id)).catch(() => push("Erro ao excluir."));
   };
   const soltar = (q) => {
     const id = dragId.current; setOver(null); dragId.current = null;
@@ -354,6 +378,61 @@ function App({ user, tema, setTema }) {
     ["Urgentes", pend.filter((t) => t.urgente).length],
     ["Atrasadas", pend.filter((t) => parse(t.prazo) < h0).length],
   ];
+
+  const renderQuadro = (q, emFoco) => {
+    const compacto = mob && !emFoco;
+    const lista = grupos[q];
+    return (
+      <section key={q} className={`q ${q}${emFoco ? " full" : ""}${!emFoco && over === q ? " over" : ""}`}
+        tabIndex={emFoco ? undefined : 0}
+        aria-label={emFoco ? undefined : `Ampliar ${Q[q].s}`}
+        onKeyDown={emFoco ? undefined : (e) => { if (e.key === "Enter" && e.target === e.currentTarget) setFoco(q); }}
+        onClick={emFoco ? undefined : (e) => {
+          if (e.target.closest("button")) return;
+          if (!compacto && e.target.closest(".tk")) return;
+          setFoco(q);
+        }}
+        onDragOver={emFoco ? undefined : (e) => { if (!prefs.auto) { e.preventDefault(); setOver(q); } }}
+        onDragLeave={emFoco ? undefined : () => setOver(null)}
+        onDrop={emFoco ? undefined : () => soltar(q)}>
+        <div className="qh">
+          <div>
+            <div className="qt">{q.toUpperCase()}: {Q[q].t}</div>
+            <div className="qs">{Q[q].s}</div>
+            <div className="qd">{Q[q].d}</div>
+          </div>
+          <div className="qa">
+            <button className="add" aria-label={`Adicionar em ${Q[q].s}`} onClick={() => setModal(novo(q))}><Plus size={16} /></button>
+            {emFoco && <button className="add" aria-label="Fechar" onClick={() => setFoco(null)}><X size={16} /></button>}
+          </div>
+        </div>
+        <div className="lst">
+          {lista.length === 0 && <div className="emp">Nada aqui neste período.</div>}
+          {lista.map((t) => {
+            const ms = t.movidoEm?.toMillis?.() ?? Date.now();
+            const why = prefs.mostrarMotivo && t.movidoMotivo && !t.concluida && Date.now() - ms < 72 * 36e5;
+            const atras = !t.concluida && parse(t.prazo) < h0;
+            return (
+              <div key={t.id} className={"tk" + (t.concluida ? " done" : "") + (why ? " moved" : "")}
+                draggable={!prefs.auto && !emFoco}
+                onDragStart={() => { dragId.current = t.id; }}>
+                <button className={"ck" + (t.concluida ? " on" : "")} aria-label="Concluir" onClick={() => alternar(t)}>
+                  {t.concluida && <Check size={12} />}
+                </button>
+                <div className="tkb" onClick={() => { if (!compacto) setModal(t); }}>
+                  <div className="tkt">{t.titulo}</div>
+                  <div className={"tkm" + (atras ? " late" : "")}><Clock size={11} /> {prazoTxt(t)}</div>
+                  {why && <div className="why"><Zap size={11} /> {t.movidoMotivo}</div>}
+                </div>
+                <button className="ic" aria-label="Excluir" onClick={() => excluir(t)}><Trash2 size={14} /></button>
+              </div>
+            );
+          })}
+          {compacto && lista.length > 3 && <div className="mais">+{lista.length - 3}</div>}
+        </div>
+      </section>
+    );
+  };
 
   return (
     <>
@@ -398,48 +477,32 @@ function App({ user, tema, setTema }) {
         </div>
 
         <div className="grid">
-          {Object.keys(Q).map((q) => (
-            <section key={q} className={`q ${q}${over === q ? " over" : ""}`}
-              onDragOver={(e) => { if (!prefs.auto) { e.preventDefault(); setOver(q); } }}
-              onDragLeave={() => setOver(null)}
-              onDrop={() => soltar(q)}>
-              <div className="qh">
-                <div>
-                  <div className="qt">{q.toUpperCase()}: {Q[q].t}</div>
-                  <div className="qs">{Q[q].s}</div>
-                  <div className="qd">{Q[q].d}</div>
-                </div>
-                <button className="add" aria-label={`Adicionar em ${Q[q].s}`} onClick={() => setModal(novo(q))}><Plus size={16} /></button>
-              </div>
-              <div className="lst">
-                {grupos[q].length === 0 && <div className="emp">Nada aqui neste período.</div>}
-                {grupos[q].map((t) => {
-                  const ms = t.movidoEm?.toMillis?.() ?? Date.now();
-                  const why = prefs.mostrarMotivo && t.movidoMotivo && !t.concluida && Date.now() - ms < 72 * 36e5;
-                  const atras = !t.concluida && parse(t.prazo) < h0;
-                  return (
-                    <div key={t.id} className={"tk" + (t.concluida ? " done" : "") + (why ? " moved" : "")}
-                      draggable={!prefs.auto}
-                      onDragStart={() => { dragId.current = t.id; }}>
-                      <button className={"ck" + (t.concluida ? " on" : "")} aria-label="Concluir" onClick={() => alternar(t)}>
-                        {t.concluida && <Check size={12} />}
-                      </button>
-                      <div className="tkb" onClick={() => setModal(t)}>
-                        <div className="tkt">{t.titulo}</div>
-                        <div className={"tkm" + (atras ? " late" : "")}><Clock size={11} /> {prazoTxt(t)}</div>
-                        {why && <div className="why"><Zap size={11} /> {t.movidoMotivo}</div>}
-                      </div>
-                      <button className="ic" aria-label="Excluir" onClick={() => excluir(t)}><Trash2 size={14} /></button>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
+          {Object.keys(Q).map((q) => renderQuadro(q, false))}
         </div>
       </main>
 
+      {foco && (
+        <div className="ov" onMouseDown={() => setFoco(null)}>
+          <div className="qx" role="dialog" aria-modal="true" aria-label={Q[foco].s} onMouseDown={(e) => e.stopPropagation()}>
+            {renderQuadro(foco, true)}
+          </div>
+        </div>
+      )}
+
       {modal && <Form init={modal} auto={prefs.auto} lim={prefs.limiteDias} onSave={salvar} onClose={() => setModal(null)} />}
+
+      {del && (
+        <div className="ov" onMouseDown={() => setDel(null)}>
+          <div className="md cf" role="alertdialog" aria-modal="true" aria-labelledby="cf-t" onMouseDown={(e) => e.stopPropagation()}>
+            <h3 id="cf-t">Excluir tarefa?</h3>
+            <p className="cft">“{del.titulo}” será removida e não poderá ser recuperada.</p>
+            <div className="act">
+              <button type="button" className="gh" autoFocus onClick={() => setDel(null)}>Cancelar</button>
+              <button type="button" className="pr dg" onClick={confirmarExcluir}>Excluir</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {cfg && (
         <div className="ov" onMouseDown={() => setCfg(false)}>
@@ -532,9 +595,11 @@ const CSS = `
 --title:"Sora",system-ui,-apple-system,"Segoe UI",sans-serif;--body:"Montserrat",system-ui,-apple-system,"Segoe UI",sans-serif;
 min-height:100vh;color:var(--tx);font-family:var(--body);
 background:radial-gradient(900px 500px at 8% -10%,var(--bg2),transparent 70%),var(--bg)}
-.mx[data-t=escuro]{--bg:#000;--bg2:#1a1a1a;--sf:#0a0a0a;--tx:#fff;--t2:#9b9b9b;--bd:#272727;--ac:#fff;--acx:#000;--hv:#171717;--sh:0 10px 30px rgba(0,0,0,.7);
---q1:#0f0707;--q1t:#ff8f8f;--q2:#07100a;--q2t:#7ee0a0;--q3:#110c05;--q3t:#ffbf6b;--q4:#0c0c0c;--q4t:#bdbdbd}
+.mx[data-t=escuro]{--bg:#000;--bg2:#1a1a1a;--sf:#0a0a0a;--tx:#fff;--t2:#9b9b9b;--bd:#272727;--ac:#fff;--acx:#000;--hv:#171717;--sh:0 10px 30px rgba(0,0,0,.7)}
 .mx *{box-sizing:border-box}
+.mx[data-t=escuro] .q{--sf:#fff;--tx:#0b1b3a;--t2:#5b6b8c;--bd:#d3def3;--hv:#eaf1ff;--ac:#2563eb;--acx:#fff;--sh:0 10px 30px rgba(37,99,235,.12)}
+.mx[data-t=escuro] .dot{box-shadow:12px 0 0 #ff8f8f,0 12px 0 #7ee0a0}
+.q{color:var(--tx)}
 .mx h1,.mx h2,.mx h3,.lg,.st b,.qs,.qt,.pnh{font-family:var(--title)}
 .mx button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
 .mx button:focus-visible,.mx input:focus-visible,.mx select:focus-visible,.mx textarea:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
@@ -571,6 +636,11 @@ background:radial-gradient(900px 500px at 8% -10%,var(--bg2),transparent 70%),va
 .q{border-radius:20px;padding:18px;min-height:300px;border:1px solid var(--bd);background:var(--bg-q);transition:box-shadow .2s,transform .2s}
 .q1{--bg-q:var(--q1);--c:var(--q1t)}.q2{--bg-q:var(--q2);--c:var(--q2t)}.q3{--bg-q:var(--q3);--c:var(--q3t)}.q4{--bg-q:var(--q4);--c:var(--q4t)}
 .q.over{box-shadow:0 0 0 2px var(--c),var(--sh);transform:scale(1.01)}
+.grid .q{cursor:pointer}
+.qa{display:flex;gap:6px;align-items:flex-start}
+.mais{font-size:11px;font-weight:700;color:var(--c);text-align:center;padding:2px 0}
+.qx{width:100%;max-width:640px;max-height:90vh;overflow:auto;border-radius:20px;animation:in .2s ease-out}
+.q.full{min-height:0}
 .qh{display:flex;justify-content:space-between;gap:10px;margin-bottom:14px}
 .qt{font-size:14px;font-weight:600}
 .qs{font-size:18px;font-weight:700;color:var(--c);margin:2px 0}
@@ -606,6 +676,9 @@ background:radial-gradient(900px 500px at 8% -10%,var(--bg2),transparent 70%),va
 .fld textarea{resize:vertical}
 .fld .seg button{flex:1}
 .hint{margin:0;font-size:13px;color:var(--t2);display:flex;gap:6px;align-items:center}
+.cf{max-width:380px}
+.cft{margin:0;font-size:14px;line-height:1.5;color:var(--t2);overflow-wrap:anywhere}
+.pr.dg{background:#dc2626!important;color:#fff!important}
 .act{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
 .err{font-size:13px;color:var(--q1t);background:var(--q1);border-radius:10px;padding:10px 12px}
 .dr{position:fixed;right:0;top:0;bottom:0;width:min(380px,100%);background:var(--sf);border-left:1px solid var(--bd);padding:20px;display:flex;flex-direction:column;gap:6px;animation:sl .22s ease-out;overflow:auto}
@@ -641,6 +714,18 @@ background:radial-gradient(900px 500px at 8% -10%,var(--bg2),transparent 70%),va
 .lg-card{max-width:380px}
 .spin{width:36px;height:36px;border-radius:50%;border:3px solid var(--bd);border-top-color:var(--ac);animation:sp .8s linear infinite}
 @keyframes sp{to{transform:rotate(360deg)}}
-@media(max-width:820px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}.hdi{gap:10px}.lg{width:100%}}
+@media(max-width:820px){
+.grid{grid-template-columns:1fr 1fr;gap:8px}
+.grid .q{min-height:0;padding:10px;border-radius:16px}
+.grid .qh{margin-bottom:8px;gap:6px}
+.grid .qt{font-size:10.5px;line-height:1.25}
+.grid .qs{font-size:14px}
+.grid .qd,.grid .tkm,.grid .why,.grid .ic,.grid .ck{display:none}
+.grid .add{width:28px;height:28px;border-radius:8px}
+.grid .lst{gap:6px}
+.grid .tk{padding:7px 8px}
+.grid .tkt{font-size:12px}
+.grid .emp{padding:12px 4px;font-size:11px}
+.stats{grid-template-columns:repeat(2,1fr)}.hdi{gap:10px}.lg{width:100%}}
 @media(prefers-reduced-motion:reduce){.mx *{animation:none!important;transition:none!important}}
 `;
