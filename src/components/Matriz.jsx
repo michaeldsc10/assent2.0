@@ -391,16 +391,13 @@ function App({ user, tema, setTema }) {
     document.addEventListener("touchcancel", cancelar);
   };
 
-  const moverPara = (id, q) => {
+  const soltar = (q) => {
+    const id = dragId.current; setOver(null); dragId.current = null;
     if (!id || prefs.auto) return;
     const t = tarefas.find((x) => x.id === id);
     if (!t || qOf(t) === q) return;
     updateDoc(doc(colRef, id), { importante: q === "q1" || q === "q2", urgente: q === "q1" || q === "q3", movidoMotivo: null })
       .catch(() => push("Erro ao mover."));
-  };
-  const soltar = (q) => {
-    const id = dragId.current; setOver(null); dragId.current = null;
-    moverPara(id, q);
   };
   soltarRef.current = soltar;
 
@@ -472,15 +469,6 @@ function App({ user, tema, setTema }) {
                   <div className="tkt">{t.titulo}</div>
                   <div className={"tkm" + (atras ? " late" : "")}><Clock size={11} /> {prazoTxt(t)}</div>
                   {why && <div className="why"><Zap size={11} /> {t.movidoMotivo}</div>}
-                  {emFoco && !prefs.auto && (
-                    <div className="mv" onClick={(e) => e.stopPropagation()}>
-                      {Object.keys(Q).filter((k) => k !== q).map((k) => (
-                        <button key={k} type="button" className={"mvb " + k} onClick={() => { moverPara(t.id, k); push(`Movida para ${Q[k].s}.`); }}>
-                          {Q[k].s}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
                 <button className="ic" aria-label="Excluir" onClick={() => excluir(t)}><Trash2 size={14} /></button>
               </div>
@@ -698,10 +686,6 @@ background:radial-gradient(900px 500px at 8% -10%,var(--bg2),transparent 70%),va
 .q.over{box-shadow:0 0 0 2px var(--c),var(--sh);transform:scale(1.01)}
 .grid .q{cursor:pointer}
 .qa{display:flex;gap:6px;align-items:flex-start}
-.mv{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;cursor:default}
-.mv::before{content:"Mover para:";font-size:11.5px;color:var(--t2)}
-.mvb{padding:4px 10px;border-radius:99px;font-size:11.5px;font-weight:600;background:var(--bg-q)!important;color:var(--c)!important;border:1px solid color-mix(in srgb,var(--c) 40%,transparent)!important}
-.mvb:hover{filter:brightness(.96)}
 .mais{font-size:11px;font-weight:700;color:var(--c);text-align:center;padding:2px 0}
 .qx{width:100%;max-width:640px;max-height:90vh;overflow:auto;border-radius:20px;animation:in .2s ease-out}
 .q.full{min-height:0}
