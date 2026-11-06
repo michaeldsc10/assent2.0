@@ -551,7 +551,7 @@ function App({ user, tema, setTema }) {
 
         <div className="stats">
           {stats.map(([l, n, k]) => k ? (
-            <button type="button" className={"st bt" + (k === "atr" && n > 0 ? " warn" : "")} key={l} aria-haspopup="dialog" onClick={() => { setRep(null); setLista(k); }}>
+            <button type="button" className={"st bt" + (lista === k ? " sel" : "") + (k === "atr" && n > 0 ? " warn" : "")} key={l} aria-haspopup="dialog" onClick={() => { setRep(null); setLista(k); }}>
               <b>{n}</b><span>{l}</span>
             </button>
           ) : (<div className="st" key={l}><b>{n}</b><span>{l}</span></div>))}
@@ -763,9 +763,6 @@ background:radial-gradient(900px 500px at 8% -10%,var(--bg2),transparent 70%),va
 .pr:disabled{opacity:.45;cursor:not-allowed}
 .gh{padding:11px 16px;border-radius:12px;font-weight:600;color:var(--t2)}
 .gh:hover{background:var(--hv)}
-.st.bt{cursor:pointer;text-align:left;font:inherit;color:var(--tx);transition:transform .15s,box-shadow .15s,background .15s}
-.st.bt:hover{transform:translateY(-1px);box-shadow:var(--sh);background:var(--hv)}
-.st.bt.warn b{color:var(--q1t)}
 .md.lst{max-width:560px;max-height:min(80vh,640px);gap:12px}
 .lsh{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .lsh h3{overflow-wrap:anywhere}
@@ -784,11 +781,25 @@ background:radial-gradient(900px 500px at 8% -10%,var(--bg2),transparent 70%),va
 .pr.sm{padding:8px 12px;font-size:13px}
 @media(max-width:560px){.li{flex-wrap:wrap}.np,.rp{margin-left:32px}}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
-.st{background:var(--sf);border:1px solid var(--bd);border-radius:14px;padding:12px 16px;display:flex;align-items:baseline;gap:8px}
+.mx .st{position:relative;width:100%;text-align:left;color:var(--tx);background:color-mix(in srgb,var(--sf) 62%,transparent);backdrop-filter:blur(12px) saturate(140%);-webkit-backdrop-filter:blur(12px) saturate(140%);border:1px solid color-mix(in srgb,var(--bd) 85%,transparent);border-radius:14px;padding:12px 16px;display:flex;align-items:baseline;gap:8px;box-shadow:0 4px 14px rgba(11,27,58,.07),inset 0 1px 0 rgba(255,255,255,.5);transition:transform .18s,box-shadow .18s,background .18s,border-color .18s}
+.mx[data-t=escuro] .st{box-shadow:0 4px 14px rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.06)}
+.mx .st.bt{cursor:pointer;padding-right:34px}
+.mx .st.bt::after{content:"\\203A";position:absolute;right:14px;top:50%;transform:translateY(-52%);font-size:22px;line-height:1;color:var(--t2);opacity:.55;transition:transform .18s,opacity .18s,color .18s}
+.mx .st.bt:hover{transform:translateY(-3px);background:color-mix(in srgb,var(--sf) 85%,transparent);border-color:color-mix(in srgb,var(--ac) 50%,transparent);box-shadow:0 12px 28px color-mix(in srgb,var(--ac) 22%,transparent),inset 0 1px 0 rgba(255,255,255,.6)}
+.mx .st.bt:hover::after{transform:translate(4px,-52%);opacity:1;color:var(--ac)}
+.mx .st.bt:active{transform:translateY(0) scale(.97);box-shadow:0 3px 8px color-mix(in srgb,var(--ac) 20%,transparent)}
+.mx .st.bt.sel{border-color:var(--ac);background:color-mix(in srgb,var(--sf) 90%,transparent);box-shadow:0 0 0 2px var(--ac),0 10px 24px color-mix(in srgb,var(--ac) 25%,transparent)}
+.mx .st.bt.warn b{color:var(--q1t)}
+.mx[data-t=escuro] .st.bt.warn b{color:#ff8f8f}
 .st b{font-size:24px;font-weight:700}
 .st span{font-size:13px;color:var(--t2)}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding-bottom:60px}
-.q{border-radius:20px;padding:18px;min-height:300px;border:1px solid var(--bd);background:var(--bg-q);transition:box-shadow .2s,transform .2s}
+.q{border-radius:20px;padding:18px;min-height:300px;border:1px solid color-mix(in srgb,var(--c) 22%,var(--bd));background:color-mix(in srgb,var(--bg-q) 78%,transparent);backdrop-filter:blur(14px) saturate(140%);-webkit-backdrop-filter:blur(14px) saturate(140%);box-shadow:0 6px 20px color-mix(in srgb,var(--c) 14%,transparent),inset 0 1px 0 rgba(255,255,255,.45);transition:box-shadow .2s,transform .2s,background .2s,border-color .2s}
+.mx[data-t=escuro] .q{background:color-mix(in srgb,var(--bg-q) 94%,transparent)}
+.grid .q:hover:not(.over){transform:translateY(-4px);background:color-mix(in srgb,var(--bg-q) 92%,transparent);border-color:color-mix(in srgb,var(--c) 55%,transparent);box-shadow:0 16px 36px color-mix(in srgb,var(--c) 30%,transparent),inset 0 1px 0 rgba(255,255,255,.55)}
+.grid .q:active:not(.over){transform:translateY(-1px) scale(.992)}
+.grid .q:focus-visible{outline:2px solid var(--c);outline-offset:3px}
+.q.full{background:var(--bg-q);box-shadow:var(--sh)}
 .q1{--bg-q:var(--q1);--c:var(--q1t)}.q2{--bg-q:var(--q2);--c:var(--q2t)}.q3{--bg-q:var(--q3);--c:var(--q3t)}.q4{--bg-q:var(--q4);--c:var(--q4t)}
 .q.over{box-shadow:0 0 0 2px var(--c),var(--sh);transform:scale(1.01)}
 .grid .q{cursor:pointer}
