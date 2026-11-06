@@ -57,6 +57,11 @@ function rotulo(view, [s, e]) {
   return fmt(s, { month: "long", year: "numeric" });
 }
 
+const dataConc = (t) => {
+  const c = t.concluidaEm;
+  return c && typeof c.toDate === "function" ? c.toDate() : null;
+};
+
 /* ── Regras de quadrante / urgência ─────────────── */
 const qOf = (t) => (t.importante ? (t.urgente ? "q1" : "q2") : (t.urgente ? "q3" : "q4"));
 const urgAuto = (t, lim) => diasAte(t.prazo) <= lim;
@@ -238,6 +243,8 @@ function App({ user, tema, setTema }) {
   const [cfg, setCfg] = useState(false);
   const [del, setDel] = useState(null);
   const [foco, setFoco] = useState(null);
+  const [lista, setLista] = useState(null); // "conc" | "atr"
+  const [rep, setRep] = useState(null); // {id, prazo}: remarcando
   const [mob, setMob] = useState(() => window.matchMedia("(max-width:820px)").matches);
   useEffect(() => {
     const m = window.matchMedia("(max-width:820px)");
@@ -336,7 +343,28 @@ function App({ user, tema, setTema }) {
       }
     } catch { push("Erro ao salvar tarefa."); }
   };
-  const alternar = (t) => updateDoc(doc(colRef, t.id), { concluida: !t.concluida }).catch(() => push("Erro ao atualizar."));
+  const alternar = (t) => updateDoc(doc(colRef, t.id), { concluida: !t.concluida, concluidaEm: t.concluida ? null : serverTimestamp() }).catch(() => push("Erro ao atualizar."));
+  const remarcar = async () => {
+    if (!rep || !rep.prazo) return;
+    const t = tarefas.find((x) => x.id === rep.id);
+    if (!t) { setRep(null); return; }
+    try {
+      await updateDoc(doc(colRef, t.id), {
+        prazo: rep.prazo,
+        urgente: prefs.auto ? urgAuto({ prazo: rep.prazo }, prefs.limiteDias) : !!t.urgente,
+        movidoMotivo: null,
+      });
+      setRep(null);
+      push(`Novo prazo: ${fmt(parse(rep.prazo), { day: "2-digit", month: "short" })}.`);
+    } catch { push("Erro ao remarcar."); }
+  };
+  useEffect(() => {
+    if (!lista) return undefined;
+    const k = (e) => { if (e.key === "Escape" && !modal && !del && !cfg) { if (rep) setRep(null); else setLista(null); } };
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
+  }, [lista, rep, modal, del, cfg]);
+
   useEffect(() => {
     if (!del) return undefined;
     const k = (e) => { if (e.key === "Escape") setDel(null); };
@@ -415,11 +443,14 @@ function App({ user, tema, setTema }) {
   visiveis.forEach((t) => grupos[qOf(t)].push(t));
   Object.values(grupos).forEach((g) => g.sort((a, b) => (a.concluida - b.concluida) || a.prazo.localeCompare(b.prazo)));
   const pend = visiveis.filter((t) => !t.concluida);
+  const feitas = visiveis.filter((t) => t.concluida)
+    .sort((a, b) => ((dataConc(b) || 0) - (dataConc(a) || 0)));
+  const atrasadas = pend.filter((t) => parse(t.prazo) < h0).sort((a, b) => a.prazo.localeCompare(b.prazo));
   const stats = [
     ["Pendentes", pend.length],
-    ["Concluídas", visiveis.length - pend.length],
+    ["Concluídas", feitas.length, "conc"],
     ["Urgentes", pend.filter((t) => t.urgente).length],
-    ["Atrasadas", pend.filter((t) => parse(t.prazo) < h0).length],
+    ["Atrasadas", atrasadas.length, "atr"],
   ];
 
   const renderQuadro = (q, emFoco) => {
@@ -519,7 +550,11 @@ function App({ user, tema, setTema }) {
         </div>
 
         <div className="stats">
-          {stats.map(([l, n]) => (<div className="st" key={l}><b>{n}</b><span>{l}</span></div>))}
+          {stats.map(([l, n, k]) => k ? (
+            <button type="button" className={"st bt" + (k === "atr" && n > 0 ? " warn" : "")} key={l} aria-haspopup="dialog" onClick={() => { setRep(null); setLista(k); }}>
+              <b>{n}</b><span>{l}</span>
+            </button>
+          ) : (<div className="st" key={l}><b>{n}</b><span>{l}</span></div>))}
         </div>
 
         <div className="grid">
@@ -533,6 +568,58 @@ function App({ user, tema, setTema }) {
         <div className="ov" onMouseDown={() => setFoco(null)}>
           <div className="qx" role="dialog" aria-modal="true" aria-label={Q[foco].s} onMouseDown={(e) => e.stopPropagation()}>
             {renderQuadro(foco, true)}
+          </div>
+        </div>
+      )}
+
+      {lista && (
+        <div className="ov" onMouseDown={() => { setRep(null); setLista(null); }}>
+          <div className="md lst" role="dialog" aria-modal="true" aria-labelledby="ls-t" onMouseDown={(e) => e.stopPropagation()}>
+            <div className="lsh">
+              <h3 id="ls-t">{lista === "conc" ? `Concluídas · ${rotulo(view, [ini, fim])}` : `Atrasadas · ${atrasadas.length} ${atrasadas.length === 1 ? "tarefa" : "tarefas"}`}</h3>
+              <button type="button" className="ib" aria-label="Fechar" onClick={() => { setRep(null); setLista(null); }}><X size={18} /></button>
+            </div>
+            <div className="lsb">
+              {lista === "conc" && (feitas.length === 0
+                ? <div className="emp">Nenhuma tarefa concluída neste período.</div>
+                : feitas.map((t) => {
+                  const dc = dataConc(t);
+                  return (
+                    <div key={t.id} className="li done">
+                      <button type="button" className="ck on" style={{ "--c": "var(--q2t)" }} aria-label="Reabrir tarefa" onClick={() => alternar(t)}><Check size={12} /></button>
+                      <div className="lib">
+                        <div className="lit">{t.titulo}</div>
+                        <div className="lim">{dc ? `concluída em ${fmt(dc, { day: "numeric", month: "short" })} · ` : "concluída · "}estava em {Q[qOf(t)].s}</div>
+                      </div>
+                    </div>
+                  );
+                }))}
+              {lista === "atr" && (atrasadas.length === 0
+                ? <div className="emp">Nenhuma tarefa atrasada.</div>
+                : atrasadas.map((t) => {
+                  const d = -diasAte(t.prazo);
+                  const edit = rep && rep.id === t.id;
+                  return (
+                    <div key={t.id} className="li late">
+                      <button type="button" className="ck" style={{ "--c": "var(--t2)" }} aria-label="Concluir tarefa" onClick={() => alternar(t)} />
+                      <div className="lib">
+                        <div className="lit">{t.titulo}</div>
+                        <div className="lim late">venceu em {fmt(parse(t.prazo), { day: "numeric", month: "short" })} · {d} {d === 1 ? "dia" : "dias"} de atraso</div>
+                      </div>
+                      {edit ? (
+                        <div className="rp">
+                          <input type="date" aria-label="Novo prazo" autoFocus min={iso(h0)} value={rep.prazo}
+                            onChange={(e) => setRep({ id: t.id, prazo: e.target.value })}
+                            onKeyDown={(e) => { if (e.key === "Enter") remarcar(); }} />
+                          <button type="button" className="pr sm" disabled={!rep.prazo || rep.prazo < iso(h0)} onClick={remarcar}>OK</button>
+                        </div>
+                      ) : (
+                        <button type="button" className="np" onClick={() => setRep({ id: t.id, prazo: iso(h0) })}>Novo prazo</button>
+                      )}
+                    </div>
+                  );
+                }))}
+            </div>
           </div>
         </div>
       )}
@@ -676,6 +763,26 @@ background:radial-gradient(900px 500px at 8% -10%,var(--bg2),transparent 70%),va
 .pr:disabled{opacity:.45;cursor:not-allowed}
 .gh{padding:11px 16px;border-radius:12px;font-weight:600;color:var(--t2)}
 .gh:hover{background:var(--hv)}
+.st.bt{cursor:pointer;text-align:left;font:inherit;color:var(--tx);transition:transform .15s,box-shadow .15s,background .15s}
+.st.bt:hover{transform:translateY(-1px);box-shadow:var(--sh);background:var(--hv)}
+.st.bt.warn b{color:var(--q1t)}
+.md.lst{max-width:560px;max-height:min(80vh,640px);gap:12px}
+.lsh{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.lsh h3{overflow-wrap:anywhere}
+.lsb{display:flex;flex-direction:column;gap:10px;overflow:auto;padding:2px}
+.li{display:flex;align-items:center;gap:12px;background:var(--sf);border:1px solid var(--bd);border-radius:14px;padding:12px 14px}
+.li.late{border-color:var(--q1t)}
+.lib{flex:1;min-width:0}
+.lit{font-weight:700;font-size:14.5px;overflow-wrap:anywhere}
+.li.done .lit,.li.done .lim{color:var(--t2)}
+.lim{font-size:12.5px;color:var(--t2);margin-top:2px}
+.lim.late{color:var(--q1t)}
+.np{flex:none;padding:8px 14px;border-radius:10px;border:2px solid var(--ac)!important;color:var(--ac)!important;font-size:13px;font-weight:700;transition:background .15s}
+.np:hover{background:var(--hv)}
+.rp{display:flex;gap:6px;align-items:center;flex:none}
+.rp input{padding:7px 8px;border-radius:10px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font:inherit;font-size:13px}
+.pr.sm{padding:8px 12px;font-size:13px}
+@media(max-width:560px){.li{flex-wrap:wrap}.np,.rp{margin-left:32px}}
 .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
 .st{background:var(--sf);border:1px solid var(--bd);border-radius:14px;padding:12px 16px;display:flex;align-items:baseline;gap:8px}
 .st b{font-size:24px;font-weight:700}
