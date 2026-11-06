@@ -53,7 +53,12 @@ function mover(view, b, n) {
 }
 function rotulo(view, [s, e]) {
   if (view === "dia") return fmt(s, { weekday: "long", day: "numeric", month: "long" });
-  if (view === "semana") return `${fmt(s, { day: "numeric", month: "short" })} a ${fmt(e, { day: "numeric", month: "short" })}`;
+  if (view === "semana") {
+    const dm = (d) => `${p2(d.getDate())}/${p2(d.getMonth() + 1)}`;
+    return s.getFullYear() === e.getFullYear()
+      ? `${dm(s)} a ${dm(e)} - ${s.getFullYear()}`
+      : `${dm(s)}/${s.getFullYear()} a ${dm(e)}/${e.getFullYear()}`;
+  }
   return fmt(s, { month: "long", year: "numeric" });
 }
 
@@ -443,7 +448,7 @@ function App({ user, tema, setTema }) {
   visiveis.forEach((t) => grupos[qOf(t)].push(t));
   Object.values(grupos).forEach((g) => g.sort((a, b) => (a.concluida - b.concluida) || a.prazo.localeCompare(b.prazo)));
   const pend = visiveis.filter((t) => !t.concluida);
-  const feitas = visiveis.filter((t) => t.concluida)
+  const feitas = tarefas.filter((t) => t.concluida && t.prazo && parse(t.prazo) >= ini && parse(t.prazo) <= fim)
     .sort((a, b) => ((dataConc(b) || 0) - (dataConc(a) || 0)));
   const atrasadas = pend.filter((t) => parse(t.prazo) < h0).sort((a, b) => a.prazo.localeCompare(b.prazo));
   const stats = [
