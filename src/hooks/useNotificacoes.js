@@ -9,6 +9,8 @@ import {
   query,
   where,
   orderBy,
+  limit,
+  arrayUnion,
   onSnapshot,
   doc,
   updateDoc,
@@ -73,7 +75,6 @@ async function salvarTokenFCM(uid, vapidKey) {
     const token = await obterTokenPush(vapidKey);
     if (!token) return;
 
-    const { arrayUnion } = await import('firebase/firestore');
     await setDoc(
       doc(db, 'usuarios', uid),
       {
@@ -91,8 +92,8 @@ export function useNotificacoes(tenantUid, user) {
   const [notificacoes, setNotificacoes] = useState([]);
   const idsConhecidosRef = useRef(null);
   const unsubFcmRef = useRef(null);
-  // Mantém mapa id→doc de ambas as queries
-  const mapaDocsRef = useRef({});
+  // Um mapa por query (evita corrida remove/add ao marcar como lida)
+  const mapaDocsRef = useRef({ nl: {}, lr: {} });
 
   const initAudio = useCallback(() => {
     initAudioContext();
@@ -142,7 +143,7 @@ export function useNotificacoes(tenantUid, user) {
     if (!tenantUid || !user?.uid) {
       setNotificacoes([]);
       idsConhecidosRef.current = null;
-      mapaDocsRef.current = {};
+      mapaDocsRef.current = { nl: {}, lr: {} };
       return;
     }
 
@@ -154,7 +155,8 @@ export function useNotificacoes(tenantUid, user) {
       colRef,
       where('destinatarioUid', '==', uid),
       where('lida', '==', false),
-      orderBy('criadoEm', 'desc')
+      orderBy('criadoEm', 'desc'),
+      limit(50)
     );
 
     // Query 2: lidas há menos de 1 dia
@@ -164,11 +166,16 @@ export function useNotificacoes(tenantUid, user) {
       where('destinatarioUid', '==', uid),
       where('lida', '==', true),
       where('lidaEm', '>=', lidaEm1DiaAtras),
-      orderBy('lidaEm', 'desc')
+      orderBy('lidaEm', 'desc'),
+      limit(50)
     );
 
     const flush = () => {
-      const docs = Object.values(mapaDocsRef.current).sort(
+      const corte = Date.now() - UM_DIA_MS;
+      const mesclado = { ...mapaDocsRef.current.nl, ...mapaDocsRef.current.lr };
+      const docs = Object.values(mesclado)
+        .filter((d) => !d.lida || (d.lidaEm?.toMillis?.() ?? 0) >= corte)
+        .sort(
         (a, b) => (b.criadoEm?.toMillis?.() ?? 0) - (a.criadoEm?.toMillis?.() ?? 0)
       );
       const idsAtuais = new Set(docs.map((d) => d.id));
@@ -184,12 +191,13 @@ export function useNotificacoes(tenantUid, user) {
       setNotificacoes(docs);
     };
 
-    const handleSnap = (snap) => {
+    const handleSnap = (chave) => (snap) => {
+      const mapa = mapaDocsRef.current[chave];
       snap.docChanges().forEach((change) => {
         if (change.type === 'removed') {
-          delete mapaDocsRef.current[change.doc.id];
+          delete mapa[change.doc.id];
         } else {
-          mapaDocsRef.current[change.doc.id] = { id: change.doc.id, ...change.doc.data() };
+          mapa[change.doc.id] = { id: change.doc.id, ...change.doc.data() };
         }
       });
       flush();
@@ -199,14 +207,14 @@ export function useNotificacoes(tenantUid, user) {
       console.error('[useNotificacoes] erro:', err.code, err.message);
     };
 
-    const unsub1 = onSnapshot(qNaoLidas, handleSnap, handleErr);
-    const unsub2 = onSnapshot(qLidasRecentes, handleSnap, handleErr);
+    const unsub1 = onSnapshot(qNaoLidas, handleSnap('nl'), handleErr);
+    const unsub2 = onSnapshot(qLidasRecentes, handleSnap('lr'), handleErr);
 
     return () => {
       unsub1();
       unsub2();
       idsConhecidosRef.current = null;
-      mapaDocsRef.current = {};
+      mapaDocsRef.current = { nl: {}, lr: {} };
     };
   }, [tenantUid, user?.uid]);
 
