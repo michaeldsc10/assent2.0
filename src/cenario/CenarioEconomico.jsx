@@ -222,7 +222,7 @@ function fetchPtaxRows(moeda, fromIso) {
   if (!p) {
     p = (async () => {
       const ctrl = new AbortController();
-      const to = setTimeout(() => ctrl.abort(), 20000);
+      const to = setTimeout(() => ctrl.abort(), 30000);
       try {
         const url = `${OLINDA}CotacaoMoedaPeriodo(moeda=@moeda,dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)` +
           `?@moeda='${moeda}'&@dataInicial='${usDate(fromIso)}'&@dataFinalCotacao='${usDate(daysAgo(0))}'` +
@@ -250,7 +250,25 @@ function fetchPtaxRows(moeda, fromIso) {
   return p;
 }
 
-async function fetchRaw(key, fromIso) {
+/* fila (máx. 3 simultâneas) + retry: redes móveis/BCB limitam requisições paralelas */
+const gate = (() => {
+  let n = 0; const q = [];
+  const next = () => {
+    if (n >= 3 || !q.length) return;
+    n++; const { fn, res, rej } = q.shift();
+    fn().then(res, rej).finally(() => { n--; next(); });
+  };
+  return (fn) => new Promise((res, rej) => { q.push({ fn, res, rej }); next(); });
+})();
+const withRetry = async (fn, tries = 3) => {
+  for (let i = 0; ; i++) {
+    try { return await fn(); }
+    catch (e) { if (i >= tries - 1) throw e; await new Promise((r) => setTimeout(r, 700 * (i + 1))); }
+  }
+};
+const fetchRaw = (key, fromIso) => gate(() => withRetry(() => fetchRawOnce(key, fromIso)));
+
+async function fetchRawOnce(key, fromIso) {
   const s = SERIES[key];
   if (!s) throw new Error("serie");
   if (s.ptax) {
@@ -258,7 +276,7 @@ async function fetchRaw(key, fromIso) {
     return rows.map((r) => [r[0], s.side === "V" ? r[1] : r[2]]);
   }
   const ctrl = new AbortController();
-  const to = setTimeout(() => ctrl.abort(), 15000);
+  const to = setTimeout(() => ctrl.abort(), 25000);
   try {
     const url = `${API_BASE}${s.code}/dados?formato=json&dataInicial=${toBR(fromIso)}&dataFinal=${toBR(daysAgo(0))}`;
     const r = await fetch(url, { signal: ctrl.signal });
@@ -464,9 +482,10 @@ const CSS = `
 .ce-dot{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 0 var(--gold);animation:ce-pulse 2.4s infinite}
 .ce-status.warn .ce-dot{background:var(--amber);animation:none}
 @keyframes ce-pulse{0%{box-shadow:0 0 0 0 var(--ce-pulse)}70%{box-shadow:0 0 0 7px var(--ce-pulse0)}100%{box-shadow:0 0 0 0 var(--ce-pulse0)}}
-.ce-ico-btn{width:38px;height:38px;display:grid;place-items:center;border-radius:50%;border:1px solid var(--border);background:var(--s1);color:var(--text-2);cursor:pointer;transition:all .15s}
+.ce-ico-btn{flex:none;width:38px;height:38px;min-width:38px;padding:0;line-height:0;display:grid;place-items:center;border-radius:50%;border:1px solid var(--border);background:var(--s1);color:var(--text-2);cursor:pointer;transition:all .15s}
 .ce-ico-btn:hover:not(:disabled){color:var(--gold);border-color:var(--gold);background:var(--gold-d)}
 .ce-ico-btn:disabled{opacity:.45;cursor:not-allowed}
+.ce-ico-btn svg{display:block;flex:none;transform-origin:50% 50%}
 .ce-spin{animation:ce-rot .9s linear infinite}
 @keyframes ce-rot{to{transform:rotate(360deg)}}
 .ce-banner{display:flex;gap:10px;align-items:flex-start;padding:12px 16px;border-radius:16px;border:1px solid var(--ce-amber-line);background:var(--amber-d);color:var(--text-2);font-size:12px;line-height:1.5}
