@@ -377,6 +377,7 @@ const CSS = `
   .sort-btn:hover { color: var(--text-2); }
   .sort-btn.active { color: var(--gold); }
   .sort-bar { display: none; }
+  .desp-mobile-meta, .only-mobile { display: none; }
 
   .desp-id    { font-family: 'Sora', sans-serif; font-size: 11px; color: var(--gold); font-weight: 500; }
   .desp-desc  { color: var(--text); font-size: 13px; font-weight: 500; }
@@ -511,68 +512,50 @@ const CSS = `
     .periodo-custom { flex-wrap: wrap; }
     .periodo-custom input[type="date"] { font-size: 11px; }
 
-    /* Tabela → cards */
-    .desp-table-wrap { margin: 0 14px 14px; }
-    .desp-table-header { padding: 11px 14px; }
+    /* Tabela compacta: Descrição | Venc. | Valor | Status */
+    .desp-table-wrap { margin: 0 8px 12px; }
+    .desp-table-header { padding: 11px 12px; }
 
-    .desp-row-head { display: none; }
-
-    .sort-bar {
-      display: flex; align-items: center; gap: 8px;
-      padding: 10px 14px; border-bottom: 1px solid var(--border);
-      background: var(--s2);
-      font-size: 10px; font-weight: 600; letter-spacing: .06em;
-      text-transform: uppercase; color: var(--text-3);
-    }
-    .sort-bar .sort-btn {
-      padding: 5px 10px; border-radius: 20px;
-      border: 1px solid var(--border); background: var(--s1);
-      font-size: 11px; font-weight: 500;
-    }
-    .sort-bar .sort-btn.active { border-color: var(--gold); }
-
-    .desp-row {
-      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-      grid-template-areas:
-        "desc  desc"
-        "valor status"
-        "cat   id"
-        "venc  pag"
-        "forn  forn"
-        "acoes acoes";
-      gap: 10px 12px;
-      padding: 14px;
+    .desp-row,
+    .desp-row-head {
+      grid-template-columns: minmax(0, 1fr) 46px 80px 62px;
+      gap: 6px; padding: 10px;
+      align-items: center;
     }
     .desp-row > * { min-width: 0; }
 
-    .desp-c-desc   { grid-area: desc; }
-    .desp-c-valor  { grid-area: valor; }
-    .desp-c-status { grid-area: status; justify-self: end; }
-    .desp-c-cat    { grid-area: cat; }
-    .desp-c-id     { grid-area: id; justify-self: end; text-align: right; }
-    .desp-c-venc   { grid-area: venc; }
-    .desp-c-pag    { grid-area: pag; }
-    .desp-c-forn   { grid-area: forn; }
-    .desp-row .desp-actions {
-      grid-area: acoes;
-      justify-content: flex-end;
-      padding-top: 10px; margin-top: 2px;
-      border-top: 1px solid var(--border);
-    }
-    .desp-row .btn-icon { width: 36px; height: 36px; }
+    /* o que sai da tabela fica no modal de detalhes (toque na linha) */
+    .desp-c-id, .desp-c-cat, .desp-c-forn, .desp-c-pag,
+    .desp-row > .desp-actions, .desp-desc-obs { display: none; }
+    .desp-row-head > span:nth-child(1),
+    .desp-row-head > span:nth-child(3),
+    .desp-row-head > span:nth-child(7),
+    .desp-row-head > span:nth-child(8),
+    .desp-row-head > span:nth-child(9) { display: none; }
 
-    .desp-desc { font-size: 14px; word-break: break-word; }
-    .desp-desc-obs { max-width: 100%; }
-    .desp-valor { font-size: 15px; }
-    .cat-badge { max-width: 100%; }
+    /* ordem das colunas */
+    .desp-c-desc, .desp-row-head > span:nth-child(2) { order: 1; }
+    .desp-c-venc, .desp-row-head > span:nth-child(5) { order: 2; }
+    .desp-c-valor, .desp-row-head > span:nth-child(4) { order: 3; text-align: right; }
+    .desp-c-status, .desp-row-head > span:nth-child(6) { order: 4; text-align: center; justify-self: center; }
 
-    /* rótulo acima de cada campo secundário */
-    .desp-c-venc::before, .desp-c-pag::before, .desp-c-forn::before {
-      content: attr(data-label);
-      display: block; margin-bottom: 2px;
-      font-size: 9px; font-weight: 600; letter-spacing: .06em;
-      text-transform: uppercase; color: var(--text-3);
+    .desp-row-head span { font-size: 9px; letter-spacing: .04em; }
+
+    .desp-desc { font-size: 13px; line-height: 1.25; word-break: break-word; }
+    .desp-mobile-meta {
+      display: block; margin-top: 2px;
+      font-size: 10px; color: var(--text-3);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
+    .desp-c-venc { font-size: 11px; white-space: nowrap; }
+    .desp-valor { font-size: 12px; white-space: nowrap; }
+    .desp-c-valor > div { text-align: right; }
+
+    .only-mobile { display: inline; }
+    .no-mobile { display: none; }
+
+    .status-badge { font-size: 10px; padding: 2px 6px; gap: 3px; }
+    .status-badge svg { display: none; }
 
     /* Formulários e detalhes em 1 coluna */
     .form-row, .form-row-3 { grid-template-columns: 1fr; gap: 0; }
@@ -2250,7 +2233,7 @@ export default function Despesas() {
           <span>Descrição</span>
           <span><SortBtn campo="categoria">Categoria</SortBtn></span>
           <span>Valor</span>
-          <span>Vencimento</span>
+          <span><span className="no-mobile">Vencimento</span><span className="only-mobile">Venc.</span></span>
           <span>Status</span>
           <span>Fornecedor</span>
           <span>Pagamento</span>
@@ -2281,6 +2264,9 @@ export default function Despesas() {
                   </span>
                 )}
               </div>
+              <div className="desp-mobile-meta">
+                {d.idShow || d.id}{d.categoria ? ` · ${d.categoria}` : ""}
+              </div>
               {d.observacao && <div className="desp-desc-obs">{d.observacao}</div>}
             </div>
 
@@ -2298,7 +2284,10 @@ export default function Despesas() {
             </div>
 
             {/* Vencimento */}
-            <span className="desp-c-venc" data-label="Vencimento">{fmtData(d.vencimento)}</span>
+            <span className="desp-c-venc" data-label="Vencimento">
+              <span className="no-mobile">{fmtData(d.vencimento)}</span>
+              <span className="only-mobile">{fmtData(d.vencimento).replace(/\/\d{2}(\d{2})$/, "/$1")}</span>
+            </span>
 
             {/* Status */}
             <div className="desp-c-status">
