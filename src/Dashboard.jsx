@@ -74,7 +74,44 @@ import { tourDoModulo }                      from "./components/Tour/tours.js";
    CONSTANTES
    ═══════════════════════════════════════════════ */
 
-const PERIODS = ["Hoje", "7 dias", "30 dias", "Este mês", "Todos", "Personalizado"];
+/* Mesmas opções do seletor de período de Despesas */
+const PERIODS = [
+  { value: "mes_passado", label: "Mês passado" },
+  { value: "mes",         label: "Este mês" },
+  { value: "proximo_mes", label: "Próximo mês" },
+  { value: "semana",      label: "Esta semana" },
+  { value: "todas",       label: "Tudo" },
+  { value: "custom",      label: "Período personalizado" },
+];
+const PERIOD_LABEL = Object.fromEntries(PERIODS.map((p) => [p.value, p.label]));
+const isoLocal = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/* Converte a opção escolhida no formato que useDashboardData já aceita
+   ("Este mês" | "Todos" | "Personalizado" + {from,to}) */
+const resolverPeriodo = (key, custom) => {
+  const agora = new Date();
+  const y = agora.getFullYear(), m = agora.getMonth();
+  if (key === "mes")   return { hookPeriod: "Este mês", hookRange: null };
+  if (key === "todas") return { hookPeriod: "Todos",    hookRange: null };
+  if (key === "custom") {
+    return {
+      hookPeriod: "Personalizado",
+      hookRange: custom.from && custom.to ? custom : null,
+    };
+  }
+  if (key === "mes_passado" || key === "proximo_mes") {
+    const off = key === "mes_passado" ? -1 : 1;
+    return {
+      hookPeriod: "Personalizado",
+      hookRange: { from: isoLocal(new Date(y, m + off, 1)), to: isoLocal(new Date(y, m + off + 1, 0)) },
+    };
+  }
+  /* semana: domingo → sábado (igual às Despesas) */
+  const ini = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() - agora.getDay());
+  const fim = new Date(ini.getFullYear(), ini.getMonth(), ini.getDate() + 6);
+  return { hookPeriod: "Personalizado", hookRange: { from: isoLocal(ini), to: isoLocal(fim) } };
+};
 
 const KEY_MAP = {
   "Dashboard":          "dashboard",
@@ -1165,6 +1202,25 @@ const CSS = `
     color: var(--gold);
     box-shadow: 0 0 12px rgba(200,165,94,0.08);
   }
+
+  /* Seletor de período — mesmo visual de Despesas */
+  .filter-select {
+    padding: 5px 10px; border-radius: 8px; font-size: 12px;
+    border: 1px solid var(--border); background: var(--s2); color: var(--text-2);
+    cursor: pointer; outline: none; font-family: 'DM Sans', sans-serif;
+    transition: border-color .13s;
+  }
+  .filter-select:focus { border-color: var(--border-h); }
+  .periodo-custom { display: flex; align-items: center; gap: 6px; }
+  .periodo-custom input[type="date"] {
+    padding: 4px 8px; border-radius: 8px; font-size: 12px;
+    border: 1px solid var(--border); background: var(--s2); color: var(--text-2);
+    outline: none; font-family: 'DM Sans', sans-serif;
+    transition: border-color .13s;
+  }
+  .periodo-custom input[type="date"]:focus { border-color: var(--border-h); }
+  .periodo-custom span { font-size: 11px; color: var(--text-3); }
+  .ag-period-mobile .periodo-custom { flex-wrap: wrap; }
 
   /* ══ CONTENT ══ */
   .ag-content {
@@ -2722,11 +2778,11 @@ const KPI_TOUR = {
 };
 
 export default function Dashboard() {
-  const [period,        setPeriod]       = useState("Este mês");
+  const [periodKey,     setPeriodKey]    = useState("mes");
   const [customRange,   setCustomRange]  = useState({ from: "", to: "" });
   /* Troca de período: volta o scroll ao topo (no mobile .ag-main é o scroller) */
   const changePeriod = (p) => {
-    setPeriod(p);
+    setPeriodKey(p);
     if (typeof document !== "undefined") {
       document.activeElement?.blur?.();
       requestAnimationFrame(() => {
@@ -2736,6 +2792,8 @@ export default function Dashboard() {
       });
     }
   };
+  const period = PERIOD_LABEL[periodKey] || "Este mês"; // texto exibido nos títulos/gráficos
+  const { hookPeriod, hookRange } = resolverPeriodo(periodKey, customRange);
   const [module,        setModule]       = useState("Dashboard");
   const [sistemaAtivo,  setSistemaAtivo] = useState("gestao");
   const [flowInitialTab, setFlowInitialTab] = useState("overview");
@@ -2882,10 +2940,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
       });
     }
   }, [authUser?.uid]);
-  const dash    = useDashboardData(
-    uid, period,
-    period === "Personalizado" && customRange.from && customRange.to ? customRange : null
-  );
+  const dash    = useDashboardData(uid, hookPeriod, hookRange);
 
   /* ── Tutorial guiado (1ª vez por dispositivo + botão "i") ── */
   const tourId = sistemaAtivo === "gestao" ? tourDoModulo(module) : null;
@@ -3809,37 +3864,34 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
             </div>
           )}
         </div>
-        <div className="ag-periods" data-tour="periodo">
-          {PERIODS.map((p) => (
-            <button key={p} className={`ag-period-btn ${period === p ? "active" : ""}`} onClick={() => changePeriod(p)}>{p}</button>
-          ))}
+        <div className="ag-periods" data-tour="periodo" style={{ alignItems: "center", gap: 8 }}>
+          <select className="filter-select" value={periodKey} onChange={(e) => changePeriod(e.target.value)}>
+            {PERIODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+          </select>
+          {periodKey === "custom" && (
+            <div className="periodo-custom">
+              <input type="date" value={customRange.from} max={customRange.to || undefined}
+                onChange={(e) => setCustomRange((r) => ({ ...r, from: e.target.value }))} />
+              <span>até</span>
+              <input type="date" value={customRange.to} min={customRange.from || undefined}
+                onChange={(e) => setCustomRange((r) => ({ ...r, to: e.target.value }))} />
+            </div>
+          )}
         </div>
-        {period === "Personalizado" && (
-          <div className="ag-custom-range">
-            <label>De</label>
-            <input type="date" className="ag-date-input" value={customRange.from} max={customRange.to || undefined}
-              onChange={(e) => setCustomRange((r) => ({ ...r, from: e.target.value }))} />
-            <span className="ag-date-sep">→</span>
-            <label>Até</label>
-            <input type="date" className="ag-date-input" value={customRange.to} min={customRange.from || undefined}
-              onChange={(e) => setCustomRange((r) => ({ ...r, to: e.target.value }))} />
-          </div>
-        )}
       </header>
 
       {/* Mobile period */}
       <div className="ag-period-mobile" data-tour="periodo" style={{ alignItems: "center", gap: 8, padding: "10px 16px", borderBottom: "1px solid var(--border)", background: "var(--s1)", flexShrink: 0 }}>
-        <select value={period} onChange={(e) => changePeriod(e.target.value)}
-          style={{ flex: 1, background: "var(--s2)", border: "1px solid var(--border)", borderRadius: 8, color: "var(--text)", fontSize: 13, padding: "7px 10px", fontFamily: "'Sora', system-ui, sans-serif", outline: "none" }}>
-          {PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
+        <select className="filter-select" value={periodKey} onChange={(e) => changePeriod(e.target.value)}>
+          {PERIODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
         </select>
-        {period === "Personalizado" && (
-          <div style={{ display: "flex", gap: 6, alignItems: "center", flex: 1, marginTop: 8 }}>
-            <input type="date" className="ag-date-input" value={customRange.from} max={customRange.to || undefined}
-              onChange={(e) => setCustomRange((r) => ({ ...r, from: e.target.value }))} style={{ flex: 1, fontSize: 12 }} />
-            <span style={{ color: "var(--text-3)", fontSize: 12 }}>→</span>
-            <input type="date" className="ag-date-input" value={customRange.to} min={customRange.from || undefined}
-              onChange={(e) => setCustomRange((r) => ({ ...r, to: e.target.value }))} style={{ flex: 1, fontSize: 12 }} />
+        {periodKey === "custom" && (
+          <div className="periodo-custom">
+            <input type="date" value={customRange.from} max={customRange.to || undefined}
+              onChange={(e) => setCustomRange((r) => ({ ...r, from: e.target.value }))} />
+            <span>até</span>
+            <input type="date" value={customRange.to} min={customRange.from || undefined}
+              onChange={(e) => setCustomRange((r) => ({ ...r, to: e.target.value }))} />
           </div>
         )}
       </div>
@@ -4189,7 +4241,7 @@ const { filtrarNav, podeVer, podeCriar, podeEditar, podeExcluir, cargo, isAdmin 
         {/* 1. Faturamento vs Despesas - BarChart / 3D */}
         <Card
           title="Faturamento vs Despesas"
-          subtitle={`Período: ${period}${period === "Personalizado" && customRange.from && customRange.to ? ` (${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")})` : ""}`}
+          subtitle={`Período: ${period}${periodKey === "custom" && customRange.from && customRange.to ? ` (${customRange.from.split("-").reverse().join("/")} – ${customRange.to.split("-").reverse().join("/")})` : ""}`}
           style={{ gridColumn: "1 / 2" }}
           headerRight={<ChartToggle value={chartsBarMode} onChange={setChartsBarMode} />}
         >
