@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo } from "react";
 import {
   Search, Plus, Edit2, Trash2, X, CheckCircle, RefreshCw,
   AlertCircle, Clock, AlertTriangle, RotateCcw, TrendingUp,
-  CreditCard, Wallet, Smartphone, ChevronDown, ChevronUp, Settings,
+  CreditCard, Wallet, Smartphone, ChevronDown, ChevronUp, Settings, ArrowUpDown,
 } from "lucide-react";
 
 import { db } from "../lib/firebase";
@@ -367,6 +367,17 @@ const CSS = `
     text-transform: uppercase; color: var(--text-3);
   }
 
+  /* Ordenação */
+  .sort-btn {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: none; border: none; padding: 0; cursor: pointer;
+    font: inherit; letter-spacing: inherit; text-transform: inherit;
+    color: var(--text-3); transition: color .13s;
+  }
+  .sort-btn:hover { color: var(--text-2); }
+  .sort-btn.active { color: var(--gold); }
+  .sort-bar { display: none; }
+
   .desp-id    { font-family: 'Sora', sans-serif; font-size: 11px; color: var(--gold); font-weight: 500; }
   .desp-desc  { color: var(--text); font-size: 13px; font-weight: 500; }
   .desp-desc-obs { font-size: 11px; color: var(--text-3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
@@ -500,9 +511,74 @@ const CSS = `
     .periodo-custom { flex-wrap: wrap; }
     .periodo-custom input[type="date"] { font-size: 11px; }
 
-    /* Tabela */
+    /* Tabela → cards */
     .desp-table-wrap { margin: 0 14px 14px; }
     .desp-table-header { padding: 11px 14px; }
+
+    .desp-row-head { display: none; }
+
+    .sort-bar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px; border-bottom: 1px solid var(--border);
+      background: var(--s2);
+      font-size: 10px; font-weight: 600; letter-spacing: .06em;
+      text-transform: uppercase; color: var(--text-3);
+    }
+    .sort-bar .sort-btn {
+      padding: 5px 10px; border-radius: 20px;
+      border: 1px solid var(--border); background: var(--s1);
+      font-size: 11px; font-weight: 500;
+    }
+    .sort-bar .sort-btn.active { border-color: var(--gold); }
+
+    .desp-row {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-areas:
+        "desc  desc"
+        "valor status"
+        "cat   id"
+        "venc  pag"
+        "forn  forn"
+        "acoes acoes";
+      gap: 10px 12px;
+      padding: 14px;
+    }
+    .desp-row > * { min-width: 0; }
+
+    .desp-c-desc   { grid-area: desc; }
+    .desp-c-valor  { grid-area: valor; }
+    .desp-c-status { grid-area: status; justify-self: end; }
+    .desp-c-cat    { grid-area: cat; }
+    .desp-c-id     { grid-area: id; justify-self: end; text-align: right; }
+    .desp-c-venc   { grid-area: venc; }
+    .desp-c-pag    { grid-area: pag; }
+    .desp-c-forn   { grid-area: forn; }
+    .desp-row .desp-actions {
+      grid-area: acoes;
+      justify-content: flex-end;
+      padding-top: 10px; margin-top: 2px;
+      border-top: 1px solid var(--border);
+    }
+    .desp-row .btn-icon { width: 36px; height: 36px; }
+
+    .desp-desc { font-size: 14px; word-break: break-word; }
+    .desp-desc-obs { max-width: 100%; }
+    .desp-valor { font-size: 15px; }
+    .cat-badge { max-width: 100%; }
+
+    /* rótulo acima de cada campo secundário */
+    .desp-c-venc::before, .desp-c-pag::before, .desp-c-forn::before {
+      content: attr(data-label);
+      display: block; margin-bottom: 2px;
+      font-size: 9px; font-weight: 600; letter-spacing: .06em;
+      text-transform: uppercase; color: var(--text-3);
+    }
+
+    /* Formulários e detalhes em 1 coluna */
+    .form-row, .form-row-3 { grid-template-columns: 1fr; gap: 0; }
+    .det-grid { grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+    .modal-overlay { padding: 12px; }
+    .modal-header, .modal-body, .modal-footer { padding-left: 16px; padding-right: 16px; }
   }
 `;
 
@@ -1527,6 +1603,7 @@ export default function Despesas() {
   const [filtroStatus, setFiltroStatus] = useState("todas");
   const [filtroCategoria, setFiltroCategoria] = useState("todas");
   const [filtroPeriodo, setFiltroPeriodo] = useState("mes");
+  const [ordem, setOrdem] = useState(null); // { campo: "id" | "categoria", dir: "asc" | "desc" } | null
   const [periodoCustom, setPeriodoCustom] = useState({ inicio: "", fim: "" });
 
   // ── Multi-tenant ──
@@ -1924,8 +2001,50 @@ export default function Despesas() {
       lista = lista.filter(d => d.status === filtroStatus);
     }
 
+    // Ordenação (clique: asc → desc → sem ordem)
+    if (ordem) {
+      const sinal = ordem.dir === "asc" ? 1 : -1;
+      const cmpId = (a, b) =>
+        String(a.idShow || a.id).localeCompare(String(b.idShow || b.id), "pt-BR", { numeric: true });
+      const cmpCat = (a, b) =>
+        String(a.categoria || "").localeCompare(String(b.categoria || ""), "pt-BR", { sensitivity: "base" });
+
+      lista = [...lista].sort((a, b) => {
+        if (ordem.campo === "categoria") {
+          // despesas sem categoria sempre no fim
+          if (!a.categoria && b.categoria) return 1;
+          if (a.categoria && !b.categoria) return -1;
+          return sinal * cmpCat(a, b) || cmpId(a, b);
+        }
+        return sinal * cmpId(a, b);
+      });
+    }
+
     return lista;
-  }, [despesasBase, filtroStatus]);
+  }, [despesasBase, filtroStatus, ordem]);
+
+  const alternarOrdem = (campo) =>
+    setOrdem(o => {
+      if (!o || o.campo !== campo) return { campo, dir: "asc" };
+      if (o.dir === "asc") return { campo, dir: "desc" };
+      return null;
+    });
+
+  const SortBtn = ({ campo, children }) => {
+    const ativo = ordem?.campo === campo;
+    const Icone = !ativo ? ArrowUpDown : ordem.dir === "asc" ? ChevronUp : ChevronDown;
+    return (
+      <button
+        type="button"
+        className={`sort-btn ${ativo ? "active" : ""}`}
+        onClick={() => alternarOrdem(campo)}
+        title={ativo ? (ordem.dir === "asc" ? "Crescente — clique para inverter" : "Decrescente — clique para remover") : "Ordenar"}
+      >
+        {children}
+        <Icone size={11} />
+      </button>
+    );
+  };
 
   const metricas = useMemo(() => {
     const base = despesasBase;
@@ -2118,11 +2237,18 @@ export default function Despesas() {
           <span className="count-badge">{despesasFiltradas.length}</span>
         </div>
 
+        {/* Ordenação (mobile) */}
+        <div className="sort-bar">
+          <span>Ordenar</span>
+          <SortBtn campo="id">ID</SortBtn>
+          <SortBtn campo="categoria">Categoria</SortBtn>
+        </div>
+
         {/* Cabeçalho */}
         <div className="desp-row desp-row-head">
-          <span>ID</span>
+          <span><SortBtn campo="id">ID</SortBtn></span>
           <span>Descrição</span>
-          <span>Categoria</span>
+          <span><SortBtn campo="categoria">Categoria</SortBtn></span>
           <span>Valor</span>
           <span>Vencimento</span>
           <span>Status</span>
@@ -2138,7 +2264,7 @@ export default function Despesas() {
         ) : despesasFiltradas.map(d => (
           <div key={d.id} className="desp-row" style={{ cursor: "pointer" }} onClick={() => setViendoDetalhes(d)}>
             {/* ID */}
-            <span className="desp-id" title={`doc.id: ${d.id}`}>
+            <span className="desp-id desp-c-id" title={`doc.id: ${d.id}`}>
               {d.idShow || d.id}
               {d.recorrente && (
                 <RefreshCw size={9} className="recorr-icon" style={{ marginLeft: 5, verticalAlign: "middle" }} />
@@ -2146,7 +2272,7 @@ export default function Despesas() {
             </span>
 
             {/* Descrição */}
-            <div>
+            <div className="desp-c-desc">
               <div className="desp-desc">
                 {d.descricao}
                 {d.parcelado && d.totalParcelas && (
@@ -2159,10 +2285,10 @@ export default function Despesas() {
             </div>
 
             {/* Categoria */}
-            <span className="cat-badge">{d.categoria || "—"}</span>
+            <div className="desp-c-cat"><span className="cat-badge">{d.categoria || "—"}</span></div>
 
             {/* Valor */}
-            <div>
+            <div className="desp-c-valor">
               <span className="desp-valor">{fmtR$(d.valor)}</span>
               {d.status === "parcial" && d.valorPago > 0 && (
                 <div style={{ fontSize: 11, color: "var(--blue)", marginTop: 2 }}>
@@ -2172,16 +2298,18 @@ export default function Despesas() {
             </div>
 
             {/* Vencimento */}
-            <span>{fmtData(d.vencimento)}</span>
+            <span className="desp-c-venc" data-label="Vencimento">{fmtData(d.vencimento)}</span>
 
             {/* Status */}
-            <StatusBadge status={d.status} valorPago={d.valorPago} valor={d.valor} />
+            <div className="desp-c-status">
+              <StatusBadge status={d.status} valorPago={d.valorPago} valor={d.valor} />
+            </div>
 
             {/* Fornecedor */}
-            <span style={{ color: "var(--text-2)", fontSize: 12 }}>{d.fornecedor || "—"}</span>
+            <span className="desp-c-forn" data-label="Fornecedor" style={{ color: "var(--text-2)", fontSize: 12 }}>{d.fornecedor || "—"}</span>
 
             {/* Data pagamento */}
-            <span style={{ fontSize: 12 }}>
+            <span className="desp-c-pag" data-label="Pagamento" style={{ fontSize: 12 }}>
               {d.dataPagamento ? fmtData(d.dataPagamento) : "—"}
             </span>
 
